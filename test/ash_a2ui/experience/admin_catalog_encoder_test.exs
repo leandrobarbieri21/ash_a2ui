@@ -160,6 +160,48 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
     end
   end
 
+  describe "master/detail on admin grids" do
+    test "a select_context table carries the context_select row action" do
+      [_create, components, _data] =
+        AshA2ui.Info.build_surface(AshA2ui.Test.AppointmentsUI, actor: nil)
+
+      grid = components_by_id(components)["data_grid"]
+
+      assert [
+               %{
+                 "label" => "View appointment",
+                 "action" => "context_select",
+                 "context" => %{
+                   "context" => "appointment",
+                   "value" => %{"path" => "id"},
+                   "component" => "table",
+                   "contexts" => %{"path" => "/context"}
+                 }
+               }
+             ] = grid["rowActions"]
+    end
+
+    test "the dispatched envelope selects the row into the context" do
+      [_create, components, _data] =
+        AshA2ui.Info.build_surface(AshA2ui.Test.AppointmentsUI, actor: nil)
+
+      [%{"action" => name, "context" => context}] =
+        components_by_id(components)["data_grid"]["rowActions"]
+
+      # the handler resolves the envelope exactly as it does the basic
+      # button's: an unknown id is rejected by the authorized read, never
+      # trusted — proving the admin entry routes through `context_select`
+      resolved = Map.put(context, "value", Ash.UUID.generate())
+
+      assert {:error, messages} =
+               ActionHandler.handle(AshA2ui.Test.AppointmentsUI, envelope(name, resolved),
+                 actor: nil
+               )
+
+      assert Enum.any?(messages, &match?(%{"updateDataModel" => _}, &1))
+    end
+  end
+
   describe "Pagination props" do
     @tag ac: "A2UI-101B/AC-4"
     test "pagination component receives boolean props" do

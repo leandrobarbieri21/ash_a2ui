@@ -8,6 +8,17 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+### Bug Fixes:
+
+- **Master/detail on admin grids** — under `catalog: :admin_v1` a table's
+  `select_context` row button was dropped: the admin `dataGrid` carried
+  View/Edit and the declared row actions but no `context_select` entry, so a
+  pickerless context (and every `:detail` bound to it) could never be filled
+  on an admin surface. The grid now carries a `View <context>` row action
+  dispatching the same `context_select` envelope the basic composition's
+  per-row button sends (context name, the row's id, the table's `component`,
+  plus the query/context bindings), so the handler contract is unchanged.
+
 ### Features:
 
 - **Dynamic-spec vocabulary for nested forms, sections, and `via`** — the

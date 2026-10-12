@@ -604,7 +604,34 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         |> maybe_destructive(view.resource, action)
       end)
 
-    view_entries ++ edit_entries ++ declared_entries
+    view_entries ++ select_context_entries(view, table) ++ edit_entries ++ declared_entries
+  end
+
+  # The master/detail row button (`select_context`): the same
+  # `context_select` envelope the basic composition's per-row button
+  # dispatches, so selecting a row into a context — and with it the
+  # `:detail` components bound to that context — works on admin surfaces
+  # too. Without it an admin grid silently dropped the only way to fill a
+  # pickerless context.
+  defp select_context_entries(_view, %{select_context: nil}), do: []
+
+  defp select_context_entries(view, table) do
+    name = table.select_context
+
+    [
+      %{
+        "label" => "View #{String.downcase(humanize(name))}",
+        "action" => "context_select",
+        "context" =>
+          %{
+            "context" => to_string(name),
+            "value" => %{"path" => "id"},
+            "component" => to_string(table.name)
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+      }
+    ]
   end
 
   defp admin_row_envelope(label, action, table) do
