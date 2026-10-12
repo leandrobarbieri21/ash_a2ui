@@ -46,6 +46,17 @@
  *              destructive-subtle
  * Misc         hover-tint · focus (focus-ring color) ·
  *              shadow-1 · shadow-2 · shadow-3
+ * Lines (1.1)  border-width (falls back to --a2ui-border-width, then 1px)
+ * Type (1.1)   font-mono (identifier cells)
+ * Links (1.1)  link · link-hover
+ * Badges (1.1) badge-radius · badge-border · badge-<tone>-background ·
+ *              badge-<tone>-text for tone in neutral/info/success/warning/
+ *              danger/accent
+ * Grid (1.1)   grid-max-height (scroll frame; sticky header) ·
+ *              grid-radius · grid-shadow · grid-header-background ·
+ *              grid-header-text · grid-header-font-size ·
+ *              grid-header-font-weight · grid-header-transform ·
+ *              grid-header-tracking · grid-row-active (press tint)
  *
  * ## Motion
  *
@@ -152,6 +163,21 @@ export function createAdminStyles(css) {
         0 12px 32px rgb(15 23 42 / 0.16),
         0 4px 12px rgb(15 23 42 / 0.08)
       );
+
+      /* 1.1: lines, identifiers, links, badges */
+      --am-border-width: var(--ash-admin-border-width, var(--a2ui-border-width, 1px));
+      --am-font-mono: var(
+        --ash-admin-font-mono,
+        ui-monospace,
+        "SFMono-Regular",
+        Menlo,
+        Consolas,
+        monospace
+      );
+      --am-link: var(--ash-admin-link, var(--am-primary));
+      --am-link-hover: var(--ash-admin-link-hover, var(--am-primary-hover));
+      --am-badge-radius: var(--ash-admin-badge-radius, var(--am-radius-pill));
+      --am-badge-border: var(--ash-admin-badge-border, transparent);
 
       box-sizing: border-box;
       color: var(--am-text);
@@ -289,7 +315,142 @@ export function createAdminStyles(css) {
     }
   `;
 
-  return {shared, buttons};
+  // Read-only content vocabulary shared by the DataGrid cells and
+  // FieldDisplay values: reference links, status pills, identifiers and
+  // markdown-ish lists. Every color/line/radius is a token.
+  const content = css`
+    .am-link {
+      font: inherit;
+      font-weight: var(--am-font-weight-medium);
+      color: var(--am-link);
+      background: none;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      text-align: inherit;
+      text-decoration: underline;
+      text-decoration-thickness: var(--am-border-width);
+      text-underline-offset: 0.2em;
+    }
+    .am-link:hover {
+      color: var(--am-link-hover);
+    }
+    .am-links {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: var(--am-space-2xs) var(--am-space-s);
+    }
+    .am-badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 0.0625rem var(--am-space-s);
+      border: var(--am-border-width) solid var(--am-badge-border);
+      border-radius: var(--am-badge-radius);
+      font-size: var(--am-font-size-xs);
+      font-weight: var(--am-font-weight-semibold);
+      line-height: var(--am-line-height-body);
+      white-space: nowrap;
+      background: var(--ash-admin-badge-neutral-background, var(--am-surface-sunken));
+      color: var(--ash-admin-badge-neutral-text, var(--am-text));
+    }
+    .am-badge[data-tone="info"] {
+      background: var(--ash-admin-badge-info-background, var(--am-primary-subtle));
+      color: var(--ash-admin-badge-info-text, var(--am-primary));
+    }
+    .am-badge[data-tone="success"] {
+      background: var(--ash-admin-badge-success-background, var(--am-success-subtle));
+      color: var(--ash-admin-badge-success-text, var(--am-success));
+    }
+    .am-badge[data-tone="warning"] {
+      background: var(--ash-admin-badge-warning-background, var(--am-warning-subtle));
+      color: var(--ash-admin-badge-warning-text, var(--am-warning));
+    }
+    .am-badge[data-tone="danger"] {
+      background: var(--ash-admin-badge-danger-background, var(--am-error-subtle));
+      color: var(--ash-admin-badge-danger-text, var(--am-error));
+    }
+    .am-badge[data-tone="accent"] {
+      background: var(--ash-admin-badge-accent-background, var(--am-primary));
+      color: var(--ash-admin-badge-accent-text, var(--am-on-primary));
+    }
+    .am-mono {
+      font-family: var(--am-font-mono);
+      font-size: 0.92em;
+    }
+    .am-list {
+      margin: 0;
+      padding-inline-start: 1.15em;
+    }
+    .am-list li + li {
+      margin-top: var(--am-space-2xs);
+    }
+    .am-multiline {
+      white-space: pre-line;
+    }
+  `;
+
+  return {shared, buttons, content};
+}
+
+/** The badge tone vocabulary (row_layout `badge_tones`). */
+export const BADGE_TONES = ["neutral", "info", "success", "warning", "danger", "accent"];
+
+/** A badge tone value from the row (`_badge_tone_<field>`), constrained to
+ * the vocabulary — anything else is "neutral". */
+export function badgeTone(tone) {
+  return BADGE_TONES.includes(tone) ? tone : "neutral";
+}
+
+/**
+ * Normalizes a bound link value into a list of link objects
+ * (`{surface, recordId, label, href?}`) — a single link, a list of links,
+ * or nothing (absent → []). Entries without a surface are dropped.
+ */
+export function linkEntries(value) {
+  const list = Array.isArray(value) ? value : value ? [value] : [];
+  return list.filter(
+    (entry) => entry && typeof entry === "object" && typeof entry.surface === "string" && entry.surface !== "",
+  );
+}
+
+const BULLET = /^\s*(?:[-*\u2022]|\d+[.)])\s+/;
+
+/**
+ * Markdown-ish list detection for read-only text: an array renders as its
+ * items; multi-line text whose non-empty lines are all bulleted (`-`, `*`,
+ * `•`, `1.`) renders as those lines without their markers. Anything else is
+ * not a list (`null`).
+ */
+export function listItems(value) {
+  if (Array.isArray(value)) {
+    const items = value
+      .filter((item) => item !== null && item !== undefined && item !== "")
+      .map((item) => (typeof item === "object" ? item.label ?? JSON.stringify(item) : String(item)));
+    return items.length > 0 ? items : null;
+  }
+  if (typeof value !== "string" || !value.includes("\n")) return null;
+  const lines = value.split(/\r?\n/).filter((line) => line.trim() !== "");
+  if (lines.length < 2 || !lines.every((line) => BULLET.test(line))) return null;
+  return lines.map((line) => line.replace(BULLET, "").trim());
+}
+
+/** Windowed page list: 1 … (p-s..p+s) … N, with "…" only where pages are skipped. */
+export function pageWindow(page, totalPages, siblings = 1) {
+  const total = Math.max(1, totalPages);
+  const current = Math.min(Math.max(1, page), total);
+  const pages = new Set([1, total, current]);
+  for (let index = current - siblings; index <= current + siblings; index++) {
+    if (index >= 1 && index <= total) pages.add(index);
+  }
+  const sorted = [...pages].sort((a, b) => a - b);
+  const windowed = [];
+  sorted.forEach((value, index) => {
+    if (index > 0 && value - sorted[index - 1] > 1) windowed.push("…");
+    windowed.push(value);
+  });
+  return windowed;
 }
 
 /**

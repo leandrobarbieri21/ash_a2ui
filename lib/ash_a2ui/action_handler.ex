@@ -614,9 +614,10 @@ defmodule AshA2ui.ActionHandler do
       record_id ->
         result =
           with {:ok, record} <-
-                 fetch_record(view, record_id, ash_opts, ResolvedView.form_loads(view)) do
+                 fetch_record(view, record_id, ash_opts, view_loads(view)) do
             {:ok,
-             task_open_messages(view, :view, record) ++ panel_record_population(view, record)}
+             task_open_messages(view, :view, record) ++
+               panel_record_population(view, record, ash_opts)}
           end
 
         case result do
@@ -1003,7 +1004,7 @@ defmodule AshA2ui.ActionHandler do
   defp run_scoped_query(view, table, params, scope, ash_opts) do
     case QueryRunner.run(table, params, ash_opts, scope) do
       {:ok, records, query_state} ->
-        rows = rows(view, table, records)
+        rows = rows(view, table, records, ash_opts)
 
         {:ok,
          records_messages(view, table, rows) ++
@@ -1065,7 +1066,7 @@ defmodule AshA2ui.ActionHandler do
         fields = details |> Enum.flat_map(& &1.fields) |> Enum.uniq()
 
         case ContextRunner.fetch_selected(view, context, value, selected, ash_opts, loads) do
-          {:ok, record} -> {:ok, record_values(view, record, fields)}
+          {:ok, record} -> {:ok, linked_record_values(view, record, fields, ash_opts)}
           # The selection was just validated; a raced-away record renders empty.
           :not_found -> {:ok, %{}}
           {:error, error} -> {:error, error}
@@ -1468,14 +1469,23 @@ defmodule AshA2ui.ActionHandler do
   # values; `/form` (the edit buffer) is never written, so view mode cannot
   # masquerade as edit-minus-save. Same field values the form would have
   # shown (nested-form rows are edit machinery and stay out of the display).
-  defp panel_record_population(view, record) do
+  defp panel_record_population(view, record, ash_opts) do
     [
       update_data_model(
         view,
         "/ui/panel/record",
-        record_values(view, record, form_fields(view))
+        linked_record_values(view, record, form_fields(view), ash_opts)
       )
     ]
+  end
+
+  # The view task loads the form's relationship loads plus whatever its
+  # linked fields need (the display record carries "_links").
+  defp view_loads(view) do
+    Enum.uniq(
+      ResolvedView.form_loads(view) ++
+        AshA2ui.Links.loads(view.resource, form_fields(view), view.fields)
+    )
   end
 
   # The /form/<argument> rows of the record's currently-related records:
@@ -1744,7 +1754,7 @@ defmodule AshA2ui.ActionHandler do
 
       {:ok, scope} ->
         case read_export_table(table, scope, env) do
-          {:ok, records} -> {:ok, rows(view, table, records)}
+          {:ok, records} -> {:ok, rows(view, table, records, env.ash_opts)}
           {:error, error} -> {:error, error_messages(view, error)}
         end
     end
@@ -1906,7 +1916,7 @@ defmodule AshA2ui.ActionHandler do
          {:ok, records} <- read_edited_table(table, scope, env) do
       rows =
         view
-        |> rows(table, records)
+        |> rows(table, records, env.ash_opts)
         |> Enum.map(&patch_errored_row(&1, record_id, field, value, text))
 
       [update_data_model(view, table.records_path, rows)]
@@ -2128,7 +2138,7 @@ defmodule AshA2ui.ActionHandler do
   defp scoped_table_refresh(view, %{query: nil} = table, _params, ash_opts, scope) do
     case read_table(table, ash_opts, scope) do
       {:ok, records} ->
-        {:ok, records_messages(view, table, rows(view, table, records))}
+        {:ok, records_messages(view, table, rows(view, table, records, ash_opts))}
 
       {:error, error} ->
         {:error, error}
@@ -2140,7 +2150,7 @@ defmodule AshA2ui.ActionHandler do
 
     case QueryRunner.run(table, params, ash_opts, scope) do
       {:ok, records, query_state} ->
-        rows = rows(view, table, records)
+        rows = rows(view, table, records, ash_opts)
 
         {:ok,
          records_messages(view, table, rows) ++
@@ -2193,12 +2203,16 @@ defmodule AshA2ui.ActionHandler do
   # row actions declare visible_when conditions, and the `_badge_<field>`
   # display text when the table declares a row_layout badge — matching the
   # encoder's initial serialization exactly.
-  defp rows(view, table, records) do
+  defp rows(view, table, records, ash_opts) do
+    links = AshA2ui.Links.context(table.resource, view.fields, table_fields(table), ash_opts)
+
     Enum.map(records, fn record ->
-      view
-      |> record_values(record, table_fields(table))
+      row = record_values(view, record, table_fields(table))
+
+      row
       |> Map.merge(Conditions.row_visibility(view, table, record))
       |> Map.merge(AshA2ui.RowLayout.badge_data(table.component.row_layout, record))
+      |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     end)
   end
 
@@ -2514,9 +2528,23 @@ defmodule AshA2ui.ActionHandler do
           value -> json_value(value)
         end
 
-      _plain ->
-        json_value(Map.get(record, field))
+      declared ->
+        case AshA2ui.Links.virtual_value(declared, record) do
+          {:ok, value} -> value
+          :not_virtual -> json_value(Map.get(record, field))
+        end
     end
+  end
+
+  # record_values/3 plus the reserved "_links" of the linked fields (detail
+  # and view-panel records; table rows merge theirs in rows/4).
+  defp linked_record_values(view, record, fields, ash_opts) do
+    row = record_values(view, record, fields)
+
+    record.__struct__
+    |> AshA2ui.Links.context(view.fields, fields, ash_opts)
+    |> AshA2ui.Links.row_data(record, row)
+    |> Map.merge(row)
   end
 
   defp walk_source(record, [attribute]), do: Map.get(record, attribute)

@@ -35,6 +35,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       live("/live-renderer/query-pubsub", AshA2ui.Test.QueryPubsubLive)
       live("/live-renderer/multi-table", AshA2ui.Test.MultiTableLive)
       live("/live-renderer/context-pubsub", AshA2ui.Test.ContextPubsubLive)
+      live("/live-renderer/deep-link", AshA2ui.Test.DeepLinkLive)
+      live("/live-renderer/open-surface-callback", AshA2ui.Test.OpenSurfaceCallbackLive)
 
       # The actor picker, reachable both ways hosts wire it: standalone
       # (its own live_session — links from surfaces reload the document)

@@ -8,7 +8,43 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+### Features:
+
+- **Reference links** — `field` gains `link :relationship` (to-one),
+  `link {surface_key, id_path}` (bare-id/polymorphic) and `links
+  :relationship` (to-many), plus `link_label`. Rows, `/detail/<context>`
+  and `/ui/panel/record` carry the reserved `"_links"` key
+  (`%{field => %{"surface", "recordId", "label"[, "href"]} | [..]}`),
+  pruned per actor by the authorized relationship load and the host's
+  `AshA2ui.LinkResolver` (`config :ash_a2ui, :link_resolver`);
+  `config :ash_a2ui, :open_surface_url` adds server-built hrefs. Link-free
+  surfaces serialize unchanged.
+- **`source` may end in a calculation/aggregate** of the final destination
+  (loaded through the path) — e.g. a decrypted display name.
+- **Admin catalog 1.1 (additive)** — DataGrid columns gain
+  `format`/`align`/`mono`/`badge`/`link` hints and the grid a `rowClick`
+  envelope; FieldDisplay gains `link`; a new `openSurface` client function.
+  Renderer: sticky header in a token-driven scroll frame (no hardcoded
+  1px/uppercase header), numbers end-aligned with tabular figures, ids in
+  mono, toned badge pills (`row_layout badge_tones`, served per row at
+  `_badge_tone_<field>`; fixes `badge_text` being lost under admin_v1),
+  whole-row click, windowed pagination, link anchors (modifier-clicks keep
+  open-in-new-tab), list-aware FieldDisplay values. Admin `:detail`
+  components render FieldDisplays.
+- **Deep links** — `AshA2ui.Info.context_state_for/3` validates carried
+  context ids through authorized reads; `AshA2ui.LiveRenderer` seeds the
+  bootstrap from `?ctx[...]`/`?q[...]`, and with `deep_link: true`
+  push_patches context changes and re-applies them on back/forward.
+- **`"a2ui:open_surface"`** — the hook forwards reference-link
+  activations; `AshA2ui.LiveRenderer` navigates to `:open_surface_url` by
+  default (or calls the `:open_surface` callback).
+- Details may render declared `source`/`link`/`links` fields when their
+  context selects the surface's own resource.
+
 ### Bug Fixes:
+
+- The admin Pagination now reads the encoder's `previousAction` envelope
+  (it only declared `prevAction`, falling back to a reconstructed envelope).
 
 - **Master/detail on admin grids** — under `catalog: :admin_v1` a table's
   `select_context` row button was dropped: the admin `dataGrid` carried

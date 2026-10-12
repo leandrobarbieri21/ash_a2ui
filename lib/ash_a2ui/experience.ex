@@ -132,6 +132,16 @@ defmodule AshA2ui.Experience do
   def admin_catalog_id, do: @admin_catalog_id
 
   @doc """
+  The admin catalog contract version (`"version"` in
+  `priv/a2ui/admin_v1/catalog.json`). Minor versions are additive within the
+  unchanged `admin_catalog_id/0` — 1.1 added the column presentation hints
+  (format/align/mono/badge/link), `rowClick`, FieldDisplay `link` and the
+  `openSurface` client function.
+  """
+  @spec admin_catalog_version() :: String.t()
+  def admin_catalog_version, do: "1.1.0"
+
+  @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item
   list (visible) — the exact shape the row-action `visible_when` slots bind
   (see `AshA2ui.Conditions.row_visibility/3`).

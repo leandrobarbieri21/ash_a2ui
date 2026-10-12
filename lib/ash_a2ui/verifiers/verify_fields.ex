@@ -10,8 +10,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     * `:form` component fields are a subset of the accepts + argument names of
       the form's create/update action(s).
 
-  Fields declared with a `source` or `relationship` option are exempt from
-  both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
+  Fields declared with a `source`, `relationship`, `link` or `links` option
+  are exempt from both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
   against the relationship graph instead.
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
@@ -43,13 +43,15 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     end
   end
 
-  # Field entities carrying a `source` or `relationship` option name virtual
-  # columns / relationship selects rather than resource fields; they are
-  # validated by VerifyRelationships.
+  # Field entities carrying a `source`, `relationship`, `link` or `links`
+  # option name virtual columns / relationship selects / reference links
+  # rather than resource fields; they are validated by VerifyRelationships.
   defp relationship_field_names(dsl_state) do
     dsl_state
     |> Verifier.get_entities([:a2ui])
-    |> Enum.filter(&(is_struct(&1, AshA2ui.Field) and (&1.source || &1.relationship)))
+    |> Enum.filter(
+      &(is_struct(&1, AshA2ui.Field) and (&1.source || &1.relationship || &1.link || &1.links))
+    )
     |> MapSet.new(& &1.name)
   end
 

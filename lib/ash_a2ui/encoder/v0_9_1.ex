@@ -182,7 +182,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   """
   @impl true
   def encode_data_model(resolved_view, records, opts) do
-    serialized = records_value(resolved_view, records)
+    serialized = records_value(resolved_view, records, opts)
 
     {path, value} =
       case Keyword.get(opts, :scope, :full) do
@@ -221,7 +221,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # list (records arrive as a list); on multi-table surfaces an object keyed
   # by table component name (records arrive as %{table_name => [record]},
   # see AshA2ui.Info) — every declared table gets a key, missing ones [].
-  defp records_value(view, records) do
+  defp records_value(view, records, opts) do
     if ResolvedView.multi_table?(view) do
       unless is_map(records) do
         raise ArgumentError,
@@ -231,12 +231,22 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
       Map.new(view.tables, fn table ->
         rows = Map.get(records, table.name, [])
-        {to_string(table.name), Enum.map(rows, &serialize_record(view, table, &1))}
+        links = table_links(view, table, opts)
+        {to_string(table.name), Enum.map(rows, &serialize_record(view, table, &1, links))}
       end)
     else
-      Enum.map(records, &serialize_record(view, List.first(view.tables), &1))
+      table = List.first(view.tables)
+      links = table_links(view, table, opts)
+      Enum.map(records, &serialize_record(view, table, &1, links))
     end
   end
+
+  # The per-render link context of a table's linked fields (nil without
+  # any — rows then carry no "_links" key).
+  defp table_links(_view, nil, _opts), do: nil
+
+  defp table_links(view, table, opts),
+    do: AshA2ui.Links.context(table.resource, view.fields, table.component.fields, opts)
 
   # --- select options ---
 
@@ -441,7 +451,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     table_sections = List.flatten(table_section_lists)
     table_children = List.flatten(table_children_lists)
 
-    detail_sections = Enum.flat_map(view.details, &detail_components(view, &1))
+    detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
 
     detail_children =
@@ -532,18 +542,36 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp admin_data_grid_components(view, table, sfx) do
     pagination_children = if table.query, do: ["pagination#{sfx}"], else: []
 
-    data_grid = %{
-      "id" => "data_grid#{sfx}",
-      "component" => "dataGrid",
-      "columns" => admin_columns(view, table),
-      "rows" => %{"path" => table.records_path},
-      "rowId" => "id",
-      "label" => AshA2ui.Experience.collection_label(view, table),
-      "rowActions" => admin_row_actions(view, table),
-      "children" => ["empty_state#{sfx}" | pagination_children]
-    }
+    data_grid =
+      %{
+        "id" => "data_grid#{sfx}",
+        "component" => "dataGrid",
+        "columns" => admin_columns(view, table),
+        "rows" => %{"path" => table.records_path},
+        "rowId" => "id",
+        "label" => AshA2ui.Experience.collection_label(view, table),
+        "rowActions" => admin_row_actions(view, table),
+        "children" => ["empty_state#{sfx}" | pagination_children]
+      }
+      |> put_row_click(view, table)
 
     [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)]
+  end
+
+  # Whole-row click: the row's primary action — the master/detail select
+  # (`select_context`) when declared, else View when the surface has a
+  # record panel. The envelope is byte-identical to the matching rowActions
+  # entry, so clicking a row is exactly clicking that button.
+  defp put_row_click(grid, view, table) do
+    case select_context_entries(view, table) do
+      [entry | _] ->
+        Map.put(grid, "rowClick", entry)
+
+      [] ->
+        if form_target?(view),
+          do: Map.put(grid, "rowClick", admin_row_envelope("View", "view_record", table)),
+          else: grid
+    end
   end
 
   # One column per visible field, derived exactly like the basic Row/Card
@@ -564,10 +592,59 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           |> Enum.uniq()
       end
 
+    layout = table.component.row_layout
+
     Enum.map(fields, fn field ->
       %{"label" => view.fields[field].label, "path" => to_string(field)}
+      |> put_column_presentation(view, table.resource, field)
+      |> put_column_badge(layout, field)
+      |> put_link_binding(view, field, "_links/#{field}")
     end)
   end
+
+  # Per-type presentation hints (additive; renderers that read only
+  # label/path are unaffected): `format` (number/datetime/boolean, as
+  # FieldDisplay), `align: "end"` for numbers, `mono: true` for identifiers.
+  # Link columns render labels, never raw ids — no mono there.
+  defp put_column_presentation(column, view, resource, field) do
+    format = display_format(view, resource, field)
+
+    column
+    |> maybe_put("format", format)
+    |> maybe_put("align", if(format == "number", do: "end"))
+    |> maybe_put("mono", if(identifier?(view, resource, field), do: true))
+  end
+
+  defp identifier?(view, resource, field) do
+    not AshA2ui.Links.link_field?(view.fields[field]) and
+      (field == :id or attribute_type(resource, field) in [Ash.Type.UUID, Ash.Type.UUIDv7])
+  end
+
+  # The row_layout badge column renders as a pill: its text is the
+  # server-computed `_badge_<field>` row key (the badge_text mapping), its
+  # tone the `_badge_tone_<field>` key when `badge_tones` are declared.
+  defp put_column_badge(column, %{badge: field} = layout, field) do
+    badge =
+      case layout.badge_tones do
+        [] -> %{"path" => "_badge_#{field}"}
+        _tones -> %{"path" => "_badge_#{field}", "tonePath" => "_badge_tone_#{field}"}
+      end
+
+    Map.put(column, "badge", badge)
+  end
+
+  defp put_column_badge(column, _layout, _field), do: column
+
+  # Linked fields bind their `_links` entry (row-relative in grids,
+  # absolute for detail/panel field displays).
+  defp put_link_binding(component, view, field, path) do
+    if AshA2ui.Links.link_field?(view.fields[field]),
+      do: Map.put(component, "link", %{"path" => path}),
+      else: component
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   # The row action envelopes, reusing the exact context shapes the
   # basic-v2 record controls and invoke/confirm buttons emit: View always;
@@ -760,21 +837,82 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "value" => %{"path" => "/ui/panel/record/#{field}"}
     }
 
-    case admin_display_format(view, field) do
-      nil -> display
-      format -> Map.put(display, "format", format)
-    end
+    display
+    |> maybe_put("format", admin_display_format(view, field))
+    |> put_link_binding(view, field, "/ui/panel/record/_links/#{field}")
   end
 
   # The optional format hint: boolean/datetime from the resolved widget,
   # number from the field type; text (the default) is omitted.
-  defp admin_display_format(view, field) do
+  defp admin_display_format(view, field), do: display_format(view, view.resource, field)
+
+  # The FieldDisplay/column `format` of a field on `resource` (the surface's
+  # resource for grids and panels, the context's for details).
+  @datetime_types [
+    Ash.Type.Date,
+    Ash.Type.UtcDatetime,
+    Ash.Type.UtcDatetimeUsec,
+    Ash.Type.NaiveDatetime,
+    Ash.Type.DateTime
+  ]
+
+  defp display_format(view, resource, field) do
+    declared = view.fields[field]
+
     cond do
-      view.fields[field].widget == :check_box -> "boolean"
-      view.fields[field].widget == :date_time_input -> "datetime"
-      attribute_type(view.resource, field) in @numeric_types -> "number"
-      true -> nil
+      AshA2ui.Links.link_field?(declared) and not resource_field?(resource, field) -> nil
+      declared && declared.widget == :check_box -> "boolean"
+      declared && declared.widget == :date_time_input -> "datetime"
+      true -> type_format(attribute_type(resource, field))
     end
+  end
+
+  defp type_format(type) when type in @numeric_types, do: "number"
+  defp type_format(type) when type in @datetime_types, do: "datetime"
+  defp type_format(Ash.Type.Boolean), do: "boolean"
+  defp type_format(_type), do: nil
+
+  defp resource_field?(resource, field) do
+    not is_nil(ResourceInfo.attribute(resource, field)) or
+      not is_nil(ResourceInfo.calculation(resource, field)) or
+      not is_nil(ResourceInfo.aggregate(resource, field))
+  end
+
+  # Admin details: the same Card/Column/heading shell as the basic
+  # composition, with each field a FieldDisplay — typed formatting,
+  # link-aware (`link` binds `/detail/<context>/_links/<field>`), and
+  # list-aware (multi-line / bulleted text renders as a list).
+  defp admin_detail_components(view, detail) do
+    base = "detail_#{detail.name}"
+    resource = view.contexts[detail.context].resource
+
+    fields =
+      Enum.map(detail.fields, fn field ->
+        %{
+          "id" => "#{base}_field_#{field}",
+          "component" => "fieldDisplay",
+          "label" => detail_field_label(view, field),
+          "value" => %{"path" => "/detail/#{detail.context}/#{field}"}
+        }
+        |> maybe_put("format", display_format(view, resource, field))
+        |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
+      end)
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => ["#{base}_heading" | Enum.map(detail.fields, &"#{base}_field_#{&1}")]
+      },
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" => humanize(detail.name),
+        "variant" => "h3"
+      }
+      | fields
+    ]
   end
 
   defp table_suffix(view, table) do
@@ -2998,7 +3136,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # --- record serialization ---
 
-  defp serialize_record(view, table, record) do
+  defp serialize_record(view, table, record, links) do
     field_names =
       case table do
         %{component: %{fields: fields}} -> fields
@@ -3013,6 +3151,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     row
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
     |> Map.merge(AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record))
+    |> Map.merge(AshA2ui.Links.row_data(links, record, row))
   end
 
   # `source` columns read through the loaded relationship path (nil-safe: a
@@ -3023,8 +3162,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{source: [_ | _] = source} ->
         record |> walk_source(source) |> source_safe()
 
-      _plain ->
-        record |> Map.get(name) |> json_safe() |> humanize_choice(view.resource, name)
+      field ->
+        case AshA2ui.Links.virtual_value(field, record) do
+          {:ok, value} ->
+            value
+
+          :not_virtual ->
+            record |> Map.get(name) |> json_safe() |> humanize_choice(view.resource, name)
+        end
     end
   end
 

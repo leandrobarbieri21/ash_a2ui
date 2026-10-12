@@ -53,7 +53,7 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
          :ok <- verify_options_namespace(contexts, dsl_state, module),
          :ok <- verify_contexts(contexts, module),
          :ok <- verify_tables(components, contexts, dsl_state, module) do
-      verify_details(components, names, contexts, module)
+      verify_details(components, names, contexts, dsl_state, module)
     end
   end
 
@@ -409,20 +409,32 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
 
   # --- detail components ---------------------------------------------------------
 
-  defp verify_details(components, names, contexts, module) do
+  defp verify_details(components, names, contexts, dsl_state, module) do
     by_name = Map.new(contexts, &{&1.name, &1})
+
+    # Declared projection fields (source / link / links) are verified
+    # against the SURFACE's resource by VerifyRelationships, so a detail may
+    # render them when its context selects that same resource.
+    projections = %{
+      target: target_resource(dsl_state),
+      names:
+        dsl_state
+        |> entities(AshA2ui.Field)
+        |> Enum.filter(&(&1.source || &1.link || &1.links))
+        |> MapSet.new(& &1.name)
+    }
 
     components
     |> Enum.filter(&(&1.name == :detail))
     |> Enum.reduce_while(:ok, fn component, :ok ->
-      case verify_detail(component, names, by_name, module) do
+      case verify_detail(component, names, by_name, projections, module) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
   end
 
-  defp verify_detail(component, names, by_name, module) do
+  defp verify_detail(component, names, by_name, projections, module) do
     key = AshA2ui.Component.key(component)
 
     cond do
@@ -447,14 +459,22 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
          )}
 
       true ->
-        verify_detail_fields(component, key, by_name[component.context], module)
+        verify_detail_fields(component, key, by_name[component.context], projections, module)
     end
   end
 
-  defp verify_detail_fields(component, key, context, module) do
+  defp verify_detail_fields(component, key, context, projections, module) do
     resource = context.resource
 
-    case Enum.find(component.fields || [], &(not detail_renderable?(resource, &1))) do
+    projection? = fn name ->
+      MapSet.member?(projections.names, name) and not is_nil(projections.target) and
+        resource == projections.target
+    end
+
+    case Enum.find(
+           component.fields || [],
+           &(not (detail_renderable?(resource, &1) or projection?.(&1)))
+         ) do
       nil ->
         :ok
 
@@ -466,7 +486,9 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
            message:
              "detail component #{inspect(key)} renders #{inspect(field)}, which is not a " <>
                "public attribute, calculation, or aggregate of the context's resource " <>
-               inspect(resource)
+               inspect(resource) <>
+               " (declared source/link/links fields are renderable only by details " <>
+               "whose context selects the surface's own resource)"
          )}
     end
   end

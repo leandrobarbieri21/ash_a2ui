@@ -100,15 +100,17 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       # and row-relative cell paths
       assert %{"columns" => columns} = grid
 
+      # — plus the additive per-type presentation hints (format; numbers
+      # end-aligned)
       assert columns == [
-               %{"label" => "Active", "path" => "active"},
-               %{"label" => "Count", "path" => "count"},
-               %{"label" => "Price", "path" => "price"},
-               %{"label" => "Birthday", "path" => "birthday"},
-               %{"label" => "Scheduled at", "path" => "scheduled_at"},
+               %{"label" => "Active", "path" => "active", "format" => "boolean"},
+               %{"label" => "Count", "path" => "count", "format" => "number", "align" => "end"},
+               %{"label" => "Price", "path" => "price", "format" => "number", "align" => "end"},
+               %{"label" => "Birthday", "path" => "birthday", "format" => "datetime"},
+               %{"label" => "Scheduled at", "path" => "scheduled_at", "format" => "datetime"},
                %{"label" => "Status", "path" => "status"},
                %{"label" => "Name", "path" => "name"},
-               %{"label" => "Created", "path" => "inserted_at"}
+               %{"label" => "Created", "path" => "inserted_at", "format" => "datetime"}
              ]
 
       # rows/rowId/label bindings

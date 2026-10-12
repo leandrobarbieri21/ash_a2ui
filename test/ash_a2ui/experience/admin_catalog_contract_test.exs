@@ -54,6 +54,36 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     end)
   end
 
+  test "catalog 1.1 is additive: version, column hints, rowClick, field links, openSurface" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == Experience.admin_catalog_version()
+    assert catalog["catalogId"] == Experience.admin_catalog_id()
+
+    grid = catalog["components"]["dataGrid"]
+    column = grid["properties"]["columns"]["items"]
+    assert column["required"] == ["label", "path"]
+
+    for hint <- ~w(format align mono badge link) do
+      assert Map.has_key?(column["properties"], hint), "column hint #{hint} missing"
+    end
+
+    refute "rowClick" in grid["required"]
+    assert Map.has_key?(grid["properties"], "rowClick")
+    assert Map.has_key?(catalog["components"]["fieldDisplay"]["properties"], "link")
+
+    open_surface = catalog["functions"]["openSurface"]
+    assert open_surface["properties"]["call"]["const"] == "openSurface"
+    assert open_surface["properties"]["args"]["required"] == ["surface"]
+
+    source = File.read!(@renderer_asset_path)
+
+    assert source =~
+             ~s(export const ADMIN_CATALOG_VERSION = "#{Experience.admin_catalog_version()}")
+
+    assert source =~ ~s(name: "openSurface")
+  end
+
   @tag ac: "A2UI-101B/AC-12"
   test "renderer asset declares the component vocabulary" do
     assert File.exists?(@renderer_asset_path),

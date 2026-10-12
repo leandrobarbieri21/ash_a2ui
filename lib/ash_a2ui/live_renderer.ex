@@ -50,6 +50,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-model and action call. Defaults to `nil` (no actor).
       * `:tenant_fn` (optional) — a 1-arity function `socket -> tenant`,
         same semantics as `:actor_fn`. Defaults to `nil` (no tenant).
+      * `:deep_link` (optional, default `false`) — keep the URL in step with
+        the surface's context selections (see "Deep links" below). Requires
+        the LiveView to be mounted at the router (it injects
+        `handle_params/3`).
+      * `:open_surface` (optional) — a 2-arity function `(args, socket) ->
+        {:noreply, socket}` handling reference-link navigation (the
+        `"a2ui:open_surface"` event, `args = %{"surface" => _, "recordId" =>
+        _, "query" => _}`). Defaults to navigating to `:open_surface_url`.
+      * `:open_surface_url` (optional) — the navigation URL template for
+        reference links, with `{surface}` and `{recordId}` placeholders
+        (e.g. `"/app/r/{surface}/{recordId}"`). Defaults to
+        `config :ash_a2ui, :open_surface_url`; without either, link
+        activations are acknowledged and ignored.
       * `:pubsub` (optional) — enables live refresh:
         `pubsub: [module: MyApp.PubSub, topics: ["providers:created", ...]]`.
         Topics are explicit configuration: pass the topics your resource's
@@ -81,6 +94,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     Override `handle_info/2` if your LiveView receives unrelated messages.
 
+    ## Deep links
+
+    The connected mount reads the surface's initial state from the URL:
+
+      * `?ctx[<context>]=<record id>` — context selections. Each id is
+        validated through the same **authorized** read a `"context_select"`
+        performs (in declaration order, dependency filters included), so a
+        link can only ever select what the actor may read; unknown names
+        and unreadable ids are dropped silently. Labels are derived
+        server-side.
+      * `?q[search]=…&q[page]=2&q[sort][field]=…&q[sort][dir]=desc&q[filters][<f>]=…`
+        — the `/query` state (on multi-table surfaces keyed by table:
+        `?q[<table>][page]=2`), validated against the query allowlist like
+        any client input (invalid state falls back to the defaults).
+
+    With `deep_link: true` the LiveView also writes context changes back:
+    after an action changes `/context` (e.g. a master/detail row select),
+    it `push_patch`es the current path with the new `ctx` params (other
+    params kept), and browser back/forward re-applies the URL's selections —
+    so a detail view is a shareable, back-button-friendly URL.
+
+    ## Reference links
+
+    The shipped JS hook pushes `"a2ui:open_surface"` when a reference link
+    is activated (see `AshA2ui.Links`). The default handling navigates
+    (`push_navigate`) to the `:open_surface_url` template; pass
+    `:open_surface` to do anything else.
+
     ## Introspection assigns
 
     `mount/3` assigns `:ash_a2ui_ui`, `:ash_a2ui_actor` and
@@ -107,7 +148,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    import Phoenix.LiveView, only: [connected?: 1, push_event: 3, start_async: 3]
+    import Phoenix.LiveView,
+      only: [connected?: 1, push_event: 3, push_navigate: 2, push_patch: 2, start_async: 3]
+
+    alias Plug.Conn.Query
 
     @messages_event "a2ui:messages"
     @refresh_message {:ash_a2ui, :refresh}
@@ -143,6 +187,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
 
         @impl true
+        def handle_event("a2ui:open_surface", args, socket) do
+          AshA2ui.LiveRenderer.handle_open_surface(__ash_a2ui_config__(), args, socket)
+        end
+
+        unquote(
+          if Keyword.get(opts, :deep_link, false) do
+            quote do
+              @impl true
+              def handle_params(params, uri, socket) do
+                AshA2ui.LiveRenderer.handle_params(__ash_a2ui_config__(), params, uri, socket)
+              end
+
+              defoverridable handle_params: 3
+            end
+          end
+        )
+
+        @impl true
         def handle_info(message, socket) do
           AshA2ui.LiveRenderer.handle_notification(__ash_a2ui_config__(), message, socket)
         end
@@ -169,6 +231,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         tenant_fn: Keyword.get(opts, :tenant_fn) || fn _socket -> nil end,
         pubsub: normalize_pubsub(Keyword.get(opts, :pubsub)),
         refresh_debounce_ms: Keyword.get(opts, :refresh_debounce_ms, @default_debounce_ms),
+        deep_link: Keyword.get(opts, :deep_link, false),
+        open_surface: Keyword.get(opts, :open_surface),
+        open_surface_url: Keyword.get(opts, :open_surface_url),
         surface_fn: Keyword.get(opts, :surface_fn, &AshA2ui.Info.build_surface/2),
         data_model_fn: Keyword.get(opts, :data_model_fn, &AshA2ui.Info.build_data_model/2),
         action_fn: Keyword.get(opts, :action_fn, &AshA2ui.ActionHandler.handle/3)
@@ -176,9 +241,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc false
-    def mount(config, _params, _session, socket) do
+    def mount(config, params, _session, socket) do
       actor = config.actor_fn.(socket)
       tenant = config.tenant_fn.(socket)
+      url_state = url_state(params)
 
       socket =
         assign(socket,
@@ -187,7 +253,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_tenant: tenant,
           ash_a2ui_refresh_scheduled?: false,
           ash_a2ui_query_state: nil,
-          ash_a2ui_context_state: nil
+          ash_a2ui_context_state: nil,
+          ash_a2ui_uri: nil,
+          ash_a2ui_url_ctx: url_state.ctx
         )
 
       socket =
@@ -197,9 +265,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           # Zero jank: the surface build is a DB read (records + options +
           # contexts) and must not block the mount — the container renders
           # now, the JS hook shows its skeleton, and the bootstrap messages
-          # hydrate the surface when the task lands.
+          # hydrate the surface when the task lands. URL-carried state is
+          # validated inside the task (authorized context reads).
           start_async(socket, :ash_a2ui_surface, fn ->
-            config.surface_fn.(config.ui, actor: actor, tenant: tenant)
+            opts = [actor: actor, tenant: tenant]
+            config.surface_fn.(config.ui, opts ++ initial_state_opts(config.ui, url_state, opts))
           end)
         else
           socket
@@ -207,6 +277,130 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       {:ok, socket}
     end
+
+    # The URL's ctx/q params (anything else — including a LiveView not
+    # mounted at the router — carries no state).
+    defp url_state(params) when is_map(params) do
+      %{
+        ctx: string_map(Map.get(params, "ctx")),
+        query: params |> Map.get("q") |> query_params()
+      }
+    end
+
+    defp url_state(_not_mounted_at_router), do: %{ctx: %{}, query: nil}
+
+    defp string_map(map) when is_map(map) do
+      for {key, value} <- map, is_binary(key) and is_binary(value) and value != "", into: %{} do
+        {key, value}
+      end
+    end
+
+    defp string_map(_other), do: %{}
+
+    # URL values are strings; the /query state's page/pageSize are integers.
+    defp query_params(map) when is_map(map) and map_size(map) > 0 do
+      Map.new(map, fn
+        {key, value} when key in ["page", "pageSize"] and is_binary(value) ->
+          case Integer.parse(value) do
+            {int, ""} -> {key, int}
+            _not_an_integer -> {key, value}
+          end
+
+        {key, value} when is_map(value) and key not in ["sort", "filters", "ranges"] ->
+          {key, query_params(value)}
+
+        pair ->
+          pair
+      end)
+    end
+
+    defp query_params(_none), do: nil
+
+    defp initial_state_opts(ui, url_state, opts) do
+      context =
+        if url_state.ctx == %{},
+          do: [],
+          else: [context_state: AshA2ui.Info.context_state_for(ui, url_state.ctx, opts)]
+
+      query = if url_state.query, do: [query_state: url_state.query], else: []
+
+      context ++ query
+    end
+
+    @doc """
+    Default `handle_params/3` injected by `deep_link: true`: records the
+    current URI (the base for context `push_patch`es) and — on browser
+    back/forward to different `ctx` params — re-applies the URL's context
+    selections (validated like the mount's) and pushes the refreshed data
+    model.
+    """
+    def handle_params(config, params, uri, socket) do
+      first? = is_nil(socket.assigns[:ash_a2ui_uri])
+      socket = assign(socket, :ash_a2ui_uri, uri)
+      ctx = url_state(params).ctx
+
+      cond do
+        first? or not connected?(socket) ->
+          {:noreply, assign(socket, :ash_a2ui_url_ctx, ctx)}
+
+        ctx == socket.assigns[:ash_a2ui_url_ctx] ->
+          {:noreply, socket}
+
+        true ->
+          opts = call_opts(socket)
+          context_state = AshA2ui.Info.context_state_for(config.ui, ctx, opts)
+
+          data_model =
+            config.data_model_fn.(
+              config.ui,
+              socket |> assign(:ash_a2ui_context_state, context_state) |> refresh_opts()
+            )
+
+          socket =
+            socket
+            |> assign(:ash_a2ui_url_ctx, ctx)
+            |> track_query_state([data_model])
+            |> track_context_state([data_model])
+
+          {:noreply, push_messages(socket, [data_model])}
+      end
+    end
+
+    @doc """
+    Default handler for the `"a2ui:open_surface"` event (reference links):
+    the `:open_surface` callback when configured, else `push_navigate` to
+    the `:open_surface_url` template (or `config :ash_a2ui,
+    :open_surface_url`) — the target is always built server-side. Without
+    either, the request is ignored.
+    """
+    def handle_open_surface(config, args, socket) do
+      surface = Map.get(args, "surface")
+
+      cond do
+        not is_binary(surface) or surface == "" ->
+          {:noreply, socket}
+
+        is_function(config.open_surface, 2) ->
+          config.open_surface.(args, socket)
+
+        template = config.open_surface_url || Application.get_env(:ash_a2ui, :open_surface_url) ->
+          record_id = Map.get(args, "recordId")
+          record_id = if is_binary(record_id) or is_integer(record_id), do: to_string(record_id)
+          path = AshA2ui.Links.href(template, surface, record_id)
+
+          {:noreply, push_navigate(socket, to: with_query(path, args))}
+
+        true ->
+          {:noreply, socket}
+      end
+    end
+
+    defp with_query(path, %{"query" => query}) when is_map(query) and map_size(query) > 0 do
+      separator = if String.contains?(path, "?"), do: "&", else: "?"
+      path <> separator <> Query.encode(query)
+    end
+
+    defp with_query(path, _args), do: path
 
     @doc false
     def surface_container(assigns) do
@@ -223,13 +417,61 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           {:error, messages} -> messages
         end
 
+      previous_context = socket.assigns.ash_a2ui_context_state
+
       socket =
         socket
         |> track_query_state(messages)
         |> track_context_state(messages)
         |> push_messages(messages)
+        |> maybe_patch_context(config, previous_context)
 
       {:noreply, socket}
+    end
+
+    # deep_link: a changed /context is written back to the URL (the ctx
+    # params), so the selection is shareable and back-button friendly.
+    defp maybe_patch_context(socket, %{deep_link: true}, previous) do
+      current = socket.assigns.ash_a2ui_context_state
+      uri = socket.assigns[:ash_a2ui_uri]
+
+      if is_binary(uri) and is_map(current) and current != previous do
+        ctx = context_ids(current)
+
+        if ctx == socket.assigns[:ash_a2ui_url_ctx] do
+          socket
+        else
+          socket
+          |> assign(:ash_a2ui_url_ctx, ctx)
+          |> push_patch(to: patched_path(uri, ctx), replace: false)
+        end
+      else
+        socket
+      end
+    end
+
+    defp maybe_patch_context(socket, _config, _previous), do: socket
+
+    defp context_ids(context_state) do
+      for {name, %{"value" => value}} <- context_state,
+          is_binary(value) and value != "",
+          into: %{},
+          do: {name, value}
+    end
+
+    defp patched_path(uri, ctx) do
+      %URI{path: path, query: query} = URI.parse(uri)
+
+      params =
+        (query || "")
+        |> Query.decode()
+        |> Map.delete("ctx")
+        |> then(&if(ctx == %{}, do: &1, else: Map.put(&1, "ctx", ctx)))
+
+      case Query.encode(params) do
+        "" -> path || "/"
+        encoded -> (path || "/") <> "?" <> encoded
+      end
     end
 
     @doc """

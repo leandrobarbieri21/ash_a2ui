@@ -98,8 +98,49 @@ defmodule AshA2ui do
         doc: """
         A relationship path (e.g. `[:user, :email]`) this table column reads its value
         through. Every step but the last must be a public relationship; the last must be
-        a public attribute of the final destination. Source columns are table-only and
-        not sortable.
+        a public attribute, calculation or aggregate of the final destination (a
+        calculation terminal is loaded through the path — e.g. a decrypted display
+        name). Source columns are table-only and not sortable.
+        """
+      ],
+      link: [
+        type:
+          {:or,
+           [
+             :atom,
+             {:tuple, [{:or, [:atom, :string]}, {:or, [:atom, {:list, :atom}]}]}
+           ]},
+        doc: """
+        Renders this field as a reference link to another record. Either a public
+        to-one relationship of the resource (`link :owner` — the link targets the
+        loaded related record, so a target the actor cannot read is simply not
+        linked), or `{surface_key, id_path}` for bare-id/polymorphic references
+        (`link {:person, :subject_id}` — the id is read from `id_path`, a public
+        attribute or a relationship path ending in one). Rows carry the link at the
+        reserved `_links/<field>` key as `%{"surface", "recordId", "label"}` (plus
+        `"href"` when `config :ash_a2ui, :open_surface_url` is set). The surface key
+        of a relationship link comes from the configured `AshA2ui.LinkResolver`,
+        which may also veto links per actor.
+        """
+      ],
+      links: [
+        type: :atom,
+        doc: """
+        Renders this field as a list of reference links over a public to-many
+        relationship (`has_many` / `many_to_many`), e.g. `links :participants`.
+        The field may be virtual (not an attribute) — its cell value is then the
+        links' labels joined with ", ". Rows carry the list at `_links/<field>`.
+        Table/detail only.
+        """
+      ],
+      link_label: [
+        type: :atom,
+        doc: """
+        The destination attribute/calculation used as each link's label for `link
+        :relationship` and `links`. Defaults to the cell's own display value for
+        single links (when it is not the bare foreign key), else the first public
+        attribute of `[:name, :title, :label, :username, :email]` on the
+        destination, else its primary key.
         """
       ]
     ]
@@ -559,6 +600,18 @@ defmodule AshA2ui do
         Display text per badge value, matched against atom (including
         boolean) values — e.g. `badge_text true: "Active", false: "Inactive"`.
         Unmatched values fall back to the humanized value.
+        """
+      ],
+      badge_tones: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Semantic tone per badge value, matched like `badge_text` — e.g.
+        `badge_tones true: :success, false: :neutral`. Tones are
+        `:neutral`, `:info`, `:success`, `:warning`, `:danger` and `:accent`;
+        renderers map them onto theme tokens. Unmatched values render
+        `:neutral`. Served per row at the reserved `_badge_tone_<field>` key
+        (the admin catalog's badge column binds it as `tonePath`).
         """
       ],
       meta: [

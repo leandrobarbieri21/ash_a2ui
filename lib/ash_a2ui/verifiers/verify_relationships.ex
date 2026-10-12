@@ -19,7 +19,16 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
       destination,
     * `source` fields are table-only: they may not appear in `:form`
       component fields (relationship-sourced columns are also rejected in
-      query `sortable` lists by `AshA2ui.Verifiers.VerifyQueries`).
+      query `sortable` lists by `AshA2ui.Verifiers.VerifyQueries`); a
+      `source` terminal may also be a public calculation or aggregate,
+    * `link :relationship` names a public to-one relationship and `links
+      :relationship` a public to-many one, each with a single-attribute
+      destination primary key; `link_label` is a public attribute,
+      calculation or aggregate of that destination; `link {surface,
+      id_path}` has a non-empty surface key and an `id_path` of public
+      relationships ending in a public attribute/calculation; `link` and
+      `links` are mutually exclusive, and `links` (or link-only virtual)
+      fields may not be rendered by `:form` components.
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. Skipped when no resource can be resolved (standalone
@@ -46,8 +55,9 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
         module = Verifier.get_persisted(dsl_state, :module)
         fields = declared_fields(dsl_state)
 
-        with :ok <- verify_selects(dsl_state, fields, target, module) do
-          verify_sources(dsl_state, fields, target, module)
+        with :ok <- verify_selects(dsl_state, fields, target, module),
+             :ok <- verify_sources(dsl_state, fields, target, module) do
+          verify_links(dsl_state, fields, target, module)
         end
     end
   end
@@ -268,14 +278,15 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
          )}
 
       {:ok, destination} ->
-        if public_attribute?(destination, terminal) do
+        if public_field?(destination, terminal) do
           :ok
         else
           {:error,
            source_error(
              field,
              module,
-             "terminal step #{inspect(terminal)} is not a public attribute of " <>
+             "terminal step #{inspect(terminal)} is not a public attribute, calculation " <>
+               "or aggregate of " <>
                inspect(destination),
              target
            )}
@@ -323,12 +334,195 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
       message:
         "source #{inspect(field.source)} on field #{inspect(field.name)} is invalid: " <>
           "#{detail}. Every step but the last must be a public relationship of " <>
-          "#{inspect(resource_name(target, module))}, and the last a public attribute " <>
-          "of the final destination."
+          "#{inspect(resource_name(target, module))}, and the last a public attribute, " <>
+          "calculation or aggregate of the final destination."
     )
   end
 
+  # --- reference links -----------------------------------------------------------
+
+  defp verify_links(dsl_state, fields, target, module) do
+    link_fields = Enum.filter(fields, &(&1.link || &1.links || &1.link_label))
+
+    with :ok <- reduce_ok(link_fields, &verify_link_field(&1, target, module)) do
+      verify_links_not_in_forms(dsl_state, link_fields, target, module)
+    end
+  end
+
+  defp verify_link_field(%{link: link, links: links} = field, _target, module)
+       when not is_nil(link) and not is_nil(links) do
+    {:error,
+     link_error(field, :links, module, "`link` and `links` are mutually exclusive — pick one")}
+  end
+
+  defp verify_link_field(%{link: nil, links: nil} = field, _target, module) do
+    {:error,
+     link_error(
+       field,
+       :link_label,
+       module,
+       "link_label is set but the field declares neither `link :relationship` nor `links`"
+     )}
+  end
+
+  defp verify_link_field(%{link: {surface, path}} = field, target, module) do
+    path = List.wrap(path)
+
+    cond do
+      not is_nil(field.link_label) ->
+        {:error,
+         link_error(
+           field,
+           :link_label,
+           module,
+           "link_label applies to relationship links; a {surface, id_path} link is " <>
+             "labelled by the field's own value"
+         )}
+
+      to_string(surface) == "" ->
+        {:error, link_error(field, :link, module, "the surface key must not be empty")}
+
+      path == [] or not Enum.all?(path, &is_atom/1) ->
+        {:error,
+         link_error(field, :link, module, "the id_path must be a non-empty list of atoms")}
+
+      true ->
+        verify_link_path(field, path, target, module)
+    end
+  end
+
+  defp verify_link_field(field, target, module) do
+    {name, option, cardinalities, expected} =
+      if field.links,
+        do: {field.links, :links, [:has_many, :many_to_many], "to-many (has_many/many_to_many)"},
+        else: {field.link, :link, [:belongs_to, :has_one], "to-one (belongs_to/has_one)"}
+
+    case Info.relationship(target, name) do
+      %{public?: true, type: type, destination: destination} ->
+        cond do
+          type not in cardinalities ->
+            {:error,
+             link_error(
+               field,
+               option,
+               module,
+               "#{option} #{inspect(name)} must be a #{expected} relationship, got #{type}"
+             )}
+
+          not match?([_single], Info.primary_key(destination)) ->
+            {:error,
+             link_error(
+               field,
+               option,
+               module,
+               "#{inspect(destination)} has a composite primary key; links need a " <>
+                 "single-attribute primary key"
+             )}
+
+          not is_nil(field.link_label) and not public_field?(destination, field.link_label) ->
+            {:error,
+             link_error(
+               field,
+               :link_label,
+               module,
+               "link_label #{inspect(field.link_label)} must be a public attribute, " <>
+                 "calculation or aggregate of #{inspect(destination)}"
+             )}
+
+          true ->
+            :ok
+        end
+
+      _private_or_missing ->
+        {:error,
+         link_error(
+           field,
+           option,
+           module,
+           "#{option} #{inspect(name)} is not a public relationship of " <>
+             inspect(resource_name(target, module))
+         )}
+    end
+  end
+
+  defp verify_link_path(field, path, target, module) do
+    {relationship_steps, [terminal]} = Enum.split(path, -1)
+
+    case walk_relationships(relationship_steps, target) do
+      {:error, step} ->
+        {:error,
+         link_error(
+           field,
+           :link,
+           module,
+           "id_path step #{inspect(step)} is not a public relationship"
+         )}
+
+      {:ok, destination} ->
+        if public_field?(destination, terminal),
+          do: :ok,
+          else:
+            {:error,
+             link_error(
+               field,
+               :link,
+               module,
+               "id_path terminal #{inspect(terminal)} is not a public attribute or " <>
+                 "calculation of #{inspect(resource_name(destination, module))}"
+             )}
+    end
+  end
+
+  # `links` fields — and link-only virtual fields (not an attribute of the
+  # resource) — are display projections; a form cannot submit them.
+  defp verify_links_not_in_forms(dsl_state, link_fields, target, module) do
+    display_only =
+      link_fields
+      |> Enum.filter(
+        &(&1.links || (&1.link && is_nil(&1.source) && not public_field?(target, &1.name)))
+      )
+      |> MapSet.new(& &1.name)
+
+    case Enum.find(form_field_names(dsl_state), &MapSet.member?(display_only, &1)) do
+      nil ->
+        :ok
+
+      name ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, :form, :fields],
+           message:
+             "link field #{inspect(name)} cannot be rendered by a :form component: " <>
+               "`links` and virtual link fields are display-only (table/detail)"
+         )}
+    end
+  end
+
+  defp link_error(field, option, module, detail) do
+    DslError.exception(
+      module: module,
+      path: [:a2ui, :field, field.name, option],
+      message: "field #{inspect(field.name)}: #{detail}"
+    )
+  end
+
+  defp reduce_ok(items, fun) do
+    Enum.reduce_while(items, :ok, fn item, :ok ->
+      case fun.(item) do
+        :ok -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
+
   # --- shared helpers ----------------------------------------------------------
+
+  defp public_field?(resource, name) do
+    public_attribute?(resource, name) or
+      match?(%{public?: true}, Info.calculation(resource, name)) or
+      match?(%{public?: true}, Info.aggregate(resource, name))
+  end
 
   defp public_attribute?(resource, name) do
     match?(%{public?: true}, Info.attribute(resource, name))

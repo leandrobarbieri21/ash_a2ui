@@ -155,6 +155,32 @@ configureAshA2ui({
 The hook attaches a `ContextProvider` to its container element, an ancestor
 of every rendered component, so all Text components pick the renderer up.
 
+### Admin catalog 1.1 tokens (grid, links, badges)
+
+The admin catalog's DataGrid, Pagination and FieldDisplay read every line,
+header and tone from tokens (each falls back to the existing
+`--ash-admin-*`/`--a2ui-*` palette):
+
+| Token | Default | Drives |
+| --- | --- | --- |
+| `--ash-admin-border-width` | `--a2ui-border-width`, else `1px` | grid frame/cell lines, badge and pager-chip borders |
+| `--ash-admin-grid-max-height` | `none` | the grid's scroll frame (the header is sticky inside it) |
+| `--ash-admin-grid-radius` / `-grid-shadow` | `radius-m` / `shadow-1` | the frame |
+| `--ash-admin-grid-header-background` / `-text` | `surface-sunken` / `text` | header cells |
+| `--ash-admin-grid-header-font-size` / `-font-weight` | `font-size-s` / bold | header type |
+| `--ash-admin-grid-header-transform` / `-tracking` | `none` / `normal` | e.g. `uppercase` + `0.05em` |
+| `--ash-admin-grid-row-active` | hover tint mixed with primary | row press feedback (clickable rows) |
+| `--ash-admin-font-mono` | system mono stack | identifier cells (`mono`) |
+| `--ash-admin-link` / `-link-hover` | `primary` / `primary-hover` | reference links |
+| `--ash-admin-badge-radius` / `-badge-border` | pill / `transparent` | badge pills |
+| `--ash-admin-badge-<tone>-background` / `-text` | subtle/strong feedback pairs | tones `neutral info success warning danger accent` |
+| `--ash-admin-pager-chip-background` / `-border` / `-radius` / `-shadow` | surface / border / radius-s / none | windowed page chips |
+| `--ash-admin-field-label-transform` / `-tracking` / `-text` | `uppercase` / wide / muted | FieldDisplay labels |
+
+A neobrutalist host, for instance, sets `--ash-admin-border-width: 2px`,
+`--ash-admin-badge-border: var(--border)` and
+`--ash-admin-grid-shadow: var(--shadow)`.
+
 ## What the encoder does for you
 
 Since v0.9.1 encoder updates, each record in a table renders as a `Card`

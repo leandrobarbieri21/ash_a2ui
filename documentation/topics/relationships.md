@@ -287,7 +287,10 @@ end
 - Serialization walks the path nil-safely: a `nil` (or unloaded) relationship
   renders as `""`.
 - Verified at compile time: every step but the last must be a **public
-  relationship**, the last a **public attribute** of the final destination.
+  relationship**, the last a **public attribute, calculation or aggregate**
+  of the final destination. A calculation terminal is loaded through the
+  path (`source [:person, :display_name]` loads `person: [:display_name]`)
+  — the way to show a decrypted or derived label.
 
 ### Not sortable
 
@@ -295,6 +298,102 @@ Relationship-sourced columns are **not sortable** in this wave: `ui_query`
 sorting works only for plain public attributes. Listing a source field in a
 query's `sortable` (or `filters`/`search_fields`) is a compile-time error.
 Forms can't render source fields either — they are table-only.
+
+## Reference links
+
+A field can render as a **link to another record** — the building block for
+"click the person, open the person". Three forms:
+
+```elixir
+a2ui do
+  component :table do
+    fields [:title, :person_name, :subject_id, :participant_links]
+  end
+
+  # to-one relationship: the link targets the loaded related record
+  field :person_name do
+    source [:person, :display_name]
+    link :person
+  end
+
+  # a bare id (or a polymorphic reference): explicit surface key + id path
+  field :subject_id do
+    link {:person, :subject_id}
+  end
+
+  # to-many: a list of links; the field may be virtual
+  field :participant_links do
+    label "Participants"
+    links :participants
+    link_label :name
+  end
+end
+```
+
+### Wire contract
+
+Every serialized record whose table/detail/panel renders a linked field
+carries the reserved `"_links"` key:
+
+```json
+{
+  "id": "…", "title": "Kickoff", "person_name": "Dr. Ada",
+  "participant_links": "Ada, Bob",
+  "_links": {
+    "person_name": {"surface": "person", "recordId": "…", "label": "Dr. Ada", "href": "/app/r/person/…"},
+    "subject_id": {"surface": "person", "recordId": "…", "label": "…"},
+    "participant_links": [
+      {"surface": "person", "recordId": "…", "label": "Ada"},
+      {"surface": "person", "recordId": "…", "label": "Bob"}
+    ]
+  }
+}
+```
+
+- A field without a link for that record is **absent** from `"_links"`
+  (nil reference, a target the actor cannot read, or a vetoed surface).
+  Records of link-free tables carry no `"_links"` key at all.
+- `"href"` is present only when `config :ash_a2ui, :open_surface_url` is
+  set (a template with `{surface}` / `{recordId}` placeholders).
+- Labels: `link_label` (a destination attribute/calculation) when set; for
+  single links otherwise the cell's own display value (unless the cell is
+  the bare foreign key); else the first public of `[:name, :title, :label,
+  :username, :email]`; else the id. Virtual link fields (not an attribute
+  of the resource) serialize their labels as the cell value.
+
+### Per-actor pruning and the resolver
+
+Relationship links read the relationship through the same **authorized**
+load as everything else, so a target the actor cannot read is never
+loaded — and never linked. On top of that the host maps link targets to
+its own surface keys (and may veto them) with an `AshA2ui.LinkResolver`:
+
+```elixir
+config :ash_a2ui, :link_resolver, MyApp.A2uiLinks
+
+defmodule MyApp.A2uiLinks do
+  @behaviour AshA2ui.LinkResolver
+
+  @impl true
+  def surface_for({:resource, MyApp.People.Person}, _ctx), do: "person"
+  def surface_for({:surface, key}, %{actor: actor}), do: if(MyApp.can_open?(actor, key), do: key)
+  def surface_for(_target, _ctx), do: nil
+end
+```
+
+It is called once per linked field per render (never per row). Without a
+resolver, `{:surface, key}` keeps its key and `{:resource, mod}` maps to
+the underscored short name (`"person"`).
+
+### Rendering
+
+The admin catalog renders link cells and FieldDisplay links as anchors
+(with the server `href`, so modifier-clicks open new tabs) whose plain
+activation invokes the catalog's `openSurface` function — handed to the
+host: by default the shipped hook pushes `"a2ui:open_surface"` and
+`AshA2ui.LiveRenderer` navigates to `:open_surface_url` (see
+[Rendering clients](rendering-clients.md)). Non-web clients read
+`columns[].link.path` and `_links` directly.
 
 ## Deferred (roadmap)
 

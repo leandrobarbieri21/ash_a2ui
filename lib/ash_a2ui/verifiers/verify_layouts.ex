@@ -8,7 +8,9 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
     * `row_layout` entities appear only on `:table` components, with
       `title`/`badge`/`meta` referencing the table's fields, no field
       referenced twice across `title`/`badge`/`meta`, `badge_text` values
-      that are strings, and `badge_text` only alongside a `badge`.
+      that are strings, `badge_text` only alongside a `badge`, and
+      `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` (also only
+      alongside a `badge`).
 
   Field-membership checks run against the component's field list as filled
   in by `AshA2ui.Transformers.InferFields`; components whose fields could
@@ -165,8 +167,9 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
 
   defp verify_row_layout(component, layout, module) do
     with :ok <- verify_layout_fields_known(component, layout, module),
-         :ok <- verify_layout_fields_distinct(layout, module) do
-      verify_badge_text(layout, module)
+         :ok <- verify_layout_fields_distinct(layout, module),
+         :ok <- verify_badge_text(layout, module) do
+      verify_badge_tones(layout, module)
     end
   end
 
@@ -231,6 +234,30 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
         {:error,
          error(module, [:a2ui, :component, :table, :row_layout, :badge_text],
            message: "badge_text for #{inspect(value)} must be a string, got: #{inspect(text)}"
+         )}
+    end
+  end
+
+  defp verify_badge_tones(%{badge: nil, badge_tones: [_ | _]}, module) do
+    {:error,
+     error(module, [:a2ui, :component, :table, :row_layout, :badge_tones],
+       message: "row_layout declares badge_tones without a badge field"
+     )}
+  end
+
+  defp verify_badge_tones(layout, module) do
+    case Enum.find(layout.badge_tones, fn {_value, tone} ->
+           tone not in AshA2ui.RowLayout.tones()
+         end) do
+      nil ->
+        :ok
+
+      {value, tone} ->
+        {:error,
+         error(module, [:a2ui, :component, :table, :row_layout, :badge_tones],
+           message:
+             "badge_tones for #{inspect(value)} must be one of " <>
+               "#{inspect(AshA2ui.RowLayout.tones())}, got: #{inspect(tone)}"
          )}
     end
   end

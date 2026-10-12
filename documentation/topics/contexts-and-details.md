@@ -167,6 +167,23 @@ so full refreshes preserve selections; `AshA2ui.LiveRenderer` tracks the
 last pushed `/context` automatically and passes it to PubSub refreshes,
 exactly like `:query_state`.
 
+### Deep links
+
+`AshA2ui.Info.context_state_for/3` validates externally carried selections
+(`%{"person" => id}`) into a `:context_state` — each through the same
+authorized read and cascade as a `"context_select"`, in declaration order;
+unreadable and unknown ids are dropped and labels are derived from the
+records. `AshA2ui.LiveRenderer` applies it to `?ctx[<context>]=<id>` on
+mount (plus `?q[...]` for the `/query` state), and with `deep_link: true`
+writes context changes back to the URL with `push_patch` — a selected
+detail is a shareable, back-button-friendly URL.
+
+Under the admin catalog, `:detail` fields render as `fieldDisplay`
+components (typed formatting, reference links bound to
+`/detail/<context>/_links/<field>`, bulleted multi-line text as a list).
+Details may render declared `source`/`link`/`links` fields when their
+context selects the surface's own resource.
+
 Surfaces without `context` entities are byte-for-byte unchanged (no
 `"context"`/`"detail"` keys, no `"contexts"` bindings — frozen contract).
 

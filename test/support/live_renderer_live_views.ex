@@ -142,6 +142,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # Reference-link navigation callback (`open_surface:`).
+    def open_surface(args, socket) do
+      Fixtures.notify({:open_surface, args})
+      {:noreply, socket}
+    end
+
+    # A NotesUI context_select follow-up: /context rewritten with the
+    # selected person id from the envelope (deep-link push_patch tests).
+    def notes_context_action(ui, envelope, opts) do
+      Fixtures.notify({:action_fn, ui, envelope, opts})
+      value = get_in(envelope, ["action", "context", "value"]) || ""
+
+      {:ok,
+       [
+         %{
+           "version" => "v0.9.1",
+           "updateDataModel" => %{
+             "surfaceId" => "notes",
+             "path" => "/context",
+             "value" => %{
+               "person" => %{"search" => "", "value" => value, "label" => "Someone"},
+               "note" => %{"search" => "", "value" => "", "label" => ""}
+             }
+           }
+         }
+       ]}
+    end
+
     # A context_select follow-up: rewrites /context wholesale (the shape the
     # real ActionHandler emits), so the LiveRenderer can track it.
     def context_action(ui, envelope, opts) do
@@ -241,5 +269,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       surface_fn: &Stubs.surface/2,
       data_model_fn: &Stubs.data_model/2,
       action_fn: &Stubs.context_action/3
+  end
+
+  defmodule AshA2ui.Test.DeepLinkLive do
+    @moduledoc false
+
+    # Deep links over the shared-ETS link fixtures: URL ctx/q params seed
+    # the bootstrap (validated through authorized reads inside the async
+    # task), context changes push_patch the URL, and back/forward
+    # re-applies it. Stubbed builds report the opts they receive.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.Links.NotesUI,
+      deep_link: true,
+      open_surface_url: "/app/r/{surface}/{recordId}",
+      surface_fn: &Stubs.surface/2,
+      data_model_fn: &Stubs.data_model/2,
+      action_fn: &Stubs.notes_context_action/3
+  end
+
+  defmodule AshA2ui.Test.OpenSurfaceCallbackLive do
+    @moduledoc false
+
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.MinimalUI,
+      open_surface: &Stubs.open_surface/2,
+      surface_fn: &Stubs.surface/2
   end
 end

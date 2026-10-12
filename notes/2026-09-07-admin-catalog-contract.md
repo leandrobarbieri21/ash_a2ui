@@ -186,3 +186,30 @@ modules consumed by the host's esbuild, exactly like the existing JS.
   and restore on close; icon-only buttons carry accessible names; view mode
   uses text semantics, never disabled inputs; `prefers-reduced-motion`
   respected (no animated travel).
+
+## Addendum (2026-10-12): catalog 1.1 — additive
+
+`priv/a2ui/admin_v1/catalog.json` gains `"version": "1.1.0"`; the catalog id
+is unchanged (every addition is optional, renderers reading only the 1.0
+props are unaffected).
+
+- `dataGrid.columns[]` optional hints: `format` (`text|datetime|boolean|number`),
+  `align` (`start|center|end`; numbers `end`), `mono` (identifier columns),
+  `badge` (`{path: "_badge_<field>", tonePath?: "_badge_tone_<field>"}` — the
+  row_layout badge as a toned pill; this restores `badge_text` under the
+  admin catalog), `link` (`{path: "_links/<field>"}` — reference links).
+- `dataGrid.rowClick` optional: the row's primary action envelope,
+  byte-identical to its rowActions entry (`context_select` when the table
+  declares `select_context`, else View). Activating the row outside its
+  buttons/links dispatches it.
+- `fieldDisplay.link` optional: binding to a field's reference link(s);
+  text values that are lists (arrays / bulleted multi-line text) render as
+  lists.
+- `functions.openSurface` `{surface, recordId?, query?}`: reference-link
+  navigation, handed to the host.
+- Admin `:detail` components now render `fieldDisplay` children (was the
+  basic Row/Text composition) so details get typed formatting and links.
+- Pagination renders windowed page chips when `total`/`pageSize` are
+  known, dispatching the existing `query` envelope with `pageDelta` = the
+  distance to the target page.
+

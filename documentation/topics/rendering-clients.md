@@ -94,6 +94,16 @@ mounts it:
 - User interactions are delivered to the processor's action callback and
   forwarded to the server as the **`"a2ui:action"`** LiveView event, wrapped
   in the A2UI v0.9.1 client envelope.
+- Reference-link activations (the admin catalog's `openSurface` function,
+  raised as the bubbling, composed `"ash-a2ui:open-surface"` DOM event with
+  `detail = {surface, recordId?, query?, href?, surfaceId}`) are forwarded
+  as the **`"a2ui:open_surface"`** LiveView event with `{surface, recordId,
+  query}`; `AshA2ui.LiveRenderer` navigates to its `:open_surface_url` by
+  default. Pass `configureAshA2ui({openSurface: (args, {surfaceId, href})
+  => …})` (or `createAshAdminCatalog({…, openSurface})`) to handle it
+  client-side instead. Hosts that handle hook events themselves (not via
+  `AshA2ui.LiveRenderer`) must add a `handle_event("a2ui:open_surface",
+  …)` clause.
 
 Wiring in `assets/js/app.js` (minimal — see the
 [Theming](theming.md) guide for the recommended full setup with the merged

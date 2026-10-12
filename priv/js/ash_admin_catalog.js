@@ -126,6 +126,10 @@ import {
   formatDisplayValue,
   applyWeight,
   childRefs,
+  badgeTone,
+  linkEntries,
+  listItems,
+  pageWindow,
 } from "./ash_admin_tokens.js";
 
 // Schema builders from web_core's OWN zod (3.x) — the instance the
@@ -150,6 +154,53 @@ import {
 
 /** The admin catalog id a surface must declare to resolve here. */
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
+
+/** The admin catalog contract version (additive within the v1 id). */
+export const ADMIN_CATALOG_VERSION = "1.1.0";
+
+/**
+ * The DOM event a reference-link activation raises when the host passed no
+ * `openSurface` callback: bubbling + composed (it crosses every shadow root
+ * up to `window`), `detail` = `{surface, recordId?, query?, href?,
+ * surfaceId}`. The shipped LiveView hook (`ash_a2ui_hook.js`) listens for
+ * it and pushes the `"a2ui:open_surface"` LiveView event, whose default
+ * `AshA2ui.LiveRenderer` handling navigates to the configured
+ * `open_surface_url`.
+ */
+export const OPEN_SURFACE_EVENT = "ash-a2ui:open-surface";
+
+/**
+ * Hands an `openSurface` request to the host: the `deps.openSurface`
+ * callback (`(args, {surfaceId, href}) => void`) when given, otherwise the
+ * OPEN_SURFACE_EVENT dispatched from `source` (an element inside the
+ * surface) or, without one, from `window`.
+ */
+function requestOpenSurface(deps, args, {surfaceId, source, href} = {}) {
+  if (!args || typeof args.surface !== "string" || args.surface === "") return;
+  if (deps && typeof deps.openSurface === "function") {
+    deps.openSurface(args, {surfaceId, href});
+    return;
+  }
+  const target = source || globalThis;
+  if (!target || typeof target.dispatchEvent !== "function") return;
+  target.dispatchEvent(
+    new CustomEvent(OPEN_SURFACE_EVENT, {
+      bubbles: true,
+      composed: true,
+      detail: {...args, surfaceId, href},
+    }),
+  );
+}
+
+/** The openSurface args of a link object. */
+function openSurfaceArgs(link) {
+  const args = {surface: String(link.surface)};
+  if (link.recordId !== null && link.recordId !== undefined && link.recordId !== "") {
+    args.recordId = String(link.recordId);
+  }
+  if (link.query && typeof link.query === "object") args.query = link.query;
+  return args;
+}
 
 /** Wire kinds (camelCase — pinned by the A2UI-101B contract) → tag names. */
 const TAGS = {
@@ -240,10 +291,26 @@ export function createAshAdminCatalog(deps) {
       : component,
   );
 
+  // The catalog's own client function: openSurface (reference-link
+  // navigation — see OPEN_SURFACE_EVENT). Usable from any functionCall
+  // action as {"call": "openSurface", "args": {surface, recordId, query}}.
+  const openSurfaceFunction = {
+    name: "openSurface",
+    returnType: "void",
+    schema: schemas.openSurfaceArgs,
+    execute: (args, context) => {
+      requestOpenSurface(deps, openSurfaceArgs(args || {}), {surfaceId: context?.surface?.id});
+      return undefined;
+    },
+  };
+
   return new Catalog(
     ADMIN_CATALOG_ID,
     [...components, ...Object.values(adminApis)],
-    [...basicCatalog.functions.values()],
+    [
+      ...[...basicCatalog.functions.values()].filter((fn) => fn.name !== "openSurface"),
+      openSurfaceFunction,
+    ],
     basicCatalog.themeSchema,
   );
 }
@@ -317,6 +384,12 @@ export function buildSchemas() {
           label: Str,
           path: Str,
           format: formatEnum(),
+          // 1.1 presentation hints — static values, read per row by the
+          // grid itself (link/badge paths are row-relative).
+          align: EnumOf(["start", "center", "end"]).optional(),
+          mono: Bool.optional(),
+          badge: RecordAny.optional(),
+          link: RecordAny.optional(),
         }),
       ),
       // Row arrays / a "/rows" binding / a function call — DynamicValue's
@@ -341,6 +414,13 @@ export function buildSchemas() {
           destructive: Bool.optional(),
         }),
       ).optional(),
+      // 1.1: the row's primary action envelope (same flat shape as a
+      // rowActions entry), dispatched on whole-row activation.
+      rowClick: EmptyObject.extend({
+        label: DynamicStringSchema,
+        action: Str,
+        context: RecordAny.optional(),
+      }).optional(),
       children: ChildListSchema.optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
@@ -365,6 +445,9 @@ export function buildSchemas() {
       rangeText: DynamicStringSchema.nullable().optional(),
       label: DynamicStringSchema.nullable().optional(),
       prevAction: bareEvent().optional(),
+      // The encoder emits `previousAction` (the contract name); `prevAction`
+      // stays accepted for older emissions.
+      previousAction: bareEvent().optional(),
       nextAction: bareEvent().optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
@@ -383,6 +466,8 @@ export function buildSchemas() {
       label: DynamicStringSchema,
       value: DynamicValueSchema.nullable().optional(),
       format: formatEnum(),
+      // 1.1: the field's reference link(s), bound like the value.
+      link: DynamicValueSchema.nullable().optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -415,6 +500,13 @@ export function buildSchemas() {
       weight: Num.optional(),
     }),
 
+    // Args of the catalog's openSurface client function.
+    openSurfaceArgs: EmptyObject.extend({
+      surface: Str,
+      recordId: Any.optional(),
+      query: Any.optional(),
+    }),
+
     confirmDialog: EmptyObject.extend({
       title: DynamicStringSchema.nullable().optional(),
       body: DynamicStringSchema.nullable().optional(),
@@ -433,6 +525,13 @@ export function buildSchemas() {
 
 function str(value) {
   return value === null || value === undefined ? "" : String(value);
+}
+
+/** The cell alignment class of a DataGrid column (`align` hint). */
+function alignClass(column) {
+  if (column?.align === "end") return "align-end";
+  if (column?.align === "center") return "align-center";
+  return "";
 }
 
 /** Merges check-driven validation errors with the /errors state. */
@@ -548,7 +647,64 @@ function buildSubmitFormContext(surface) {
 function defineAdminElements(deps, {adminApis}) {
   const {basicCatalog, A2uiLitElement, A2uiController, lit} = deps;
   const {html, css, nothing} = lit;
-  const {shared, buttons} = createAdminStyles(css);
+  const {shared, buttons, content} = createAdminStyles(css);
+
+  // --- shared read-only content: links, values -------------------------------
+
+  /** Renders reference link(s) (see linkEntries): one link inline, several
+   * as a wrapping list. */
+  function renderLinks(element, links) {
+    const rendered = links.map((link) => renderLink(element, link));
+    return rendered.length === 1 ? rendered[0] : html`<span class="am-links">${rendered}</span>`;
+  }
+
+  /**
+   * One reference link. With a server-provided `href` it is a real anchor
+   * (modifier/middle clicks keep the browser's open-in-new-tab behavior);
+   * a plain activation is handed to the host as an openSurface request
+   * (requestOpenSurface) instead of a full page load. Without an href it is
+   * a link-styled button.
+   */
+  function renderLink(element, link) {
+    const label = str(link.label) || str(link.recordId);
+    const activate = (event) => {
+      if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      requestOpenSurface(deps, openSurfaceArgs(link), {
+        surfaceId: element.context?.dataContext?.surface?.id,
+        source: element,
+        href: link.href,
+      });
+    };
+
+    if (typeof link.href === "string" && link.href !== "") {
+      return html`<a class="am-link" href=${link.href} data-surface=${link.surface} @click=${activate}
+        >${label}</a
+      >`;
+    }
+    return html`<button type="button" class="am-link" data-surface=${link.surface} @click=${activate}>
+      ${label}
+    </button>`;
+  }
+
+  /**
+   * Read-only value: text-formatted values that are lists (arrays, or
+   * bulleted multi-line text) render as a list, other multi-line text keeps
+   * its line breaks; everything else is the formatted display string.
+   */
+  function renderValue(value, format) {
+    if (!format || format === "text") {
+      const items = listItems(value);
+      if (items) return html`<ul class="am-list">${items.map((item) => html`<li>${item}</li>`)}</ul>`;
+      if (typeof value === "string" && value.includes("\n")) {
+        return html`<span class="am-multiline">${value}</span>`;
+      }
+    }
+    return formatDisplayValue(value, format);
+  }
 
   // --- zero jank: instant action acknowledgement -----------------------------
   //
@@ -785,35 +941,79 @@ function defineAdminElements(deps, {adminApis}) {
       static styles = [
         shared,
         buttons,
+        content,
         css`
           :host {
             display: block;
             container-type: inline-size;
+            /* 1.1 grid tokens (see ash_admin_tokens.js) — no hardcoded
+             * lines or header styling: every value is themeable. */
+            --am-grid-max-height: var(--ash-admin-grid-max-height, none);
+            --am-grid-radius: var(--ash-admin-grid-radius, var(--am-radius-m));
+            --am-grid-shadow: var(--ash-admin-grid-shadow, var(--am-shadow-1));
+            --am-grid-header-bg: var(--ash-admin-grid-header-background, var(--am-surface-sunken));
+            --am-grid-header-text: var(--ash-admin-grid-header-text, var(--am-text));
+            --am-grid-header-size: var(--ash-admin-grid-header-font-size, var(--am-font-size-s));
+            --am-grid-header-weight: var(
+              --ash-admin-grid-header-font-weight,
+              var(--am-font-weight-bold)
+            );
+            --am-grid-header-transform: var(--ash-admin-grid-header-transform, none);
+            --am-grid-header-tracking: var(--ash-admin-grid-header-tracking, normal);
+            --am-grid-row-active: var(
+              --ash-admin-grid-row-active,
+              color-mix(in srgb, var(--am-hover-tint) 70%, var(--am-primary))
+            );
+          }
+          /* Scroll frame: the table scrolls inside it (both axes) and the
+           * header sticks — opaque, so rows never show through it. */
+          .grid-frame {
+            max-height: var(--am-grid-max-height);
+            overflow: auto;
+            border: var(--am-border-width) solid var(--am-border);
+            border-radius: var(--am-grid-radius);
+            background: var(--am-surface);
+            box-shadow: var(--am-grid-shadow);
           }
           .grid-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: var(--am-font-size-m);
             background: var(--am-surface);
           }
-          .grid-table th {
+          .grid-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
             text-align: left;
-            font-size: var(--am-font-size-xs);
-            font-weight: var(--am-font-weight-semibold);
-            letter-spacing: var(--am-tracking-wide);
-            text-transform: uppercase;
-            color: var(--am-text-muted);
+            font-size: var(--am-grid-header-size);
+            font-weight: var(--am-grid-header-weight);
+            letter-spacing: var(--am-grid-header-tracking);
+            text-transform: var(--am-grid-header-transform);
+            color: var(--am-grid-header-text);
+            background: var(--am-grid-header-bg);
             padding: var(--am-space-s) var(--am-space-m);
-            border-bottom: 1px solid var(--am-border-strong);
+            border-bottom: var(--am-border-width) solid var(--am-border-strong);
             white-space: nowrap;
           }
           .grid-table tbody tr:hover {
             background: var(--am-hover-tint);
           }
+          .grid-table tbody tr.is-clickable {
+            cursor: pointer;
+          }
+          .grid-table tbody tr.is-clickable:active {
+            background: var(--am-grid-row-active);
+          }
+          .grid-table tbody tr.is-clickable:focus-visible {
+            outline: 2px solid var(--am-focus);
+            outline-offset: -2px;
+          }
           .grid-table td,
           .grid-table th[scope="row"] {
             padding: var(--am-space-s) var(--am-space-m);
-            border-bottom: 1px solid var(--am-border);
+            border-bottom: var(--am-border-width) solid var(--am-border);
             text-align: left;
             vertical-align: top;
           }
@@ -824,6 +1024,13 @@ function defineAdminElements(deps, {adminApis}) {
           .grid-table tbody tr:last-child td,
           .grid-table tbody tr:last-child th {
             border-bottom: none;
+          }
+          .grid-table .align-end {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+          }
+          .grid-table .align-center {
+            text-align: center;
           }
           .cell-actions {
             text-align: right;
@@ -842,10 +1049,13 @@ function defineAdminElements(deps, {adminApis}) {
           }
           .card {
             background: var(--am-surface);
-            border: 1px solid var(--am-border);
+            border: var(--am-border-width) solid var(--am-border);
             border-radius: var(--am-radius-m);
             padding: var(--am-space-m) var(--am-space-l);
             box-shadow: var(--am-shadow-1);
+          }
+          .card.is-clickable {
+            cursor: pointer;
           }
           .card-fields {
             margin: 0;
@@ -854,10 +1064,10 @@ function defineAdminElements(deps, {adminApis}) {
             grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
           }
           .card-field dt {
-            font-size: var(--am-font-size-xs);
-            font-weight: var(--am-font-weight-semibold);
-            letter-spacing: var(--am-tracking-wide);
-            text-transform: uppercase;
+            font-size: var(--am-grid-header-size);
+            font-weight: var(--am-grid-header-weight);
+            letter-spacing: var(--am-grid-header-tracking);
+            text-transform: var(--am-grid-header-transform);
             color: var(--am-text-muted);
           }
           .card-field dd {
@@ -888,7 +1098,7 @@ function defineAdminElements(deps, {adminApis}) {
           /* Real table at ≥ 48rem, card list below. Browsers without
            * container queries degrade to the table. */
           @container (max-width: 47.99rem) {
-            .grid-table {
+            .grid-frame {
               display: none;
             }
             .grid-cards {
@@ -999,33 +1209,45 @@ function defineAdminElements(deps, {adminApis}) {
       renderTable(columns, rows, rowActions, label) {
         const hasActions = rowActions.length > 0;
         return html`
-          <table class="grid-table" aria-label=${label || "Records"}>
-            <thead>
-              <tr>
-                ${columns.map((column) => html`<th scope="col">${str(column.label)}</th>`)}
-                ${hasActions
-                  ? html`<th scope="col"><span class="sr-only">Actions</span></th>`
-                  : nothing}
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map(
-                (row, index) => this.renderTableRow(row, index, columns, rowActions, hasActions),
-              )}
-            </tbody>
-          </table>
+          <div class="grid-frame" part="frame">
+            <table class="grid-table" aria-label=${label || "Records"}>
+              <thead>
+                <tr>
+                  ${columns.map(
+                    (column) =>
+                      html`<th scope="col" class=${alignClass(column)}>${str(column.label)}</th>`,
+                  )}
+                  ${hasActions
+                    ? html`<th scope="col"><span class="sr-only">Actions</span></th>`
+                    : nothing}
+                </tr>
+              </thead>
+              <tbody>
+                ${rows.map(
+                  (row, index) => this.renderTableRow(row, index, columns, rowActions, hasActions),
+                )}
+              </tbody>
+            </table>
+          </div>
         `;
       }
 
       renderTableRow(row, index, columns, rowActions, hasActions) {
         const rowId = this.rowIdentity(row, index);
+        const clickable = this.rowClickable();
         return html`
-          <tr id="row-${rowId}">
+          <tr
+            id="row-${rowId}"
+            class=${clickable ? "is-clickable" : ""}
+            tabindex=${clickable ? "0" : nothing}
+            @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
+            @keydown=${clickable ? (event) => this.onRowKey(event, index) : nothing}
+          >
             ${columns.map((column, columnIndex) => {
-              const cell = this.cellValue(row, column);
+              const cell = this.renderCell(row, column);
               return columnIndex === 0
-                ? html`<th scope="row">${cell}</th>`
-                : html`<td>${cell}</td>`;
+                ? html`<th scope="row" class=${alignClass(column)}>${cell}</th>`
+                : html`<td class=${alignClass(column)}>${cell}</td>`;
             })}
             ${hasActions
               ? html`<td class="cell-actions">${this.renderRowActions(row, index, rowActions)}</td>`
@@ -1044,14 +1266,18 @@ function defineAdminElements(deps, {adminApis}) {
 
       renderCard(row, index, columns, rowActions) {
         const hasActions = rowActions.length > 0;
+        const clickable = this.rowClickable();
         return html`
-          <li class="card">
+          <li
+            class="card ${clickable ? "is-clickable" : ""}"
+            @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
+          >
             <dl class="card-fields">
               ${columns.map(
                 (column) => html`
                   <div class="card-field">
                     <dt>${str(column.label)}</dt>
-                    <dd>${this.cellValue(row, column)}</dd>
+                    <dd>${this.renderCell(row, column)}</dd>
                   </div>
                 `,
               )}
@@ -1061,6 +1287,65 @@ function defineAdminElements(deps, {adminApis}) {
               : nothing}
           </li>
         `;
+      }
+
+      /**
+       * One cell: the column's link(s) when the row carries them (pruned
+       * per actor server-side — absent means plain value), a toned status
+       * pill for badge columns, identifiers in mono, lists as lists, and
+       * everything else through the format rules.
+       */
+      renderCell(row, column) {
+        if (column.link && typeof column.link.path === "string") {
+          const links = linkEntries(getByPath(row, column.link.path));
+          if (links.length > 0) return renderLinks(this, links);
+        }
+
+        if (column.badge && typeof column.badge.path === "string") {
+          const text = getByPath(row, column.badge.path);
+          if (text === null || text === undefined || text === "") return "—";
+          const tone =
+            typeof column.badge.tonePath === "string"
+              ? badgeTone(getByPath(row, column.badge.tonePath))
+              : "neutral";
+          return html`<span class="am-badge" data-tone=${tone}>${str(text)}</span>`;
+        }
+
+        const raw = getByPath(row, column.path);
+        if (!column.format) {
+          const items = listItems(raw);
+          if (items) return items.join(", ");
+        }
+        const value = this.cellValue(row, column);
+        return column.mono === true && value !== "—"
+          ? html`<span class="am-mono">${value}</span>`
+          : value;
+      }
+
+      rowClickable() {
+        const rowClick = this.controller?.props?.rowClick;
+        return !!(rowClick && typeof rowClick.action === "string");
+      }
+
+      /** Whole-row activation dispatches the row's primary action — unless
+       * the click landed on something interactive of its own (a row
+       * button, a link) or finished a text selection. */
+      onRowClick(event, index) {
+        const rowClick = this.controller?.props?.rowClick;
+        if (!rowClick) return;
+        for (const node of event.composedPath()) {
+          if (node === event.currentTarget) break;
+          if (node.tagName && /^(A|BUTTON|INPUT|SELECT|TEXTAREA|LABEL)$/.test(node.tagName)) return;
+        }
+        const selection = globalThis.getSelection ? globalThis.getSelection() : null;
+        if (selection && String(selection).trim() !== "") return;
+        this.onRowAction(rowClick, index);
+      }
+
+      onRowKey(event, index) {
+        if (event.key !== "Enter" || event.target !== event.currentTarget) return;
+        event.preventDefault();
+        this.onRowAction(this.controller?.props?.rowClick, index);
       }
 
       renderRowActions(row, index, rowActions) {
@@ -1109,6 +1394,7 @@ function defineAdminElements(deps, {adminApis}) {
       }
 
       onRowAction(action, index) {
+        if (!action) return;
         const envelope = rowActionEnvelope(action);
         if (!envelope) return;
 
@@ -1324,6 +1610,45 @@ function defineAdminElements(deps, {adminApis}) {
             font-size: 1em;
             line-height: 1;
           }
+          /* 1.1: windowed page chips (shown when the total is known). */
+          .pager-pages {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--am-space-2xs);
+            flex-wrap: wrap;
+          }
+          .pager-chip {
+            min-width: 2rem;
+            min-height: 2rem;
+            padding: 0 var(--am-space-xs);
+            font: inherit;
+            font-size: var(--am-font-size-s);
+            font-weight: var(--am-font-weight-medium);
+            font-variant-numeric: tabular-nums;
+            color: var(--am-text);
+            background: var(--ash-admin-pager-chip-background, var(--am-surface));
+            border: var(--am-border-width) solid var(--ash-admin-pager-chip-border, var(--am-border));
+            border-radius: var(--ash-admin-pager-chip-radius, var(--am-radius-s));
+            box-shadow: var(--ash-admin-pager-chip-shadow, none);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+          }
+          .pager-chip:hover {
+            background: var(--am-hover-tint);
+          }
+          .pager-chip[aria-current="page"] {
+            cursor: default;
+            color: var(--am-on-primary);
+            background: var(--am-primary);
+            border-color: var(--ash-admin-pager-chip-border, var(--am-primary));
+            font-weight: var(--am-font-weight-bold);
+          }
+          .pager-gap {
+            color: var(--am-text-muted);
+            padding: 0 var(--am-space-2xs);
+          }
         `,
       ];
 
@@ -1348,6 +1673,11 @@ function defineAdminElements(deps, {adminApis}) {
             ? NaN
             : Number(props.page);
         const label = str(props.label) || "Results";
+        const totalPages = this.totalPages(props);
+
+        if (Number.isFinite(page) && totalPages > 1) {
+          return this.renderWindowed(props, page, totalPages, label, showPrevious, showNext);
+        }
 
         return html`
           <nav class="pager" aria-label=${label}>
@@ -1387,8 +1717,63 @@ function defineAdminElements(deps, {adminApis}) {
         `;
       }
 
+      /** Total page count from the bound total/pageSize (NaN when the
+       * data layer could not count — the pager then stays prev/next). */
+      totalPages(props) {
+        const total = Number(props.total);
+        const size = Number(props.pageSize);
+        if (props.total === null || props.total === undefined || props.total === "") return NaN;
+        if (!Number.isFinite(total) || !Number.isFinite(size) || size <= 0) return NaN;
+        return Math.max(1, Math.ceil(total / size));
+      }
+
+      renderWindowed(props, page, totalPages, label, showPrevious, showNext) {
+        return html`
+          <nav class="pager" aria-label=${label}>
+            <button
+              type="button"
+              class="am-btn am-btn-quiet am-btn-sm"
+              ?disabled=${!showPrevious || page <= 1}
+              @click=${() => this.turnPage(-1)}
+            >
+              <span class="pager-chevron" aria-hidden="true">‹</span>
+              Previous
+            </button>
+            <span class="pager-pages">
+              ${pageWindow(page, totalPages).map((entry) =>
+                entry === "…"
+                  ? html`<span class="pager-gap" aria-hidden="true">…</span>`
+                  : entry === page
+                    ? html`<span class="pager-chip" aria-current="page">${entry}</span>`
+                    : html`<button
+                        type="button"
+                        class="pager-chip"
+                        aria-label="Page ${entry}"
+                        @click=${() => this.turnPage(entry - page)}
+                      >
+                        ${entry}
+                      </button>`,
+              )}
+            </span>
+            <button
+              type="button"
+              class="am-btn am-btn-quiet am-btn-sm"
+              ?disabled=${!showNext || page >= totalPages}
+              @click=${() => this.turnPage(1)}
+            >
+              Next
+              <span class="pager-chevron" aria-hidden="true">›</span>
+            </button>
+            ${props.rangeText
+              ? html`<span class="pager-range">${str(props.rangeText)}</span>`
+              : nothing}
+          </nav>
+        `;
+      }
+
       /**
-       * Dispatches the existing `query` envelope with the given pageDelta.
+       * Dispatches the existing `query` envelope with the given pageDelta
+       * (any integer: prev/next are ∓1, a page chip jumps by the distance).
        *
        * Priority: the `previousAction`/`nextAction` event object the admin
        * encoder emits (`{"name": "query", "context": {...}}`, byte-exact) —
@@ -1404,10 +1789,12 @@ function defineAdminElements(deps, {adminApis}) {
         const props = this.controller?.props;
         if (!props) return;
 
-        const envelope = delta < 0 ? props.prevAction : props.nextAction;
+        const envelope =
+          delta < 0 ? props.previousAction || props.prevAction : props.nextAction;
 
         if (typeof envelope === "function") {
-          envelope();
+          // Legacy callables only know their own ±1 step.
+          if (Math.abs(delta) === 1) envelope();
           return;
         }
 
@@ -1417,7 +1804,7 @@ function defineAdminElements(deps, {adminApis}) {
 
         if (envelope && typeof envelope.name === "string") {
           const resolved = resolveEventContext(
-            {event: {name: envelope.name, context: envelope.context || {}}},
+            {event: {name: envelope.name, context: {...(envelope.context || {}), pageDelta: delta}}},
             surface.dataModel,
             "/",
           );
@@ -1426,7 +1813,11 @@ function defineAdminElements(deps, {adminApis}) {
         }
 
         if (envelope && envelope.event && typeof envelope.event.name === "string") {
-          const resolved = resolveEventContext(envelope, surface.dataModel, "/");
+          const event = {
+            ...envelope.event,
+            context: {...(envelope.event.context || {}), pageDelta: delta},
+          };
+          const resolved = resolveEventContext({...envelope, event}, surface.dataModel, "/");
           surface.dispatchAction(resolved, context.componentModel.id);
           return;
         }
@@ -1633,6 +2024,7 @@ function defineAdminElements(deps, {adminApis}) {
     class AshAdminFieldDisplay extends A2uiLitElement {
       static styles = [
         shared,
+        content,
         css`
           :host {
             display: block;
@@ -1644,7 +2036,7 @@ function defineAdminElements(deps, {adminApis}) {
             gap: var(--am-space-2xs) var(--am-space-l);
             align-items: baseline;
             padding: var(--am-space-xs) 0;
-            border-bottom: 1px solid var(--am-border);
+            border-bottom: var(--am-border-width) solid var(--am-border);
           }
           :host(:last-child) .field,
           .field:last-child {
@@ -1653,9 +2045,9 @@ function defineAdminElements(deps, {adminApis}) {
           .field-label {
             font-size: var(--am-font-size-xs);
             font-weight: var(--am-font-weight-semibold);
-            letter-spacing: var(--am-tracking-wide);
-            text-transform: uppercase;
-            color: var(--am-text-muted);
+            letter-spacing: var(--ash-admin-field-label-tracking, var(--am-tracking-wide));
+            text-transform: var(--ash-admin-field-label-transform, uppercase);
+            color: var(--ash-admin-field-label-text, var(--am-text-muted));
           }
           .field-value {
             margin: 0;
@@ -1703,19 +2095,36 @@ function defineAdminElements(deps, {adminApis}) {
         const props = this.controller?.props;
         if (!props) return nothing;
 
-        const value = formatDisplayValue(props.value, props.format);
         const isBoolean = props.format === "boolean";
+        const links = linkEntries(props.link);
+
+        if (links.length > 0) {
+          return html`
+            <div class="field">
+              <dt class="field-label">${str(props.label)}</dt>
+              <dd class="field-value">${renderLinks(this, links)}</dd>
+            </div>
+          `;
+        }
+
+        if (isBoolean) {
+          const value = formatDisplayValue(props.value, props.format);
+          return html`
+            <div class="field">
+              <dt class="field-label">${str(props.label)}</dt>
+              <dd
+                class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
+              >
+                ${value}
+              </dd>
+            </div>
+          `;
+        }
 
         return html`
           <div class="field">
             <dt class="field-label">${str(props.label)}</dt>
-            ${isBoolean
-              ? html`<dd
-                  class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
-                >
-                  ${value}
-                </dd>`
-              : html`<dd class="field-value">${value}</dd>`}
+            <dd class="field-value">${renderValue(props.value, props.format)}</dd>
           </div>
         `;
       }

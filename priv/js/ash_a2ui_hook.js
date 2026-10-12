@@ -39,6 +39,19 @@
  * v0.9.1 surfaces are untouched: their messages pass straight through and
  * their actions keep the v0.9.1 envelope.
  *
+ * ## Reference links: `openSurface`
+ *
+ * Activating a reference link (admin catalog DataGrid link cells and
+ * FieldDisplay links, or any `{"functionCall": {"call": "openSurface"}}`)
+ * raises the bubbling, composed `"ash-a2ui:open-surface"` DOM event with
+ * `detail = {surface, recordId?, query?, href?, surfaceId}`. The hook
+ * catches it for its own surface and pushes the `"a2ui:open_surface"`
+ * LiveView event with `{surface, recordId, query}` — `AshA2ui.LiveRenderer`
+ * navigates to the configured `open_surface_url` by default. A
+ * server-sent v1.0 `callFunction` `openSurface` takes the same path. Hosts
+ * that want to handle it client-side pass
+ * `configureAshA2ui({openSurface: (args, {surfaceId, href}) => ...})`.
+ *
  * ## Contract with the host bundle
  *
  * This file ships without dependencies — importing `@a2ui/lit` /
@@ -146,6 +159,7 @@ let hookDeps = null;
  *   catalogs: Array<object>,
  *   markdown?: {ContextProvider: Function, context: object, render: Function},
  *   functions?: Object<string, Function>,
+ *   openSurface?: Function,
  *   pendingMessage?: string,
  *   actionTimeoutMs?: number,
  * }} deps
@@ -154,7 +168,9 @@ let hookDeps = null;
  *   merged over the built-in `openUrl` / `downloadFile`. `pendingMessage` — the optimistic
  *   `/ui/response` message shown while a v1.0 action is in flight (default
  *   "Working…"). `actionTimeoutMs` — v1.0 actionResponse watchdog (default
- *   10000; 0 disables).
+ *   10000; 0 disables). `openSurface` — `(args, {surfaceId, href}) => void`:
+ *   handle reference-link navigation client-side instead of pushing the
+ *   `"a2ui:open_surface"` LiveView event.
  */
 export function configureAshA2ui(deps) {
   hookDeps = deps;
@@ -179,11 +195,13 @@ function resolveDeps() {
     markdown: deps.markdown || null,
     functions: {...BUILTIN_FUNCTIONS, ...(deps.functions || {})},
     pendingMessage: deps.pendingMessage || "Working…",
+    openSurface: typeof deps.openSurface === "function" ? deps.openSurface : null,
     actionTimeoutMs: deps.actionTimeoutMs === undefined ? 10000 : deps.actionTimeoutMs,
   };
 }
 
 const V1_VERSION = "v1.0";
+const OPEN_SURFACE_EVENT = "ash-a2ui:open-surface";
 const V1_BASIC_CATALOG_ID = "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json";
 const V0_BASIC_CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
@@ -409,6 +427,28 @@ export const AshA2ui = {
     this.surfaceEl = document.createElement("a2ui-surface");
     this.el.appendChild(this.surfaceEl);
 
+    // Reference links: element-raised requests bubble (composed) through
+    // this container; catalog-function requests are raised on window with
+    // the surface id — accept those only for surfaces this hook renders.
+    this.surfaceIds = new Set();
+    this.onOpenSurface = (event) => {
+      const detail = event.detail || {};
+      const ours = event.composedPath().includes(this.el) || this.surfaceIds.has(detail.surfaceId);
+      if (!ours || event.__ashA2uiHandled) return;
+      event.__ashA2uiHandled = true;
+      this.openSurface(detail);
+    };
+    window.addEventListener(OPEN_SURFACE_EVENT, this.onOpenSurface);
+    // The server-sent v1.0 callFunction "openSurface" takes the same route
+    // unless the host registered its own function under that name.
+    this.functions = {
+      openSurface: (args) => {
+        this.openSurface(args || {});
+        return null;
+      },
+      ...deps.functions,
+    };
+
     this.processor = new MessageProcessor(catalogs, (action) => {
       this.forwardAction(action);
     });
@@ -417,6 +457,7 @@ export const AshA2ui = {
     // as the processor creates it (single-surface v0 semantics).
     if (typeof this.processor.onSurfaceCreated === "function") {
       this.surfaceSubscription = this.processor.onSurfaceCreated((surface) => {
+        if (surface && surface.id) this.surfaceIds.add(surface.id);
         this.surfaceEl.surface = surface;
         this.dismissSkeleton();
       });
@@ -428,6 +469,8 @@ export const AshA2ui = {
   },
 
   destroyed() {
+    if (this.onOpenSurface) window.removeEventListener(OPEN_SURFACE_EVENT, this.onOpenSurface);
+
     for (const pending of this.pendingActions.values()) {
       if (pending.timer) clearTimeout(pending.timer);
     }
@@ -698,7 +741,7 @@ export const AshA2ui = {
   executeFunctionCall(message) {
     const {functionCallId, wantResponse, callFunction} = message;
     const name = callFunction && callFunction.call;
-    const fn = this.deps.functions[name];
+    const fn = (this.functions || this.deps.functions)[name];
 
     const reply = (payload) => {
       if (wantResponse) this.pushEvent("a2ui:function_response", payload);
@@ -727,6 +770,28 @@ export const AshA2ui = {
           error: {code: "FUNCTION_FAILED", message: String(error), functionCallId},
         }),
       );
+  },
+
+  /**
+   * Opens another surface on a record (reference links): the host's
+   * `openSurface` callback when configured, else the `"a2ui:open_surface"`
+   * LiveView event with `{surface, recordId, query}` (the server builds the
+   * navigation target itself — a client-supplied href is never trusted).
+   */
+  openSurface(detail) {
+    const surface = detail && detail.surface;
+    if (typeof surface !== "string" || surface === "") return;
+    const args = {surface};
+    if (detail.recordId !== undefined && detail.recordId !== null && detail.recordId !== "") {
+      args.recordId = String(detail.recordId);
+    }
+    if (detail.query && typeof detail.query === "object") args.query = detail.query;
+
+    if (this.deps.openSurface) {
+      this.deps.openSurface(args, {surfaceId: detail.surfaceId, href: detail.href});
+      return;
+    }
+    this.pushEvent("a2ui:open_surface", args);
   },
 
   /**

@@ -4,6 +4,11 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui experience v2 surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1` (requires experience_version 2; ignored under v1). Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
+  "version": "1.1.0",
+  "x-changelog": {
+    "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
+    "1.0.0": "The ten-component contract (notes/2026-09-07-admin-catalog-contract.md)."
+  },
   "components": {
     "entityPage": {
       "type": "object",
@@ -34,12 +39,32 @@
         "component": {"const": "dataGrid"},
         "columns": {
           "type": "array",
-          "description": "One entry per visible field, in field order: {label: string, path: string} where path is row-relative (the cell value's key on the row object).",
+          "description": "One entry per visible field, in field order: {label: string, path: string} where path is row-relative (the cell value's key on the row object). Optional presentation hints (1.1): format, align, mono, badge, link — renderers that ignore them still render correct cells from label/path.",
           "items": {
             "type": "object",
             "properties": {
               "label": {"type": "string"},
-              "path": {"type": "string"}
+              "path": {"type": "string"},
+              "format": {"type": "string", "enum": ["text", "datetime", "boolean", "number"], "description": "Cell formatting hint, as fieldDisplay's format; text when omitted."},
+              "align": {"type": "string", "enum": ["start", "center", "end"], "description": "Cell alignment; numbers are end-aligned. start when omitted."},
+              "mono": {"type": "boolean", "description": "true for identifier columns (ids, UUIDs): render in a monospaced face."},
+              "badge": {
+                "type": "object",
+                "description": "Render the cell as a status pill. path (row-relative) is the pill's display text (the server-computed _badge_<field> key); tonePath (row-relative, optional) is the row's semantic tone (the _badge_tone_<field> key): neutral | info | success | warning | danger | accent. Without tonePath (or an unknown tone) the pill is neutral.",
+                "properties": {
+                  "path": {"type": "string"},
+                  "tonePath": {"type": "string"}
+                },
+                "required": ["path"],
+                "additionalProperties": false
+              },
+              "link": {
+                "type": "object",
+                "description": "Row-relative binding ({path: \"_links/<field>\"}) to the cell's reference link(s): a link object {surface, recordId, label[, href]} or a list of them (multi-valued links). Absent on a row = no link for that row (pruned per actor). Activating a link invokes the openSurface function with {surface, recordId}.",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": false
+              }
             },
             "required": ["label", "path"],
             "additionalProperties": false
@@ -71,6 +96,17 @@
             "required": ["label", "action", "context"],
             "additionalProperties": false
           }
+        },
+        "rowClick": {
+          "type": "object",
+          "description": "Optional (1.1): the row's primary action envelope — byte-identical to its rowActions entry (the select_context entry when declared, else View). Activating the row (outside its buttons and links) dispatches it, resolved against the row like a rowActions entry.",
+          "properties": {
+            "label": {"type": "string"},
+            "action": {"type": "string"},
+            "context": {"type": "object"}
+          },
+          "required": ["label", "action", "context"],
+          "additionalProperties": false
         },
         "children": {
           "type": "array",
@@ -163,7 +199,14 @@
         "format": {
           "type": "string",
           "enum": ["text", "datetime", "boolean", "number"],
-          "description": "Optional value formatting hint; text when omitted."
+          "description": "Optional value formatting hint; text when omitted. Text values that are lists (arrays, or multi-line text whose lines are bulleted with -, * or •) render as lists."
+        },
+        "link": {
+          "type": "object",
+          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]} or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
+          "properties": {"path": {"type": "string"}},
+          "required": ["path"],
+          "additionalProperties": false
         }
       },
       "required": ["component", "label", "value"],
@@ -249,6 +292,27 @@
       "unevaluatedProperties": false
     }
   },
-  "functions": {},
+  "functions": {
+    "openSurface": {
+      "type": "object",
+      "description": "Opens another surface on a record — the reference-link navigation. The client decides how (the web renderer hands it to the host: by default the LiveView navigates to the configured open_surface_url; other clients may stack the surface and return with a back key). No return value.",
+      "returnType": "void",
+      "properties": {
+        "call": {"const": "openSurface"},
+        "args": {
+          "type": "object",
+          "properties": {
+            "surface": {"type": "string", "description": "The target surface key (the link's surface)."},
+            "recordId": {"type": "string", "description": "The target record's id (the link's recordId); omitted to open the surface itself."},
+            "query": {"type": "object", "description": "Optional initial state for the target surface (e.g. {\"ctx\": {\"person\": \"<id>\"}})."}
+          },
+          "required": ["surface"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["call", "args"],
+      "unevaluatedProperties": false
+    }
+  },
   "$defs": {}
 }

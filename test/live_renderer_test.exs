@@ -12,6 +12,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     alias AshA2ui.Test.LiveRendererFixtures, as: Fixtures
     alias AshA2ui.Test.{MinimalUI, SchemaHelper}
+    alias Plug.Conn.Query
 
     @endpoint AshA2ui.Test.Endpoint
 
@@ -308,6 +309,128 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert %{"updateDataModel" => %{"path" => "/", "value" => value}} = message
         assert %{"new_items" => _, "done_items" => _} = value["records"]
         assert %{"new_items" => %{"page" => 1}} = value["query"]
+      end
+    end
+
+    describe "deep links and reference links" do
+      setup do
+        alias AshA2ui.Test.Links.{Note, Participant, Person}
+
+        for resource <- [Participant, Note, Person] do
+          resource
+          |> Ash.read!(authorize?: false)
+          |> Enum.each(&Ash.destroy!(&1, authorize?: false))
+        end
+
+        ada = Ash.create!(Person, %{name: "Ada"}, authorize?: false)
+        hidden = Ash.create!(Person, %{name: "Hidden", visible: false}, authorize?: false)
+
+        %{ada: ada, hidden: hidden}
+      end
+
+      test "URL ctx/q params seed the bootstrap — ctx validated through authorized reads", %{
+        conn: conn,
+        ada: ada
+      } do
+        {:ok, _view, _html} =
+          live(conn, "/live-renderer/deep-link?ctx[person]=#{ada.id}&q[page]=2")
+
+        assert_receive {:surface_fn, AshA2ui.Test.Links.NotesUI, opts}, 1_000
+        assert %{"person" => %{"value" => value, "label" => "Ada"}} = opts[:context_state]
+        assert value == ada.id
+        assert opts[:query_state] == %{"page" => 2}
+      end
+
+      test "unreadable deep-linked ids are dropped", %{conn: conn, hidden: hidden} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/deep-link?ctx[person]=#{hidden.id}")
+
+        assert_receive {:surface_fn, AshA2ui.Test.Links.NotesUI, opts}, 1_000
+        assert opts[:context_state]["person"]["value"] == ""
+      end
+
+      test "without URL state the bootstrap opts are unchanged", %{conn: conn} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/stubbed")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        refute Keyword.has_key?(opts, :context_state)
+        refute Keyword.has_key?(opts, :query_state)
+      end
+
+      test "deep_link: a context change push_patches the ctx params", %{conn: conn, ada: ada} do
+        {:ok, view, _html} = live(conn, "/live-renderer/deep-link?tab=notes")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_hook(view, "a2ui:action", %{
+          "version" => "v0.9.1",
+          "action" => %{
+            "name" => "context_select",
+            "surfaceId" => "notes",
+            "sourceComponentId" => "row_select",
+            "timestamp" => "2026-10-12T12:00:00Z",
+            "context" => %{"context" => "person", "value" => ada.id}
+          }
+        })
+
+        path = assert_patch(view)
+        %URI{path: "/live-renderer/deep-link", query: query} = URI.parse(path)
+        params = Query.decode(query)
+        assert params["ctx"] == %{"person" => ada.id}
+        # other params survive
+        assert params["tab"] == "notes"
+      end
+
+      test "deep_link: back/forward to other ctx params re-applies them", %{
+        conn: conn,
+        ada: ada
+      } do
+        {:ok, view, _html} = live(conn, "/live-renderer/deep-link")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_patch(view, "/live-renderer/deep-link?ctx[person]=#{ada.id}")
+
+        assert_receive {:data_model_fn, AshA2ui.Test.Links.NotesUI, opts}, 1_000
+        assert opts[:context_state]["person"]["value"] == ada.id
+        assert_push_event(view, "a2ui:messages", %{messages: [_data_model]})
+      end
+
+      test "a2ui:open_surface navigates to the open_surface_url template", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/deep-link")
+
+        render_hook(view, "a2ui:open_surface", %{"surface" => "person", "recordId" => "a b"})
+
+        assert_redirect(view, "/app/r/person/a%20b")
+      end
+
+      test "a2ui:open_surface carries a query map onto the target", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/deep-link")
+
+        render_hook(view, "a2ui:open_surface", %{
+          "surface" => "person",
+          "recordId" => "p1",
+          "query" => %{"ctx" => %{"note" => "n1"}}
+        })
+
+        {path, _flash} = assert_redirect(view)
+
+        assert path ==
+                 "/app/r/person/p1?" <> Query.encode(%{"ctx" => %{"note" => "n1"}})
+      end
+
+      test "an open_surface callback replaces the default navigation", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/open-surface-callback")
+
+        render_hook(view, "a2ui:open_surface", %{"surface" => "person", "recordId" => "p1"})
+
+        assert_receive {:open_surface, %{"surface" => "person", "recordId" => "p1"}}, 1_000
+      end
+
+      test "without a URL template or callback the request is acknowledged and ignored", %{
+        conn: conn
+      } do
+        {:ok, view, _html} = live(conn, "/live-renderer/stubbed")
+
+        assert render_hook(view, "a2ui:open_surface", %{"surface" => "person"}) =~
+                 "ash-a2ui-surface"
       end
     end
   end

@@ -89,6 +89,16 @@ end
   transports driving `build_surface/2`/`build_data_model/2` should pass
   `:context_state` themselves.
 
+## Deep links
+
+- `AshA2ui.Info.context_state_for(ui, %{"<context>" => id}, actor: …)`
+  turns externally carried ids (a URL's `?ctx[person]=<id>`) into a
+  `:context_state` — every id through the same authorized read +
+  cascade as `"context_select"`; unreadable/unknown ids are dropped.
+- `AshA2ui.LiveRenderer` reads `?ctx[...]` and `?q[...]` on mount; with
+  `deep_link: true` it `push_patch`es `ctx` params on context changes and
+  re-applies them on back/forward.
+
 ## Avoid list
 
 - ❌ Modeling a simple enum/status narrowing as a context — that's a query

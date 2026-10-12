@@ -149,6 +149,53 @@ defmodule AshA2ui.Info do
   end
 
   @doc """
+  Validates externally carried context selections — `%{"<context>" =>
+  "<record id>"}`, e.g. from a deep link's `?ctx[person]=<id>` — into the
+  `/context` state map `build_surface/2`/`build_data_model/2` take as
+  `:context_state`.
+
+  Every id goes through the same **authorized** read (dependency filter
+  included) and cascade as a client `"context_select"`, in declaration
+  order, with the `opts`' `:actor`/`:tenant`/`:authorize?`/`:domain`.
+  Unknown context names and ids the actor cannot read (or that fall outside
+  the selected parent's scope) are dropped; labels are derived from the
+  records. Surfaces without contexts return `%{}`.
+  """
+  @spec context_state_for(module | Spark.Dsl.t(), %{String.t() => String.t()}, keyword) ::
+          %{String.t() => map}
+  def context_state_for(resource_or_ui_module, ids, opts \\ []) do
+    view =
+      ResolvedView.resolve(
+        resource_or_ui_module,
+        Keyword.take(opts, [:actor, :tenant, :domain, :authorize?])
+      )
+
+    if view.contexts == %{} do
+      %{}
+    else
+      ash_opts = read_opts(view, opts)
+
+      selected =
+        Enum.reduce(view.context_order, %{}, fn name, selected ->
+          select_carried(view, name, Map.get(ids, to_string(name)), selected, ash_opts)
+        end)
+
+      AshA2ui.ContextRunner.state(view, selected)
+    end
+  end
+
+  defp select_carried(_view, _name, value, selected, _ash_opts)
+       when not is_binary(value) or value == "",
+       do: selected
+
+  defp select_carried(view, name, value, selected, ash_opts) do
+    case AshA2ui.ContextRunner.select(view, view.contexts[name], value, selected, ash_opts) do
+      {:ok, change} -> change.selected
+      _not_found_or_error -> selected
+    end
+  end
+
+  @doc """
   The versioned encoder module for a resolved view: `AshA2ui.Encoder.V0_9_1`
   or `AshA2ui.Encoder.V1_0`, per the surface's `spec_version`.
   """
@@ -352,7 +399,7 @@ defmodule AshA2ui.Info do
                read_opts(resolved_view, opts),
                loads
              ) do
-          {:ok, record} -> ResolvedView.record_values(resolved_view, record, fields)
+          {:ok, record} -> ResolvedView.record_values(resolved_view, record, fields, opts)
           :not_found -> %{}
           {:error, error} -> raise Ash.Error.to_error_class(error)
         end

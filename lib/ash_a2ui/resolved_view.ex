@@ -350,16 +350,24 @@ defmodule AshA2ui.ResolvedView do
   JSON-safe values — dates/datetimes to ISO 8601, decimals to strings, atoms
   to strings — with `"id"` always included). Declared `source` fields walk
   the loaded relationship path (nil-safe: an unloaded or nil relationship
-  serializes to `""`).
+  serializes to `""`). When any of `fields` declares `link`/`links`, the
+  map carries the reserved `"_links"` key (see `AshA2ui.Links`); `opts`
+  carries the render's `:actor`/`:tenant` for the `AshA2ui.LinkResolver`.
 
   Used for `/detail/<context>` record values; matches the row serialization
   of `/records`.
   """
-  @spec record_values(t(), Ash.Resource.record(), [atom]) :: %{String.t() => term}
-  def record_values(%__MODULE__{} = view, record, fields) do
-    fields
-    |> Map.new(fn name -> {to_string(name), serialized_field(view, record, name)} end)
-    |> Map.put("id", json_safe(Map.get(record, :id)))
+  @spec record_values(t(), Ash.Resource.record(), [atom], keyword) :: %{String.t() => term}
+  def record_values(%__MODULE__{} = view, record, fields, opts \\ []) do
+    row =
+      fields
+      |> Map.new(fn name -> {to_string(name), serialized_field(view, record, name)} end)
+      |> Map.put("id", json_safe(Map.get(record, :id)))
+
+    view.fields
+    |> then(&AshA2ui.Links.context(record.__struct__, &1, fields, opts))
+    |> AshA2ui.Links.row_data(record, row)
+    |> Map.merge(row)
   end
 
   defp serialized_field(view, record, name) do
@@ -370,8 +378,11 @@ defmodule AshA2ui.ResolvedView do
           value -> json_safe(value)
         end
 
-      _plain ->
-        json_safe(Map.get(record, name))
+      field ->
+        case AshA2ui.Links.virtual_value(field, record) do
+          {:ok, value} -> value
+          :not_virtual -> json_safe(Map.get(record, name))
+        end
     end
   end
 
@@ -898,14 +909,33 @@ defmodule AshA2ui.ResolvedView do
       field_names
       |> Enum.map(&(fields[&1] && fields[&1].source))
       |> Enum.reject(&is_nil/1)
-      |> Enum.map(&Enum.drop(&1, -1))
+      |> Enum.map(&source_load_path(resource, &1))
       |> Enum.reject(&(&1 == []))
       |> Enum.uniq()
       |> Enum.map(&path_to_load/1)
 
     calc_loads = Enum.filter(field_names, &calculation_or_aggregate?(resource, &1))
 
-    source_loads ++ calc_loads
+    Enum.uniq(source_loads ++ calc_loads ++ AshA2ui.Links.loads(resource, field_names, fields))
+  end
+
+  # A source path loads its relationship prefix — and, when the terminal
+  # step is a calculation/aggregate of the final destination (a decrypted
+  # display name, a count), the terminal too.
+  defp source_load_path(resource, source) do
+    {relationships, [terminal]} = Enum.split(source, -1)
+
+    destination =
+      Enum.reduce_while(relationships, resource, fn step, current ->
+        case ResourceInfo.relationship(current, step) do
+          %{destination: destination} -> {:cont, destination}
+          nil -> {:halt, nil}
+        end
+      end)
+
+    if destination && calculation_or_aggregate?(destination, terminal),
+      do: source,
+      else: relationships
   end
 
   defp calculation_or_aggregate?(resource, name) do
