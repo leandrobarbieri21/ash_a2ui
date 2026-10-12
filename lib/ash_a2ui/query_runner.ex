@@ -227,6 +227,10 @@ defmodule AshA2ui.QueryRunner do
     effective_sort = effective_sort(query, params)
     preset = params.preset && Enum.find(query.presets, &(&1.name == params.preset))
 
+    # A related table reads a resource that may live in another domain.
+    ash_opts =
+      Keyword.put(ash_opts, :domain, ResourceInfo.domain(view.resource) || ash_opts[:domain])
+
     filtered =
       view.resource
       |> Ash.Query.for_read(read_action(view, preset), %{}, ash_opts)

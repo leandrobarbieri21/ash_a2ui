@@ -4,7 +4,8 @@ defmodule AshA2ui.Transformers.InferFields do
 
     * `:table` components get the resource's public attributes (via
       `Ash.Resource.Info.public_attributes/1`), in declaration order,
-      excluding primary key attributes.
+      excluding primary key attributes — a related table's (`resource`)
+      own resource's.
     * `:form` components get the create action's `accept` list (the
       component's `create_action` if set, otherwise the primary create),
       falling back to the update action's accepts when no create action
@@ -71,6 +72,13 @@ defmodule AshA2ui.Transformers.InferFields do
       resource when is_atom(resource) and resource not in [nil, false] -> resource
       _missing -> nil
     end
+  end
+
+  # A related table (`resource` on the component) infers against its own
+  # resource.
+  defp infer_target(_target, %AshA2ui.Component{name: :table, resource: resource}, _dsl_state)
+       when not is_nil(resource) do
+    if Code.ensure_loaded?(resource) and Info.resource?(resource), do: resource
   end
 
   defp infer_target(target, _component, _dsl_state), do: target

@@ -862,6 +862,20 @@ defmodule AshA2ui do
         doc:
           "Fields shown by this component. Omit to infer (public attributes for tables, action accepts for forms). On `:report` components: the column allowlist, required — each entry is a key of the returned row maps, rendered in this order."
       ],
+      resource: [
+        type: :atom,
+        doc: """
+        A **related table**: the Ash resource this `:table` reads, when it is
+        not the surface's own (`component :table, :messages do resource
+        MyApp.Message; context_filter thread_id: :thread; require_context
+        [:thread] end`). Its fields, `read_action`, `query`, `context_filter`
+        keys, `source` paths and links are resolved against this resource,
+        read as the surface's actor like every other table. Related tables
+        are read-only: no `row_actions`, `editable` or `sections`, and a
+        `select_context` must name a context over this resource. Defaults to
+        the surface resource.
+        """
+      ],
       read_action: [
         type: :atom,
         doc: "The read action used to load records (tables). Defaults to the primary read."

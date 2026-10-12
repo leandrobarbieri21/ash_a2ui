@@ -10,6 +10,7 @@ defmodule AshA2ui.Component do
     :name,
     :as,
     :fields,
+    :resource,
     :read_action,
     :create_action,
     :update_action,
@@ -36,6 +37,7 @@ defmodule AshA2ui.Component do
           name: :table | :form | :detail | :report,
           as: atom | String.t() | nil,
           fields: [atom] | nil,
+          resource: module | nil,
           read_action: atom | nil,
           create_action: atom | nil,
           update_action: atom | nil,
@@ -69,4 +71,23 @@ defmodule AshA2ui.Component do
   @spec key(t()) :: atom | String.t()
   def key(%__MODULE__{as: nil, name: name}), do: name
   def key(%__MODULE__{as: as}), do: as
+
+  @doc """
+  The resource a component reads: a related `:table`'s own `resource`, else
+  `surface_resource` (the surface's `for_resource` / the resource itself).
+  """
+  @spec resource(t(), module | nil) :: module | nil
+  def resource(%__MODULE__{name: :table, resource: resource}, _surface_resource)
+      when not is_nil(resource),
+      do: resource
+
+  def resource(%__MODULE__{}, surface_resource), do: surface_resource
+
+  @doc "Whether this is a related table (a `:table` over another resource)."
+  @spec related?(t(), module | nil) :: boolean
+  def related?(%__MODULE__{name: :table, resource: resource}, surface_resource)
+      when not is_nil(resource),
+      do: resource != surface_resource
+
+  def related?(%__MODULE__{}, _surface_resource), do: false
 end

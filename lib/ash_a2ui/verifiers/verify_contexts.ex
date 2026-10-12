@@ -288,6 +288,10 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
   end
 
   defp verify_component_context_options(%{name: :table} = component, by_name, target, module) do
+    # A related table (`resource`) is scoped and selected against its own resource.
+    target =
+      if target, do: AshA2ui.Component.resource(component, target), else: component.resource
+
     key = AshA2ui.Component.key(component)
 
     with :ok <- verify_context_filter(component, key, by_name, target, module),

@@ -4,7 +4,7 @@ defmodule AshA2ui.Verifiers.VerifyFields do
 
     * every component field (declared or inferred) and every `field` override
       name is a public attribute, calculation, or aggregate of the resolved
-      resource,
+      resource — a related table's (`resource`) fields of its own resource,
     * `:form` component fields never name a calculation or aggregate (they
       are not writable — table-only), and
     * `:form` component fields are a subset of the accepts + argument names of
@@ -38,6 +38,12 @@ defmodule AshA2ui.Verifiers.VerifyFields do
         exempt = relationship_field_names(dsl_state)
 
         with :ok <- verify_components(dsl_state, target, module, known, exempt) do
+          # A field override may style a related table's column too.
+          known =
+            dsl_state
+            |> related_resources(target)
+            |> Enum.reduce(known, &MapSet.union(&2, known_field_names(&1)))
+
           verify_field_overrides(dsl_state, module, known, exempt)
         end
     end
@@ -76,6 +82,20 @@ defmodule AshA2ui.Verifiers.VerifyFields do
   # shape instead.
   defp verify_component(%AshA2ui.Component{name: :report}, _target, _module, _known, _exempt),
     do: :ok
+
+  # A related table's fields belong to its own resource.
+  defp verify_component(
+         %AshA2ui.Component{name: :table} = component,
+         target,
+         module,
+         _known,
+         exempt
+       )
+       when not is_nil(component.resource) and component.resource != target do
+    if Code.ensure_loaded?(component.resource) and Info.resource?(component.resource),
+      do: verify_known_fields(component, module, known_field_names(component.resource), exempt),
+      else: :ok
+  end
 
   defp verify_component(component, target, module, known, exempt) do
     with :ok <- verify_known_fields(component, module, known, exempt) do
@@ -225,6 +245,14 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     dsl_state
     |> Verifier.get_entities([:a2ui])
     |> Enum.filter(&is_struct(&1, AshA2ui.Component))
+  end
+
+  defp related_resources(dsl_state, target) do
+    for %AshA2ui.Component{name: :table, resource: resource} <- components(dsl_state),
+        not is_nil(resource) and resource != target,
+        Code.ensure_loaded?(resource) and Info.resource?(resource),
+        uniq: true,
+        do: resource
   end
 
   defp known_field_names(target) do

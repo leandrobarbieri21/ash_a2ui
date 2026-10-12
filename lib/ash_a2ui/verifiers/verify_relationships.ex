@@ -30,6 +30,9 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
       `links` are mutually exclusive, and `links` (or link-only virtual)
       fields may not be rendered by `:form` components.
 
+  `source` and link fields listed by a related table (`resource` on a
+  `:table` component) are checked against that table's resource.
+
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. Skipped when no resource can be resolved (standalone
   UI module without `for_resource`) — `AshA2ui.Info.resource!/1` reports that
@@ -55,9 +58,11 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
         module = Verifier.get_persisted(dsl_state, :module)
         fields = declared_fields(dsl_state)
 
+        targets = field_targets(dsl_state, target)
+
         with :ok <- verify_selects(dsl_state, fields, target, module),
-             :ok <- verify_sources(dsl_state, fields, target, module) do
-          verify_links(dsl_state, fields, target, module)
+             :ok <- verify_sources(dsl_state, fields, targets, module) do
+          verify_links(dsl_state, fields, targets, target, module)
         end
     end
   end
@@ -243,20 +248,19 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
 
   # --- source columns ----------------------------------------------------------
 
-  defp verify_sources(dsl_state, fields, target, module) do
+  defp verify_sources(dsl_state, fields, targets, module) do
     source_fields = Enum.filter(fields, & &1.source)
 
-    with :ok <- verify_source_paths(source_fields, target, module) do
+    with :ok <- verify_source_paths(source_fields, targets, module) do
       verify_sources_not_in_forms(dsl_state, source_fields, module)
     end
   end
 
-  defp verify_source_paths(source_fields, target, module) do
-    Enum.reduce_while(source_fields, :ok, fn field, :ok ->
-      case verify_source_path(field, target, module) do
-        :ok -> {:cont, :ok}
-        {:error, error} -> {:halt, {:error, error}}
-      end
+  # A field is walked from every resource that renders it: the surface's,
+  # and each related table's (`resource`) that lists it.
+  defp verify_source_paths(source_fields, targets, module) do
+    reduce_ok(source_fields, fn field ->
+      reduce_ok(targets_of(targets, field), &verify_source_path(field, &1, module))
     end)
   end
 
@@ -341,10 +345,15 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
 
   # --- reference links -----------------------------------------------------------
 
-  defp verify_links(dsl_state, fields, target, module) do
+  defp verify_links(dsl_state, fields, targets, target, module) do
     link_fields = Enum.filter(fields, &(&1.link || &1.links || &1.link_label))
 
-    with :ok <- reduce_ok(link_fields, &verify_link_field(&1, target, module)) do
+    verified =
+      reduce_ok(link_fields, fn field ->
+        reduce_ok(targets_of(targets, field), &verify_link_field(field, &1, module))
+      end)
+
+    with :ok <- verified do
       verify_links_not_in_forms(dsl_state, link_fields, target, module)
     end
   end
@@ -527,6 +536,26 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
   defp public_attribute?(resource, name) do
     match?(%{public?: true}, Info.attribute(resource, name))
   end
+
+  # Which resources render each field: a related table (`resource`) renders
+  # its fields against its own resource; every other table and the form
+  # against the surface's. A field no table lists (a detail-only or override-
+  # only field) is checked against the surface resource.
+  defp field_targets(dsl_state, target) do
+    dsl_state
+    |> Verifier.get_entities([:a2ui])
+    |> Enum.filter(&(is_struct(&1, AshA2ui.Component) and &1.name in [:table, :form]))
+    |> Enum.flat_map(fn component ->
+      resource = AshA2ui.Component.resource(component, target)
+      Enum.map(component.fields || [], &{&1, resource})
+    end)
+    |> Enum.reduce(%{}, fn {name, resource}, acc ->
+      Map.update(acc, name, [resource], &Enum.uniq([resource | &1]))
+    end)
+    |> Map.put(:__default__, target)
+  end
+
+  defp targets_of(targets, field), do: Map.get(targets, field.name, [targets.__default__])
 
   defp form_field_names(dsl_state) do
     dsl_state

@@ -303,7 +303,7 @@ defmodule AshA2ui.Info do
         |> Ash.Query.for_read(table.read_action)
         |> AshA2ui.ContextRunner.apply_scope(scope)
         |> Ash.Query.load(table.loads)
-        |> Ash.read!(read_opts(resolved_view, opts))
+        |> Ash.read!(table_read_opts(resolved_view, table, opts))
 
       {records, nil}
     end
@@ -435,6 +435,16 @@ defmodule AshA2ui.Info do
   defp option_string(%DateTime{} = datetime), do: DateTime.to_iso8601(datetime)
   defp option_string(%Decimal{} = decimal), do: Decimal.to_string(decimal)
   defp option_string(value), do: to_string(value)
+
+  # A related table (`resource`) reads in its own resource's domain.
+  defp table_read_opts(resolved_view, table, opts) do
+    read_opts = read_opts(resolved_view, opts)
+
+    case ResourceInfo.domain(table.resource) do
+      nil -> read_opts
+      domain -> Keyword.put(read_opts, :domain, domain)
+    end
+  end
 
   defp read_opts(resolved_view, opts) do
     domain =

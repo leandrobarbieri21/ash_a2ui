@@ -588,6 +588,8 @@ defmodule AshA2ui.ResolvedView do
     Enum.map(table_components, fn component ->
       name = AshA2ui.Component.key(component)
       query = resolve_query(resource_or_ui_module, component)
+      # A related table (`resource` on the component) reads its own resource.
+      resource = AshA2ui.Component.resource(component, resource)
 
       %{
         name: name,

@@ -3168,7 +3168,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             value
 
           :not_virtual ->
-            record |> Map.get(name) |> json_safe() |> humanize_choice(view.resource, name)
+            # The record's own resource: a related table's rows are not the surface's.
+            record |> Map.get(name) |> json_safe() |> humanize_choice(record.__struct__, name)
         end
     end
   end

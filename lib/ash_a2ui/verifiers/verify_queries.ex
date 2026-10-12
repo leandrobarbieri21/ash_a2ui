@@ -51,7 +51,8 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
         source_fields = source_field_names(dsl_state)
 
         with :ok <- verify_unique_names(queries, module),
-             :ok <- verify_queries(queries, target, source_fields, module) do
+             :ok <-
+               verify_queries(queries, query_targets(dsl_state, target), source_fields, module) do
           verify_references(dsl_state, queries, module)
         end
     end
@@ -82,15 +83,33 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
     end
   end
 
-  defp verify_queries(queries, target, source_fields, module) do
-    ctx = %{
-      target: target,
-      attributes: public_attributes(target),
-      source_fields: source_fields,
-      module: module
-    }
+  # A query is checked against every resource whose table uses it: the
+  # surface's, or a related table's (`resource`). An unused query is checked
+  # against the surface resource.
+  defp query_targets(dsl_state, target) do
+    targets =
+      dsl_state
+      |> Verifier.get_entities([:a2ui])
+      |> Enum.filter(&(is_struct(&1, AshA2ui.Component) and &1.name == :table and &1.query))
+      |> Enum.reduce(%{}, fn component, acc ->
+        resource = AshA2ui.Component.resource(component, target)
+        Map.update(acc, component.query, [resource], &Enum.uniq([resource | &1]))
+      end)
 
-    Enum.reduce_while(queries, :ok, fn query, :ok ->
+    &Map.get(targets, &1, [target])
+  end
+
+  defp verify_queries(queries, targets_of, source_fields, module) do
+    pairs = for query <- queries, target <- targets_of.(query.name), do: {query, target}
+
+    Enum.reduce_while(pairs, :ok, fn {query, target}, :ok ->
+      ctx = %{
+        target: target,
+        attributes: public_attributes(target),
+        source_fields: source_fields,
+        module: module
+      }
+
       case verify_query(query, ctx) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}

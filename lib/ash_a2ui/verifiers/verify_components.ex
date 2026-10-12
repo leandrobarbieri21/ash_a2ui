@@ -7,6 +7,9 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
       omit their names,
     * at most one `:form` component is declared,
     * only `:table` and `:detail` components may carry an `as` name,
+    * only `:table` components may name a `resource` (a related table), it
+      must be an Ash resource, and a related table is read-only — no
+      `row_actions`, `editable` or `sections`,
 
   and that `action` entities (per-action refresh metadata) are sound:
 
@@ -34,6 +37,7 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     actions = entities(dsl_state, AshA2ui.Action)
 
     with :ok <- verify_named_tables_only(components, module),
+         :ok <- verify_related_tables(components, target_resource(dsl_state), module),
          :ok <- verify_unique_keys(components, module),
          :ok <- verify_single_form(components, module),
          :ok <- verify_unique_action_names(actions, module),
@@ -60,6 +64,71 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
                "only :table, :detail and :report components may carry a distinguishing name"
          )}
     end
+  end
+
+  # A related table reads another resource as the surface's actor; it shows
+  # rows, it does not act on them (row actions, inline edits and sections are
+  # all dispatched against the surface resource).
+  defp verify_related_tables(components, target, module) do
+    Enum.reduce_while(components, :ok, fn component, :ok ->
+      case verify_related_table(component, target, module) do
+        :ok -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
+
+  defp verify_related_table(%Component{resource: nil}, _target, _module), do: :ok
+
+  defp verify_related_table(%Component{name: name} = component, _target, module)
+       when name != :table do
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :component, Component.key(component), :resource],
+       message:
+         "component #{inspect(name)} cannot name a resource: only :table components " <>
+           "may read another resource (a related table)"
+     )}
+  end
+
+  defp verify_related_table(%Component{resource: resource} = component, target, module) do
+    key = Component.key(component)
+
+    cond do
+      not (Code.ensure_loaded?(resource) and ResourceInfo.resource?(resource)) ->
+        related_error(module, key, :resource, "#{inspect(resource)} is not an Ash resource")
+
+      resource == target ->
+        :ok
+
+      component.row_actions != [] ->
+        related_error(
+          module,
+          key,
+          :row_actions,
+          "a related table is read-only: row_actions are dispatched against the surface " <>
+            "resource, not #{inspect(resource)}"
+        )
+
+      not is_nil(component.editable) ->
+        related_error(module, key, :editable, "a related table is read-only: no editable block")
+
+      not is_nil(component.sections) ->
+        related_error(module, key, :sections, "a related table cannot declare sections")
+
+      true ->
+        :ok
+    end
+  end
+
+  defp related_error(module, key, option, detail) do
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :component, key, option],
+       message: "related table #{inspect(key)}: #{detail}"
+     )}
   end
 
   defp verify_unique_keys(components, module) do

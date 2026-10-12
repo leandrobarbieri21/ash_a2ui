@@ -10,6 +10,13 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Related tables** — a `:table` component may name its own `resource`
+  (`component :table, :messages do resource MyApp.Message; context_filter
+  thread_id: :thread; require_context [:thread] end`): fields, read action,
+  query, context filters, `source` paths and links resolve against that
+  resource, and reads run as the surface's actor in its domain. Read-only
+  (no row actions, editable or sections). Surfaces without `resource`
+  serialize unchanged.
 - **Reference links** — `field` gains `link :relationship` (to-one),
   `link {surface_key, id_path}` (bare-id/polymorphic) and `links
   :relationship` (to-many), plus `link_label`. Rows, `/detail/<context>`

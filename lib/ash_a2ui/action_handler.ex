@@ -2239,6 +2239,10 @@ defmodule AshA2ui.ActionHandler do
   # --- Ash invocation helpers ------------------------------------------------
 
   defp read_table(table, ash_opts, scope) do
+    # A related table reads a resource that may live in another domain.
+    ash_opts =
+      Keyword.put(ash_opts, :domain, ResourceInfo.domain(table.resource) || ash_opts[:domain])
+
     table.resource
     |> Ash.Query.for_read(
       table.read_action || primary_action(table.resource, :read),

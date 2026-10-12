@@ -63,6 +63,10 @@ defmodule AshA2ui.Verifiers.VerifyActions do
   end
 
   defp verify_component(component, target, module) do
+    # A related table's read_action belongs to its own resource (it has no
+    # row actions: VerifyComponents).
+    target = AshA2ui.Component.resource(component, target)
+
     with :ok <- verify_typed_actions(component, target, module) do
       verify_row_actions(component, target, module)
     end

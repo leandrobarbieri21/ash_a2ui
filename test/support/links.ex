@@ -227,3 +227,69 @@ defmodule AshA2ui.Test.Links.PagedNotesUI do
     end
   end
 end
+
+defmodule AshA2ui.Test.Links.PeopleUI do
+  @moduledoc """
+  Related tables (`resource` on a `:table`): a surface over `Person` whose
+  selected person's notes and participations are tables over `Note` and
+  `Participant`, scoped by the `:person` context — each with its own
+  fields, query, links and `source` columns resolved against its own
+  resource.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Links.Person
+    surface_id "people"
+
+    context :person do
+      resource AshA2ui.Test.Links.Person
+      option_label :name
+      picker false
+    end
+
+    query :notes do
+      search_fields [:title]
+      sortable [:title, :amount]
+      default_sort title: :asc
+      page_size 10
+    end
+
+    component :table do
+      fields [:name]
+      select_context :person
+    end
+
+    component :detail, :person_detail do
+      context :person
+      fields [:name]
+    end
+
+    component :table, :their_notes do
+      resource AshA2ui.Test.Links.Note
+      fields [:title, :status, :amount, :participant_links]
+      query :notes
+      context_filter person_id: :person
+      require_context [:person]
+    end
+
+    component :table, :participations do
+      resource AshA2ui.Test.Links.Participant
+      fields [:note_title]
+      context_filter person_id: :person
+      require_context [:person]
+    end
+
+    field :participant_links do
+      label "Participants"
+      links :participants
+    end
+
+    field :note_title do
+      label "Note"
+      source [:note, :title]
+      link :note
+    end
+  end
+end
