@@ -191,7 +191,40 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
 
-    {spec, component_rejections(component, path)}
+    {spec, component_rejections(component, path) ++ board_rejections(component, path)}
+  end
+
+  # Boards (source-less sections, `display :board`) have no spec
+  # vocabulary: the imported spec keeps a plain table and says so.
+  defp board_rejections(component, path) do
+    sections =
+      if match?(%{source: nil}, component.sections) do
+        [
+          Rejection.new(
+            "#{path}.sections",
+            "sections",
+            "declared without a source (enumerated lanes) — sections over an " <>
+              "attribute's values have no spec vocabulary"
+          )
+        ]
+      else
+        []
+      end
+
+    display =
+      if component.display == :board do
+        [
+          Rejection.new(
+            "#{path}.display",
+            "display",
+            "declared as :board on this component — boards have no spec vocabulary"
+          )
+        ]
+      else
+        []
+      end
+
+    sections ++ display
   end
 
   # Declared component features with no spec vocabulary: rejected with the
@@ -279,6 +312,7 @@ defmodule AshA2ui.Dynamic.Importer do
   # of tables, so a per-section unrolling cannot round-trip). The source is
   # named by its allowlist name; defaults (limit) stay unspoken.
   defp put_sections(spec, nil), do: spec
+  defp put_sections(spec, %{source: nil}), do: spec
 
   defp put_sections(spec, sections) do
     section =

@@ -143,7 +143,9 @@ Refreshes written by the action handler serialize the key identically.
 
 - **No wrap, no real grid** — the basic catalog's `Row` cannot wrap, so
   "N columns" means server-side chunking. Pick `columns` for the narrowest
-  client you target.
+  client you target. Boards (`display :board`) therefore lay their lanes
+  out in a horizontal `List`, not a `Row` (see
+  [Multi-Section Surfaces](multi-section-surfaces.md)).
 - **`weight` placement** — only legal on direct children of a `Row`/`Column`;
   the encoder confines it to grid cells and the header title.
 - **Badges are `Text`** — the catalog has no chip/badge component; the

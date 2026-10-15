@@ -27,6 +27,7 @@ defmodule AshA2ui.Component do
     require_context: [],
     row_actions: [],
     bulk_actions: [],
+    display: :list,
     nested_forms: [],
     groups: [],
     __spark_metadata__: nil
@@ -55,6 +56,7 @@ defmodule AshA2ui.Component do
           require_context: [atom],
           row_actions: [atom],
           bulk_actions: [atom],
+          display: :list | :board,
           nested_forms: [AshA2ui.NestedForm.t()],
           groups: [AshA2ui.Group.t()]
         }

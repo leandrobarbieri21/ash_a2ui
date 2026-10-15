@@ -118,6 +118,33 @@ defmodule AshA2ui.Bulk.BulkVerifierTest do
 
     assert generic_without_record_id =~
              ~r/bulk action :ping is a generic action without a :record_id argument: a generic bulk action runs once per selected record/
+
+    on_board =
+      capture_io(:stderr, fn ->
+        defmodule BulkOnBoard do
+          @moduledoc false
+          use AshA2ui.Standalone
+
+          a2ui do
+            for_resource AshA2ui.Test.BoardTask
+
+            component :table, :board do
+              display :board
+              bulk_actions [:claim]
+
+              row_layout do
+                title :name
+              end
+
+              sections do
+                scope_by :status
+              end
+            end
+          end
+        end
+      end)
+
+    assert on_board =~ ~r/table :board is a display :board: board lanes have no selection toolbar/
   end
 
   test "a valid bulk table with per-record visible_when compiles cleanly" do

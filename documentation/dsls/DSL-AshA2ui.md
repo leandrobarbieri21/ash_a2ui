@@ -348,6 +348,7 @@ end
 | [`update_action`](#a2ui-component-update_action){: #a2ui-component-update_action } | `atom` |  | The update action submitted by the form. |
 | [`row_actions`](#a2ui-component-row_actions){: #a2ui-component-row_actions } | `list(atom)` | `[]` | Actions rendered as per-row buttons (tables). |
 | [`bulk_actions`](#a2ui-component-bulk_actions){: #a2ui-component-bulk_actions } | `list(atom)` | `[]` | Update, destroy or generic actions run over a row selection (tables). Each row gets a CheckBox bound to its reserved `_selected` key, and a toolbar above the list carries one button per bulk action plus "Select page" and "Clear". The server re-reads the selected ids through the table's read under its active query preset, with its scope, as the actor, and runs the action once per record; `visible_when`, `via` and `refreshes` on the action's `action` entity apply per record. A generic bulk action must declare a `:record_id` argument. No `prompt_fields`; not on related tables. See the Bulk Actions topic. |
+| [`display`](#a2ui-component-display){: #a2ui-component-display } | `:list \| :board` | `:list` | How a sectioned `:table` lays out its sections: `:list` (default) stacks them; `:board` renders them side by side as lanes, each with its heading and total, card list and pagination. `:board` requires a `sections` block and a `row_layout`. Cards move between lanes only through row actions (transitions); there is no drag-and-drop. |
 | [`query`](#a2ui-component-query){: #a2ui-component-query } | `atom` |  | Name of a `query` entity providing server-enforced search/sort/filter/pagination (tables). |
 | [`context_filter`](#a2ui-component-context_filter){: #a2ui-component-context_filter } | `keyword` | `[]` | Context scoping for a `:table`: keys are public attributes of the table's resource, values are declared context names (`context_filter user_id: :user`). Each context with a selected value ANDs `attribute == selected value` onto the table's reads; unselected contexts contribute nothing. |
 | [`require_context`](#a2ui-component-require_context){: #a2ui-component-require_context } | `list(atom)` | `[]` | Context names (a subset of this table's `context_filter` contexts) of which **at least one** must be selected before the table reads — otherwise it renders no records (and no read is executed). |
@@ -524,6 +525,14 @@ actor-scoped and authorized like any other read. A surface with a
 sectioned table is always a multi-table surface, regardless of how many
 sections the source yields at runtime.
 
+Without a `source`, the sections are the enumerated values of `scope_by`
+— an `Ash.Type.Enum`'s values or the attribute's `one_of` constraint, in
+declaration order — and no read is issued to enumerate them. `values`
+picks a subset and an order, `labels` overrides headings (otherwise the
+enum's label or the humanized value). Combined with `display :board` on
+the table this renders a board: one lane per value, side by side (see the
+multi-section surfaces topic).
+
 
 
 
@@ -537,6 +546,15 @@ end
 
 ```
 
+```
+sections do
+  scope_by :status
+  values [:open, :claimed, :completed]
+  labels open: "To do"
+end
+
+```
+
 
 
 
@@ -544,13 +562,15 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`source`](#a2ui-component-sections-source){: #a2ui-component-sections-source .spark-required} | `module` |  | The Ash resource whose records enumerate the sections at render time. |
-| [`scope_by`](#a2ui-component-sections-scope_by){: #a2ui-component-sections-scope_by .spark-required} | `atom` |  | The public attribute of the **table's** resource each section's reads filter on (`scope_by == <section record's value attribute>`). |
-| [`label`](#a2ui-component-sections-label){: #a2ui-component-sections-label } | `atom` |  | The source attribute shown as each section's table heading. Defaults like an option label (first existing public attribute of `[:name, :title, :label, :username, :email]`, else the section value). |
-| [`value`](#a2ui-component-sections-value){: #a2ui-component-sections-value } | `atom` |  | The source attribute providing each section's scope value (matched against `scope_by`) and its runtime name. Defaults to the source's primary key (required explicitly when composite). |
-| [`read_action`](#a2ui-component-sections-read_action){: #a2ui-component-sections-read_action } | `atom` |  | The source read action enumerating the sections. Defaults to the primary read. |
-| [`sort`](#a2ui-component-sections-sort){: #a2ui-component-sections-sort } | `atom` |  | The source attribute sections are ordered by (ascending). Defaults to the resolved `label`. |
-| [`limit`](#a2ui-component-sections-limit){: #a2ui-component-sections-limit } | `pos_integer` | `50` | Maximum number of sections rendered (the source read's limit). |
+| [`scope_by`](#a2ui-component-sections-scope_by){: #a2ui-component-sections-scope_by .spark-required} | `atom` |  | The public attribute of the **table's** resource each section's reads filter on (`scope_by == <section record's value attribute>`). Without a `source` it must have enumerable values: an `Ash.Type.Enum` type or a `one_of` constraint. |
+| [`source`](#a2ui-component-sections-source){: #a2ui-component-sections-source } | `module` |  | The Ash resource whose records enumerate the sections at render time. Optional: without it the sections are the enumerated values of `scope_by` (see `values` and `labels`). |
+| [`values`](#a2ui-component-sections-values){: #a2ui-component-sections-values } | `list(atom \| String.t)` |  | Source-less sections only: the enumerated values of `scope_by` that become sections, in this order (`values [:open, :claimed]`). Each must be one of the enumerated values. Defaults to all of them, in declaration order. |
+| [`labels`](#a2ui-component-sections-labels){: #a2ui-component-sections-labels } | `keyword` | `[]` | Source-less sections only: heading overrides per value (`labels open: "To do"`). Sections without an entry are headed by the enum's label, else the humanized value. |
+| [`label`](#a2ui-component-sections-label){: #a2ui-component-sections-label } | `atom` |  | The source attribute shown as each section's table heading (requires `source`). Defaults like an option label (first existing public attribute of `[:name, :title, :label, :username, :email]`, else the section value). |
+| [`value`](#a2ui-component-sections-value){: #a2ui-component-sections-value } | `atom` |  | The source attribute providing each section's scope value (matched against `scope_by`) and its runtime name (requires `source`). Defaults to the source's primary key (required explicitly when composite). |
+| [`read_action`](#a2ui-component-sections-read_action){: #a2ui-component-sections-read_action } | `atom` |  | The source read action enumerating the sections (requires `source`). Defaults to the primary read. |
+| [`sort`](#a2ui-component-sections-sort){: #a2ui-component-sections-sort } | `atom` |  | The source attribute sections are ordered by (ascending; requires `source`). Defaults to the resolved `label`. |
+| [`limit`](#a2ui-component-sections-limit){: #a2ui-component-sections-limit } | `pos_integer` | `50` | Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count. |
 
 
 

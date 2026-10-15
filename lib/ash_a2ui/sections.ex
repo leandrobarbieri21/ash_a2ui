@@ -21,6 +21,14 @@ defmodule AshA2ui.Sections do
   so the scoped paths — and the `"component"` context keys baked into
   emitted controls — never change shape between renders.
 
+  A `sections` block without a `source` enumerates its sections from the
+  values of `scope_by` instead (an `Ash.Type.Enum`'s values or a `one_of`
+  constraint, narrowed and ordered by `values`, headed per `labels`): no
+  read is issued, and the runtime names, scoped paths and per-section
+  filters are exactly those of a source-backed set. A `:table` with
+  `display :board` renders such a set as side-by-side lanes (see
+  `AshA2ui.Board`).
+
   `refreshes` metadata may target the template key (`refreshes
   [:per_bucket]`): after expansion it covers every runtime table of the set.
 
@@ -41,17 +49,21 @@ defmodule AshA2ui.Sections do
     :value,
     :read_action,
     :sort,
+    :values,
+    labels: [],
     limit: 50,
     __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
-          source: module,
+          source: module | nil,
           scope_by: atom,
           label: atom | nil,
           value: atom | nil,
           read_action: atom | nil,
           sort: atom | nil,
+          values: [atom | String.t()] | nil,
+          labels: keyword,
           limit: pos_integer
         }
 
@@ -148,7 +160,8 @@ defmodule AshA2ui.Sections do
         section: %{
           value: value,
           label: label,
-          filter: {config.scope_by, value}
+          filter: {config.scope_by, value},
+          template: table.name
         }
       })
     end)
@@ -207,6 +220,12 @@ defmodule AshA2ui.Sections do
       end)
 
     %{view | tables: tables, components: components, refreshes: refreshes}
+  end
+
+  # Source-less sections (boards): the lanes are the enumerated values of
+  # `scope_by`, synthesized as `%{value, label}` records — no read.
+  defp read_sections(%{source: nil} = config, _opts) do
+    {:ok, config.resource |> AshA2ui.Board.lanes(config) |> Enum.take(config.limit)}
   end
 
   defp read_sections(config, opts) do

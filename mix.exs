@@ -128,6 +128,7 @@ defmodule AshA2ui.MixProject do
           AshA2ui.Query,
           AshA2ui.Action,
           AshA2ui.Sections,
+          AshA2ui.Board,
           AshA2ui.Editable,
           AshA2ui.Export
         ],

@@ -29,6 +29,26 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   a `:record_id` argument, `prompt_fields` and related tables. Basic-composed on both spec versions and under the
   admin catalog. Prior art: PyroManiac's bulk actions. Surfaces without
   bulk actions serialize unchanged. See the Bulk Actions topic.
+- **Boards** — `sections` no longer requires a `source`: without one, the
+  sections are the enumerated values of `scope_by` (an `Ash.Type.Enum` or a
+  `one_of` constraint), narrowed and ordered by the new `values` option and
+  headed per the new `labels` option, with no read to enumerate them. The
+  new `:table` option `display :board` renders such a set as lanes side by
+  side (a horizontal `List` of lane `Column`s, each with its heading, a
+  total at the reserved `/_lane_total_<lane>` path, its card list and its
+  pagination), on v0.9.1 and v1.0. Cards move through transition row
+  actions (`visible_when` + `refreshes` on the template key); there is no
+  drag-and-drop. The lane scope is ANDed onto every read, so a client
+  filter cannot widen it. Compile-time rules cover enumerability,
+  `values`/`labels` membership, lanes that would share a runtime name
+  (a repeated value, or values that sanitize alike), a `limit` below the
+  lane count (on a board `limit` caps lanes, not cards per lane),
+  source-only options and the board's `sections` + `row_layout`
+  requirement. ChoicePicker options, choice text in rows and lane headings
+  share one labelling rule (`AshA2ui.TypeMapper.choices/2`). `display :list` (the default)
+  output is unchanged. The kanban vocabulary comes from PyroManiac
+  (frankdugan3/pyro_maniac); see
+  `notes/2026-10-15-pyro-maniac-borrowings.md`.
 - **Related tables** — a `:table` component may name its own `resource`
   (`component :table, :messages do resource MyApp.Message; context_filter
   thread_id: :thread; require_context [:thread] end`): fields, read action,
@@ -68,6 +88,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   context selects the surface's own resource.
 
 ### Bug Fixes:
+
+- **Sectioned tables under the admin catalog** — with `catalog: :admin_v1`,
+  any surface with a `sections` block raised `KeyError` (key `:sections`
+  not found) while encoding, because the expanded section tables no longer
+  carry the template's `sections` key. They now fall back to the basic
+  composition, as the admin catalog contract describes.
 
 - The admin Pagination now reads the encoder's `previousAction` envelope
   (it only declared `prevAction`, falling back to a reconstructed envelope).

@@ -175,6 +175,123 @@ authorized like any other read — and each returned record becomes one table:
   `select_context` (compile-time verified by
   `AshA2ui.Verifiers.VerifySections`).
 
+## Boards: sections over an attribute's values
+
+A board is a sectioned table whose sections come from the **values of an
+attribute** instead of the records of a source resource, rendered as lanes
+side by side. It adds no component kind: it is a `sections` block without a
+`source`, plus `display :board` on the table. Expansion, per-lane reads and
+pagination, and template-key refresh fan-out are the same as above.
+
+```elixir
+component :table, :board do
+  display :board
+  row_actions [:claim, :complete]
+  query :lane_q                         # optional: per-lane pagination
+
+  row_layout do
+    title :name
+    badge :priority
+  end
+
+  sections do
+    scope_by :status                      # lanes = enumerated values of :status
+    values [:open, :claimed, :completed]  # optional: subset + order
+    labels open: "To do"                  # optional: per-lane heading overrides
+  end
+end
+
+action :claim do
+  visible_when status: :open
+  refreshes [:board]                      # template key -> every lane
+end
+
+action :complete do
+  visible_when status: :claimed
+  refreshes [:board]
+end
+```
+
+**Lanes.** Without `source`, the sections are the enumerated values of
+`scope_by`: an `Ash.Type.Enum`'s values, or the `one_of` constraint of an
+attribute (or calculation), in declaration order. No read is issued to
+enumerate them. `values` picks a subset and an order; `labels` overrides
+headings, which otherwise are the enum's label or the humanized value. Each
+lane is an ordinary expanded table: runtime name `<template_key>_<value>`
+(`board_open`), records at `/records/board_open`, query state at
+`/query/board_open`, reads ANDed with `status == :open`. A lane with no
+records is kept and shows its empty state.
+
+**Rendering.** `display :board` emits one root child, `board_<template_key>`:
+a `Column` holding an h2 heading, the create affordance (v2, when the
+surface has a create action) and `board_<template_key>_lanes`, a **horizontal
+`List`** of lane `Column`s. It is a `List`, not a `Row`, because the basic
+`Row` cannot wrap (see the Layout topic); renderers typically scroll a
+horizontal list. Each lane `Column` (`lane_<lane>`) holds:
+
+- `lane_<lane>_header`: a `Row` of the lane heading (`table_heading_<lane>`,
+  h3) and the lane total (`lane_<lane>_total`, bound to the reserved
+  `/_lane_total_<lane>` string),
+- `query_<lane>_controls`, only when the lane's query declares search,
+  presets, filters or ranges,
+- `records_list_<lane>` with the `row_layout` cards, row actions and
+  visibility slots of the list composition,
+- the v2 empty state and the lane's pagination and export controls.
+
+`display :list` (the default) keeps the stacked rendering above, unchanged.
+The admin catalog renders boards with this basic composition, as it does
+every sectioned table.
+
+**Totals.** `/_lane_total_<lane>` is the lane query's `totalCount` when it
+has one, else the lane's row count (`"5+"` when the query reports more rows
+without a count). The initial render, action refreshes and `query` actions
+rewrite it beside the lane's records. A records-only push
+(`encode_data_model(view, records, scope: :records)`) replaces `/records`
+alone and leaves the totals as they were; push a full data model when they
+must follow.
+
+**`limit` caps lanes.** Without a `source`, `limit` (default 50) is the
+maximum number of lanes, as it is the maximum number of sections with one.
+It is not a per-lane card limit: a lane's page size comes from its query
+(`page_size`). A `limit` below the number of lanes is a compile error, so no
+lane is dropped silently.
+
+**Moves.** A card moves when a transition runs: a row action gated by
+`visible_when` on the lane attribute that refreshes the template key. The
+server runs the action like any row action, then re-reads every lane, so the
+card leaves one lane and appears in the next. There is no drag-and-drop: it
+needs pointer events the basic catalog does not have. A future custom
+catalog component can add it, and its drop would still be an `invoke` of a
+declared transition, validated server-side like a button.
+
+**Scope cannot be widened.** A lane's `scope_by == value` filter is ANDed
+onto every read, including `"query"` actions. A client filter on the lane
+attribute that names another value returns nothing; it cannot pull records
+from another lane. Only declared lanes are addressable components.
+
+**Rules** (compile-time verified):
+
+- Without `source`, `scope_by` must have enumerable values, every `values`
+  entry and every `labels` key must be one of them, and `label`, `value`,
+  `sort` and `read_action` are not allowed.
+- No two lanes may share a runtime name: a value listed twice in `values`
+  (`:open` and `"open"` count as the same value) and two values that
+  sanitize alike (`:"in-progress"` and `:in_progress`, both
+  `board_in_progress`) are rejected.
+- Without `source`, `limit` may not be below the number of lanes.
+- With `source`, `values` and `labels` are not allowed.
+- `display :board` needs a `:table` with a `sections` block and a
+  `row_layout`.
+
+**Not included:** ordering within a lane by a stored rank, WIP limits,
+swimlanes on a second axis, and a generated move action. Transitions are the
+resource's own actions, so state-machine rules stay on the resource.
+
+Prior art: the board vocabulary comes from PyroManiac
+(<https://github.com/frankdugan3/pyro_maniac>), an Ash UI DSL with kanban
+views. We borrowed the idea, not the code; the design record is
+`notes/2026-10-15-pyro-maniac-borrowings.md`.
+
 ## Inline cell editing: `editable`
 
 An `editable` block renders an allowlist of a table's fields as in-row

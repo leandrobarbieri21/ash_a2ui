@@ -246,7 +246,13 @@ defmodule AshA2ui.Experience do
   The per-table empty-state text (e.g. `"No Appointment records yet."`).
   """
   @spec empty_message(ResolvedView.t(), ResolvedView.table()) :: String.t()
-  def empty_message(view, table), do: "No #{collection_label(view, table)} records yet."
+  def empty_message(view, table) do
+    # A board lane is headed by its value already; its empty state names
+    # the records ("No Task records yet."), not the runtime lane name.
+    if AshA2ui.Board.lane?(table),
+      do: "No #{resource_label(view)} records yet.",
+      else: "No #{collection_label(view, table)} records yet."
+  end
 
   @doc false
   # The humanized collection name for a table: the resource label on

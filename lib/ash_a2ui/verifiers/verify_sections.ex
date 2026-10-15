@@ -10,7 +10,16 @@ defmodule AshA2ui.Verifiers.VerifySections do
     * `label` / `value` / `sort`, when declared, are public attributes of the
       section `source`,
     * `read_action`, when declared, is a read action of the source,
-    * a source with a composite primary key requires an explicit `value`.
+    * a source with a composite primary key requires an explicit `value`,
+    * with a `source`, `values` and `labels` are not declared (they shape
+      source-less sections only),
+    * without a `source` (a board's enumerated lanes, see `AshA2ui.Board`):
+      `label` / `value` / `sort` / `read_action` are not declared, `scope_by`
+      has enumerable values (an `Ash.Type.Enum` or a `one_of` constraint),
+      every `values` entry is one of them, and every `labels` key is one of
+      them; no two lanes share a runtime name (a value listed twice, or two
+      values that sanitize alike), and `limit` is not below the number of
+      lanes (it caps lanes, not cards per lane).
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. Skipped checks degrade gracefully when the target
@@ -49,7 +58,10 @@ defmodule AshA2ui.Verifiers.VerifySections do
     with :ok <- verify_table(component, key, module),
          :ok <- verify_no_select_context(component, key, module),
          :ok <- verify_scope_by(component, key, dsl_state, module) do
-      verify_source(component, key, module)
+      case component.sections.source do
+        nil -> verify_enumerated(component, key, dsl_state, module)
+        _source -> verify_source(component, key, module)
+      end
     end
   end
 
@@ -105,6 +117,33 @@ defmodule AshA2ui.Verifiers.VerifySections do
     sections = component.sections
     source = sections.source
 
+    with :ok <-
+           verify_source_only(
+             sections,
+             [:values],
+             key,
+             module,
+             "applies only to sections without a source"
+           ),
+         :ok <- verify_labels_without_source(sections, key, module) do
+      verify_source_attributes(sections, source, key, module)
+    end
+  end
+
+  defp verify_labels_without_source(%{labels: []}, _key, _module), do: :ok
+
+  defp verify_labels_without_source(_sections, key, module) do
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :component, key, :sections, :labels],
+       message:
+         "labels shape source-less sections only: with a source, headings come " <>
+           "from the source's label attribute"
+     )}
+  end
+
+  defp verify_source_attributes(sections, source, key, module) do
     if Code.ensure_loaded?(source) and ResourceInfo.resource?(source) do
       with :ok <- verify_source_attribute(sections, :label, key, module),
            :ok <- verify_source_attribute(sections, :value, key, module),
@@ -115,6 +154,142 @@ defmodule AshA2ui.Verifiers.VerifySections do
     else
       :ok
     end
+  end
+
+  # --- source-less sections (enumerated values) ---
+
+  defp verify_enumerated(component, key, dsl_state, module) do
+    sections = component.sections
+
+    with :ok <-
+           verify_source_only(
+             sections,
+             [:label, :value, :sort, :read_action],
+             key,
+             module,
+             "requires a source"
+           ) do
+      case target_resource(dsl_state) do
+        nil -> :ok
+        resource -> verify_enumerable(sections, key, resource, module)
+      end
+    end
+  end
+
+  # Options that belong to one mode only: `values` without a source,
+  # `label`/`value`/`sort`/`read_action` with one.
+  defp verify_source_only(sections, options, key, module, requirement) do
+    case Enum.find(options, &(not is_nil(Map.fetch!(sections, &1)))) do
+      nil ->
+        :ok
+
+      option ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :sections, option],
+           message: "sections option #{option} #{requirement}"
+         )}
+    end
+  end
+
+  defp verify_enumerable(sections, key, resource, module) do
+    labelled = Keyword.keys(sections.labels)
+
+    case AshA2ui.Board.enumerated_values(resource, sections.scope_by) do
+      {:ok, all} ->
+        with :ok <- verify_known_values(sections.values || [], all, :values, key, module),
+             :ok <- verify_known_values(labelled, all, :labels, key, module),
+             lanes = Enum.map(sections.values || all, &AshA2ui.Board.match_value(&1, all)),
+             :ok <- verify_distinct_lanes(sections, lanes, key, module) do
+          verify_lane_limit(sections, lanes, key, module)
+        end
+
+      :error ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :sections, :scope_by],
+           message:
+             "sections without a source need enumerable values: scope_by " <>
+               "#{inspect(sections.scope_by)} is neither an Ash.Type.Enum nor " <>
+               "constrained by one_of"
+         )}
+    end
+  end
+
+  defp verify_known_values(values, all, option, key, module) do
+    case Enum.find(values, &is_nil(AshA2ui.Board.match_value(&1, all))) do
+      nil ->
+        :ok
+
+      unknown ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :sections, option],
+           message:
+             "#{option} entry #{inspect(unknown)} is not an enumerated value of " <>
+               "scope_by (#{Enum.map_join(all, ", ", &inspect/1)})"
+         )}
+    end
+  end
+
+  # Every lane is a table with its own component ids and data-model paths
+  # (`AshA2ui.Sections.section_name/2`), so two lanes may not share a
+  # runtime name: neither a value listed twice in `values` (`:open` and
+  # `"open"` are the same value) nor two values that sanitize alike
+  # (`:"in-progress"` and `:in_progress`).
+  defp verify_distinct_lanes(sections, lanes, key, module) do
+    clash =
+      lanes
+      |> Enum.group_by(&AshA2ui.Sections.section_name(key, &1))
+      |> Enum.find(fn {_name, values} -> length(values) > 1 end)
+
+    case clash do
+      nil ->
+        :ok
+
+      {name, values} ->
+        option = if sections.values, do: :values, else: :scope_by
+
+        message =
+          case Enum.uniq(values) do
+            [value] ->
+              "values lists #{inspect(value)} more than once: each lane is " <>
+                "rendered once, as #{name}"
+
+            distinct ->
+              "lane values #{Enum.map_join(distinct, " and ", &inspect/1)} collide " <>
+                "on the runtime name #{name}: list only one of them in values"
+          end
+
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :sections, option],
+           message: message
+         )}
+    end
+  end
+
+  # Without a source, `limit` caps the number of lanes, not the cards per
+  # lane (a lane's page size comes from its query); a limit below the lane
+  # count would drop the trailing lanes silently.
+  defp verify_lane_limit(%{limit: limit}, lanes, _key, _module) when limit >= length(lanes),
+    do: :ok
+
+  defp verify_lane_limit(sections, lanes, key, module) do
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :component, key, :sections, :limit],
+       message:
+         "limit #{sections.limit} is below the #{length(lanes)} lanes " <>
+           "(#{Enum.map_join(lanes, ", ", &inspect/1)}): without a source, limit " <>
+           "caps the number of lanes, not the cards per lane (set a lane's page " <>
+           "size with its query's page_size); narrow the lanes with values instead"
+     )}
   end
 
   defp verify_source_attribute(sections, option, key, module) do

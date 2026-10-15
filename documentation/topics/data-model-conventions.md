@@ -23,6 +23,7 @@ custom hooks, and tests can rely on them.
 | `/ui/action_result_text` | The human-readable rendering of `/ui/action_result` | Same as `/ui/action_result` |
 | `/query` | The current search/filter/preset/sort/pagination state of a query-enabled table (multi-table surfaces: an object keyed by table component name) | Initial render; after every `query` action; alongside query-aware success refreshes |
 | `/query/<component_name>` | One table's query state on a **multi-table** surface | Same as `/query`, per table |
+| `/_lane_total_<lane>` | A board lane's total as a string (`"3"`, `"5+"`) — only on surfaces with `display :board` tables | Initial render; action refreshes and `query` actions on that lane. A `scope: :records` push leaves it untouched |
 | `/prompt/values/<action>` | The input values of a prompt-enabled row action's Modal (only on surfaces with `prompt_fields` actions) | Initial render (empty); pre-filled on `prompt`; cleared after a successful prompt `invoke` |
 | `/context/<name>` | One surface context's selection state (`{"search", "value", "label"}`) — only on surfaces with `context` entities | Initial render; every `context_select`/`context_clear` (the whole `/context` map is rewritten) |
 | `/options/<context>` | A picker context's option list (same `{"label","value"}` shape; shares the `/options` namespace) | Initial render; `context_search`; cascades that re-derive a dependent context's options |
@@ -93,6 +94,26 @@ component (named via `component :table, :some_name` — see
   }
 }
 ```
+
+## Board lanes: `/_lane_total_<lane>`
+
+A `display :board` table (see
+[Multi-Section Surfaces](multi-section-surfaces.md#boards-sections-over-an-attribute-s-values))
+is a set of expanded tables, one per lane, so each lane follows the
+multi-table rules above under its runtime name (`/records/board_open`,
+`/query/board_open`). One reserved root key is added per lane:
+
+- `/_lane_total_<lane>` — the lane's total as a **string**, bound by the
+  lane heading: the lane query's `totalCount` when present, else the number
+  of rows in the lane, suffixed `+` when the query reports more rows but no
+  count. It sits at the root beside the v2 `_empty_visible_<table>`
+  sentinels. The initial render, action refreshes (`refreshes`) and
+  `query` actions rewrite it beside the lane's records. A records-only
+  push (`encode_data_model(view, records, scope: :records)`) replaces
+  `/records` alone and leaves it as it was, like the `_empty_visible`
+  sentinels; push a full data model when the totals must follow.
+
+Surfaces without boards never carry the key.
 
 ## `refreshes` — per-action refresh regions
 

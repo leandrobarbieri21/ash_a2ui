@@ -10,7 +10,9 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       referenced twice across `title`/`badge`/`meta`, `badge_text` values
       that are strings, `badge_text` only alongside a `badge`, and
       `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` (also only
-      alongside a `badge`).
+      alongside a `badge`),
+    * `display :board` appears only on `:table` components that declare a
+      `sections` block and a `row_layout` (lanes render cards).
 
   Field-membership checks run against the component's field list as filled
   in by `AshA2ui.Transformers.InferFields`; components whose fields could
@@ -62,11 +64,29 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
                   "`row_layout` entities are only supported on :table components"
             )}}
 
+        invalid_board?(component) ->
+          {:halt,
+           {:error,
+            error(module, [:a2ui, :component, AshA2ui.Component.key(component), :display],
+              message:
+                "component #{inspect(AshA2ui.Component.key(component))} declares display " <>
+                  ":board: a board needs a :table component with a sections block and " <>
+                  "a row_layout"
+            )}}
+
         true ->
           {:cont, :ok}
       end
     end)
   end
+
+  # A board renders sections as lanes of cards: it needs a sectioned :table
+  # with a row_layout.
+  defp invalid_board?(%{display: :board} = component) do
+    component.name != :table or is_nil(component.sections) or is_nil(component.row_layout)
+  end
+
+  defp invalid_board?(_component), do: false
 
   defp verify_component(%{name: :form} = component, module) do
     verify_groups(component, module)

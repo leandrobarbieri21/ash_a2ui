@@ -134,7 +134,7 @@ defmodule AshA2ui.ResolvedView do
   `AshA2ui.Sections.expand/2` replaces it with one concrete table per
   section record before encoding/dispatch — each with a runtime string
   `name`, runtime-scoped paths, and a `section` key
-  (`%{value:, label:, filter: {attribute, value}}`) its reads AND on.
+  (`%{value:, label:, filter: {attribute, value}, template:}`) its reads AND on.
   """
   @type table :: %{
           name: atom | String.t(),
@@ -614,7 +614,7 @@ defmodule AshA2ui.ResolvedView do
         context_filter: component.context_filter,
         require_context: component.require_context,
         select_context: component.select_context,
-        sections: resolve_sections(component.sections),
+        sections: resolve_sections(component.sections, resource),
         editable: resolve_editable(resource, component.editable),
         export: resolve_export(component, component.fields || public_attribute_names(resource))
       }
@@ -658,9 +658,25 @@ defmodule AshA2ui.ResolvedView do
   # The resolved dynamic-section config of a sectioned table template, with
   # the label/value/sort/read_action defaults applied (like an option
   # source's). Consumed by `AshA2ui.Sections.expand/2`.
-  defp resolve_sections(nil), do: nil
+  defp resolve_sections(nil, _resource), do: nil
 
-  defp resolve_sections(sections) do
+  # Source-less sections enumerate scope_by's values at expansion time
+  # (AshA2ui.Board.lanes/2); the synthesized lane records carry `:value`
+  # and `:label` keys.
+  defp resolve_sections(%{source: nil} = sections, resource) do
+    %{
+      source: nil,
+      resource: resource,
+      scope_by: sections.scope_by,
+      label: :label,
+      value: :value,
+      values: sections.values,
+      labels: sections.labels,
+      limit: sections.limit
+    }
+  end
+
+  defp resolve_sections(sections, _resource) do
     value = sections.value || sections_single_primary_key!(sections)
     label = sections.label || default_option_label(sections.source, value)
 

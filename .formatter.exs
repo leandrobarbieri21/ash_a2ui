@@ -22,6 +22,7 @@ spark_locals_without_parens = [
   default_sort: 1,
   depends_on: 1,
   depends_on_path: 1,
+  display: 1,
   editable: 0,
   editable: 1,
   export: 0,
@@ -38,6 +39,7 @@ spark_locals_without_parens = [
   group: 2,
   hidden: 1,
   label: 1,
+  labels: 1,
   limit: 1,
   link: 1,
   link_label: 1,
@@ -84,6 +86,7 @@ spark_locals_without_parens = [
   title: 1,
   update_action: 1,
   value: 1,
+  values: 1,
   via: 1,
   visible_when: 1,
   widget: 1

@@ -190,7 +190,8 @@ end
   the server re-reads the page and rewrites its rows with `_selected` set
   (Select page / Clear). Carried rows are never echoed back. On a table
   without a query, Select page marks at most the bulk cap's worth of rows.
-- No `prompt_fields` on bulk actions, no bulk actions on related tables,
+- No `prompt_fields` on bulk actions, no bulk actions on related tables or
+  `display :board` tables,
   and bulk actions are not exposed as AG-UI tools. Full contract in the
   bulk-actions topic.
 

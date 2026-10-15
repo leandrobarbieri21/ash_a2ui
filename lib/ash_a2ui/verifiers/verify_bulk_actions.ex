@@ -13,7 +13,9 @@ defmodule AshA2ui.Verifiers.VerifyBulkActions do
     * a bulk action may not declare `prompt_fields` (one shared prompt for
       many records is not supported),
     * the table's resource has a single primary key (the selection is a
-      list of row ids).
+      list of row ids),
+    * the table is not a `display :board` (board lanes render without the
+      selection toolbar, so the declaration would silently do nothing).
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. The resource-dependent checks are skipped when no
@@ -62,6 +64,15 @@ defmodule AshA2ui.Verifiers.VerifyBulkActions do
       component,
       "related table #{inspect(Component.key(component))}: a related table is read-only, " <>
         "so it cannot declare bulk_actions (they run against the surface resource)"
+    )
+  end
+
+  defp verify_component(%Component{display: :board} = component, _settings, _target, module) do
+    error(
+      module,
+      component,
+      "table #{inspect(Component.key(component))} is a display :board: board lanes have no " <>
+        "selection toolbar, so bulk_actions are not supported on boards"
     )
   end
 

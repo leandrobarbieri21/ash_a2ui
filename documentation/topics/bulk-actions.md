@@ -53,6 +53,8 @@ Compile-time rules (`AshA2ui.Verifiers.VerifyBulkActions`):
   `bulk_actions`, for the same reason it may not declare `row_actions`.
 - The resource must have a single primary key, because the selection is a
   list of row ids.
+- A `display :board` table may not declare `bulk_actions`. Board lanes
+  render without the selection toolbar.
 
 ## What renders
 

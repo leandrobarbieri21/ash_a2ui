@@ -21,8 +21,9 @@ Sub-rules (addressable as `ash_a2ui:<name>`):
   search/sort/filter/pagination.
 - `ash_a2ui:relationships` — `belongs_to` form selects (inference,
   `option_*` defaults, `/options/<field>`) and `source` table columns.
-- `ash_a2ui:layout` — `group` form sections (labeled N-column grids) and
-  `row_layout` card-style table rows (title + badge header, metadata grid).
+- `ash_a2ui:layout` — `group` form sections (labeled N-column grids),
+  `row_layout` card-style table rows (title + badge header, metadata grid),
+  and `display :board` boards (lanes over an attribute's values).
 - `ash_a2ui:contexts` — surface `context` entities (server-validated
   selections, dependent options, `context_filter`/`require_context`/
   `select_context`) and `:detail` components.
@@ -135,6 +136,13 @@ end
   at render time into one scoped table per source record, under runtime
   names following the multi-table conventions. `refreshes` naming the
   template key fans out to the whole set (multi-section-surfaces topic).
+- When the sections are the *values of an attribute* (a status, a stage),
+  omit `source`: the lanes are `scope_by`'s `Ash.Type.Enum` values or
+  `one_of` constraint, narrowed/ordered by `values`, headed per `labels`, with
+  no read to enumerate them. Add `display :board` (plus a `row_layout`) to
+  render them as side-by-side lanes. Cards move only through transition row
+  actions gated by `visible_when` that refresh the template key — no
+  drag-and-drop (rules in `ash_a2ui:layout`).
 - Per-cell editing (spreadsheet-style columns) is an `editable` block on
   the table (`fields` allowlist + `update_action`), not a form: cells
   commit through the `"edit_cell"` action, validation errors mirror into

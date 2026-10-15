@@ -646,6 +646,14 @@ defmodule AshA2ui do
     actor-scoped and authorized like any other read. A surface with a
     sectioned table is always a multi-table surface, regardless of how many
     sections the source yields at runtime.
+
+    Without a `source`, the sections are the enumerated values of `scope_by`
+    — an `Ash.Type.Enum`'s values or the attribute's `one_of` constraint, in
+    declaration order — and no read is issued to enumerate them. `values`
+    picks a subset and an order, `labels` overrides headings (otherwise the
+    enum's label or the humanized value). Combined with `display :board` on
+    the table this renders a board: one lane per value, side by side (see the
+    multi-section surfaces topic).
     """,
     examples: [
       """
@@ -654,28 +662,58 @@ defmodule AshA2ui do
         scope_by :bucket_id
         label :name
       end
+      """,
+      """
+      sections do
+        scope_by :status
+        values [:open, :claimed, :completed]
+        labels open: "To do"
+      end
       """
     ],
     target: AshA2ui.Sections,
     schema: [
       source: [
         type: {:behaviour, Ash.Resource},
-        required: true,
-        doc: "The Ash resource whose records enumerate the sections at render time."
+        doc: """
+        The Ash resource whose records enumerate the sections at render time.
+        Optional: without it the sections are the enumerated values of
+        `scope_by` (see `values` and `labels`).
+        """
       ],
       scope_by: [
         type: :atom,
         required: true,
         doc: """
         The public attribute of the **table's** resource each section's reads
-        filter on (`scope_by == <section record's value attribute>`).
+        filter on (`scope_by == <section record's value attribute>`). Without a
+        `source` it must have enumerable values: an `Ash.Type.Enum` type or a
+        `one_of` constraint.
+        """
+      ],
+      values: [
+        type: {:list, {:or, [:atom, :string]}},
+        doc: """
+        Source-less sections only: the enumerated values of `scope_by` that
+        become sections, in this order (`values [:open, :claimed]`). Each
+        must be one of the enumerated values. Defaults to all of them, in
+        declaration order.
+        """
+      ],
+      labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Source-less sections only: heading overrides per value
+        (`labels open: "To do"`). Sections without an entry are headed by
+        the enum's label, else the humanized value.
         """
       ],
       label: [
         type: :atom,
         doc: """
-        The source attribute shown as each section's table heading. Defaults
-        like an option label (first existing public attribute of `[:name,
+        The source attribute shown as each section's table heading (requires
+        `source`). Defaults like an option label (first existing public attribute of `[:name,
         :title, :label, :username, :email]`, else the section value).
         """
       ],
@@ -683,25 +721,27 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         The source attribute providing each section's scope value (matched
-        against `scope_by`) and its runtime name. Defaults to the source's
+        against `scope_by`) and its runtime name (requires `source`). Defaults to the source's
         primary key (required explicitly when composite).
         """
       ],
       read_action: [
         type: :atom,
-        doc: "The source read action enumerating the sections. Defaults to the primary read."
+        doc:
+          "The source read action enumerating the sections (requires `source`). Defaults to the primary read."
       ],
       sort: [
         type: :atom,
         doc: """
-        The source attribute sections are ordered by (ascending). Defaults to
-        the resolved `label`.
+        The source attribute sections are ordered by (ascending; requires
+        `source`). Defaults to the resolved `label`.
         """
       ],
       limit: [
         type: :pos_integer,
         default: 50,
-        doc: "Maximum number of sections rendered (the source read's limit)."
+        doc:
+          "Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count."
       ]
     ]
   }
@@ -925,6 +965,17 @@ defmodule AshA2ui do
         apply per record. A generic bulk action must declare a `:record_id`
         argument. No `prompt_fields`; not on related tables. See the Bulk
         Actions topic.
+        """
+      ],
+      display: [
+        type: {:one_of, [:list, :board]},
+        default: :list,
+        doc: """
+        How a sectioned `:table` lays out its sections: `:list` (default)
+        stacks them; `:board` renders them side by side as lanes, each with
+        its heading and total, card list and pagination. `:board` requires a
+        `sections` block and a `row_layout`. Cards move between lanes only
+        through row actions (transitions); there is no drag-and-drop.
         """
       ],
       query: [

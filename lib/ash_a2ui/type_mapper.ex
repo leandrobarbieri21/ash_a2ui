@@ -10,6 +10,8 @@ defmodule AshA2ui.TypeMapper do
   `"TextField"`, ...) lives in the encoder (`AshA2ui.Encoder.V0_9_1`).
   """
 
+  alias Ash.Resource.Info, as: ResourceInfo
+
   @text_field_types [Ash.Type.String, Ash.Type.CiString] ++
                       [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
 
@@ -58,4 +60,51 @@ defmodule AshA2ui.TypeMapper do
   end
 
   def enum_type?(_type), do: false
+
+  @doc """
+  The enumerated choices of the attribute or calculation `name` on
+  `resource` (a resource module or its DSL state), as `{value, label}`
+  pairs in declaration order: an `Ash.Type.Enum`'s values labelled by its
+  `label/1` (humanized when the enum declares no label), else the `one_of`
+  constraint's values humanized. `[]` when `name` is neither, or has no
+  enumerable values.
+
+  This is the one labelling rule behind ChoicePicker options, choice text
+  in rows and board lane headings, so all three agree for the same value.
+  """
+  @spec choices(module | map, atom) :: [{atom | String.t(), String.t()}]
+  def choices(resource, name) do
+    case ResourceInfo.attribute(resource, name) || ResourceInfo.calculation(resource, name) do
+      %{type: type} = field ->
+        type = Ash.Type.get_type(type)
+
+        if enum_type?(type) do
+          Enum.map(type.values(), &{&1, enum_label(type, &1)})
+        else
+          field.constraints
+          |> one_of()
+          |> Enum.map(&{&1, humanize(&1)})
+        end
+
+      nil ->
+        []
+    end
+  end
+
+  defp one_of(constraints), do: Keyword.get(constraints, :one_of) || []
+
+  # `Ash.Type.Enum.label/1` is nil unless the enum declared explicit labels.
+  defp enum_label(type, value) do
+    case type.label(value) do
+      nil -> humanize(value)
+      label -> to_string(label)
+    end
+  end
+
+  defp humanize(value) do
+    value
+    |> to_string()
+    |> String.replace("_", " ")
+    |> String.capitalize()
+  end
 end

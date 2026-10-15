@@ -2407,6 +2407,19 @@ defmodule AshA2ui.ActionHandler do
   defp records_messages(view, table, rows) do
     [update_data_model(view, table.records_path, rows)]
     |> Kernel.++(empty_state_messages(view, table, rows))
+    |> Kernel.++(lane_total_messages(view, table, rows, nil))
+  end
+
+  # Board lanes rewrite their /_lane_total_<lane> beside their records (see
+  # AshA2ui.Board). A lane with a query takes its total from the query state,
+  # so its records rewrite leaves the total to query_state_messages/4.
+  defp lane_total_messages(view, table, rows, state) do
+    if AshA2ui.Board.lane?(table) and (is_nil(table.query) or not is_nil(state)) do
+      text = AshA2ui.Board.total_text(length(rows), state)
+      [update_data_model(view, AshA2ui.Board.total_path(table), text)]
+    else
+      []
+    end
   end
 
   defp empty_state_messages(view, table, rows) do
@@ -2436,7 +2449,7 @@ defmodule AshA2ui.ActionHandler do
         |> Experience.with_pagination_sentinels(length(rows))
         |> Experience.with_admin_pagination_booleans(length(rows))
       )
-    ]
+    ] ++ lane_total_messages(view, table, rows, state)
   end
 
   # Table rows carry the per-row visibility data (`"_actions"` +
