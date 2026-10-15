@@ -1,0 +1,109 @@
+---
+# Acceptance criteria for A2UI-104 (bulk actions over a row selection).
+# Written BEFORE implementation. Criterion ids are immutable.
+# CI is the only evidence producer. Design:
+# notes/2026-10-15-pyro-maniac-borrowings.md section 1.
+item: A2UI-104
+
+criteria:
+  - id: A2UI-104/AC-1
+    given: a table declaring bulk_actions over an update action
+    when: the surface is encoded for v0.9.1 and for v1.0
+    then: >-
+      every row carries "_selected" false, each row template binds a CheckBox
+      to the row-relative path _selected, a toolbar carries one bulk_invoke
+      Button per bulk action plus Select page and Clear, and both payloads
+      validate against the vendored schemas
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/bulk/bulk_encoder_test.exs::encodes_selection_and_toolbar_for_both_versions
+
+  - id: A2UI-104/AC-2
+    given: three selected rows and a bulk_invoke for an allowed update action
+    when: the handler runs it
+    then: >-
+      each selected record is updated through the action as the actor, the
+      /bulk/<table>/result write reports ok 3, and the target tables are
+      refreshed once with "_selected" false on every row
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/bulk/bulk_action_handler_test.exs::runs_the_action_on_every_selected_record
+
+  - id: A2UI-104/AC-3
+    given: a bulk_invoke naming an action that is a row action but not a bulk
+      action, or not declared at all
+    when: the handler runs it
+    then: no record is read or written and an error status names the refusal
+    verify: sast
+    risk: high
+    test: >-
+      test/ash_a2ui/bulk/bulk_security_test.exs::refuses_actions_outside_bulk_actions
+
+  - id: A2UI-104/AC-4
+    given: carried rows whose selected ids include one the actor cannot read,
+      one outside the table's context scope and one that does not exist
+    when: a bulk_invoke runs
+    then: >-
+      only ids returned by the authorized, scoped re-read are written; the
+      others are counted as refused and are never passed to an action
+    verify: sast
+    risk: high
+    test: >-
+      test/ash_a2ui/bulk/bulk_security_test.exs::forged_and_out_of_scope_ids_are_refused
+
+  - id: A2UI-104/AC-5
+    given: a bulk action with visible_when and a selection mixing records that
+      satisfy it and records that do not
+    when: a bulk_invoke runs
+    then: >-
+      only satisfying records are written; the rest are counted as skipped,
+      using the same predicate as single-row enforcement
+    verify: integration
+    risk: high
+    test: >-
+      test/ash_a2ui/bulk/bulk_action_handler_test.exs::visible_when_skips_records_per_record
+
+  - id: A2UI-104/AC-6
+    given: a selection where one record's action fails validation
+    when: a bulk_invoke runs
+    then: >-
+      the other records are still written, the result reports failed 1 with
+      its error, and the status and v2 feedback signal partial success
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/bulk/bulk_action_handler_test.exs::partial_failure_is_reported_not_rolled_back
+
+  - id: A2UI-104/AC-7
+    given: an empty selection, or more selected ids than the table's page size
+    when: a bulk_invoke runs
+    then: >-
+      an empty selection returns an error status without writes; an oversized
+      one is refused without writes
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/bulk/bulk_security_test.exs::empty_and_oversized_selections_are_refused
+
+  - id: A2UI-104/AC-8
+    given: bulk_actions naming a read action, an action with prompt_fields, or
+      declared on a related table
+    when: the UI module compiles
+    then: a verifier error names the offending action and the rule
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/bulk/bulk_verifier_test.exs::rejects_invalid_bulk_actions
+
+  - id: A2UI-104/AC-9
+    given: a bulk_select with selected true on a page of rows
+    when: the handler runs it
+    then: >-
+      the table's records are rewritten from an authorized re-read with
+      "_selected" true on every row; selected false rewrites them false
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/bulk/bulk_action_handler_test.exs::select_page_and_clear_rewrite_selection

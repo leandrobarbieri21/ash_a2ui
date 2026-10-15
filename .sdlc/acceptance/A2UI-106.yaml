@@ -1,0 +1,103 @@
+---
+# Acceptance criteria for A2UI-106 (wizard steps on forms). Written BEFORE
+# implementation. Criterion ids are immutable. CI is the only evidence
+# producer. Design: notes/2026-10-15-pyro-maniac-borrowings.md section 3.
+item: A2UI-106
+
+criteria:
+  - id: A2UI-106/AC-1
+    given: a form with three steps, the last a review step
+    when: the surface is encoded for v0.9.1 and for v1.0
+    then: >-
+      /ui/wizard/index is 0, /ui/wizard/steps lists the three steps with
+      states, only the first step's fields are visible, Back and Next
+      controls are present, and both payloads validate against the vendored
+      schemas; forms without steps are byte-identical to before
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/wizard/wizard_encoder_test.exs::encodes_steps_for_both_versions
+
+  - id: A2UI-106/AC-2
+    given: a wizard_next on step one with a step-one field invalid and a
+      later-step required field blank
+    when: the handler runs it
+    then: >-
+      the step-one error is written to /errors, the later-step error is not,
+      the index stays 0, and nothing is written to the data layer
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/wizard/wizard_action_handler_test.exs::next_validates_only_reached_steps
+
+  - id: A2UI-106/AC-3
+    given: a wizard_next on step one with step-one fields valid and later
+      fields blank
+    when: the handler runs it
+    then: the index advances to 1, /errors clears and nothing is persisted
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/wizard/wizard_action_handler_test.exs::next_advances_when_the_step_is_valid
+
+  - id: A2UI-106/AC-4
+    given: a wizard_back from step two
+    when: the handler runs it
+    then: the index decrements without validation and /form is unchanged
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/wizard/wizard_action_handler_test.exs::back_does_not_validate
+
+  - id: A2UI-106/AC-5
+    given: a final submit_form whose changeset fails on a field owned by step
+      one
+    when: the handler runs it
+    then: the index jumps to 0 and the error is written to /errors/<field>
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/wizard/wizard_action_handler_test.exs::submit_failure_returns_to_the_owning_step
+
+  - id: A2UI-106/AC-6
+    given: a successful submit, a start_create or a cancel_record_task
+    when: the handler runs it
+    then: the index is reset to 0
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/wizard/wizard_action_handler_test.exs::index_resets_after_submit_and_task_changes
+
+  - id: A2UI-106/AC-7
+    given: a wizard_next whose carried /form contains keys outside the form's
+      fields, or a carried index outside the step range
+    when: the handler runs it
+    then: >-
+      unknown keys never reach the changeset and the index is clamped or
+      refused without atom creation
+    verify: sast
+    risk: high
+    test: >-
+      test/ash_a2ui/wizard/wizard_security_test.exs::carried_state_is_filtered
+
+  - id: A2UI-106/AC-8
+    given: steps leaving a form field unassigned, a field in two steps,
+      duplicate step names, review? not last or with fields, steps mixed with
+      groups, or a single step
+    when: the UI module compiles
+    then: a verifier error names the rule
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/wizard/wizard_verifier_test.exs::rejects_invalid_steps
+
+  - id: A2UI-106/AC-9
+    given: experience v2 with a stepped create form
+    when: the panel state is built on each step
+    then: >-
+      the primary label reads Next before the last step and the existing
+      create label on the last step
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/wizard/wizard_experience_test.exs::primary_label_follows_the_step

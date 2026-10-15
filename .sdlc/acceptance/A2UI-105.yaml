@@ -1,0 +1,89 @@
+---
+# Acceptance criteria for A2UI-105 (boards: sections over an attribute's
+# enumerated values, rendered as lanes). Written BEFORE implementation.
+# Criterion ids are immutable. CI is the only evidence producer. Design:
+# notes/2026-10-15-pyro-maniac-borrowings.md section 2.
+item: A2UI-105
+
+criteria:
+  - id: A2UI-105/AC-1
+    given: a sectioned table without source whose scope_by is an atom
+      attribute with a one_of constraint, and one whose scope_by is an
+      Ash.Type.Enum
+    when: the view is expanded
+    then: >-
+      one concrete table exists per enumerated value, in declaration order,
+      named <template_key>_<value>, each scoped to scope_by == value, and no
+      read is issued to enumerate the lanes
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_sections_test.exs::lanes_come_from_enumerated_values
+
+  - id: A2UI-105/AC-2
+    given: values naming a subset in a custom order and labels overriding one
+      heading
+    when: the view is expanded
+    then: >-
+      only those lanes exist, in that order, with the overridden heading and
+      humanized headings elsewhere
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/board/board_sections_test.exs::values_and_labels_shape_the_lanes
+
+  - id: A2UI-105/AC-3
+    given: a lane with no matching records
+    when: the surface is built
+    then: the lane is still present with its empty state
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/board/board_sections_test.exs::empty_lanes_are_kept
+
+  - id: A2UI-105/AC-4
+    given: a display board table
+    when: the surface is encoded for v0.9.1 and for v1.0
+    then: >-
+      the lanes are emitted side by side, each with its heading, total, card
+      list and pagination, and both payloads validate against the vendored
+      schemas; display list output is byte-identical to before
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_encoder_test.exs::encodes_lanes_side_by_side
+
+  - id: A2UI-105/AC-5
+    given: a card in the open lane and a transition row action gated by
+      visible_when status open that refreshes the template key
+    when: the action is invoked on the card
+    then: >-
+      the record's status changes and every lane is refreshed, so the card
+      leaves the open lane and appears in the claimed lane
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_action_handler_test.exs::transition_moves_the_card_between_lanes
+
+  - id: A2UI-105/AC-6
+    given: a query action naming a lane, with a client filter on the lane
+      attribute that targets another value
+    when: the lane is read
+    then: >-
+      the lane's own scope still applies, so no record from another lane is
+      returned
+    verify: sast
+    risk: high
+    test: >-
+      test/ash_a2ui/board/board_action_handler_test.exs::lane_scope_cannot_be_widened_by_the_client
+
+  - id: A2UI-105/AC-7
+    given: a source-less sections block whose scope_by has no enumerable
+      values, values outside the enumeration, label or sort without source,
+      or display board without sections or row_layout
+    when: the UI module compiles
+    then: a verifier error names the rule
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/board/board_verifier_test.exs::rejects_invalid_boards
