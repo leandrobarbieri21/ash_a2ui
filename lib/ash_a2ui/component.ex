@@ -30,6 +30,7 @@ defmodule AshA2ui.Component do
     display: :list,
     nested_forms: [],
     groups: [],
+    steps: [],
     __spark_metadata__: nil
   ]
 
@@ -58,7 +59,8 @@ defmodule AshA2ui.Component do
           bulk_actions: [atom],
           display: :list | :board,
           nested_forms: [AshA2ui.NestedForm.t()],
-          groups: [AshA2ui.Group.t()]
+          groups: [AshA2ui.Group.t()],
+          steps: [AshA2ui.Step.t()]
         }
 
   @doc """

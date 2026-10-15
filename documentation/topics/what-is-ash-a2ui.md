@@ -111,9 +111,11 @@ replace your rendering stack.
   [Backpex](https://hexdocs.pm/backpex) for Ecto-first admin panels) will
   fight you less. A protocol with a fixed component catalog is a ceiling, not
   a floor.
-- The UI is deeply stateful and server-coupled (multi-step wizards with
-  server round trips per keystroke, collaborative editing) — that's
-  LiveView's home turf.
+- The UI is deeply stateful and server-coupled (server round trips per
+  keystroke, collaborative editing, multi-step flows that branch on an
+  answer, upload files or wait on background work) — that's LiveView's home
+  turf. Linear, server-validated steps over one Ash action are covered by
+  form `step`s (see [Wizard Steps](wizard-steps.md)).
 - You only have one Phoenix web client and no agent/embedding story on the
   horizon: the protocol indirection buys you nothing yet.
 

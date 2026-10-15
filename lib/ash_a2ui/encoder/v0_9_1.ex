@@ -133,6 +133,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   Record values are JSON-safe: dates/datetimes via `to_iso8601`, decimals and
   atoms via `to_string`.
 
+  ## Wizard steps
+
+  A form declaring `step` entities replaces its field children with the
+  `form_wizard` subtree and carries `/ui/wizard` in the data model; see
+  `AshA2ui.Wizard`. Forms without steps are unchanged.
+
   ## Experience v2
 
   With experience v2 (the default; pin
@@ -221,7 +227,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
            |> put_export_state(resolved_view)
            |> put_bulk_state(resolved_view)
            |> put_experience_state(resolved_view)
-           |> put_lane_totals(resolved_view)}
+           |> put_lane_totals(resolved_view)
+           |> put_wizard_state(resolved_view)}
       end
 
     %{
@@ -556,12 +563,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # The form subtree: recordPanel (+ fieldDisplay children for view mode,
   # formSection + actionBar for create/edit) on core surfaces; the
-  # byte-equal basic-v2 form_slot composition when nested forms are
-  # declared.
+  # byte-equal basic-v2 form_slot composition when nested forms or wizard
+  # steps are declared.
   defp admin_form_sections(_view, nil, _options), do: {[], []}
 
   defp admin_form_sections(view, form, options) do
-    if form.nested_forms == [] do
+    if form.nested_forms == [] and form.steps == [] do
       {[admin_record_panel(form) | admin_panel_descendants(view, form, options)],
        ["record_panel"]}
     else
@@ -2144,7 +2151,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
         {%{"id" => "form", "component" => "Card", "child" => "form_body"}, body, footer}
       else
-        children = field_children ++ nested_children ++ ["form_submit_button"]
+        children = field_children ++ nested_children ++ [AshA2ui.Wizard.submit_child(form)]
 
         {%{"id" => "form", "component" => "Column", "children" => children}, children, []}
       end
@@ -2164,9 +2171,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           "children" => body_children
         }
         | footer_components ++ panel_mode_slots(view, form, field_children, nested_children)
-      ] ++ group_components(view, form)
+      ] ++ group_components(view, form) ++ wizard_components(view, form)
     else
-      [form_root] ++ group_components(view, form)
+      [form_root] ++ group_components(view, form) ++ wizard_components(view, form)
     end
   end
 
@@ -2243,6 +2250,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     [anchor, "form_error_#{field}"]
   end
 
+  # A stepped form's fields render inside its wizard pages.
+  defp form_field_children(_view, %{steps: [_ | _]}), do: AshA2ui.Wizard.field_children()
+
   # The ordering contract with groups: walking the form's effective field
   # order, an ungrouped field renders its input/error pair in place, and a
   # group renders (whole, in the group's own field order) at the position of
@@ -2307,6 +2317,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       {field_anchor_ids(view, field), []}
     end)
   end
+
+  # Stepped forms (see AshA2ui.Wizard): the wizard Column, its step pages
+  # and Back/Next controls. Inputs stay the encoder's own field anchors.
+  defp wizard_components(view, form),
+    do: AshA2ui.Wizard.components(view, form, &field_anchor_ids(view, &1))
 
   defp searchable_select?(view, field_name) do
     match?(%{search_fields: [_ | _]}, view.selects[field_name])
@@ -3224,6 +3239,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       value
     else
       Map.put(value, "prompt", %{"values" => prompt_values})
+    end
+  end
+
+  # The reserved /ui/wizard state (step 0) — only on surfaces whose form
+  # declares steps (frozen shape unchanged everywhere else).
+  defp put_wizard_state(value, view) do
+    if AshA2ui.Wizard.stepped?(view) do
+      Map.update!(value, "ui", &Map.put(&1, "wizard", AshA2ui.Wizard.state(view, 0)))
+    else
+      value
     end
   end
 

@@ -74,6 +74,13 @@ The form's children follow the form's effective field order (after `order` /
 Nested forms and the submit button follow all fields, as before. Hidden
 fields drop out of groups exactly as they drop out of the form.
 
+## Wizard steps
+
+A form can also be split into pages with `step` entities (Back/Next over the
+one form, with server-side validation per step and an optional review
+step). Steps are not mixed with groups on one form. See
+[Wizard Steps](wizard-steps.md).
+
 ## Card-style table rows (`row_layout`)
 
 A `row_layout` upgrades a table's records from flat cell rows to cards with

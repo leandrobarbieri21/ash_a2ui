@@ -38,8 +38,12 @@ the declared update action, with validation errors mirrored into the
 failing row's `_error_<field>` key), `"report"` (`:report` components —
 runs the declared generic action; `ash_a2ui:reports`), `"export"`
 (components with an `export` block — answers with the `downloadFile`
-callFunction; `ash_a2ui:reports`) and `"bulk_invoke"` / `"bulk_select"`
-(tables with `bulk_actions` — see "Bulk actions" below). Don't invent new `action.name` values;
+callFunction; `ash_a2ui:reports`), `"bulk_invoke"` / `"bulk_select"`
+(tables with `bulk_actions` — see "Bulk actions" below) and `"wizard_next"` /
+`"wizard_back"` (forms declaring `step`s — Next builds the form action's
+changeset over the carried `/form` through the same path `submit_form` writes
+with, without submitting it, and keeps only errors of reached steps;
+`ash_a2ui:layout`). Don't invent new `action.name` values;
 add a proper Ash action and expose it via `row_actions` instead.
 
 - `"submit_form"` — context `%{"values" => %{...}, "recordId" => id | nil}`.

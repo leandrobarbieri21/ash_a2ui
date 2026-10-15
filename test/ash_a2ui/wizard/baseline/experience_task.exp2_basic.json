@@ -1,0 +1,549 @@
+[
+  {
+    "createSurface": {
+      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "surfaceId": "experience_task"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateComponents": {
+      "components": [
+        {
+          "children": [
+            "form_slot",
+            "status_text",
+            "table_heading",
+            "query_controls",
+            "create_button",
+            "records_list",
+            "empty_state",
+            "query_pagination",
+            "action_result_panel"
+          ],
+          "component": "Column",
+          "id": "root"
+        },
+        {
+          "component": "Text",
+          "id": "table_heading",
+          "text": "Task",
+          "variant": "h2"
+        },
+        {
+          "children": {
+            "componentId": "record_row",
+            "path": "/records"
+          },
+          "component": "List",
+          "id": "records_list"
+        },
+        {
+          "child": "query_controls_body",
+          "component": "Card",
+          "id": "query_controls"
+        },
+        {
+          "children": [
+            "query_search_input",
+            "query_apply_button"
+          ],
+          "component": "Row",
+          "id": "query_controls_body"
+        },
+        {
+          "component": "TextField",
+          "id": "query_search_input",
+          "label": "Search",
+          "value": {
+            "path": "/query/search"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "page": 1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_apply_text",
+          "component": "Button",
+          "id": "query_apply_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_apply_text",
+          "text": "Apply"
+        },
+        {
+          "children": {
+            "componentId": "query_pagination_row",
+            "path": "/query/_pagination_visible"
+          },
+          "component": "List",
+          "id": "query_pagination"
+        },
+        {
+          "children": [
+            "query_prev_slot",
+            "query_page_text",
+            "query_next_slot"
+          ],
+          "component": "Row",
+          "id": "query_pagination_row"
+        },
+        {
+          "children": {
+            "componentId": "query_prev_button",
+            "path": "/query/_previous_visible"
+          },
+          "component": "List",
+          "id": "query_prev_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "pageDelta": -1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_prev_text",
+          "component": "Button",
+          "id": "query_prev_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_prev_text",
+          "text": "Previous"
+        },
+        {
+          "component": "Text",
+          "id": "query_page_text",
+          "text": {
+            "path": "/query/_range_text"
+          }
+        },
+        {
+          "children": {
+            "componentId": "query_next_button",
+            "path": "/query/_next_visible"
+          },
+          "component": "List",
+          "id": "query_next_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "pageDelta": 1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_next_text",
+          "component": "Button",
+          "id": "query_next_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_next_text",
+          "text": "Next"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {},
+              "name": "start_create"
+            }
+          },
+          "child": "create_text",
+          "component": "Button",
+          "id": "create_button",
+          "variant": "primary"
+        },
+        {
+          "component": "Text",
+          "id": "create_text",
+          "text": "Create Task"
+        },
+        {
+          "child": "record_row_content",
+          "component": "Card",
+          "id": "record_row"
+        },
+        {
+          "children": [
+            "table_cell_name",
+            "row_action_destroy_button",
+            "view_button",
+            "edit_button"
+          ],
+          "component": "Row",
+          "id": "record_row_content"
+        },
+        {
+          "children": [
+            "table_cell_name_label",
+            "table_cell_name_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_name"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_name_label",
+          "text": "Name",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_name_value",
+          "text": {
+            "path": "name"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "destroy",
+                "component": "table",
+                "query": {
+                  "path": "/query"
+                },
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "invoke"
+            }
+          },
+          "child": "row_action_destroy_text",
+          "component": "Button",
+          "id": "row_action_destroy_button"
+        },
+        {
+          "component": "Text",
+          "id": "row_action_destroy_text",
+          "text": "Destroy"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "view_record"
+            }
+          },
+          "child": "view_button_text",
+          "component": "Button",
+          "id": "view_button"
+        },
+        {
+          "component": "Text",
+          "id": "view_button_text",
+          "text": "View"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "start_edit"
+            }
+          },
+          "child": "edit_button_text",
+          "component": "Button",
+          "id": "edit_button"
+        },
+        {
+          "component": "Text",
+          "id": "edit_button_text",
+          "text": "Edit"
+        },
+        {
+          "children": {
+            "componentId": "empty_state_text",
+            "path": "/_empty_visible"
+          },
+          "component": "List",
+          "id": "empty_state"
+        },
+        {
+          "component": "Text",
+          "id": "empty_state_text",
+          "text": {
+            "path": "_empty_message"
+          }
+        },
+        {
+          "children": {
+            "componentId": "form",
+            "path": "/ui/panel/visible"
+          },
+          "component": "List",
+          "id": "form_slot"
+        },
+        {
+          "child": "form_body",
+          "component": "Card",
+          "id": "form"
+        },
+        {
+          "children": [
+            "form_title",
+            "panel_view_slot",
+            "form_fields_slot",
+            "form_footer_divider",
+            "form_footer"
+          ],
+          "component": "Column",
+          "id": "form_body"
+        },
+        {
+          "component": "Divider",
+          "id": "form_footer_divider"
+        },
+        {
+          "children": [
+            "form_submit_slot",
+            "form_cancel_button"
+          ],
+          "component": "Column",
+          "id": "form_footer"
+        },
+        {
+          "children": {
+            "componentId": "panel_view",
+            "path": "/ui/panel/view_visible"
+          },
+          "component": "List",
+          "id": "panel_view_slot"
+        },
+        {
+          "children": [
+            "panel_view_name"
+          ],
+          "component": "Column",
+          "id": "panel_view"
+        },
+        {
+          "children": [
+            "panel_view_name_label",
+            "panel_view_name_value"
+          ],
+          "component": "Row",
+          "id": "panel_view_name"
+        },
+        {
+          "component": "Text",
+          "id": "panel_view_name_label",
+          "text": "Name",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "panel_view_name_value",
+          "text": {
+            "path": "/ui/panel/record/name"
+          }
+        },
+        {
+          "children": {
+            "componentId": "form_fields",
+            "path": "/ui/panel/form_visible"
+          },
+          "component": "List",
+          "id": "form_fields_slot"
+        },
+        {
+          "children": [
+            "form_input_name",
+            "form_error_name"
+          ],
+          "component": "Column",
+          "id": "form_fields"
+        },
+        {
+          "component": "TextField",
+          "id": "form_input_name",
+          "label": "Name",
+          "value": {
+            "path": "/form/name"
+          }
+        },
+        {
+          "component": "Text",
+          "id": "form_error_name",
+          "text": {
+            "path": "/errors/name"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_title",
+          "text": {
+            "path": "/ui/panel/title"
+          },
+          "variant": "h3"
+        },
+        {
+          "children": {
+            "componentId": "form_submit_button",
+            "path": "/ui/panel/submit_visible"
+          },
+          "component": "List",
+          "id": "form_submit_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "query": {
+                  "path": "/query"
+                },
+                "recordId": {
+                  "path": "/form/id"
+                },
+                "values": {
+                  "path": "/form"
+                }
+              },
+              "name": "submit_form"
+            }
+          },
+          "child": "form_submit_text",
+          "component": "Button",
+          "id": "form_submit_button",
+          "variant": "primary"
+        },
+        {
+          "component": "Text",
+          "id": "form_submit_text",
+          "text": {
+            "path": "/ui/panel/primary_label"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {},
+              "name": "cancel_record_task"
+            }
+          },
+          "child": "form_cancel_text",
+          "component": "Button",
+          "id": "form_cancel_button"
+        },
+        {
+          "component": "Text",
+          "id": "form_cancel_text",
+          "text": "Cancel"
+        },
+        {
+          "component": "Text",
+          "id": "status_text",
+          "text": {
+            "path": "/ui/feedback/message"
+          }
+        },
+        {
+          "children": [
+            "action_result_text"
+          ],
+          "component": "Column",
+          "id": "action_result_panel"
+        },
+        {
+          "component": "Text",
+          "id": "action_result_text",
+          "text": {
+            "path": "/ui/action_result_text"
+          }
+        }
+      ],
+      "surfaceId": "experience_task"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "experience_task",
+      "value": {
+        "_empty_message": "No Task records yet.",
+        "_empty_visible": [
+          {
+            "id": "on"
+          }
+        ],
+        "errors": {},
+        "form": {},
+        "options": {},
+        "query": {
+          "_next_visible": [],
+          "_pagination_visible": [],
+          "_previous_visible": [],
+          "_range_text": "",
+          "filters": {},
+          "hasMore": false,
+          "page": 1,
+          "pageSize": 2,
+          "search": "",
+          "sort": {
+            "dir": "asc",
+            "field": "name"
+          },
+          "totalCount": 0
+        },
+        "records": [],
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          },
+          "status": ""
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

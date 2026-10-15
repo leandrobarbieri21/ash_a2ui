@@ -8,7 +8,7 @@ defmodule AshA2ui.Dynamic.Importer do
   imported spec resolves to a surface that renders like the declared one.
 
   Import is honest about the spec's boundaries: a declared feature with no
-  spec vocabulary (inline editing, file export, plus the section options
+  spec vocabulary (inline editing, file export, wizard steps, plus the section options
   that live outside the spec — `surface_id`, `record_label`,
   `spec_version`) becomes a **visible rejection** carrying the reason,
   never a silent drop. The composer shows rejections in the inspector; the
@@ -236,7 +236,8 @@ defmodule AshA2ui.Dynamic.Importer do
           {:action, "generic-action tables have no spec vocabulary"},
           {:params, "generic-action tables have no spec vocabulary"},
           {:bulk_actions,
-           "bulk actions have no spec vocabulary — keep them in the declared surface"}
+           "bulk actions have no spec vocabulary — keep them in the declared surface"},
+          {:steps, "wizard steps have no spec vocabulary — keep them in the declared surface"}
         ],
         value = Map.get(component, feature),
         value not in [nil, false, []] do

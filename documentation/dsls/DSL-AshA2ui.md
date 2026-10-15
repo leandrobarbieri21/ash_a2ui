@@ -51,6 +51,7 @@ for the resource named by `for_resource`).
  * [component](#a2ui-component)
    * nested_form
    * group
+   * step
    * row_layout
    * sections
    * editable
@@ -302,6 +303,7 @@ distinguishing name via the optional second argument, e.g.
 ### Nested DSLs
  * [nested_form](#a2ui-component-nested_form)
  * [group](#a2ui-component-group)
+ * [step](#a2ui-component-step)
  * [row_layout](#a2ui-component-row_layout)
  * [sections](#a2ui-component-sections)
  * [editable](#a2ui-component-editable)
@@ -464,6 +466,65 @@ end
 ### Introspection
 
 Target: `AshA2ui.Group`
+
+### a2ui.component.step
+```elixir
+step name
+```
+
+
+One step of a wizard: declared (in order) inside a `:form` component,
+splitting its fields across pages over the one form and the one Ash
+action. Next validates the current and earlier steps server-side
+without writing anything; the last step's button is the usual submit.
+A `review?` step has no fields and renders a read-only summary of the
+form. Every form field belongs to exactly one step, and a stepped form
+has at least two steps. Steps are not combined with `group` or
+`nested_form` entities on the same form. See the Wizard Steps topic.
+
+
+
+
+### Examples
+```
+step :who do
+  label "Who"
+  fields [:name, :email]
+end
+
+step :what do
+  fields [:role, :team]
+end
+
+step :confirm do
+  review? true
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#a2ui-component-step-name){: #a2ui-component-step-name .spark-required} | `atom` |  | The name of the step. Step names must be unique within the form. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label`](#a2ui-component-step-label){: #a2ui-component-step-label } | `String.t` |  | Heading of the step (and its progress entry). Defaults to the humanized step name. |
+| [`description`](#a2ui-component-step-description){: #a2ui-component-step-description } | `String.t` |  | Optional help text rendered under the step heading. |
+| [`fields`](#a2ui-component-step-fields){: #a2ui-component-step-fields } | `list(atom)` | `[]` | The form fields this step renders, in order. Every entry must be one of the form component's fields, and every form field must belong to exactly one step (verified at compile time). |
+| [`review?`](#a2ui-component-step-review?){: #a2ui-component-step-review? } | `boolean` | `false` | Render a read-only summary of every form field instead of inputs. Only allowed on the last step, and only without `fields`. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.Step`
 
 ### a2ui.component.row_layout
 

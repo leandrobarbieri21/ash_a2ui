@@ -102,6 +102,7 @@ defmodule AshA2ui.MixProject do
         "documentation/topics/agent-composed-surfaces.md",
         "documentation/topics/relationships.md",
         "documentation/topics/layout.md",
+        "documentation/topics/wizard-steps.md",
         "documentation/topics/data-model-conventions.md",
         {"documentation/dsls/DSL-AshA2ui.md", search_data: Spark.Docs.search_data_for(AshA2ui)},
         "CHANGELOG.md"

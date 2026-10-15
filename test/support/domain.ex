@@ -32,5 +32,6 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.BulkProject
     resource AshA2ui.Test.BulkTask
     resource AshA2ui.Test.BoardTask
+    resource AshA2ui.Test.Enrollment
   end
 end

@@ -557,6 +557,70 @@ defmodule AshA2ui do
     ]
   }
 
+  @step %Spark.Dsl.Entity{
+    name: :step,
+    describe: """
+    One step of a wizard: declared (in order) inside a `:form` component,
+    splitting its fields across pages over the one form and the one Ash
+    action. Next validates the current and earlier steps server-side
+    without writing anything; the last step's button is the usual submit.
+    A `review?` step has no fields and renders a read-only summary of the
+    form. Every form field belongs to exactly one step, and a stepped form
+    has at least two steps. Steps are not combined with `group` or
+    `nested_form` entities on the same form. See the Wizard Steps topic.
+    """,
+    examples: [
+      """
+      step :who do
+        label "Who"
+        fields [:name, :email]
+      end
+
+      step :what do
+        fields [:role, :team]
+      end
+
+      step :confirm do
+        review? true
+      end
+      """
+    ],
+    target: AshA2ui.Step,
+    args: [:name],
+    schema: [
+      name: [
+        type: :atom,
+        required: true,
+        doc: "The name of the step. Step names must be unique within the form."
+      ],
+      label: [
+        type: :string,
+        doc: "Heading of the step (and its progress entry). Defaults to the humanized step name."
+      ],
+      description: [
+        type: :string,
+        doc: "Optional help text rendered under the step heading."
+      ],
+      fields: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        The form fields this step renders, in order. Every entry must be one
+        of the form component's fields, and every form field must belong to
+        exactly one step (verified at compile time).
+        """
+      ],
+      review?: [
+        type: :boolean,
+        default: false,
+        doc: """
+        Render a read-only summary of every form field instead of inputs.
+        Only allowed on the last step, and only without `fields`.
+        """
+      ]
+    ]
+  }
+
   @row_layout %Spark.Dsl.Entity{
     name: :row_layout,
     describe: """
@@ -875,6 +939,7 @@ defmodule AshA2ui do
     entities: [
       nested_forms: [@nested_form],
       groups: [@group],
+      steps: [@step],
       row_layout: [@row_layout],
       sections: [@table_sections],
       editable: [@editable],
@@ -1231,6 +1296,7 @@ defmodule AshA2ui do
   @verifiers [
     AshA2ui.Verifiers.VerifyComponents,
     AshA2ui.Verifiers.VerifyLayouts,
+    AshA2ui.Verifiers.VerifySteps,
     AshA2ui.Verifiers.VerifyContexts,
     AshA2ui.Verifiers.VerifyFields,
     AshA2ui.Verifiers.VerifyActions,

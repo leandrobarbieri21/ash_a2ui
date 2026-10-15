@@ -293,8 +293,14 @@ defmodule AshA2ui.Experience do
   Only `form_visible`/`view_visible` ever differ from the submit gate: the
   panel content is either the editable form (create/edit) or the derived
   read-only display (view), never both.
+
+  On a stepped form (see `AshA2ui.Wizard`) `step_index` is the current step:
+  before the last step the create/edit primary label reads `"Next"` and the
+  submit stays hidden (the wizard's Next button binds the label); on the
+  last step both are the usual create/edit values. Without steps
+  `step_index` is ignored.
   """
-  @spec panel_state(mode, ResolvedView.t(), term) :: map
+  @spec panel_state(mode, ResolvedView.t(), term, non_neg_integer) :: map
   def panel_state(:hidden) do
     %{
       "visible" => sentinel(false),
@@ -308,9 +314,13 @@ defmodule AshA2ui.Experience do
     }
   end
 
-  def panel_state(mode, view, record_id) when mode in [:create, :view, :edit] do
+  def panel_state(mode, view, record_id, step_index \\ 0)
+      when mode in [:create, :view, :edit] do
+    next_step? = mode != :view and AshA2ui.Wizard.before_last_step?(view, step_index)
+
     primary_label =
       case mode do
+        _form_mode when next_step? -> AshA2ui.Wizard.next_label()
         :create -> create_label(view)
         :edit -> save_changes_label()
         :view -> ""
@@ -322,7 +332,7 @@ defmodule AshA2ui.Experience do
       "title" => panel_title(mode, view),
       "primary_label" => primary_label,
       "record_id" => (record_id && to_string(record_id)) || nil,
-      "submit_visible" => sentinel(primary_label != ""),
+      "submit_visible" => sentinel(primary_label != "" and not next_step?),
       "form_visible" => sentinel(mode in [:create, :edit]),
       "view_visible" => sentinel(mode == :view)
     }

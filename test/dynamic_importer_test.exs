@@ -130,6 +130,17 @@ defmodule AshA2ui.DynamicImporterTest do
       allow = Dynamic.allowlist([AshA2ui.Test.BoardTask])
       assert {:ok, %Dynamic.Surface{}} = Dynamic.resolve(spec, allowlist: allow)
     end
+
+    test "wizard steps are rejected visibly; the form's fields still import" do
+      {:ok, spec, rejections} = Importer.import(AshA2ui.Test.Enrollment)
+
+      assert [%{path: path}] = Enum.filter(rejections, &(&1.feature == "steps"))
+      assert path =~ ~r/^components\[\d+\]\.steps$/
+
+      form = Enum.find(spec["components"], &(&1["kind"] == "form"))
+      assert form["fields"] == ["name", "email", "role", "team"]
+      refute Map.has_key?(form, "steps")
+    end
   end
 
   describe "import/1 — nothing to import" do

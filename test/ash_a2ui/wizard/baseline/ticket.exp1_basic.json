@@ -1,0 +1,428 @@
+[
+  {
+    "createSurface": {
+      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "surfaceId": "tickets"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateComponents": {
+      "components": [
+        {
+          "children": [
+            "table_heading",
+            "records_list",
+            "form",
+            "status_text",
+            "action_result_panel"
+          ],
+          "component": "Column",
+          "id": "root"
+        },
+        {
+          "component": "Text",
+          "id": "table_heading",
+          "text": "Ticket",
+          "variant": "h2"
+        },
+        {
+          "children": {
+            "componentId": "record_row",
+            "path": "/records"
+          },
+          "component": "List",
+          "id": "records_list"
+        },
+        {
+          "child": "record_row_content",
+          "component": "Card",
+          "id": "record_row"
+        },
+        {
+          "children": [
+            "table_cell_subject",
+            "row_select_button"
+          ],
+          "component": "Row",
+          "id": "record_row_content"
+        },
+        {
+          "children": [
+            "table_cell_subject_label",
+            "table_cell_subject_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_subject"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_subject_label",
+          "text": "Subject",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_subject_value",
+          "text": {
+            "path": "subject"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "select_row"
+            }
+          },
+          "child": "row_select_text",
+          "component": "Button",
+          "id": "row_select_button"
+        },
+        {
+          "component": "Text",
+          "id": "row_select_text",
+          "text": "Select"
+        },
+        {
+          "children": [
+            "form_input_subject",
+            "form_error_subject",
+            "form_input_author_id",
+            "form_error_author_id",
+            "nested_notes",
+            "nested_tags",
+            "form_submit_button"
+          ],
+          "component": "Column",
+          "id": "form"
+        },
+        {
+          "component": "TextField",
+          "id": "form_input_subject",
+          "label": "Subject",
+          "value": {
+            "path": "/form/subject"
+          }
+        },
+        {
+          "component": "ChoicePicker",
+          "id": "form_input_author_id",
+          "label": "Author id",
+          "options": [],
+          "value": {
+            "path": "/form/author_id"
+          },
+          "variant": "mutuallyExclusive"
+        },
+        {
+          "children": [
+            "nested_notes_heading",
+            "nested_notes_rows",
+            "nested_notes_add_button"
+          ],
+          "component": "Column",
+          "id": "nested_notes"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_heading",
+          "text": "Notes",
+          "variant": "h3"
+        },
+        {
+          "children": {
+            "componentId": "nested_notes_row",
+            "path": "/form/notes"
+          },
+          "component": "List",
+          "id": "nested_notes_rows"
+        },
+        {
+          "children": [
+            "nested_notes_input_body",
+            "nested_notes_row_error_body",
+            "nested_notes_input_rating",
+            "nested_notes_row_error_rating",
+            "nested_notes_remove_button"
+          ],
+          "component": "Row",
+          "id": "nested_notes_row"
+        },
+        {
+          "component": "TextField",
+          "id": "nested_notes_input_body",
+          "label": "Body",
+          "value": {
+            "path": "body"
+          }
+        },
+        {
+          "component": "TextField",
+          "id": "nested_notes_input_rating",
+          "label": "Rating",
+          "value": {
+            "path": "rating"
+          },
+          "variant": "number"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_row_error_body",
+          "text": {
+            "path": "_error_body"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_row_error_rating",
+          "text": {
+            "path": "_error_rating"
+          },
+          "variant": "caption"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "argument": "notes",
+                "row": {
+                  "path": "_row"
+                },
+                "rows": {
+                  "path": "/form/notes"
+                }
+              },
+              "name": "nested_remove"
+            }
+          },
+          "child": "nested_notes_remove_text",
+          "component": "Button",
+          "id": "nested_notes_remove_button"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_remove_text",
+          "text": "Remove"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "argument": "notes",
+                "rows": {
+                  "path": "/form/notes"
+                }
+              },
+              "name": "nested_add"
+            }
+          },
+          "child": "nested_notes_add_text",
+          "component": "Button",
+          "id": "nested_notes_add_button"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_add_text",
+          "text": "Add"
+        },
+        {
+          "children": [
+            "nested_tags_heading",
+            "nested_tags_rows",
+            "nested_tags_picker",
+            "nested_tags_add_button"
+          ],
+          "component": "Column",
+          "id": "nested_tags"
+        },
+        {
+          "component": "Text",
+          "id": "nested_tags_heading",
+          "text": "Tags",
+          "variant": "h3"
+        },
+        {
+          "children": {
+            "componentId": "nested_tags_row",
+            "path": "/form/tags"
+          },
+          "component": "List",
+          "id": "nested_tags_rows"
+        },
+        {
+          "children": [
+            "nested_tags_row_label",
+            "nested_tags_remove_button"
+          ],
+          "component": "Row",
+          "id": "nested_tags_row"
+        },
+        {
+          "component": "Text",
+          "id": "nested_tags_row_label",
+          "text": {
+            "path": "label"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "argument": "tags",
+                "row": {
+                  "path": "_row"
+                },
+                "rows": {
+                  "path": "/form/tags"
+                }
+              },
+              "name": "nested_remove"
+            }
+          },
+          "child": "nested_tags_remove_text",
+          "component": "Button",
+          "id": "nested_tags_remove_button"
+        },
+        {
+          "component": "Text",
+          "id": "nested_tags_remove_text",
+          "text": "Remove"
+        },
+        {
+          "component": "ChoicePicker",
+          "id": "nested_tags_picker",
+          "label": "Add",
+          "options": [],
+          "value": {
+            "path": "/select/tags/picked"
+          },
+          "variant": "mutuallyExclusive"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "argument": "tags",
+                "rows": {
+                  "path": "/form/tags"
+                },
+                "value": {
+                  "path": "/select/tags/picked"
+                }
+              },
+              "name": "nested_add"
+            }
+          },
+          "child": "nested_tags_add_text",
+          "component": "Button",
+          "id": "nested_tags_add_button"
+        },
+        {
+          "component": "Text",
+          "id": "nested_tags_add_text",
+          "text": "Add"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_subject",
+          "text": {
+            "path": "/errors/subject"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_author_id",
+          "text": {
+            "path": "/errors/author_id"
+          },
+          "variant": "caption"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "recordId": {
+                  "path": "/form/id"
+                },
+                "values": {
+                  "path": "/form"
+                }
+              },
+              "name": "submit_form"
+            }
+          },
+          "child": "form_submit_text",
+          "component": "Button",
+          "id": "form_submit_button",
+          "variant": "primary"
+        },
+        {
+          "component": "Text",
+          "id": "form_submit_text",
+          "text": "Save"
+        },
+        {
+          "component": "Text",
+          "id": "status_text",
+          "text": {
+            "path": "/ui/status"
+          }
+        },
+        {
+          "children": [
+            "action_result_text"
+          ],
+          "component": "Column",
+          "id": "action_result_panel"
+        },
+        {
+          "component": "Text",
+          "id": "action_result_text",
+          "text": {
+            "path": "/ui/action_result_text"
+          }
+        }
+      ],
+      "surfaceId": "tickets"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "tickets",
+      "value": {
+        "errors": {},
+        "form": {
+          "notes": [],
+          "tags": []
+        },
+        "options": {
+          "author_id": [],
+          "tags": []
+        },
+        "records": [],
+        "select": {
+          "tags": {
+            "picked": [],
+            "search": ""
+          }
+        },
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "status": ""
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

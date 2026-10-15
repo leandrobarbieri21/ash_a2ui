@@ -1073,6 +1073,7 @@ defmodule AshA2ui.ResolvedView do
       component
       | fields: effective,
         groups: Enum.map(component.groups, &normalize_group(&1, effective)),
+        steps: Enum.map(component.steps, &normalize_step(&1, effective)),
         row_layout: normalize_row_layout(component.row_layout, effective)
     }
   end
@@ -1082,6 +1083,14 @@ defmodule AshA2ui.ResolvedView do
       group
       | label: group.label || humanize(group.name),
         fields: Enum.filter(group.fields, &(&1 in effective))
+    }
+  end
+
+  defp normalize_step(step, effective) do
+    %{
+      step
+      | label: step.label || humanize(step.name),
+        fields: Enum.filter(step.fields, &(&1 in effective))
     }
   end
 

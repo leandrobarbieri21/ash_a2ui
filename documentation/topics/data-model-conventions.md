@@ -29,6 +29,7 @@ custom hooks, and tests can rely on them.
 | `/options/<context>` | A picker context's option list (same `{"label","value"}` shape; shares the `/options` namespace) | Initial render; `context_search`; cascades that re-derive a dependent context's options |
 | `/detail/<context>` | The selected record of a context rendered by `:detail` components (`{}` while unselected) | Initial render; every selection change of that context |
 | `/report/<name>` | One `:report` component's state: `{"params" => %{<param> => ""}, "rows" => []}` — only on surfaces with `:report` components | Initial render (empty params, no rows); every `report` action rewrites `/report/<name>/rows` |
+| `/ui/wizard` | A stepped form's wizard state: `index`, `steps` (`[{"name","label","state"}]`), the `<step>_visible` sentinels and the `nav` sentinels — only on surfaces whose form declares `step`s | Initial render (step 0); `wizard_next`/`wizard_back`; a failed `submit_form` (jumps to the owning step); reset to step 0 by task open/cancel and every successful write |
 | `/export/<name>/columns` | The column-selection booleans of a `column_select` export (`%{<column> => true}`, all checked initially) — only on surfaces with column-selectable `export` blocks | Initial render; toggled client-side by the checkboxes (never rewritten by the server) |
 | `/bulk/<table>/result` | The last bulk run's outcome on a table with `bulk_actions`: `{"ok", "failed", "refused", "skipped", "errors"}` (`errors`: `[{"id", "message"}]`) — only on surfaces with bulk actions | Initial render (all zero); every `bulk_invoke` that passes the allowlist and selection checks |
 
@@ -424,6 +425,26 @@ cascades) run under the client's current selections. Carried context values
 are **scoping input, not authority**: the changed context's value always
 round-trips through an authorized read, and scoped table reads run with the
 surface's actor/tenant/authorize? as usual.
+
+## `/ui/wizard` — wizard step state
+
+Present **only** on surfaces whose form declares `step` entities (see
+[Wizard Steps](wizard-steps.md)). It carries:
+
+- `"index"` — the current step (0-based integer);
+- `"steps"` — one `{"name", "label", "state"}` entry per step, `state`
+  being `"done"`, `"current"` or `"todo"` (the progress header binds it);
+- `"<step>_visible"` — one zero-or-one sentinel per step (`[{"id": "on"}]`
+  on the current step, `[]` elsewhere); each step page is a `List`
+  templated over it;
+- `"nav"` — `"back_visible"`, `"next_visible"` and `"submit_visible"`
+  sentinels for the navigation controls.
+
+The server rewrites the whole `/ui/wizard` value on every move. `/form` is
+carried across steps unchanged: the `wizard_next` / `wizard_back` contexts
+carry `"index": {"path": "/ui/wizard/index"}` (and Next the
+`/form` values), and the server re-checks both — keys outside the form's
+fields are dropped and the index is clamped into the step range.
 
 ## Per-row visibility: `"_actions"` and `"_visible_<action>"`
 

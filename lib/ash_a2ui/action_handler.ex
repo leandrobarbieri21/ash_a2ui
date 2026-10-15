@@ -122,6 +122,28 @@ defmodule AshA2ui.ActionHandler do
       panel, and submitted values), and `invoke` failures under v2 carry an
       `/ui/feedback` error write alongside the classic `/ui/status` text.
 
+    * `"wizard_next"` / `"wizard_back"` — the wizard-step actions of a form
+      declaring `step` entities (see `AshA2ui.Wizard`). `wizard_next` takes
+      `%{"values" => /form, "recordId" => id | nil, "index" => step}` and
+      builds the changeset exactly as `submit_form` does (one shared path:
+      the values are filtered to the form's own fields, cast, and run
+      through `Ash.Changeset.for_create/4` or `for_update/4` on the record
+      read through the surface's read action) **without** submitting it.
+      On a stepped form `submit_form` applies the same field filter, so a
+      key the action accepts but the form does not render reaches neither
+      Next nor Submit. Only errors on fields of the current and earlier steps are
+      written to `/errors/<field>` (the index stays), otherwise `/errors`
+      clears and `/ui/wizard` moves to the next step. `wizard_back` takes
+      `%{"index" => step}` and moves back without validating or touching
+      `/form`. The carried index is clamped into the step range; a
+      non-integer index is refused. Under v2 both also rewrite
+      `/ui/panel/primary_label` and `/ui/panel/submit_visible`. A failed
+      `submit_form` on a stepped form moves `/ui/wizard` to the earliest
+      step owning an erroring field (the last step when none does).
+      `start_create`, `start_edit`, `cancel_record_task`, a successful
+      `submit_form` and, under v1, `select_row` and every other success
+      reset it to step 0. Surfaces without steps reject both names.
+
     * `"query"` — context `%{"query" => <the /query map>}` plus an optional
       literal `"page"` override or relative `"pageDelta"` (used by the
       emitted Apply / prev / next controls). Requires the surface's table to
@@ -610,6 +632,9 @@ defmodule AshA2ui.ActionHandler do
       else: unknown_action(view, "cancel_record_task")
   end
 
+  defp dispatch("wizard_next", context, env), do: wizard_next(env, context)
+  defp dispatch("wizard_back", context, env), do: wizard_back(env, context)
+
   defp dispatch(name, _context, %{view: view}) do
     unknown_action(view, name)
   end
@@ -626,7 +651,7 @@ defmodule AshA2ui.ActionHandler do
          update_data_model(view, "/form", ResolvedView.initial_form(view)),
          update_data_model(view, "/errors", %{}),
          update_data_model(view, "/ui/feedback", Experience.clear_feedback())
-       ]}
+       ] ++ wizard_reset(view)}
     else
       {:error, [status(view, "This surface does not declare a create action.")]}
     end
@@ -703,7 +728,7 @@ defmodule AshA2ui.ActionHandler do
        update_data_model(view, "/form", ResolvedView.initial_form(view)),
        update_data_model(view, "/errors", %{}),
        update_data_model(view, "/ui/feedback", Experience.clear_feedback())
-     ]}
+     ] ++ wizard_reset(view)}
   end
 
   # The task-open write set: intent + panel for the mode, stale errors and
@@ -714,7 +739,7 @@ defmodule AshA2ui.ActionHandler do
       update_data_model(view, "/ui/panel", Experience.panel_state(mode, view, record.id)),
       update_data_model(view, "/errors", %{}),
       update_data_model(view, "/ui/feedback", Experience.clear_feedback())
-    ]
+    ] ++ wizard_reset(view)
   end
 
   defp unknown_action(view, name) do
@@ -1115,30 +1140,51 @@ defmodule AshA2ui.ActionHandler do
 
   # --- submit_form -----------------------------------------------------------
 
-  defp create(%{view: view, ash_opts: ash_opts} = env, values) do
-    action = view.create_action || primary_action(view.resource, :create)
-    env = Map.put(env, :invoked, action)
-    values = prepare_nested_values(view, values)
-
-    view.resource
-    |> Ash.Changeset.for_create(action, cast_values(view.resource, action, values), ash_opts)
-    |> Ash.create()
-    |> after_write(env, "Created successfully.")
+  defp create(%{view: view} = env, values) do
+    env = Map.put(env, :invoked, form_action(view, nil))
+    result = with {:ok, changeset} <- form_changeset(env, nil, values), do: Ash.create(changeset)
+    after_write(result, env, "Created successfully.")
   end
 
-  defp update(%{view: view, ash_opts: ash_opts} = env, record_id, values) do
-    action = view.update_action || primary_action(view.resource, :update)
-    env = Map.put(env, :invoked, action)
-    values = prepare_nested_values(view, values)
+  defp update(%{view: view} = env, record_id, values) do
+    env = Map.put(env, :invoked, form_action(view, record_id))
 
     result =
-      with {:ok, record} <- fetch_record(view, record_id, ash_opts) do
-        record
-        |> Ash.Changeset.for_update(action, cast_values(view.resource, action, values), ash_opts)
-        |> Ash.update()
-      end
+      with {:ok, changeset} <- form_changeset(env, record_id, values), do: Ash.update(changeset)
 
     after_write(result, env, "Updated successfully.")
+  end
+
+  # The one changeset path for a form write. submit_form (create/update)
+  # and wizard_next both build it here, so Next validates exactly what
+  # Submit writes: the same action, the same values and the same atom-free
+  # cast. A stepped form keeps only its own fields' keys (see
+  # AshA2ui.Wizard.form_values/2); a form without steps casts every key the
+  # action accepts, as it always has.
+  defp form_changeset(%{view: view, ash_opts: ash_opts}, record_id, values) do
+    action = form_action(view, record_id)
+    cast = cast_values(view.resource, action, form_write_values(view, values))
+
+    case record_id do
+      nil ->
+        {:ok, Ash.Changeset.for_create(view.resource, action, cast, ash_opts)}
+
+      record_id ->
+        with {:ok, record} <- fetch_record(view, record_id, ash_opts) do
+          {:ok, Ash.Changeset.for_update(record, action, cast, ash_opts)}
+        end
+    end
+  end
+
+  defp form_action(view, nil), do: view.create_action || primary_action(view.resource, :create)
+
+  defp form_action(view, _record_id),
+    do: view.update_action || primary_action(view.resource, :update)
+
+  defp form_write_values(view, values) do
+    if AshA2ui.Wizard.stepped?(view),
+      do: AshA2ui.Wizard.form_values(view, values),
+      else: prepare_nested_values(view, values)
   end
 
   # Nested-form argument values are prepared before the Ash cast:
@@ -1684,10 +1730,18 @@ defmodule AshA2ui.ActionHandler do
   # nested-form argument (loaded through the argument's relationship), and
   # rewrites /select with the searchable selects' current labels (surfaces
   # without wave-5 relationship inputs emit the single frozen /form message).
+  #
+  # Under experience v1 the row select is what loads a record into the
+  # form, so a stepped form goes back to its first step with it. Under v2
+  # the start_edit task open does that (task_open_messages/3).
   defp select_row(view, record_id, ash_opts) do
     case fetch_record(view, record_id, ash_opts, ResolvedView.form_loads(view)) do
-      {:ok, record} -> {:ok, form_population(view, record)}
-      {:error, error} -> {:error, error_messages(view, error)}
+      {:ok, record} ->
+        reset = if Experience.v2?(), do: [], else: wizard_reset(view)
+        {:ok, form_population(view, record) ++ reset}
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
     end
   end
 
@@ -2187,6 +2241,145 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
+  # --- wizard steps ----------------------------------------------------------
+
+  # wizard_next / wizard_back (see AshA2ui.Wizard). Next builds the FULL
+  # changeset over the carried /form through form_changeset/3 — the same
+  # path submit_form writes through (filtered to the form's own fields, no
+  # atoms from client input) — without submitting it, and keeps only the
+  # errors on fields of the current and earlier steps. Nothing is written to the data layer. Back never
+  # validates and never touches /form.
+  defp wizard_next(%{view: view} = env, context) do
+    with {:ok, index} <- wizard_index(view, context),
+         {:ok, changeset} <-
+           form_changeset(env, Map.get(context, "recordId"), Map.get(context, "values")) do
+      reached = AshA2ui.Wizard.reached_fields(view, index)
+
+      errors =
+        Enum.filter(field_errors(%{errors: changeset.errors}), fn {[field | _rest], _text} ->
+          MapSet.member?(reached, field)
+        end)
+
+      wizard_next_result(env, context, index, errors)
+    else
+      {:error, messages} when is_list(messages) -> {:error, messages}
+      {:error, error} -> {:error, error_messages(view, error)}
+    end
+  end
+
+  defp wizard_next_result(%{view: view}, context, index, []) do
+    next = min(index + 1, AshA2ui.Wizard.last_index(view))
+
+    {:ok,
+     [update_data_model(view, "/errors", %{})] ++
+       wizard_moves(view, Map.get(context, "recordId"), next)}
+  end
+
+  defp wizard_next_result(%{view: view}, context, index, errors) do
+    field_messages =
+      for {segments, text} <- errors do
+        update_data_model(view, "/errors/" <> Enum.map_join(segments, "/", &to_string/1), text)
+      end
+
+    messages =
+      [update_data_model(view, "/errors", %{}) | field_messages] ++
+        [status(view, error_status(field_messages, nil), "VALIDATION_FAILED")]
+
+    feedback =
+      if Experience.v2?(),
+        do: [
+          update_data_model(
+            view,
+            "/ui/feedback",
+            Experience.feedback("error", feedback_message(messages))
+          )
+        ],
+        else: []
+
+    {:error, messages ++ feedback ++ wizard_moves(view, Map.get(context, "recordId"), index)}
+  end
+
+  defp wizard_back(%{view: view}, context) do
+    with {:ok, index} <- wizard_index(view, context) do
+      {:ok, wizard_moves(view, Map.get(context, "recordId"), max(index - 1, 0))}
+    end
+  end
+
+  defp wizard_index(view, context) do
+    if AshA2ui.Wizard.stepped?(view) do
+      case AshA2ui.Wizard.parse_index(view, Map.get(context, "index")) do
+        {:ok, index} ->
+          {:ok, index}
+
+        :error ->
+          {:error,
+           [status(view, ~s(Malformed wizard action: "index" must be an integer step index.))]}
+      end
+    else
+      {:error, [status(view, "This surface's form does not declare steps.")]}
+    end
+  end
+
+  # The /ui/wizard state for `index` plus — under experience v2 — the panel's
+  # primary label and submit gate for that step (create without a record
+  # id, edit with one).
+  defp wizard_moves(view, record_id, index) do
+    panel =
+      if Experience.v2?() do
+        mode = if is_nil(record_id), do: :create, else: :edit
+        state = Experience.panel_state(mode, view, record_id, index)
+
+        [
+          update_data_model(view, "/ui/panel/primary_label", state["primary_label"]),
+          update_data_model(view, "/ui/panel/submit_visible", state["submit_visible"])
+        ]
+      else
+        []
+      end
+
+    [update_data_model(view, "/ui/wizard", AshA2ui.Wizard.state(view, index)) | panel]
+  end
+
+  # Every /form reset (task open/cancel, row select under v1, a successful
+  # submit) returns a stepped form to its first step. A no-op without steps.
+  defp wizard_reset(view) do
+    if AshA2ui.Wizard.stepped?(view),
+      do: [update_data_model(view, "/ui/wizard", AshA2ui.Wizard.state(view, 0))],
+      else: []
+  end
+
+  # A failed submit_form on a stepped form jumps to the earliest step owning
+  # an erroring field; an error on no step's field stays on the last step.
+  # The submitted /form carries "id" on edit tasks (it only picks the v2
+  # panel label — the write already ran against the context's recordId).
+  defp wizard_submit_failure(%{submitted: submitted, view: view}, error) do
+    if AshA2ui.Wizard.stepped?(view) do
+      fields = for {[field | _rest], _text} <- field_errors(error), do: field
+
+      index =
+        AshA2ui.Wizard.earliest_owning_index(view, fields) || AshA2ui.Wizard.last_index(view)
+
+      record_id = if is_map(submitted), do: Map.get(submitted, "id")
+      wizard_moves(view, record_id, index)
+    else
+      []
+    end
+  end
+
+  defp wizard_submit_failure(_env, _error), do: []
+
+  # A successful submit_form ends the stepped form's run: back to step 0
+  # (under v2 the panel is closed by task_success/2 in the same batch).
+  # Under v1 every other success clears /form too, so the stepped form
+  # restarts with it. Under v2 any other success (a row action) leaves the
+  # open task alone: its step and the panel's primary label and submit
+  # gate stay in step with each other.
+  defp wizard_success_reset(%{view: view} = env) do
+    if Map.has_key?(env, :submitted) or not Experience.v2?(),
+      do: wizard_reset(view),
+      else: []
+  end
+
   # --- success follow-ups ----------------------------------------------------
 
   defp after_write(:ok, env, status_text), do: success(env, status_text)
@@ -2194,7 +2387,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp after_write({:error, error}, %{view: view} = env, _status_text) do
     messages = error_messages(view, error) ++ nested_error_mirrors(env, error)
-    {:error, messages ++ task_error_feedback(env, messages)}
+    {:error, messages ++ task_error_feedback(env, messages) ++ wizard_submit_failure(env, error)}
   end
 
   # A success re-reads and re-emits every refresh-target table (each table's
@@ -2233,7 +2426,8 @@ defmodule AshA2ui.ActionHandler do
            select_clear(view) ++
            prompt_clear(env) ++
            task_success(env, status_text) ++
-           success_feedback(env, status_text)}
+           success_feedback(env, status_text) ++
+           wizard_success_reset(env)}
 
       {:error, error} ->
         {:error, error_messages(view, error)}
@@ -2256,7 +2450,8 @@ defmodule AshA2ui.ActionHandler do
            prompt_clear(env) ++
            extra ++
            task_success(env, status_text) ++
-           success_feedback(env, status_text)}
+           success_feedback(env, status_text) ++
+           wizard_success_reset(env)}
 
       {:error, error} ->
         {:error, error_messages(view, error)}

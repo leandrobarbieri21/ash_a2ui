@@ -1,0 +1,504 @@
+[
+  {
+    "createSurface": {
+      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
+      "surfaceId": "kitchen_sink"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateComponents": {
+      "components": [
+        {
+          "children": [
+            "record_panel",
+            "status_banner",
+            "create_button",
+            "data_grid",
+            "action_result_panel"
+          ],
+          "component": "entityPage",
+          "id": "root",
+          "title": "Kitchen sink"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {},
+              "name": "start_create"
+            }
+          },
+          "child": "create_text",
+          "component": "Button",
+          "id": "create_button",
+          "variant": "primary"
+        },
+        {
+          "component": "Text",
+          "id": "create_text",
+          "text": "Create Kitchen sink"
+        },
+        {
+          "children": [
+            "empty_state"
+          ],
+          "columns": [
+            {
+              "format": "boolean",
+              "label": "Active",
+              "path": "active"
+            },
+            {
+              "align": "end",
+              "format": "number",
+              "label": "Count",
+              "path": "count"
+            },
+            {
+              "align": "end",
+              "format": "number",
+              "label": "Price",
+              "path": "price"
+            },
+            {
+              "format": "datetime",
+              "label": "Birthday",
+              "path": "birthday"
+            },
+            {
+              "format": "datetime",
+              "label": "Scheduled at",
+              "path": "scheduled_at"
+            },
+            {
+              "label": "Status",
+              "path": "status"
+            },
+            {
+              "label": "Name",
+              "path": "name"
+            },
+            {
+              "format": "datetime",
+              "label": "Created",
+              "path": "inserted_at"
+            }
+          ],
+          "component": "dataGrid",
+          "id": "data_grid",
+          "label": "Kitchen sink",
+          "rowActions": [
+            {
+              "action": "view_record",
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "View"
+            },
+            {
+              "action": "start_edit",
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "Edit"
+            },
+            {
+              "action": "invoke",
+              "context": {
+                "action": "update",
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "Update"
+            },
+            {
+              "action": "invoke",
+              "context": {
+                "action": "destroy",
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "destructive": true,
+              "label": "Destroy"
+            }
+          ],
+          "rowClick": {
+            "action": "view_record",
+            "context": {
+              "component": "table",
+              "recordId": {
+                "path": "id"
+              }
+            },
+            "label": "View"
+          },
+          "rowId": "id",
+          "rows": {
+            "path": "/records"
+          }
+        },
+        {
+          "children": [],
+          "component": "emptyState",
+          "id": "empty_state",
+          "message": {
+            "path": "_empty_message"
+          }
+        },
+        {
+          "children": [
+            "field_display_active",
+            "field_display_count",
+            "field_display_price",
+            "field_display_birthday",
+            "field_display_scheduled_at",
+            "field_display_status",
+            "field_display_name",
+            "form_section",
+            "action_bar"
+          ],
+          "component": "recordPanel",
+          "id": "record_panel",
+          "mode": {
+            "path": "/ui/panel/mode"
+          },
+          "recordId": {
+            "path": "/ui/panel/record_id"
+          },
+          "title": {
+            "path": "/ui/panel/title"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "format": "boolean",
+          "id": "field_display_active",
+          "label": "Active",
+          "value": {
+            "path": "/ui/panel/record/active"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "format": "number",
+          "id": "field_display_count",
+          "label": "Count",
+          "value": {
+            "path": "/ui/panel/record/count"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "format": "number",
+          "id": "field_display_price",
+          "label": "Price",
+          "value": {
+            "path": "/ui/panel/record/price"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "format": "datetime",
+          "id": "field_display_birthday",
+          "label": "Birthday",
+          "value": {
+            "path": "/ui/panel/record/birthday"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "format": "datetime",
+          "id": "field_display_scheduled_at",
+          "label": "Scheduled at",
+          "value": {
+            "path": "/ui/panel/record/scheduled_at"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "id": "field_display_status",
+          "label": "Status",
+          "value": {
+            "path": "/ui/panel/record/status"
+          }
+        },
+        {
+          "component": "fieldDisplay",
+          "id": "field_display_name",
+          "label": "Name",
+          "value": {
+            "path": "/ui/panel/record/name"
+          }
+        },
+        {
+          "children": [
+            "form_input_active",
+            "form_error_active",
+            "form_input_count",
+            "form_error_count",
+            "form_input_price",
+            "form_error_price",
+            "form_input_birthday",
+            "form_error_birthday",
+            "form_input_scheduled_at",
+            "form_error_scheduled_at",
+            "form_input_status",
+            "form_error_status",
+            "form_input_name",
+            "form_error_name"
+          ],
+          "component": "formSection",
+          "id": "form_section"
+        },
+        {
+          "component": "CheckBox",
+          "id": "form_input_active",
+          "label": "Active",
+          "value": {
+            "path": "/form/active"
+          }
+        },
+        {
+          "component": "TextField",
+          "id": "form_input_count",
+          "label": "Count",
+          "value": {
+            "path": "/form/count"
+          },
+          "variant": "number"
+        },
+        {
+          "component": "TextField",
+          "id": "form_input_price",
+          "label": "Price",
+          "value": {
+            "path": "/form/price"
+          },
+          "variant": "number"
+        },
+        {
+          "component": "DateTimeInput",
+          "enableDate": true,
+          "enableTime": false,
+          "id": "form_input_birthday",
+          "label": "Birthday",
+          "value": {
+            "path": "/form/birthday"
+          }
+        },
+        {
+          "component": "DateTimeInput",
+          "enableDate": true,
+          "enableTime": true,
+          "id": "form_input_scheduled_at",
+          "label": "Scheduled at",
+          "value": {
+            "path": "/form/scheduled_at"
+          }
+        },
+        {
+          "component": "ChoicePicker",
+          "id": "form_input_status",
+          "label": "Status",
+          "options": [
+            {
+              "label": "Draft",
+              "value": "draft"
+            },
+            {
+              "label": "Published",
+              "value": "published"
+            },
+            {
+              "label": "Archived",
+              "value": "archived"
+            }
+          ],
+          "value": {
+            "path": "/form/status"
+          },
+          "variant": "mutuallyExclusive"
+        },
+        {
+          "component": "TextField",
+          "id": "form_input_name",
+          "label": "Name",
+          "value": {
+            "path": "/form/name"
+          }
+        },
+        {
+          "component": "Text",
+          "id": "form_error_active",
+          "text": {
+            "path": "/errors/active"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_count",
+          "text": {
+            "path": "/errors/count"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_price",
+          "text": {
+            "path": "/errors/price"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_birthday",
+          "text": {
+            "path": "/errors/birthday"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_scheduled_at",
+          "text": {
+            "path": "/errors/scheduled_at"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_status",
+          "text": {
+            "path": "/errors/status"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "form_error_name",
+          "text": {
+            "path": "/errors/name"
+          },
+          "variant": "caption"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "recordId": {
+                  "path": "/form/id"
+                },
+                "values": {
+                  "path": "/form"
+                }
+              },
+              "name": "submit_form"
+            }
+          },
+          "busy": false,
+          "children": [
+            "form_cancel_button"
+          ],
+          "component": "actionBar",
+          "id": "action_bar",
+          "primaryLabel": {
+            "path": "/ui/panel/primary_label"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {},
+              "name": "cancel_record_task"
+            }
+          },
+          "child": "form_cancel_text",
+          "component": "Button",
+          "id": "form_cancel_button"
+        },
+        {
+          "component": "Text",
+          "id": "form_cancel_text",
+          "text": "Cancel"
+        },
+        {
+          "component": "statusBanner",
+          "id": "status_banner",
+          "kind": {
+            "path": "/ui/feedback/kind"
+          },
+          "message": {
+            "path": "/ui/feedback/message"
+          }
+        },
+        {
+          "children": [
+            "action_result_text"
+          ],
+          "component": "Column",
+          "id": "action_result_panel"
+        },
+        {
+          "component": "Text",
+          "id": "action_result_text",
+          "text": {
+            "path": "/ui/action_result_text"
+          }
+        }
+      ],
+      "surfaceId": "kitchen_sink"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "kitchen_sink",
+      "value": {
+        "_empty_message": "No Kitchen sink records yet.",
+        "_empty_visible": [
+          {
+            "id": "on"
+          }
+        ],
+        "errors": {},
+        "form": {},
+        "options": {},
+        "records": [],
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          },
+          "status": ""
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

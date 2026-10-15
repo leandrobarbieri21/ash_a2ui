@@ -1,8 +1,8 @@
 # AshA2ui layout rules
 
-Rules for the `group` and `row_layout` layout entities and for boards
-(`display :board`). See the Layout and Multi-Section Surfaces topics for the
-full contracts.
+Rules for the `group`, `step` and `row_layout` layout entities and for boards
+(`display :board`). See the Layout, Wizard Steps and Multi-Section Surfaces
+topics for the full contracts.
 
 ## Form groups
 
@@ -27,6 +27,50 @@ full contracts.
   groups to render in group-declaration order.
 - Don't reach for `columns 3+` casually: the basic catalog cannot wrap, so
   wide grids stay wide on narrow clients.
+
+## Wizard steps
+
+- Split a long form into pages with ordered `step` entities inside
+  `component :form` (the vocabulary is borrowed from PyroManiac):
+
+  ```elixir
+  step :who do
+    label "Who"              # defaults to the humanized step name
+    fields [:name, :email]
+  end
+
+  step :what do
+    fields [:role, :team]
+  end
+
+  step :confirm do
+    review? true             # read-only summary of /form; last step only
+  end
+  ```
+
+- Every form field belongs to exactly one step; at least two steps; unique
+  names; `review?` only on the last step and without `fields`; no `group`
+  or `nested_form` on a stepped form (all compile-verified).
+- It is still one form over one Ash action. `wizard_next` builds the full
+  changeset over the carried `/form` without submitting it and reports only
+  errors on fields of the current and earlier steps; nothing is persisted
+  until the last step's normal `submit_form`. A failed submit jumps back to
+  the earliest step owning an erroring field.
+- The server re-checks carried state: `/form` keys outside the form's fields
+  are dropped (on `wizard_next` and on the final `submit_form` — one shared
+  changeset path), the index is clamped, a non-integer index is refused.
+  Don't rely on the client to keep the user on a step.
+- The review step binds raw `/form` values (a searchable select shows its
+  `/select/<field>/label`); choice fields show their stored value, not the
+  option label.
+- State lives at `/ui/wizard` (`index`, `steps`, `<step>_visible`, `nav`) —
+  see the Data Model Conventions topic. Forms without steps are unchanged.
+- Under experience v2 the panel's primary label reads "Next" until the last
+  step, then the usual "Create X" / "Save changes".
+- Use steps for linear, server-validated flows. Branching flows, uploads,
+  and steps that wait on background jobs belong in a LiveView. Agent-composed
+  (`AshA2ui.Dynamic`) specs have no step vocabulary; the importer rejects
+  them visibly.
 
 ## Card-style table rows
 
@@ -118,3 +162,6 @@ full contracts.
 - ❌ Duplicating a field across `title`/`badge`/`meta` or across groups.
 - ❌ Hardcoding one `:table` per status value — use a source-less `sections`
   block, so the lanes follow the attribute's declared values.
+- ❌ Treating steps as a security boundary. They decide what is shown and
+  when it is checked; the final submit validates every field, and
+  authorization runs on that write.

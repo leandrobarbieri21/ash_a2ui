@@ -658,6 +658,12 @@ Shipped beyond the v0 core:
   computed `_badge_<field>` display-text row key); both compile-verified
   and byte-identical to the flat output when undeclared (see
   [Layout](documentation/topics/layout.md)).
+- ✅ **Wizard steps** — `step` entities split a form into pages over the
+  one form and the one Ash action: Back/Next with server-side validation of
+  the reached steps (nothing persisted until the final submit), an optional
+  read-only review step, and `/ui/wizard` state composed from basic
+  components on v0.9.1 and v1.0. The step vocabulary is borrowed from
+  PyroManiac (see [Wizard Steps](documentation/topics/wizard-steps.md)).
 - ✅ **Nested relationship forms (`nested_form`)** — forms edit related
   records through `manage_relationship` action arguments, with the
   interaction mode **inferred** from the change's options via
@@ -752,6 +758,8 @@ Documented as roadmap (not built):
 - [Multi-Section Surfaces](documentation/topics/multi-section-surfaces.md)
 - [Layout](documentation/topics/layout.md) — form field groups and
   card-style table rows
+- [Wizard Steps](documentation/topics/wizard-steps.md) — stepped forms with
+  server-side per-step validation and a review step
 - [Contexts and Details](documentation/topics/contexts-and-details.md)
 - [Agent-Composed Surfaces](documentation/topics/agent-composed-surfaces.md) —
   runtime specs, the allowlist, and the server-held surface contract

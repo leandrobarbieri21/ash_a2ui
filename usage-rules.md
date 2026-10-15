@@ -22,8 +22,10 @@ Sub-rules (addressable as `ash_a2ui:<name>`):
 - `ash_a2ui:relationships` — `belongs_to` form selects (inference,
   `option_*` defaults, `/options/<field>`) and `source` table columns.
 - `ash_a2ui:layout` — `group` form sections (labeled N-column grids),
-  `row_layout` card-style table rows (title + badge header, metadata grid),
-  and `display :board` boards (lanes over an attribute's values).
+  `step` wizard pages on forms (Back/Next with server-side per-step
+  validation, optional review step), `row_layout` card-style table rows
+  (title + badge header, metadata grid), and `display :board` boards (lanes
+  over an attribute's values).
 - `ash_a2ui:contexts` — surface `context` entities (server-validated
   selections, dependent options, `context_filter`/`require_context`/
   `select_context`) and `:detail` components.
@@ -74,7 +76,9 @@ Work down this ladder and stop at the first rung that fits:
    **use AshAdmin**, not AshA2ui. It's less work and renders in-process.
 3. The page needs bespoke interactions, custom widgets, or pixel-level
    control → **write plain LiveView** (or use Backpex for Ecto-first admin
-   panels). Don't fight the fixed component catalog.
+   panels). Don't fight the fixed component catalog. A *linear* multi-step
+   form over one Ash action is not a reason to leave: declare form `step`s.
+   Branching flows, uploads and steps that wait on background jobs are.
 4. Only one Phoenix web client exists and nothing needs to consume a UI
    protocol → plain LiveView; the protocol indirection buys nothing yet.
 
@@ -323,8 +327,9 @@ end
   `"start_edit"`, `"cancel_record_task"` (v2 is the default; under a
   `experience_version: 1` pin they are rejected like unknown actions),
   plus the feature names `"edit_cell"` (`editable` tables), `"report"` and
-  `"export"` (`ash_a2ui:reports`), and `"bulk_invoke"` / `"bulk_select"`
-  (tables with `bulk_actions`).
+  `"export"` (`ash_a2ui:reports`), `"bulk_invoke"` / `"bulk_select"`
+  (tables with `bulk_actions`), and `"wizard_next"`, `"wizard_back"` (only
+  on forms declaring `step`s — see `ash_a2ui:layout`).
   Don't invent new `action.name` values; add a proper Ash action and expose
   it via `row_actions` instead.
 - Row actions that need user input declare `prompt_fields` on their
