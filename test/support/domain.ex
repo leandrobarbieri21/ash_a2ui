@@ -29,5 +29,7 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.Appointment
     resource AshA2ui.Test.Bucket
     resource AshA2ui.Test.BucketWord
+    resource AshA2ui.Test.BulkProject
+    resource AshA2ui.Test.BulkTask
   end
 end

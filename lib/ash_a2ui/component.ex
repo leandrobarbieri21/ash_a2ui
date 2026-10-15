@@ -26,6 +26,7 @@ defmodule AshA2ui.Component do
     context_filter: [],
     require_context: [],
     row_actions: [],
+    bulk_actions: [],
     nested_forms: [],
     groups: [],
     __spark_metadata__: nil
@@ -53,6 +54,7 @@ defmodule AshA2ui.Component do
           context_filter: [{atom, atom}],
           require_context: [atom],
           row_actions: [atom],
+          bulk_actions: [atom],
           nested_forms: [AshA2ui.NestedForm.t()],
           groups: [AshA2ui.Group.t()]
         }

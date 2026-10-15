@@ -10,6 +10,25 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Bulk actions** (A2UI-104) — `bulk_actions [:approve, :reject]` on a
+  `:table` runs update, destroy or generic actions over a row selection.
+  Rows carry the reserved `_selected` key (bound by a row CheckBox), a
+  toolbar adds one button per bulk action plus Select page / Clear, and
+  `/bulk/<table>/result` reports `ok`/`failed`/`refused`/`skipped` and
+  per-record errors. The new `bulk_invoke` action checks the
+  `bulk_actions` allowlist, re-reads the selected ids through the table's
+  read under its active query preset (a `read_action` preset swaps the
+  read, a `filter` preset ANDs on) and context/section scope as the actor
+  (ids it does not return are refused), skips records failing
+  `visible_when`, and runs each remaining record through the same dispatch
+  as `invoke` with no shared transaction; `bulk_select` rewrites the
+  page's selection from an authorized re-read, marking at most the bulk
+  cap on a table without a query. Typed v2 feedback gains `"warning"` for
+  partial success (the admin catalog's `statusBanner` documents it).
+  Compile-time checks reject read/create actions, generic actions without
+  a `:record_id` argument, `prompt_fields` and related tables. Basic-composed on both spec versions and under the
+  admin catalog. Prior art: PyroManiac's bulk actions. Surfaces without
+  bulk actions serialize unchanged. See the Bulk Actions topic.
 - **Related tables** — a `:table` component may name its own `resource`
   (`component :table, :messages do resource MyApp.Message; context_filter
   thread_id: :thread; require_context [:thread] end`): fields, read action,

@@ -10,8 +10,8 @@ DSL is small and these rules cover most decisions.
 Sub-rules (addressable as `ash_a2ui:<name>`):
 
 - `ash_a2ui:actions` — routing client envelopes through
-  `AshA2ui.ActionHandler`, the `row_actions` allowlist, and the reserved
-  data-model paths.
+  `AshA2ui.ActionHandler`, the `row_actions` and `bulk_actions`
+  allowlists, and the reserved data-model paths.
 - `ash_a2ui:liveview` — the `AshA2ui.LiveRenderer` transport and the JS
   hook wiring contract.
 - `ash_a2ui:ag-ui` — the `AshA2ui.AgUi` transport: serving surfaces to
@@ -160,6 +160,16 @@ end
   Update actions in `row_actions` run **argument-less** on the record
   (touch-style state transitions) — actions needing values belong in the
   form or a generic action with `:record_id` (`ash_a2ui:actions`).
+- **Bulk actions are a second allowlist.** `bulk_actions [:approve]` on a
+  `:table` adds a row CheckBox (row key `_selected`) and a toolbar; the
+  `"bulk_invoke"` action re-reads the selected ids through the table's
+  read under its active query preset and scope as the actor, then runs the
+  action once per record through the same dispatch as `invoke`
+  (`visible_when`, `via`, `refreshes` apply per record; no shared
+  transaction). Update, destroy or generic actions only (a generic one
+  must declare `argument :record_id`); no `prompt_fields`; not on related
+  tables (compile-time verified). One page per run. Keep the list as small as `row_actions` —
+  see the bulk-actions topic and `ash_a2ui:actions`.
 - A row action whose click must run through a **host-provided function**
   instead of the mapped Ash action (e.g. an engine facade that completes an
   external task and invokes the action itself) declares `via` on its
@@ -179,8 +189,9 @@ end
   `{:ok, term}`, or `{:error, Ash.Error.t()}` — and the result renders
   through the standard channels unchanged (refreshes honoring `refreshes`,
   status text, `/errors/<field>` mapping). The client is unaware `via`
-  exists. `via` is row-action-only and mutually exclusive with
-  `prompt_fields` (compile-time verified); the named Ash action must still
+  exists. `via` applies to row and bulk actions only (a bulk run calls the
+  MFA once per record) and is mutually exclusive with `prompt_fields`
+  (compile-time verified); the named Ash action must still
   exist — it remains the allowlist entry and the button's label.
 - Omit `fields` only when the inferred set (public attributes for tables,
   action `accept`s for forms) is genuinely what you want shown. Otherwise
@@ -302,7 +313,10 @@ end
   surfaces with `context` entities — see `ash_a2ui:contexts`), and the
   experience v2 task modes `"start_create"`, `"view_record"`,
   `"start_edit"`, `"cancel_record_task"` (v2 is the default; under a
-  `experience_version: 1` pin they are rejected like unknown actions).
+  `experience_version: 1` pin they are rejected like unknown actions),
+  plus the feature names `"edit_cell"` (`editable` tables), `"report"` and
+  `"export"` (`ash_a2ui:reports`), and `"bulk_invoke"` / `"bulk_select"`
+  (tables with `bulk_actions`).
   Don't invent new `action.name` values; add a proper Ash action and expose
   it via `row_actions` instead.
 - Row actions that need user input declare `prompt_fields` on their
@@ -328,7 +342,8 @@ end
   state per table: `/records/<component_name>`, `/query/<component_name>`),
   `/prompt/values/<action>` for prompt Modal state,
   `/context/<name>` + `/detail/<context>` for surface-context selections
-  and their detail records
+  and their detail records, `/bulk/<table>/result` for the last bulk run's
+  outcome (rows of bulk tables carry the `_selected` key)
   — never through ad-hoc paths or custom message types. Renderers depend on
   these paths.
 
@@ -337,7 +352,10 @@ end
 - ❌ Hand-writing or string-templating A2UI message JSON.
 - ❌ Calling Ash actions directly from transport code in response to client
   envelopes (bypasses the allowlist — use `ActionHandler`).
-- ❌ Wide-open `row_actions` (e.g. mirroring every action on the resource).
+- ❌ Wide-open `row_actions` or `bulk_actions` (e.g. mirroring every action
+  on the resource).
+- ❌ Running a bulk write yourself from carried row ids — `bulk_invoke`
+  re-reads them through the table's authorized, scoped read first.
 - ❌ Treating `authorize?: true` as access control on a policy-less
   resource.
 - ❌ Suppressing or working around compile-time verifier errors.

@@ -15,7 +15,8 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
 
     * action names are unique,
     * every `action` names an action reachable from the surface (listed in a
-      table's `row_actions`, or the form's create/update action),
+      table's `row_actions` or `bulk_actions`, or the form's create/update
+      action),
     * every `refreshes` entry names a declared `:table` component key.
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
@@ -218,6 +219,7 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     components
     |> Enum.flat_map(fn component ->
       component.row_actions ++
+        component.bulk_actions ++
         Enum.reject([component.create_action, component.update_action], &is_nil/1)
     end)
     |> Enum.concat(form_defaults(form, target))

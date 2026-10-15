@@ -89,6 +89,21 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       map-returning generic action results; empty until an action produces
       one)
 
+  ## Bulk actions
+
+  A table declaring `bulk_actions` gains a `CheckBox`
+  (`record_row<sfx>_selected`, bound to the row-relative `_selected` path)
+  as the first child of its row (the card header under a `row_layout`), and
+  a toolbar Row `bulk<sfx>_toolbar` right above `records_list<sfx>`: one
+  `bulk<sfx>_<action>_button` per bulk action (event `bulk_invoke`, context
+  `{"action", "component", "records": {"path": <records path>}}` plus the
+  usual query/contexts bindings), then `bulk<sfx>_select_page_button` and
+  `bulk<sfx>_clear_button` (event `bulk_select` with `"selected"` true /
+  false). Its rows carry `"_selected": false` and the data model a
+  `"bulk"` entry per such table (see `AshA2ui.Bulk`). Under the admin
+  catalog such a table stays basic-composed. Tables without bulk actions
+  are unchanged.
+
   ## Data model
 
   The reserved-path value shape (see `topics/data-model-conventions`):
@@ -204,6 +219,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
            |> put_context_data(resolved_view, opts)
            |> put_report_state(resolved_view)
            |> put_export_state(resolved_view)
+           |> put_bulk_state(resolved_view)
            |> put_experience_state(resolved_view)}
       end
 
@@ -283,6 +299,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     case ResolvedView.export_state(view) do
       state when state == %{} -> value
       state -> Map.put(value, "export", state)
+    end
+  end
+
+  # The reserved /bulk state (per-table last bulk result, see
+  # AshA2ui.Bulk). Omitted entirely on surfaces without bulk actions
+  # (frozen shape unchanged).
+  defp put_bulk_state(value, view) do
+    case AshA2ui.Bulk.state(view) do
+      state when state == %{} -> value
+      state -> Map.put(value, "bulk", state)
     end
   end
 
@@ -493,7 +519,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # contract's advanced-feature list. Everything else (and the form's
   # nested_form case below) falls back to its byte-equal basic-v2 subtree.
   defp admin_core_table?(table) do
-    is_nil(table.sections) and is_nil(table.export) and is_nil(table.editable)
+    is_nil(table.sections) and is_nil(table.export) and is_nil(table.editable) and
+      not AshA2ui.Bulk.enabled?(table)
   end
 
   defp admin_table_section(view, table, _options) do
@@ -969,6 +996,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     ["table_heading#{sfx}"] ++
       ((table.query && ["query#{sfx}_controls"]) || []) ++
       create_button_ids(view, table, sfx) ++
+      ((AshA2ui.Bulk.enabled?(table) && [AshA2ui.Bulk.toolbar_id(sfx)]) || []) ++
       ["records_list#{sfx}"] ++
       empty_state_ids(view, table, sfx) ++
       ((table.query && ["query#{sfx}_pagination"]) || []) ++
@@ -1088,7 +1116,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "component" => "List",
         "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
       }
-    ]
+    ] ++ bulk_toolbar_components(view, table, sfx)
+  end
+
+  # The bulk-action toolbar above the list (tables with bulk_actions only;
+  # see AshA2ui.Bulk). Its action contexts carry the usual query/contexts
+  # bindings, like row-action invokes.
+  defp bulk_toolbar_components(view, table, sfx) do
+    if AshA2ui.Bulk.enabled?(table) do
+      AshA2ui.Bulk.toolbar_components(table, sfx, fn context ->
+        context |> put_query_binding(view) |> put_contexts_binding(view)
+      end)
+    else
+      []
+    end
   end
 
   # --- query controls (search / filters / pagination) ---
@@ -1353,6 +1394,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         nil -> flat_row_components(view, table, action_ids, sfx)
         layout -> card_row_components(view, layout, action_ids, sfx)
       end
+
+    # Bulk tables add the row CheckBox (no-op otherwise).
+    row_components = AshA2ui.Bulk.with_row_checkbox(row_components, table, sfx)
 
     row_components ++
       List.flatten(action_components) ++ context_select_components ++ control_components
@@ -3152,6 +3196,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
     |> Map.merge(AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record))
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
+    |> Map.merge(AshA2ui.Bulk.row_data(table))
   end
 
   # `source` columns read through the loaded relationship path (nil-safe: a

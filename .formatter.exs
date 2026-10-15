@@ -8,6 +8,7 @@ spark_locals_without_parens = [
   badge: 1,
   badge_text: 1,
   badge_tones: 1,
+  bulk_actions: 1,
   column_select: 1,
   columns: 1,
   component: 1,

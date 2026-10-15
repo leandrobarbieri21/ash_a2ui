@@ -36,9 +36,10 @@ the relationship-picker actions (`ash_a2ui:relationships`), `"edit_cell"`
 (tables with an `editable` block — commits one field of one record through
 the declared update action, with validation errors mirrored into the
 failing row's `_error_<field>` key), `"report"` (`:report` components —
-runs the declared generic action; `ash_a2ui:reports`) and `"export"`
+runs the declared generic action; `ash_a2ui:reports`), `"export"`
 (components with an `export` block — answers with the `downloadFile`
-callFunction; `ash_a2ui:reports`). Don't invent new `action.name` values;
+callFunction; `ash_a2ui:reports`) and `"bulk_invoke"` / `"bulk_select"`
+(tables with `bulk_actions` — see "Bulk actions" below). Don't invent new `action.name` values;
 add a proper Ash action and expose it via `row_actions` instead.
 
 - `"submit_form"` — context `%{"values" => %{...}, "recordId" => id | nil}`.
@@ -110,6 +111,8 @@ them:
   table).
 - `/prompt/values/<action>` — a prompt Modal's input values: pre-filled by
   `prompt`, cleared to `%{}` after a successful prompt `invoke`.
+- `/bulk/<table>/result` — the last bulk run's outcome (`ok`, `failed`,
+  `refused`, `skipped`, `errors`); rows of bulk tables carry `_selected`.
 
 On `Ash.Error.Forbidden` only a `/ui/status` "not authorized" message is
 emitted — no field errors, to avoid leaking policy details.
@@ -154,10 +157,47 @@ end
   Real authorization still belongs in Ash policies — `visible_when` is UX
   scoping inside the `row_actions` allowlist.
 
+## Bulk actions
+
+```elixir
+component :table do
+  row_actions [:approve]
+  bulk_actions [:approve, :archive]   # update/destroy/generic, compile-verified
+end
+```
+
+- `"bulk_invoke"` — context `%{"action" => name, "component" => table,
+  "records" => <the carried rows>}` plus the usual `"query"`/`"contexts"`.
+  The action must be in the surface's `bulk_actions` (and the table's own
+  list) or it is refused before anything is read. Only the `"id"` of rows
+  whose `"_selected"` is `true` is used; an empty selection is an error
+  and more than one page (the query's `max_page_size`) is refused.
+- The ids are **re-read** through the table's read under its active query
+  preset (from the carried `"query"`, else `default_preset`: a
+  `read_action` preset swaps the read, a `filter` preset ANDs on) with its
+  context and section scope, as the actor. Ids the read does not return
+  (forged, hidden by policy, out of scope or preset) count as `refused` and
+  never reach the action. Each remaining record is checked against
+  `visible_when` (`skipped` when it fails) and then runs through the same
+  dispatch as `invoke`, one call per record, without a shared transaction.
+- A **generic** bulk action must declare `argument :record_id` (compile-time
+  verified): each call gets the record's id there.
+- The handler writes `/bulk/<table>/result` and a status line, sends
+  typed v2 feedback (`"warning"` on partial success, `"error"` when
+  nothing was written) and refreshes the targets once. Nothing is
+  refreshed when nothing was written.
+- `"bulk_select"` — context `%{"component", "selected" => true | false}`:
+  the server re-reads the page and rewrites its rows with `_selected` set
+  (Select page / Clear). Carried rows are never echoed back. On a table
+  without a query, Select page marks at most the bulk cap's worth of rows.
+- No `prompt_fields` on bulk actions, no bulk actions on related tables,
+  and bulk actions are not exposed as AG-UI tools. Full contract in the
+  bulk-actions topic.
+
 ## Rules
 
-- Keep `row_actions` minimal — it is an allowlist, not documentation. Never
-  mirror every action on the resource.
+- Keep `row_actions` and `bulk_actions` minimal — they are allowlists, not
+  documentation. Never mirror every action on the resource.
 - Always pass `actor:` (and `tenant:` where relevant); `authorize?` defaults
   to `true` and should stay on.
 - On a resource with **no policies**, `authorize?: true` is a no-op —

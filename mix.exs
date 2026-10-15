@@ -97,6 +97,7 @@ defmodule AshA2ui.MixProject do
         "documentation/topics/queries-and-pagination.md",
         "documentation/topics/multi-section-surfaces.md",
         "documentation/topics/reports-and-exports.md",
+        "documentation/topics/bulk-actions.md",
         "documentation/topics/contexts-and-details.md",
         "documentation/topics/agent-composed-surfaces.md",
         "documentation/topics/relationships.md",

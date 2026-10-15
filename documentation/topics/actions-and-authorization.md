@@ -51,6 +51,8 @@ The v0 `action.name` vocabulary:
 | `"prompt"` | A prompt Modal's trigger was clicked | No Ash write — pre-fills `/prompt/values/<action>` for the Modal inputs |
 | `"select_row"` | A table row was selected | Selection state (e.g. loading a record into the form) |
 | `"query"` | Query controls were applied | The table's `query` allowlist (see [Queries and Pagination](queries-and-pagination.md)) |
+| `"bulk_invoke"` | A bulk toolbar button was clicked over a row selection | The named action in the table's `bulk_actions`, once per re-read selected record (see [Bulk Actions](bulk-actions.md)) |
+| `"bulk_select"` | Select page / Clear was clicked | No Ash write — the table's rows are re-read and rewritten with `_selected` set |
 
 When the view declares no form/table action, the handler falls back to the
 resource's **primary** create/update/read action — so minimal surfaces work
@@ -165,6 +167,11 @@ never expose an action through the surface just because it exists.
 The declared actions are verified to exist (with compatible types) at compile
 time, so the allowlist can't silently drift from the resource.
 
+`bulk_actions` is a second allowlist with the same rule for `bulk_invoke`.
+A bulk run never trusts the carried row ids: it re-reads them through the
+table's read action and scope as the actor, and only the records that read
+returns are passed to the action (see [Bulk Actions](bulk-actions.md)).
+
 ## Layering your authorization
 
 Defense in depth, from outside in:
@@ -173,8 +180,8 @@ Defense in depth, from outside in:
    who reaches the surface at all, and supply the actor
    (`actor_fn:` on `AshA2ui.LiveRenderer`, `conn.assigns` for JSON
    endpoints).
-2. **The DSL allowlist** — `row_actions` + declared form actions bound what
-   can be attempted.
+2. **The DSL allowlist** — `row_actions`, `bulk_actions` and the declared
+   form actions bound what can be attempted.
 3. **Ash policies** — decide whether *this* actor may perform the attempted
    action on *this* record, exactly as everywhere else in your app.
 

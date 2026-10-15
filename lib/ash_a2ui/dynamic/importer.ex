@@ -201,11 +201,12 @@ defmodule AshA2ui.Dynamic.Importer do
           {:editable, "inline cell editing has no spec vocabulary"},
           {:export, "file export has no spec vocabulary — keep it in the declared surface"},
           {:action, "generic-action tables have no spec vocabulary"},
-          {:params, "generic-action tables have no spec vocabulary"}
+          {:params, "generic-action tables have no spec vocabulary"},
+          {:bulk_actions,
+           "bulk actions have no spec vocabulary — keep them in the declared surface"}
         ],
         value = Map.get(component, feature),
-        not is_nil(value),
-        value != false do
+        value not in [nil, false, []] do
       Rejection.new(
         "#{path}.#{feature}",
         to_string(feature),

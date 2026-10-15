@@ -14,11 +14,12 @@ defmodule AshA2ui.Verifiers.VerifyActions do
     * `prompt_fields` may only be declared on actions listed in a table's
       `row_actions`, and every entry must be an argument or accepted
       attribute of the Ash action (the prompt values are cast against them),
-    * `visible_when` may only be declared on row actions; its keys must be
+    * `visible_when` may only be declared on row or bulk actions; its keys must be
       public attributes or public expression calculations, and its values
       must cast to the field's type (`nil` and per-member list values
       included),
-    * `via` (host-delegated dispatch) may only be declared on row actions,
+    * `via` (host-delegated dispatch) may only be declared on row or bulk
+      actions,
       and is mutually exclusive with `prompt_fields` — the prompt collects
       values cast against the direct Ash action, which `via` bypasses.
 
@@ -137,21 +138,30 @@ defmodule AshA2ui.Verifiers.VerifyActions do
       |> Enum.flat_map(& &1.row_actions)
       |> MapSet.new()
 
+    # Bulk actions take visible_when and via per record (VerifyBulkActions
+    # refuses prompt_fields on them).
+    per_record_names =
+      dsl_state
+      |> components()
+      |> Enum.flat_map(& &1.bulk_actions)
+      |> MapSet.new()
+      |> MapSet.union(row_action_names)
+
     dsl_state
     |> Verifier.get_entities([:a2ui])
     |> Enum.filter(&is_struct(&1, AshA2ui.Action))
     |> Enum.reduce_while(:ok, fn setting, :ok ->
-      case verify_action_setting(setting, row_action_names, target, module) do
+      case verify_action_setting(setting, {row_action_names, per_record_names}, target, module) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
   end
 
-  defp verify_action_setting(setting, row_action_names, target, module) do
+  defp verify_action_setting(setting, {row_action_names, per_record_names}, target, module) do
     with :ok <- verify_row_action_only(setting, :prompt_fields, row_action_names, module),
-         :ok <- verify_row_action_only(setting, :visible_when, row_action_names, module),
-         :ok <- verify_row_action_only(setting, :via, row_action_names, module),
+         :ok <- verify_row_action_only(setting, :visible_when, per_record_names, module),
+         :ok <- verify_row_action_only(setting, :via, per_record_names, module),
          :ok <- verify_via_exclusivity(setting, module),
          :ok <- verify_prompt_fields(setting, target, module) do
       verify_visible_when(setting, target, module)

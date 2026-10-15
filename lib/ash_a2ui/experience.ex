@@ -324,7 +324,8 @@ defmodule AshA2ui.Experience do
 
   @doc """
   A typed feedback value: `%{"kind" => kind, "message" => message}` where
-  `kind` is `"success"` / `"error"` / `nil`.
+  `kind` is `"success"` / `"warning"` (a bulk run that partly succeeded) /
+  `"error"` / `nil`.
   """
   @spec feedback(String.t() | nil, String.t()) :: map
   def feedback(kind, message \\ "")

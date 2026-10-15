@@ -911,6 +911,22 @@ defmodule AshA2ui do
         default: [],
         doc: "Actions rendered as per-row buttons (tables)."
       ],
+      bulk_actions: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Update, destroy or generic actions run over a row selection (tables).
+        Each row gets a CheckBox bound to its reserved `_selected` key, and a
+        toolbar above the list carries one button per bulk action plus
+        "Select page" and "Clear". The server re-reads the selected ids
+        through the table's read under its active query preset, with its
+        scope, as the actor, and runs the action once per record;
+        `visible_when`, `via` and `refreshes` on the action's `action` entity
+        apply per record. A generic bulk action must declare a `:record_id`
+        argument. No `prompt_fields`; not on related tables. See the Bulk
+        Actions topic.
+        """
+      ],
       query: [
         type: :atom,
         doc:
@@ -1027,6 +1043,8 @@ defmodule AshA2ui do
         public expression calculations; `nil` values mean `is_nil`, list
         values mean membership, anything else is equality. Enforced
         server-side on every invoke; rendering hides the button per row.
+        A bulk action applies the same check to each selected record and
+        counts the records that fail it as skipped.
         """
       ],
       via: [
@@ -1063,7 +1081,8 @@ defmodule AshA2ui do
         action must still exist (it remains the row-action allowlist entry and
         the button's label source); `via` only reroutes the dispatch.
         Mutually exclusive with `prompt_fields` (the prompt exists to collect
-        values cast against the direct Ash action); row actions only.
+        values cast against the direct Ash action). Row and bulk actions
+        only; a bulk action calls the MFA once per selected record.
         """
       ]
     ]
@@ -1170,7 +1189,8 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyReports,
     AshA2ui.Verifiers.VerifyExport,
     AshA2ui.Verifiers.VerifyRelationships,
-    AshA2ui.Verifiers.VerifyNestedForms
+    AshA2ui.Verifiers.VerifyNestedForms,
+    AshA2ui.Verifiers.VerifyBulkActions
   ]
 
   @moduledoc """

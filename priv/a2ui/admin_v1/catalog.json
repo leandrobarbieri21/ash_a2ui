@@ -266,10 +266,10 @@
     },
     "statusBanner": {
       "type": "object",
-      "description": "Typed feedback banner. Renders nothing while the bound kind is null (renderer concern; success → role=status, error → role=alert).",
+      "description": "Typed feedback banner. Renders nothing while the bound kind is null (renderer concern; success and warning → role=status, error → role=alert).",
       "properties": {
         "component": {"const": "statusBanner"},
-        "kind": {"type": "object", "description": "Bound to /ui/feedback/kind: \"success\", \"error\", or null."},
+        "kind": {"type": "object", "description": "Bound to /ui/feedback/kind: \"success\", \"warning\" (partial success of a bulk run), \"error\", or null."},
         "message": {"type": "object", "description": "Bound to /ui/feedback/message."}
       },
       "required": ["component", "kind", "message"],

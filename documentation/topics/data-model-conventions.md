@@ -29,6 +29,7 @@ custom hooks, and tests can rely on them.
 | `/detail/<context>` | The selected record of a context rendered by `:detail` components (`{}` while unselected) | Initial render; every selection change of that context |
 | `/report/<name>` | One `:report` component's state: `{"params" => %{<param> => ""}, "rows" => []}` — only on surfaces with `:report` components | Initial render (empty params, no rows); every `report` action rewrites `/report/<name>/rows` |
 | `/export/<name>/columns` | The column-selection booleans of a `column_select` export (`%{<column> => true}`, all checked initially) — only on surfaces with column-selectable `export` blocks | Initial render; toggled client-side by the checkboxes (never rewritten by the server) |
+| `/bulk/<table>/result` | The last bulk run's outcome on a table with `bulk_actions`: `{"ok", "failed", "refused", "skipped", "errors"}` (`errors`: `[{"id", "message"}]`) — only on surfaces with bulk actions | Initial render (all zero); every `bulk_invoke` that passes the allowlist and selection checks |
 
 Everything under these paths uses camelCase string keys, matching the rest of
 the wire format.
@@ -416,6 +417,18 @@ actions carry two extra keys (server-computed; see
 
 Rows of tables without conditional actions are unchanged (no underscore
 keys).
+
+## Per-row selection: `"_selected"`
+
+Rows of a table that declares `bulk_actions` carry `"_selected"`, bound by
+the row's CheckBox (see [Bulk Actions](bulk-actions.md)). The server writes
+`false` on every row it sends (initial render, refreshes, a successful
+`bulk_invoke`), and `true` or `false` on a `bulk_select` rewrite (on a
+table without a query, "Select page" marks at most the bulk cap). The client
+toggles it in place; `bulk_invoke` reads only `"id"` and `"_selected"` from
+the carried rows, and every id is re-read through an authorized, scoped read
+before anything is written. Rows of tables without bulk actions carry no
+`"_selected"` key.
 
 ## Per-row error mirrors: `"_error_<field>"`
 

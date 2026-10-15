@@ -331,7 +331,11 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       "start_create",
       "view_record",
       "start_edit",
-      "cancel_record_task"
+      "cancel_record_task",
+      # A2UI-104 bulk actions (not catalog-driven: the admin catalog keeps
+      # bulk tables basic-composed)
+      "bulk_invoke",
+      "bulk_select"
     ]
 
     @tag ac: "A2UI-101B/AC-11"

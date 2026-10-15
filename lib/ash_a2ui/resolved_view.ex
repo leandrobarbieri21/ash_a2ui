@@ -42,6 +42,8 @@ defmodule AshA2ui.ResolvedView do
       `row_actions` / `loads` fields mirror the single table exactly as
       before; on multi-table surfaces `read_action`/`query` are `nil` and
       `row_actions`/`loads` are the union across tables
+    * `bulk_actions` is the union of every table's `bulk_actions` (each
+      table scope also carries its own list) — the `bulk_invoke` allowlist
 
   FROZEN CONTRACT — the struct fields and `resolve/2` signature are the
   interface every parallel track codes against; do not change outside an
@@ -64,6 +66,7 @@ defmodule AshA2ui.ResolvedView do
     components: [],
     fields: %{},
     row_actions: [],
+    bulk_actions: [],
     selects: %{},
     loads: [],
     tables: [],
@@ -141,6 +144,7 @@ defmodule AshA2ui.ResolvedView do
           query: AshA2ui.Query.t() | nil,
           loads: list,
           row_actions: [atom],
+          bulk_actions: [atom],
           records_path: String.t(),
           query_path: String.t() | nil,
           context_filter: [{atom, atom}],
@@ -221,6 +225,7 @@ defmodule AshA2ui.ResolvedView do
           update_action: atom | nil,
           query: AshA2ui.Query.t() | nil,
           row_actions: [atom],
+          bulk_actions: [atom],
           selects: %{atom => select},
           loads: list,
           tables: [table],
@@ -302,6 +307,7 @@ defmodule AshA2ui.ResolvedView do
       update_action: update_action,
       query: single && single.query,
       row_actions: tables |> Enum.flat_map(& &1.row_actions) |> Enum.uniq(),
+      bulk_actions: tables |> Enum.flat_map(& &1.bulk_actions) |> Enum.uniq(),
       selects: selects,
       loads: tables |> Enum.flat_map(& &1.loads) |> Enum.uniq(),
       tables: tables,
@@ -602,6 +608,7 @@ defmodule AshA2ui.ResolvedView do
             loads(resource, component, fields) ++ condition_loads(resource, component, actions)
           ),
         row_actions: component.row_actions,
+        bulk_actions: component.bulk_actions,
         records_path: (multi? && "/records/#{name}") || "/records",
         query_path: query && ((multi? && "/query/#{name}") || "/query"),
         context_filter: component.context_filter,

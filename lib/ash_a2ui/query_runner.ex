@@ -225,17 +225,11 @@ defmodule AshA2ui.QueryRunner do
   def run(view, params, ash_opts, scope \\ []) do
     query = view.query
     effective_sort = effective_sort(query, params)
-    preset = params.preset && Enum.find(query.presets, &(&1.name == params.preset))
-
-    # A related table reads a resource that may live in another domain.
-    ash_opts =
-      Keyword.put(ash_opts, :domain, ResourceInfo.domain(view.resource) || ash_opts[:domain])
 
     filtered =
-      view.resource
-      |> Ash.Query.for_read(read_action(view, preset), %{}, ash_opts)
+      view
+      |> preset_read(params, ash_opts)
       |> AshA2ui.ContextRunner.apply_scope(scope)
-      |> apply_preset(preset)
       |> apply_filters(params.filters)
       |> apply_ranges(params.ranges)
       |> apply_search(query, params.search)
@@ -257,6 +251,36 @@ defmodule AshA2ui.QueryRunner do
         {:error, error}
     end
   end
+
+  @doc """
+  The read a table performs under the active preset of `params`, before
+  scope, search, filters, sort and pagination: the preset's `read_action`
+  (or the table's declared or primary read), as the actor in `ash_opts`,
+  with a `filter` preset's conditions ANDed on. `params` may be `nil` (a
+  table without a query), which reads through the table's read action.
+
+  `run/4` builds on it, and so does the authorized re-read of a bulk
+  selection (`AshA2ui.Bulk.read_selected/5`), so a selection is re-read
+  through the same action and preset predicate as the page it came from.
+  """
+  @spec preset_read(ResolvedView.t() | ResolvedView.table(), params | nil, keyword) ::
+          Ash.Query.t()
+  def preset_read(view, params, ash_opts) do
+    preset = active_preset(view.query, params)
+
+    # A related table reads a resource that may live in another domain.
+    ash_opts =
+      Keyword.put(ash_opts, :domain, ResourceInfo.domain(view.resource) || ash_opts[:domain])
+
+    view.resource
+    |> Ash.Query.for_read(read_action(view, preset), %{}, ash_opts)
+    |> apply_preset(preset)
+  end
+
+  defp active_preset(%{presets: presets}, %{preset: name}) when not is_nil(name),
+    do: Enum.find(presets, &(&1.name == name))
+
+  defp active_preset(_query, _params), do: nil
 
   # --- context parsing --------------------------------------------------------
 
