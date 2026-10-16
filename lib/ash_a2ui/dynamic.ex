@@ -872,6 +872,13 @@ defmodule AshA2ui.Dynamic do
       "type" => "object",
       "properties" => %{
         "name" => Map.put(name, "description", "The Ash action this metadata applies to."),
+        "label" => %{
+          "type" => "string",
+          "maxLength" => 120,
+          "description" =>
+            "Button text for the action (row, bulk and prompt buttons); defaults to the " <>
+              "humanized action name."
+        },
         "refreshes" =>
           Map.put(
             name_list,

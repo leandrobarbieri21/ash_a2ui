@@ -105,10 +105,11 @@ defmodule AshA2ui.Experience do
   `priv/a2ui/admin_v1/catalog.json`). Minor versions are additive within the
   unchanged `admin_catalog_id/0` — 1.1 added the column presentation hints
   (format/align/mono/badge/link), `rowClick`, FieldDisplay `link` and the
-  `openSurface` client function.
+  `openSurface` client function; 1.2 added the `rowActions` entries'
+  `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.1.0"
+  def admin_catalog_version, do: "1.2.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item

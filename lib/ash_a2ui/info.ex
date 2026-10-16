@@ -307,12 +307,18 @@ defmodule AshA2ui.Info do
         {:error, error} -> raise Ash.Error.to_error_class(error)
       end
     else
+      # The read opts go to `for_read/4`, not only to `read!`: the action's
+      # preparations (and argument validation) run when the query is built,
+      # so a preparation scoping rows to the actor or tenant must see them
+      # there.
+      read_opts = table_read_opts(resolved_view, table, opts)
+
       records =
         table.resource
-        |> Ash.Query.for_read(table.read_action)
+        |> Ash.Query.for_read(table.read_action, %{}, read_opts)
         |> AshA2ui.ContextRunner.apply_scope(scope)
         |> Ash.Query.load(table.loads)
-        |> Ash.read!(table_read_opts(resolved_view, table, opts))
+        |> Ash.read!()
 
       {records, nil}
     end
@@ -354,10 +360,14 @@ defmodule AshA2ui.Info do
       |> Map.new(fn {name, source} ->
         records =
           source.destination
-          |> Ash.Query.for_read(ResourceInfo.primary_action!(source.destination, :read).name)
+          |> Ash.Query.for_read(
+            ResourceInfo.primary_action!(source.destination, :read).name,
+            %{},
+            option_read_opts(source.destination, opts)
+          )
           |> Ash.Query.sort([{source.option_sort, :asc}])
           |> Ash.Query.limit(source.option_limit)
-          |> Ash.read!(option_read_opts(source.destination, opts))
+          |> Ash.read!()
 
         {name, Enum.map(records, &option_entry(&1, source))}
       end)

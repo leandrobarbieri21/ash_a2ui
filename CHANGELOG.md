@@ -10,6 +10,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`label` on the action entity.** `action :confirm_merge do label
+  "Confirm match" end` names the action's row button and bulk toolbar
+  button in both compositions, its admin `rowActions` entry, its prompt
+  heading (unless `prompt_title` is set) and its bulk status line. No
+  wrapper action is needed just to get a readable button. The dynamic spec
+  carries it too (`"label"` on an action; parser, `spec_schema/1`,
+  Importer and promotion).
+- **Prompt fields get form widgets.** A prompt field over a `belongs_to`
+  source attribute (or a `field` with `relationship`) is a ChoicePicker over
+  the actor's options, loaded at `/options/<field>` like a form select's; an
+  enumerated argument or attribute is a ChoicePicker over its values;
+  booleans and dates get CheckBox and DateTimeInput. A relationship field
+  with `option_search` renders the searchable-select composite
+  (`row_action_<action>_prompt_select_<field>`, state at
+  `/prompt/select/<action>/<field>`); its `option_select` carries
+  `"prompt"` and writes the picked value to `/prompt/values/<action>/<field>`
+  after an authorized re-read. Values are cast and validated server-side as
+  before. The merged catalog's combobox upgrades these composites too.
+- **`select_context` on boards.** A `display :board` table may declare
+  `select_context`: every card gets the "Select <context>" control, so a
+  board can fill a `:detail` instead of deep-linking away. List-mode
+  sectioned tables still refuse it.
+
 - **Reference links can render in the basic catalog (opt-in).** Rows and
   detail records carried `_links`, but only the admin catalog drew them.
   With the new `link_buttons: true` option to
@@ -50,6 +73,41 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `links`.
 
 ### Bug Fixes:
+
+- **Security: every read carries the surface's actor, tenant and
+  `authorize?`.** A `:table` without a `query`, the option lists of
+  relationship selects and a `sections` source were read with
+  `Ash.Query.for_read/2` without them (passed only to `Ash.read`), so the
+  read action's preparations ran with no actor or tenant: clinic-demo's
+  worklist preparation saw nobody and had to declare a query to work
+  around it. The opts now go to `for_read/4`. Audited: every other read in
+  `AshA2ui.Info`, `AshA2ui.Sections`, `AshA2ui.ContextRunner`,
+  `AshA2ui.QueryRunner`, `AshA2ui.Bulk` and `AshA2ui.ActionHandler` already
+  built its query with them, and `AshA2ui.LiveRenderer` passes the mounted
+  actor and tenant to every build and action call.
+- **Admin catalog (1.2.0, additive): prompts, per-row visibility, the View
+  panel.** Prompt row actions dispatched `invoke` with empty values and
+  failed with "Validation failed": the dataGrid's entry now carries a
+  `prompt` (a grid child holding the inputs, the heading and the pre-fill
+  envelope) and the grid collects the values in a dialog. Entries of
+  `visible_when` actions carry `visiblePath` (`_visible_<action>`), so the
+  grid offers them only on the rows they apply to. The read-only View panel
+  shows the action bar's Cancel, which closes it. Row action buttons wrap
+  inside their cell. See the contract note's 1.2 addendum.
+- **Board lanes no longer size to their cards.** Lanes were a horizontal
+  `List`, whose items shrink-wrap their content (a three-lane board rendered
+  2266px wide on a 1280px viewport). They are now a `Row` of lane Columns at
+  `weight` 1, sharing the board's width on any renderer; the merged catalog
+  scrolls them inside the board below `--a2ui-board-lane-min-width`
+  (default 18rem). The `board_<template>_lanes` component is a `Row` (was a
+  `List` with `direction: "horizontal"`).
+- **Readable error feedback.** Errors without a field rendered as "Request
+  failed: …" (an Ash error class's first message line, often blank) or a
+  bare "Validation failed…". `/ui/feedback` now carries the error's own
+  message for field-less errors (an invalid change, a `via` function's
+  string refusal), "You are not authorized to perform this action." for any
+  Forbidden class, and names field errors the action shows no input for
+  ("Status: must equal :claimed."). Field errors stay on `/errors/<field>`.
 
 - **Importing a master/detail surface dropped its related tables and
   links.** The Importer silently dropped a table's `resource`, every

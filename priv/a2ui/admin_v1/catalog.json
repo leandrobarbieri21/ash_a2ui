@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "x-changelog": {
+    "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
     "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
     "1.0.0": "The ten-component contract (notes/2026-09-07-admin-catalog-contract.md)."
   },
@@ -91,7 +92,29 @@
               "label": {"type": "string"},
               "action": {"type": "string", "description": "The client action name dispatched (view_record, start_edit, or invoke)."},
               "context": {"type": "object", "description": "The action context: literal values and {\"path\": ...} refs resolved against the row (recordId, component, action, values)."},
-              "destructive": {"type": "boolean", "description": "true when dispatch must be confirmed through ConfirmDialog (destroy actions)."}
+              "destructive": {"type": "boolean", "description": "true when dispatch must be confirmed through ConfirmDialog (destroy actions)."},
+              "visiblePath": {"type": "string", "description": "Optional (1.2): row-relative path of the action's per-row visibility (the server-computed _visible_<action> key of a visible_when action). The renderer offers the action only on rows where the value is a non-empty list (or true); absent means always offered. Enforcement stays server-side."},
+              "prompt": {
+                "type": "object",
+                "description": "Optional (1.2): the action collects values first (prompt_fields). Activating it dispatches the open envelope (the server pre-fills /prompt/values/<action>), shows the content child (a grid child holding the prompt's inputs) in a dialog headed title, and on confirm dispatches this rowActions entry itself — the invoke envelope whose context binds values to /prompt/values/<action>. The dialog stays open on an error outcome and closes on success.",
+                "properties": {
+                  "content": {"type": "string", "description": "Id of the dataGrid child holding the prompt inputs (bound to /prompt/values/<action>/<field>)."},
+                  "title": {"type": "string"},
+                  "confirmLabel": {"type": "string"},
+                  "open": {
+                    "type": "object",
+                    "description": "The prompt pre-fill envelope, in the flat rowActions shape ({action: \"prompt\", context}), resolved against the row.",
+                    "properties": {
+                      "action": {"type": "string"},
+                      "context": {"type": "object"}
+                    },
+                    "required": ["action", "context"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["content", "title", "open"],
+                "additionalProperties": false
+              }
             },
             "required": ["label", "action", "context"],
             "additionalProperties": false

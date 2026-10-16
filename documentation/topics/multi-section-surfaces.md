@@ -228,10 +228,14 @@ records is kept and shows its empty state.
 
 **Rendering.** `display :board` emits one root child, `board_<template_key>`:
 a `Column` holding an h2 heading, the create affordance (when the
-surface has a create action) and `board_<template_key>_lanes`, a **horizontal
-`List`** of lane `Column`s. It is a `List`, not a `Row`, because the basic
-`Row` cannot wrap (see the Layout topic); renderers typically scroll a
-horizontal list. Each lane `Column` (`lane_<lane>`) holds:
+surface has a create action) and `board_<template_key>_lanes`, a `Row` of
+lane `Column`s, each at layout `weight` 1: the lanes share the board's width
+equally instead of each sizing to its widest card. The AshA2ui merged
+catalog (`priv/js/ash_a2ui_catalog.js`) scrolls the lanes horizontally
+inside the board once they reach their minimum width
+(`--a2ui-board-lane-min-width`, default 18rem; `--a2ui-board-lane-max-width`
+caps them), so a board with many lanes never widens the page. Each lane
+`Column` (`lane_<lane>`) holds:
 
 - `lane_<lane>_header`: a `Row` of the lane heading (`table_heading_<lane>`,
   h3) and the lane total (`lane_<lane>_total`, bound to the reserved
@@ -245,6 +249,13 @@ horizontal list. Each lane `Column` (`lane_<lane>`) holds:
 `display :list` (the default) keeps the stacked rendering above, unchanged.
 The admin catalog renders boards with this basic composition, as it does
 every sectioned table.
+
+**Selecting a card.** A board takes `select_context` like a list table: every
+card gets the per-row "Select <context>" button (`row_context_<lane>_button`),
+dispatching `context_select` with the card's id, so the `:detail` components
+and related tables bound to the context follow. Nothing in it depends on the
+runtime lane name. Other sectioned tables (`display :list`) still do not
+take `select_context`.
 
 **Totals.** `/_lane_total_<lane>` is the lane query's `totalCount` when it
 has one, else the lane's row count (`"5+"` when the query reports more rows

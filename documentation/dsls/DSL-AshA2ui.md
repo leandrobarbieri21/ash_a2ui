@@ -354,7 +354,7 @@ end
 | [`query`](#a2ui-component-query){: #a2ui-component-query } | `atom` |  | Name of a `query` entity providing server-enforced search/sort/filter/pagination (tables). |
 | [`context_filter`](#a2ui-component-context_filter){: #a2ui-component-context_filter } | `keyword` | `[]` | Context scoping for a `:table`: keys are public attributes of the table's resource, values are declared context names (`context_filter user_id: :user`). Each context with a selected value ANDs `attribute == selected value` onto the table's reads; unselected contexts contribute nothing. |
 | [`require_context`](#a2ui-component-require_context){: #a2ui-component-require_context } | `list(atom)` | `[]` | Context names (a subset of this table's `context_filter` contexts) of which **at least one** must be selected before the table reads — otherwise it renders no records (and no read is executed). |
-| [`select_context`](#a2ui-component-select_context){: #a2ui-component-select_context } | `atom` |  | A declared context (over the same resource as this table) the table's per-row "Select <context>" button selects into — the master/detail pattern: the button sends `"context_select"` with the row's record id, and the detail panels and related tables bound to the context follow. |
+| [`select_context`](#a2ui-component-select_context){: #a2ui-component-select_context } | `atom` |  | A declared context (over the same resource as this table) the table's per-row "Select <context>" button selects into — the master/detail pattern: the button sends `"context_select"` with the row's record id, and the detail panels and related tables bound to the context follow. On a board (`display :board`) every card carries the button; other sectioned tables do not take `select_context`. |
 | [`context`](#a2ui-component-context){: #a2ui-component-context } | `atom` |  | The declared context a `:detail` component renders: its selected record's fields are written to `/detail/<context>` and displayed as a read-only label/value grid. Required on `:detail` components. |
 
 
@@ -797,8 +797,9 @@ action name
 ```
 
 
-Per-action metadata: refresh targets, argument prompts, per-row
-visibility conditions, and host-delegated dispatch (`via`).
+Per-action metadata: the button label, refresh targets, argument
+prompts, per-row visibility conditions, and host-delegated dispatch
+(`via`).
 
 
 
@@ -816,6 +817,13 @@ end
 action :decline do
   prompt_fields [:notes]
   prompt_title "Decline referral"
+end
+
+```
+
+```
+action :confirm_merge do
+  label "Confirm match"
 end
 
 ```
@@ -840,9 +848,10 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
+| [`label`](#a2ui-action-label){: #a2ui-action-label } | `String.t` |  | The text of this action's buttons — its row button, bulk toolbar button, admin `rowActions` entry and (unless `prompt_title` is set) its prompt heading — and the name in its bulk status line. A plain string, so a host can pass translated text. Defaults to the humanized action name. |
 | [`refreshes`](#a2ui-action-refreshes){: #a2ui-action-refreshes } | `list(atom)` |  | The table components refreshed after this action succeeds, by component name (`refreshes [:new_items]`; the unnamed table is `:table`). `[]` refreshes no table. Omitted (and for actions without an `action` entity) every table is refreshed (the default). |
 | [`prompt_fields`](#a2ui-action-prompt_fields){: #a2ui-action-prompt_fields } | `list(atom)` | `[]` | Arguments/accepts of the Ash action collected from the user in a per-row Modal prompt before the action is invoked (row actions only). Clicking the row button opens the Modal instead of invoking directly; its confirm button sends `invoke` with a `"values"` map. |
-| [`prompt_title`](#a2ui-action-prompt_title){: #a2ui-action-prompt_title } | `String.t` |  | Heading shown inside the prompt Modal. Defaults to the humanized action name. |
+| [`prompt_title`](#a2ui-action-prompt_title){: #a2ui-action-prompt_title } | `String.t` |  | Heading shown inside the prompt Modal. Defaults to the action's `label`, else the humanized action name. |
 | [`visible_when`](#a2ui-action-visible_when){: #a2ui-action-visible_when } | `keyword` | `[]` | Per-record conditions gating this row action, ANDed together (`visible_when status: :pending`). Keys are public attributes or public expression calculations; `nil` values mean `is_nil`, list values mean membership, anything else is equality. Enforced server-side on every invoke; rendering hides the button per row. A bulk action applies the same check to each selected record and counts the records that fail it as skipped. |
 | [`via`](#a2ui-action-via){: #a2ui-action-via } | `mfa` |  | Delegate this row action to a host-provided function instead of running the mapped Ash action directly (`via {MyApp.Tasks, :check_in, ["board"]}`). The framework knows nothing about the host's engine: at click time the handler fetches the row's record (with any `visible_when` condition calculations loaded, enforced as always) and calls     apply(module, function, [context \| extra_args]) where `context` is a map carrying the dispatch state:   * `:record` — the row's record, loaded as the surface loads it   * `:actor` — the actor the host passed to the handler (`nil` when none)   * `:tenant` — the tenant the host passed to the handler   * `:action` — the row-action name (atom)   * `:surface_id` — the surface's id   * `:selected` — the surface's context selections (see     `AshA2ui.ContextRunner.selected/2`; `%{}` without contexts) The MFA returns the same shape the direct path does — `:ok` \| `{:ok, term}` \| `{:error, Ash.Error.t()}` (any Ash error class or exception; mapped exactly like a direct invocation's failure: `Ash.Error.Forbidden` to a not-authorized status, validation errors to `/errors/<field>`) — and the result renders through the standard success/error channels unchanged: success refreshes the tables (honoring `refreshes`) and reports the action's status text; errors go to the typed `/ui/feedback` error. The client is unaware `via` exists: the emitted button is the ordinary `invoke` row action, addressed by the same action name. The named Ash action must still exist (it remains the row-action allowlist entry and the button's label source); `via` only reroutes the dispatch. Mutually exclusive with `prompt_fields` (the prompt exists to collect values cast against the direct Ash action). Row and bulk actions only; a bulk action calls the MFA once per selected record. |
 

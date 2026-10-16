@@ -320,14 +320,15 @@ defmodule AshA2ui.Bulk do
 
   @doc """
   The status line of a run, e.g. `"Approve: 4 of 5 selected records done;
-  1 refused."`.
+  1 refused."` — named by `label` (the action's `label`) when given, else
+  the humanized action name.
   """
-  @spec status_text(atom, non_neg_integer, map) :: String.t()
-  def status_text(action, selected, result) do
+  @spec status_text(atom, non_neg_integer, map, String.t() | nil) :: String.t()
+  def status_text(action, selected, result, label \\ nil) do
     others =
       for key <- ["refused", "skipped", "failed"], result[key] > 0, do: "#{result[key]} #{key}"
 
-    base = "#{humanize(action)}: #{result["ok"]} of #{selected} selected records done"
+    base = "#{label || humanize(action)}: #{result["ok"]} of #{selected} selected records done"
 
     case others do
       [] -> base <> "."
@@ -353,10 +354,11 @@ defmodule AshA2ui.Bulk do
   @doc """
   The toolbar above a bulk table's list: one `bulk_invoke` Button per bulk
   action, then "Select page" and "Clear" (`bulk_select`). `bind` adds the
-  surface's usual carried bindings (`"query"`, `"contexts"`) to a context.
+  surface's usual carried bindings (`"query"`, `"contexts"`) to a context;
+  `label` names each action's button (the action's `label`).
   """
-  @spec toolbar_components(map, String.t(), (map -> map)) :: [map]
-  def toolbar_components(table, sfx, bind) do
+  @spec toolbar_components(map, String.t(), (map -> map), (atom -> String.t())) :: [map]
+  def toolbar_components(table, sfx, bind, label \\ &humanize/1) do
     base = "bulk#{sfx}"
     records = %{"path" => table.records_path}
     component = to_string(table.name)
@@ -368,7 +370,7 @@ defmodule AshA2ui.Bulk do
         context =
           bind.(%{"action" => to_string(action), "component" => component, "records" => records})
 
-        button("#{base}_action_#{action}", humanize(action), "bulk_invoke", context)
+        button("#{base}_action_#{action}", label.(action), "bulk_invoke", context)
       end)
 
     selects =

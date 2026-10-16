@@ -434,6 +434,7 @@ defmodule AshA2ui.Dynamic.Importer do
       if MapSet.member?(reachable, action.name) do
         spec =
           %{"name" => to_string(action.name)}
+          |> put_value("label", action.label)
           |> put_list("refreshes", action.refreshes)
           |> put_list("prompt_fields", action.prompt_fields)
           |> put_value("prompt_title", action.prompt_title)

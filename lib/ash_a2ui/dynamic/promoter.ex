@@ -96,6 +96,7 @@ defmodule AshA2ui.Dynamic.Promoter do
   ]
 
   @action_options [
+    label: :raw,
     refreshes: :name_list,
     prompt_fields: :name_list,
     prompt_title: :raw,

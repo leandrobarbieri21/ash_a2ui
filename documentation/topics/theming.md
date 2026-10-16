@@ -92,7 +92,13 @@ function except:
   Composites the detector cannot fully verify — and every other Column —
   render exactly like the basic catalog, so the wire format stays plain
   basic catalog (progressive enhancement; stock renderers show the flat
-  composite).
+  composite). The same detection covers searchable relationship **prompt**
+  fields (`row_action_<action>_prompt_select_<field>`).
+  A **board** container (`board_<template>`) renders its lanes `Row` inside
+  a horizontal scroll frame: the weighted lanes share the board's width
+  down to `--a2ui-board-lane-min-width` (default 18rem), then scroll
+  inside the board rather than widening the page
+  (`--a2ui-board-lane-max-width` caps a lane; default none).
 
 Like the hook, the file has no bundled dependencies — the host bundle
 passes the renderer classes in:
@@ -126,7 +132,8 @@ Combobox/chip styling rides the same token system, with a few extra knobs:
 `--a2ui-combobox-box-shadow`, `--a2ui-combobox-option-padding`,
 `--a2ui-chip-background`/`--a2ui-chip-color`,
 `--a2ui-chip-selected-background`/`--a2ui-chip-selected-color`, and
-`--a2ui-chip-border-radius` (see the JSDoc in the file).
+`--a2ui-chip-border-radius` (see the JSDoc in the file). Board lanes:
+`--a2ui-board-lane-min-width` and `--a2ui-board-lane-max-width`.
 
 ### Markdown rendering (fixes literal `##` headings)
 

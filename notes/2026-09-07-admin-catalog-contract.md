@@ -219,3 +219,38 @@ props are unaffected).
   known, dispatching the existing `query` envelope with `pageDelta` = the
   distance to the target page.
 
+
+## Addendum (2026-10-16): catalog 1.2 — additive (adoption findings)
+
+`priv/a2ui/admin_v1/catalog.json` is `"version": "1.2.0"`; the catalog id is
+unchanged and every addition is optional. Adopting the admin catalog in
+clinic-demo found prompt row actions failing with "Validation failed", a
+View panel that could not be closed, and every row action on every row.
+
+- `dataGrid.rowActions[].visiblePath` (string, row-relative): set on the
+  entries of `visible_when` actions to `_visible_<action>`, the row key the
+  basic composition's visibility slot already templates over. The grid
+  offers the action only on rows whose value there is a non-empty list (or
+  `true`); a missing key means offered. Enforcement stays in the handler.
+- `dataGrid.rowActions[].prompt` (object): set on the entries of
+  `prompt_fields` actions — `{content, title, confirmLabel, open}`.
+  `content` is the id of a dataGrid child, a `Column` holding the prompt's
+  inputs (the same widgets the basic Modal holds, bound to
+  `/prompt/values/<action>/<field>`, with `/errors/<field>` captions);
+  `open` is the `prompt` pre-fill envelope in the flat rowActions shape
+  (`{action: "prompt", context: {action, recordId: {path: "id"},
+  component}}`). Activating the entry dispatches `open` and shows the
+  content in a dialog headed `title`; Confirm dispatches the entry itself
+  (its `invoke` context already binds `values` to
+  `/prompt/values/<action>`). The dialog stays open, showing the
+  `/ui/feedback` message, on an error outcome and closes on success. Prompt
+  contents are never rendered outside their dialog. The server contract
+  (`prompt`, `invoke` with `values`) is unchanged.
+- `recordPanel` in view mode renders its `actionBar` child after the field
+  displays: the primary is hidden there (empty `primaryLabel`), and the
+  bar's Cancel (`cancel_record_task`) closes the panel, as the basic
+  composition's footer does. No new prop.
+- Row action buttons wrap inside their cell instead of pushing the grid
+  past its frame (renderer-only).
+- Entry labels come from the action entity's `label` when declared (the
+  humanized action name otherwise), as do the basic buttons'.

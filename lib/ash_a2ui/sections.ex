@@ -233,16 +233,18 @@ defmodule AshA2ui.Sections do
       ResourceInfo.domain(config.source) || opts[:domain] ||
         raise(ArgumentError, "no domain configured for #{inspect(config.source)}")
 
+    # The opts go to `for_read/4` so the source action's preparations see
+    # the actor and tenant (they run when the query is built).
     config.source
-    |> Ash.Query.for_read(config.read_action)
-    |> Ash.Query.sort([{config.sort, :asc}])
-    |> Ash.Query.limit(config.limit)
-    |> Ash.read(
+    |> Ash.Query.for_read(config.read_action, %{},
       domain: domain,
       actor: opts[:actor],
       tenant: opts[:tenant],
       authorize?: Keyword.get(opts, :authorize?, true)
     )
+    |> Ash.Query.sort([{config.sort, :asc}])
+    |> Ash.Query.limit(config.limit)
+    |> Ash.read()
   end
 
   defp section_string(%Date{} = date), do: Date.to_iso8601(date)

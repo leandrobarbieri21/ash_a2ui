@@ -1075,6 +1075,8 @@ defmodule AshA2ui do
         per-row "Select <context>" button selects into — the master/detail
         pattern: the button sends `"context_select"` with the row's record id,
         and the detail panels and related tables bound to the context follow.
+        On a board (`display :board`) every card carries the button; other
+        sectioned tables do not take `select_context`.
         """
       ],
       context: [
@@ -1091,8 +1093,9 @@ defmodule AshA2ui do
   @action %Spark.Dsl.Entity{
     name: :action,
     describe: """
-    Per-action metadata: refresh targets, argument prompts, per-row
-    visibility conditions, and host-delegated dispatch (`via`).
+    Per-action metadata: the button label, refresh targets, argument
+    prompts, per-row visibility conditions, and host-delegated dispatch
+    (`via`).
     """,
     examples: [
       """
@@ -1105,6 +1108,11 @@ defmodule AshA2ui do
       action :decline do
         prompt_fields [:notes]
         prompt_title "Decline referral"
+      end
+      """,
+      """
+      action :confirm_merge do
+        label "Confirm match"
       end
       """,
       """
@@ -1123,6 +1131,16 @@ defmodule AshA2ui do
         required: true,
         doc:
           "The Ash action this metadata applies to (a row action, or the form's create/update action)."
+      ],
+      label: [
+        type: :string,
+        doc: """
+        The text of this action's buttons — its row button, bulk toolbar
+        button, admin `rowActions` entry and (unless `prompt_title` is set)
+        its prompt heading — and the name in its bulk status line. A plain
+        string, so a host can pass translated text. Defaults to the
+        humanized action name.
+        """
       ],
       refreshes: [
         type: {:list, :atom},
@@ -1146,8 +1164,8 @@ defmodule AshA2ui do
       prompt_title: [
         type: :string,
         doc: """
-        Heading shown inside the prompt Modal. Defaults to the humanized
-        action name.
+        Heading shown inside the prompt Modal. Defaults to the action's
+        `label`, else the humanized action name.
         """
       ],
       visible_when: [
