@@ -1,8 +1,9 @@
 defmodule AshA2ui.Experience.AffordancesTest do
   @moduledoc """
-  A2UI-101/AC-11..AC-13: experience-layer affordances — the View/Edit row
-  controls (gated on the view's update action) and the create affordance
-  (gated on the view's create action).
+  A2UI-101/AC-11, AC-12 and AC-18: experience-layer affordances — the
+  View/Edit row controls (View gated on the surface having a record panel,
+  Edit also on the view's update action) and the create affordance (gated on
+  the view's create action). AC-18 replaced the retired AC-13.
   """
 
   use ExUnit.Case, async: false
@@ -57,7 +58,7 @@ defmodule AshA2ui.Experience.AffordancesTest do
   end
 
   describe "read-only resources" do
-    @tag ac: "A2UI-101/AC-13"
+    @tag ac: "A2UI-101/AC-18"
     test "a formless surface ships no View affordance (it would be dead)" do
       # The audit found 7 of 9 View buttons dead: the panel they open only
       # exists on surfaces with a form. ReadOnly has neither form nor
@@ -80,7 +81,7 @@ defmodule AshA2ui.Experience.AffordancesTest do
       refute Map.has_key?(comps, "form_submit_button")
     end
 
-    @tag ac: "A2UI-101/AC-13"
+    @tag ac: "A2UI-101/AC-18"
     test "a surface WITH a form keeps its View affordance" do
       %{comps: comps} = surface!(NoUpdate)
 

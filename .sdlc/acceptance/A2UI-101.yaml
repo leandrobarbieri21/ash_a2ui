@@ -16,7 +16,10 @@
 # composition were removed on 2026-10-16 as a clean break, so the experience
 # layer is now the only composition. "An experience v2 surface" in the
 # criteria below means any surface; the wording is kept because criterion
-# text is part of the reviewed oracle. AC-17 is retired (see its entry).
+# text is part of the reviewed oracle. AC-13 and AC-17 are retired (see
+# their entries); AC-18 replaces AC-13. A retired criterion keeps its id and
+# its text and says why in `retired_reason` (ai-sdlc ADR 0039 amendment of
+# 2026-10-16); it is not live coverage.
 item: A2UI-101
 
 criteria:
@@ -161,6 +164,15 @@ criteria:
       test/ash_a2ui/experience/affordances_test.exs::create_action_presence_gates_the_create_affordance
 
   - id: A2UI-101/AC-13
+    status: retired
+    retired_reason: >-
+      2026-10-16. Current behaviour contradicts "rows offer View only": a
+      surface with no form component has no record panel for View to open,
+      so its rows carry no View control at all (the audit found such View
+      buttons dead). The test this named, read_only_resource_offers_view_only,
+      was renamed before the experience v1 removal and now asserts the
+      opposite. Superseded by A2UI-101/AC-18; the text below is kept as
+      written.
     given: an experience v2 surface for a resource with neither create nor
       update actions
     when: affordances are emitted
@@ -210,7 +222,7 @@ criteria:
 
   - id: A2UI-101/AC-17
     status: retired
-    retired: >-
+    retired_reason: >-
       2026-10-16, with the removal of experience v1 (clean break, no
       compatibility shim). The version-1 composition this criterion protected
       no longer exists, so its given/when/then (kept below as written) can no
@@ -231,3 +243,19 @@ criteria:
     test: >-
       test/ash_a2ui/experience/no_version_switch_test.exs::a_leftover_experience_version_setting_is_inert
       and ::select_row_is_an_unknown_action
+
+  - id: A2UI-101/AC-18
+    given: >-
+      a surface for a resource with neither create nor update actions and no
+      form component
+    when: affordances are emitted
+    then: >-
+      rows carry no View or Edit control, because there is no record panel
+      for them to open; there is no create affordance; and no form or submit
+      control is emitted. A surface that does have a form keeps its View
+      control
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/experience/affordances_test.exs::a_formless_surface_ships_no_view_affordance_it_would_be_dead
+      and ::a_surface_with_a_form_keeps_its_view_affordance

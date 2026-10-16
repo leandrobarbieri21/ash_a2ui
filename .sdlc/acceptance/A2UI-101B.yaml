@@ -113,7 +113,7 @@ criteria:
 
   - id: A2UI-101B/AC-9
     status: retired
-    retired: >-
+    retired_reason: >-
       2026-10-16, with the removal of experience v1 (clean break). There is
       no experience version left for the admin catalog to depend on, so the
       given/when/then below (kept as written) can no longer hold. The id

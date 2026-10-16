@@ -101,7 +101,7 @@ end
 defmodule AshA2ui.Test.Experience.ReadOnly do
   @moduledoc """
   Experience-layer fixture: neither create nor update actions, and no form
-  component — rows must offer View only.
+  component — rows carry no record controls (A2UI-101/AC-18).
   """
 
   use Ash.Resource,
