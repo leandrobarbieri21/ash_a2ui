@@ -1309,7 +1309,12 @@ defmodule AshA2ui.ActionHandler do
 
   defp invoke(action_name, record_id, values, %{view: view} = env) do
     setting = Map.get(view.actions, action_name)
-    env = env |> Map.put(:invoked, action_name) |> Map.put(:setting, setting)
+
+    env =
+      env
+      |> Map.put(:invoked, action_name)
+      |> Map.put(:setting, setting)
+      |> Map.put(:shown_fields, (setting && setting.prompt_fields) || [])
 
     case enforce_visibility(view, setting, record_id, env.ash_opts) do
       :ok ->
@@ -2920,18 +2925,10 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # The fields an invoke shows inputs for: its prompt fields (none for a
-  # plain row action). Forms and everything else show all of theirs.
-  defp shown_fields(env) do
-    if Map.has_key?(env, :invoked) do
-      case Map.get(env, :setting) do
-        %{prompt_fields: fields} -> fields
-        _no_entity -> []
-      end
-    else
-      :all
-    end
-  end
+  # The fields the failed action shows inputs for: an invoke records its
+  # prompt fields (none for a plain row action, see invoke/4); forms and
+  # everything else show all of theirs.
+  defp shown_fields(env), do: Map.get(env, :shown_fields, :all)
 
   # Validation errors on create_inline rows are additionally mirrored INTO
   # the submitted rows as "_error_<field>" keys (one /form/<argument>
