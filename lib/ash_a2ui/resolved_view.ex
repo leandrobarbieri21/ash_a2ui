@@ -248,7 +248,8 @@ defmodule AshA2ui.ResolvedView do
     :query_state,
     :context_state,
     :surface_properties,
-    :spec_version
+    :spec_version,
+    :link_buttons
   ]
 
   @doc """
@@ -261,6 +262,8 @@ defmodule AshA2ui.ResolvedView do
     * `:actor` / `:tenant` / `:authorize?` / `:domain` / `:query_state` —
       reserved for data loading (see `AshA2ui.Info.build_surface/2`);
       validated and passed through, not consumed by normalization itself.
+    * `:surface_properties` / `:link_buttons` — encoder options (see
+      `AshA2ui.Info.build_surface/2`); passed through.
     * `:spec_version` — `"0.9.1"` or `"1.0"`: overrides the surface's
       declared `spec_version` for this resolve. Transports whose renderer
       only speaks one protocol version (see the External Transports topic)

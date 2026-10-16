@@ -64,6 +64,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert opts[:tenant] == :stub_tenant
       end
 
+      test "a LiveView that cannot navigate builds without link Buttons", %{conn: conn} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/stubbed")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        refute Keyword.has_key?(opts, :link_buttons)
+      end
+
+      test "an :open_surface callback turns basic-catalog link Buttons on", %{conn: conn} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/open-surface-callback")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        assert opts[:link_buttons] == true
+      end
+
       test "assigns ui/actor/tenant on the socket for introspection", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/stubbed")
 
@@ -344,6 +358,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert %{"person" => %{"value" => value, "label" => "Ada"}} = opts[:context_state]
         assert value == ada.id
         assert opts[:query_state] == %{"page" => 2}
+        # an :open_surface_url template: link Buttons can navigate
+        assert opts[:link_buttons] == true
       end
 
       test "unreadable deep-linked ids are dropped", %{conn: conn, hidden: hidden} do
@@ -433,7 +449,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         Ash.create!(Participant, %{note_id: kickoff.id, person_id: ada.id}, authorize?: false)
 
         {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link")
-        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+        assert_push_event(view, "a2ui:messages", %{messages: initial}, 1_000)
+
+        # the real build got link_buttons: true from the URL template
+        assert Enum.any?(initial, fn message ->
+                 message
+                 |> get_in(["updateComponents", "components"])
+                 |> List.wrap()
+                 |> Enum.any?(&(&1["id"] == "table_cell_participations_note_title_value_link"))
+               end)
 
         render_hook(view, "a2ui:action", %{
           "version" => "v0.9.1",

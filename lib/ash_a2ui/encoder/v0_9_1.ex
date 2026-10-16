@@ -41,8 +41,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       cells — each `table_cell_<field>` is a `Row` of a caption `Text`
       (`table_cell_<field>_label`, the humanized field name) and a value
       `Text` (`table_cell_<field>_value`, bound to the template-relative
-      path `<field>`, `format: :date` rendered through `formatDate`; a
-      to-one reference link wraps that Text in a borderless `Button`,
+      path `<field>`, `format: :date` rendered through `formatDate`; with
+      the `link_buttons: true` option (set by `AshA2ui.LiveRenderer` when
+      it can navigate) a to-one reference link wraps that Text in a
+      borderless `Button`,
       `table_cell_<field>_value_link`, dispatching `open_surface` with
       `{"field", "surface", "recordId"}` bound to the row's
       `_links/<field>` — card rows and details do the same) —
@@ -321,7 +323,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # `:openable_links` for the component pass only (the data model is
   # encoded from the unannotated view). A vetoed field keeps its plain value
   # Text; `links` (to-many) fields stay plain text in the basic catalog.
+  # Opt-in (`link_buttons: true`): a Button only helps when the transport
+  # navigates on an accepted "open_surface", so without the option every
+  # value stays plain Text, as before link Buttons existed.
   defp with_openable_links(view, opts) do
+    if Keyword.get(opts, :link_buttons, false) == true do
+      annotate_openable_links(view, opts)
+    else
+      view
+    end
+  end
+
+  defp annotate_openable_links(view, opts) do
     tables =
       Enum.map(view.tables, fn table ->
         Map.put(
@@ -1902,7 +1915,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # moved onto it) dispatching `open_surface` with the field name and the
   # bound `_links/<field>` surface and record id (`links_prefix` is "" for
   # template-relative rows, "/detail/<context>/" for details). The server
-  # validates the request and the transport navigates — the
+  # validates the field/surface pair (not the record id — the opened
+  # surface authorizes its read) and the transport navigates — the
   # `open_surface_url` / `:open_surface` contract the admin catalog's link
   # cells reach through `"a2ui:open_surface"` (see `AshA2ui.LiveRenderer`).
   # A row without a link for the field (nil reference, unreadable target)

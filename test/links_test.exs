@@ -349,8 +349,42 @@ defmodule AshA2ui.LinksTest do
       button
     end
 
-    test "card-row meta values link to-one fields; to-many and plain fields stay Text" do
+    test "off by default: without link_buttons every linked value stays plain Text" do
+      for ui <- [NotesUI, AshA2ui.Test.Links.PagedNotesUI, AshA2ui.Test.Links.PeopleUI] do
+        messages = AshA2ui.Info.build_surface(ui)
+        Enum.each(messages, &assert_valid_server_message/1)
+        comps = components_by_id(messages)
+
+        refute Enum.any?(comps, fn {id, comp} ->
+                 String.ends_with?(id, "_link") and comp["component"] == "Button"
+               end),
+               "#{inspect(ui)} rendered link Buttons without link_buttons: true"
+      end
+
       messages = AshA2ui.Info.build_surface(NotesUI)
+      comps = components_by_id(messages)
+
+      # the row data still carries _links for hosts that read it directly
+      kickoff =
+        messages
+        |> data_model()
+        |> Map.fetch!("records")
+        |> Enum.find(&(&1["title"] == "Kickoff"))
+
+      assert kickoff["_links"]["person_name"]["surface"] == "person"
+
+      assert comps["record_row_meta_cell_person_name"]["children"] == [
+               "record_row_meta_label_person_name",
+               "record_row_meta_value_person_name"
+             ]
+
+      # identical to an explicit link_buttons: false
+      assert AshA2ui.Info.build_surface(NotesUI) ==
+               AshA2ui.Info.build_surface(NotesUI, link_buttons: false)
+    end
+
+    test "card-row meta values link to-one fields; to-many and plain fields stay Text" do
+      messages = AshA2ui.Info.build_surface(NotesUI, link_buttons: true)
       Enum.each(messages, &assert_valid_server_message/1)
       comps = components_by_id(messages)
 
@@ -371,7 +405,7 @@ defmodule AshA2ui.LinksTest do
     end
 
     test "flat table cells link to-one fields" do
-      messages = AshA2ui.Info.build_surface(AshA2ui.Test.Links.PagedNotesUI)
+      messages = AshA2ui.Info.build_surface(AshA2ui.Test.Links.PagedNotesUI, link_buttons: true)
       Enum.each(messages, &assert_valid_server_message/1)
       comps = components_by_id(messages)
 
@@ -386,7 +420,10 @@ defmodule AshA2ui.LinksTest do
     end
 
     test "related tables link through their own resource's relationships" do
-      comps = components_by_id(AshA2ui.Info.build_surface(AshA2ui.Test.Links.PeopleUI))
+      comps =
+        components_by_id(
+          AshA2ui.Info.build_surface(AshA2ui.Test.Links.PeopleUI, link_buttons: true)
+        )
 
       assert_link_button(
         comps,
@@ -399,7 +436,7 @@ defmodule AshA2ui.LinksTest do
     end
 
     test "detail values link through /detail/<context>/_links" do
-      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI))
+      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI, link_buttons: true))
 
       assert_link_button(
         comps,
@@ -413,7 +450,7 @@ defmodule AshA2ui.LinksTest do
     end
 
     test "the v1.0 surface carries the same link buttons, schema-valid" do
-      [create] = AshA2ui.Info.build_surface(NotesUI, spec_version: "1.0")
+      [create] = AshA2ui.Info.build_surface(NotesUI, spec_version: "1.0", link_buttons: true)
       assert_valid_server_message(create, :v1_0)
 
       comps = Map.new(create["createSurface"]["components"], &{&1["id"], &1})
@@ -424,7 +461,7 @@ defmodule AshA2ui.LinksTest do
 
     test "a field the resolver vetoes keeps its plain value Text", %{bob: bob} do
       Application.put_env(:ash_a2ui, :link_resolver, AshA2ui.LinksTest.PersonVetoResolver)
-      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI))
+      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI, link_buttons: true))
 
       refute link_button(comps, "record_row_meta_value_person_name")
 
@@ -456,7 +493,11 @@ defmodule AshA2ui.LinksTest do
     test "rows are untouched: encoder and handler refresh serialize them identically", %{
       ada: ada
     } do
-      initial = NotesUI |> AshA2ui.Info.build_surface() |> data_model() |> Map.fetch!("records")
+      initial =
+        NotesUI
+        |> AshA2ui.Info.build_surface(link_buttons: true)
+        |> data_model()
+        |> Map.fetch!("records")
 
       {:ok, messages} =
         ActionHandler.handle(

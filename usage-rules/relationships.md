@@ -172,15 +172,20 @@ end
 - Admin catalog: link columns carry `"link": {"path": "_links/<field>"}`,
   FieldDisplays `"link": {"path": ".../_links/<field>"}`; activation calls
   the catalog's `openSurface` function (`{surface, recordId, query}`).
-- Basic catalog: a to-one link (`link :rel` / `link {surface, id_path}`)
-  in a table cell, card-row title/meta or detail value wraps its value
-  Text (same id) in a borderless Button `<value id>_link` dispatching
+- Basic catalog, with `link_buttons: true` (the LiveRenderer sets it when
+  it has `:open_surface` / `:open_surface_url`; off, links stay plain
+  Text): a to-one link (`link :rel` / `link {surface, id_path}`) in a
+  table cell, card-row title/meta or detail value wraps its value Text
+  (same id) in a borderless Button `<value id>_link` dispatching
   `"open_surface"` with `{"field", "surface": {"path":
   ".../_links/<field>/surface"}, "recordId": {"path": ...}}`. The handler
-  accepts it only for that field's resolved surface (no follow-ups) and
+  accepts it only for that field's resolved surface (no follow-ups; the
+  record id is not checked, the opened surface authorizes its read) and
   `AshA2ui.LiveRenderer` then navigates like `"a2ui:open_surface"`. Only
   fields the resolver resolves in this render get a Button; `links`
-  (to-many) stay plain text. Row data is unchanged.
+  (to-many) stay plain text. Row data is unchanged. Rows without a link
+  for the field still get the Button (it sits in the row template); it is
+  acknowledged and opens nothing.
 - Verified at compile time: `link` → public to-one relationship, `links`
   → public to-many, single-attribute destination PK, `link_label` a
   public destination field, `{surface, id_path}` walks public
@@ -210,9 +215,10 @@ end
 - ❌ Building link URLs or re-checking link readability client-side —
   read `_links/<field>` (absent = no link) and hand activation to
   `openSurface` (admin) or the `"open_surface"` action (basic).
-- ❌ Hosts with their own transport swallowing an accepted
-  `"open_surface"` action — the handler returns no messages; the transport
-  must navigate (or hand the request to its own `open_surface`).
+- ❌ Passing `link_buttons: true` from a host whose transport swallows an
+  accepted `"open_surface"` action — the handler returns no messages; the
+  transport must navigate (or hand the request to its own
+  `open_surface`), or the Buttons do nothing.
 - ❌ Linking through a `source` column's raw foreign key when a label
   exists — `link :relationship` labels itself from the cell (or
   `link_label`).

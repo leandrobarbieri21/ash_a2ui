@@ -240,7 +240,8 @@ end
   with a form, Edit only with a declared `update_action`, neither on a
   related table), a **Create <Resource>** button (only with a create action,
   never under a related table), to-one reference links as borderless
-  link Buttons in the basic catalog (anchors in the admin catalog),
+  link Buttons in the basic catalog when built with `link_buttons: true`
+  (anchors in the admin catalog),
   pagination that hides on a single page,
   data-driven empty states, and typed feedback at `/ui/feedback`
   (`kind` + `message`) for every action outcome.
@@ -344,9 +345,10 @@ end
   `"export"` (`ash_a2ui:reports`), `"bulk_invoke"` / `"bulk_select"`
   (tables with `bulk_actions`), `"wizard_next"`, `"wizard_back"` (only
   on forms declaring `step`s — see `ash_a2ui:layout`), and
-  `"open_surface"` (the basic catalog's reference-link Buttons: validated
-  against the surface's to-one link fields, no follow-up messages, the
-  transport navigates — see `ash_a2ui:relationships`).
+  `"open_surface"` (the basic catalog's opt-in reference-link Buttons: the
+  field/surface pair is validated against the surface's to-one link
+  fields, the record id is not; no follow-up messages, the transport
+  navigates — see `ash_a2ui:relationships`).
   Don't invent new `action.name` values; add a proper Ash action and expose
   it via `row_actions` instead.
 - Row actions that need user input declare `prompt_fields` on their

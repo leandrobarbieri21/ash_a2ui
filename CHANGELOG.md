@@ -10,25 +10,34 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
-- **Reference links render in the basic catalog.** Rows and detail records
-  carried `_links`, but only the admin catalog drew them. In the basic
-  composition a to-one link (`link :relationship` or `link {surface,
-  id_path}`) now wraps its value Text (same id, same binding) in a
-  borderless `Button`, `<value id>_link`, in flat table cells, card-row
-  titles and meta values, and detail values. The Button dispatches the new
-  `"open_surface"` action with the field name and the bound
-  `_links/<field>` surface and record id. `AshA2ui.ActionHandler` accepts it
-  only when the field is a to-one link of the surface whose resolved
-  surface, for this actor, is the one sent, and returns no messages;
+- **Reference links can render in the basic catalog (opt-in).** Rows and
+  detail records carried `_links`, but only the admin catalog drew them.
+  With the new `link_buttons: true` option to
+  `AshA2ui.Info.build_surface/2`, a to-one link (`link :relationship` or
+  `link {surface, id_path}`) in the basic composition wraps its value Text
+  (same id, same binding) in a borderless `Button`, `<value id>_link`, in
+  flat table cells, card-row titles and meta values, and detail values.
+  The Button dispatches the new `"open_surface"` action with the field
+  name and the bound `_links/<field>` surface and record id.
+  `AshA2ui.ActionHandler` accepts it only when the field is a to-one link
+  of the surface whose resolved surface, for this actor, is the one sent,
+  and returns no messages. It does not check the record id: the opened
+  surface authorizes its own read, as for any typed URL.
   `AshA2ui.LiveRenderer` then navigates exactly as for
   `"a2ui:open_surface"` (the `:open_surface` callback, else the
-  `:open_surface_url` template). Only fields the `AshA2ui.LinkResolver`
-  resolves in that render get a Button, so a vetoed field keeps its plain
-  value. `links` (to-many) fields stay plain text, and row data is
+  `:open_surface_url` template), and sets `link_buttons: true` itself when
+  it has either. Without the option nothing changes: link values stay
+  plain Text, so hosts whose transport does not navigate (a plain
+  `ActionHandler.handle/3` call) never show a control that does nothing.
+  Only fields the `AshA2ui.LinkResolver` resolves in that render get a
+  Button, so a vetoed field keeps its plain value. The Button is in the
+  row template, so a row with no link for that field (a nil reference, an
+  unreadable target) still gets one; clicking it is acknowledged and
+  opens nothing. `links` (to-many) fields stay plain text, and row data is
   unchanged. Built from basic-catalog components only, on v0.9.1 and v1.0
   (the v0.9.1 `openUrl` takes only a literal URL, so it cannot open a
-  per-row target). Hosts with their own transport navigate on an accepted
-  `"open_surface"`.
+  per-row target). Hosts with their own transport pass `link_buttons:
+  true` only once they navigate on an accepted `"open_surface"`.
 - **The dynamic spec carries related tables and reference links.** A table
   component takes `"resource"` (an allowlisted name) to read another
   resource, and fields take `"link"` (a relationship name or `{"surface",

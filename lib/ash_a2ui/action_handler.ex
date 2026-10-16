@@ -147,8 +147,10 @@ defmodule AshA2ui.ActionHandler do
       to-one link field (`link :relationship` or `link {surface, id_path}`)
       of one of the surface's tables or details and the
       `AshA2ui.LinkResolver` resolves it, for this actor, to `surface`;
-      anything else is rejected with an error outcome. A missing or empty
-      `"surface"` (a row without a link for that field) is acknowledged.
+      anything else is rejected with an error outcome. `"recordId"` is
+      not checked: the opened surface authorizes its own read. A missing
+      or empty `"surface"` (a row without a link for that field) is
+      acknowledged.
       Returns no follow-up messages: the transport navigates —
       `AshA2ui.LiveRenderer` hands an accepted request to its
       `"a2ui:open_surface"` handling (the `:open_surface` callback, else
