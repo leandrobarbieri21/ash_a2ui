@@ -107,6 +107,16 @@ mounts it:
   client-side instead. Hosts that handle hook events themselves (not via
   `AshA2ui.LiveRenderer`) must add a `handle_event("a2ui:open_surface",
   …)` clause.
+- Basic-catalog reference links are ordinary `"a2ui:action"` envelopes
+  named `"open_surface"` (context `{field, surface, recordId}`).
+  `AshA2ui.LiveRenderer` passes them to the action handler and, once the
+  handler accepted the field/surface pair, navigates through the same
+  `:open_surface` / `:open_surface_url` path. Hosts with their own
+  `"a2ui:action"` handling do the same: call the handler, and on `{:ok,
+  _}` for an `"open_surface"` action, navigate. The Buttons only render
+  when the surface is built with `link_buttons: true`, which the
+  LiveRenderer passes when it has `:open_surface` or `:open_surface_url`;
+  other hosts pass it once they navigate.
 
 Wiring in `assets/js/app.js` (minimal — see the
 [Theming](theming.md) guide for the recommended full setup with the merged

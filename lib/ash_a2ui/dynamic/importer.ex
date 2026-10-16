@@ -7,12 +7,17 @@ defmodule AshA2ui.Dynamic.Importer do
   map — the same vocabulary `AshA2ui.Dynamic.resolve/2` parses, so an
   imported spec resolves to a surface that renders like the declared one.
 
+  Contexts (pickers, `select_context`, `context_filter`, `require_context`,
+  details), related tables (`resource` on a `:table`) and reference links
+  (`link` / `links` / `link_label`) are spec vocabulary and import as such.
+
   Import is honest about the spec's boundaries: a declared feature with no
-  spec vocabulary (inline editing, file export, wizard steps, plus the section options
-  that live outside the spec — `surface_id`, `record_label`,
-  `spec_version`) becomes a **visible rejection** carrying the reason,
-  never a silent drop. The composer shows rejections in the inspector; the
-  spec itself contains exactly what the dynamic stack can honor.
+  spec vocabulary (inline editing, file export, wizard steps, bulk actions,
+  boards, plus the section options that live outside the spec —
+  `surface_id`, `record_label`, `spec_version`) becomes a **visible
+  rejection** carrying the reason, never a silent drop. The composer shows
+  rejections in the inspector; the spec itself contains exactly what the
+  dynamic stack can honor.
 
   The inverse direction (spec → DSL source) is
   `AshA2ui.Dynamic.to_dsl_source/2`.
@@ -148,13 +153,15 @@ defmodule AshA2ui.Dynamic.Importer do
   # --- components --------------------------------------------------------------------
 
   defp component_specs(module) do
+    surface_resource = AshA2ui.Info.resource!(module)
+
     AshA2ui.Info.components(module)
     |> Enum.with_index()
     |> Enum.flat_map_reduce([], fn {component, index}, acc ->
       path = "components[#{index}]"
 
       if component.name in [:table, :form, :detail] do
-        {spec, rejections} = component_entry(component, path)
+        {spec, rejections} = component_entry(component, surface_resource, path)
         {[spec], acc ++ rejections}
       else
         # The spec's kind vocabulary is table/form/detail; anything else the
@@ -172,10 +179,11 @@ defmodule AshA2ui.Dynamic.Importer do
     end)
   end
 
-  defp component_entry(%Component{} = component, path) do
+  defp component_entry(%Component{} = component, surface_resource, path) do
     spec =
       %{"kind" => to_string(component.name)}
       |> put_component_name(component)
+      |> put_related_resource(component.resource, surface_resource)
       |> put_list("fields", component.fields)
       |> put_opt("read_action", component.read_action)
       |> put_opt("create_action", component.create_action)
@@ -259,6 +267,14 @@ defmodule AshA2ui.Dynamic.Importer do
 
   defp put_component_name(spec, _form), do: spec
 
+  # A related table names its resource by allowlist name; the surface's own
+  # resource is the default and stays unspoken.
+  defp put_related_resource(spec, nil, _surface_resource), do: spec
+  defp put_related_resource(spec, resource, resource), do: spec
+
+  defp put_related_resource(spec, resource, _surface_resource),
+    do: Map.put(spec, "resource", short_name(resource))
+
   defp put_row_layout(spec, nil), do: spec
 
   defp put_row_layout(spec, layout) do
@@ -267,6 +283,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("title", layout.title)
       |> put_opt("badge", layout.badge)
       |> put_keyword("badge_text", layout.badge_text, :raw)
+      |> put_keyword("badge_tones", layout.badge_tones, :name)
       |> put_list("meta", layout.meta)
       |> put_value("columns", layout.columns)
 
@@ -377,7 +394,23 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("option_sort", field.option_sort)
       |> put_value("option_limit", field.option_limit)
       |> put_list("option_search", field.option_search)
+      |> put_link(field.link)
+      |> put_opt("links", field.links)
+      |> put_opt("link_label", field.link_label)
     end)
+  end
+
+  # `link :relationship` is a name; `link {surface, id_path}` the explicit
+  # {"surface", "path"} object (the surface key as a string, the path as a
+  # name list — a bare atom path is the one-step list).
+  defp put_link(spec, nil), do: spec
+  defp put_link(spec, name) when is_atom(name), do: Map.put(spec, "link", to_string(name))
+
+  defp put_link(spec, {surface, path}) do
+    Map.put(spec, "link", %{
+      "surface" => to_string(surface),
+      "path" => path |> List.wrap() |> Enum.map(&to_string/1)
+    })
   end
 
   # --- actions -----------------------------------------------------------------------

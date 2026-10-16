@@ -41,10 +41,40 @@ composer chooses among the same knobs a DSL author has, nothing more.
 ```
 
 The full vocabulary — components (`table` / `form` / `detail`), field
-overrides, queries with presets and range filters, `row_layout` cards, form
-`groups` and `nested_forms`, sectioned tables (`sections`), `action`
-metadata (`refreshes`, `prompt_fields`, `visible_when`, `via`), and
-`contexts` — mirrors the DSL entity for entity.
+overrides, queries with presets and range filters, `row_layout` cards (with
+`badge_text` and `badge_tones`), form `groups` and `nested_forms`,
+sectioned tables (`sections`), `action` metadata (`refreshes`,
+`prompt_fields`, `visible_when`, `via`), `contexts` with the tables'
+`select_context` / `context_filter` / `require_context`, related tables and
+reference links — mirrors the DSL entity for entity.
+
+A master/detail surface, as a spec: a pickerless context selected from the
+people table, and a related table over `Note` scoped by it, with a link
+column:
+
+```json
+{
+  "resource": "Person",
+  "contexts": [{"name": "person", "resource": "Person", "picker": false}],
+  "components": [
+    {"kind": "table", "fields": ["name"], "select_context": "person"},
+    {"kind": "table", "name": "their_notes", "resource": "Note",
+     "fields": ["title", "status", "subject_id"],
+     "context_filter": {"person_id": "person"}, "require_context": ["person"]}
+  ],
+  "fields": [
+    {"name": "subject_id", "label": "Subject",
+     "link": {"surface": "person", "path": ["subject_id"]}}
+  ]
+}
+```
+
+A related table's `resource` is an allowlisted name like a context's; its
+fields, query, `context_filter` keys, `source` paths and links resolve
+against that resource, and the related-table rules (read-only, no
+`row_actions` or `sections`) are the DSL verifiers'. A field's `link` is a
+to-one relationship name or `{"surface", "path"}`; `links` names a to-many
+relationship; `link_label` a destination attribute.
 `AshA2ui.Dynamic.spec_schema/1` returns a JSON Schema of the whole spec,
 ready to hand to an LLM as a tool parameter schema.
 
@@ -52,9 +82,10 @@ ready to hand to an LLM as a tool parameter schema.
 
 `AshA2ui.Dynamic.resolve(spec, allowlist: allowlist)` runs:
 
-1. **Allowlist gate** — the spec's `resource` (and every context `resource`)
-   must be in the host-configured allowlist. Nothing outside it is
-   introspectable or renderable.
+1. **Allowlist gate** — the spec's `resource` (and every context
+   `resource`, related-table `resource` and `sections` source) must be in
+   the host-configured allowlist. Nothing outside it is introspectable or
+   renderable.
 2. **Entity building** — every spec entry is built through
    `Spark.Dsl.Entity.build/5` with the extension's own entity definitions,
    so Spark's option schemas (types, `one_of` values, required options,

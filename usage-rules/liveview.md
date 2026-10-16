@@ -50,6 +50,13 @@ a debounced (150 ms) `AshA2ui.Info.build_data_model/2` refresh.
   `open_surface: &MyLive.open/2` (`(args, socket) -> {:noreply, socket}`)
   to stack surfaces or anything else. The target is always built
   server-side — never trust a client href.
+- Basic-catalog reference links arrive as an `"a2ui:action"` named
+  `"open_surface"` (context `%{"field", "surface", "recordId"}`). The
+  handler validates the field/surface pair (not the record id) and
+  returns no messages; on `{:ok, _}` the LiveRenderer navigates through
+  the same `:open_surface` / `:open_surface_url` path. The LiveRenderer
+  builds with `link_buttons: true` only when it has one of those two, so
+  a LiveView that cannot navigate shows plain link text.
 
 Don't rename these events or bypass the handler in a custom
 `handle_event/3`.

@@ -336,7 +336,10 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       # A2UI-106 wizard steps: emitted only by the basic-composed wizard
       # subtree (admin falls back to it), never by a semantic component
       "wizard_next",
-      "wizard_back"
+      "wizard_back",
+      # Basic-catalog reference-link Buttons: the admin catalog's link cells
+      # keep pushing "a2ui:open_surface" and never dispatch it
+      "open_surface"
     ]
 
     @tag ac: "A2UI-101B/AC-11"

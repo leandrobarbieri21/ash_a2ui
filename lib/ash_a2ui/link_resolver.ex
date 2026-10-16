@@ -19,8 +19,9 @@ defmodule AshA2ui.LinkResolver do
         def surface_for(_target, _context), do: nil
       end
 
-  `surface_for/2` is called once per linked field per render (never per
-  row) with:
+  `surface_for/2` is called once per linked field per table or detail in
+  each render pass — the component tree and the row data each ask —
+  never per row, with:
 
     * `target` — `{:resource, module}` for relationship links (`link :owner`,
       `links :participants`), `{:surface, key}` for explicit

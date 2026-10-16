@@ -289,6 +289,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       action_fn: &Stubs.notes_context_action/3
   end
 
+  defmodule AshA2ui.Test.PeopleDeepLinkLive do
+    @moduledoc false
+
+    # Unstubbed: the real Info builds and ActionHandler over the shared-ETS
+    # related-table fixture, so a deep-linked mount renders exactly what the
+    # library renders and basic-catalog link Buttons reach the real
+    # open_surface validation before navigating.
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.Links.PeopleUI,
+      deep_link: true,
+      open_surface_url: "/app/r/{surface}/{recordId}"
+  end
+
   defmodule AshA2ui.Test.OpenSurfaceCallbackLive do
     @moduledoc false
 

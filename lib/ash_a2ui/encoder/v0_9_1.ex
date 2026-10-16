@@ -41,7 +41,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       cells — each `table_cell_<field>` is a `Row` of a caption `Text`
       (`table_cell_<field>_label`, the humanized field name) and a value
       `Text` (`table_cell_<field>_value`, bound to the template-relative
-      path `<field>`, `format: :date` rendered through `formatDate`) —
+      path `<field>`, `format: :date` rendered through `formatDate`; with
+      the `link_buttons: true` option (set by `AshA2ui.LiveRenderer` when
+      it can navigate) a to-one reference link wraps that Text in a
+      borderless `Button`,
+      `table_cell_<field>_value_link`, dispatching `open_surface` with
+      `{"field", "surface", "recordId"}` bound to the row's
+      `_links/<field>` — card rows and details do the same) —
       one `Button` per row action
       (`row_action_<action>_button`: event `invoke`, context
       `{"action": "<name>", "recordId": {"path": "id"}}`), a
@@ -54,7 +60,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       `{"recordId": {"path": "id"}, "component": "<table>"}`. Tables
       declaring a `row_layout` swap the card's content for a header +
       metadata-grid structure — see the Layout topic and
-      `card_row_components/4`
+      `card_row_components/5`
     * `empty_state` — a zero-or-one `List` over the root `_empty_visible`
       sentinel rendering `empty_state_text` (bound to `_empty_message`,
       "No <resource> records yet.")
@@ -211,7 +217,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "version" => @version,
         "updateComponents" => %{
           "surfaceId" => resolved_view.surface_id,
-          "components" => components(resolved_view, select_options(resolved_view, opts))
+          "components" =>
+            resolved_view
+            |> with_openable_links(opts)
+            |> components(select_options(resolved_view, opts))
         }
       },
       encode_data_model(resolved_view, records, opts)
@@ -305,6 +314,57 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp table_links(view, table, opts),
     do: AshA2ui.Links.context(table.resource, view.fields, table.component.fields, opts)
+
+  # Basic-catalog reference links: which to-one link fields (`link
+  # :relationship` / `link {surface, id_path}`) of each table and detail
+  # resolve to a surface for this render's actor — the
+  # `AshA2ui.LinkResolver`'s per-field answer, the same one the row data's
+  # `_links` come from. Each table/detail scope carries its set under
+  # `:openable_links` for the component pass only (the data model is
+  # encoded from the unannotated view). A vetoed field keeps its plain value
+  # Text; `links` (to-many) fields stay plain text in the basic catalog.
+  # Opt-in (`link_buttons: true`): a Button only helps when the transport
+  # navigates on an accepted "open_surface", so without the option every
+  # value stays plain Text, as before link Buttons existed.
+  defp with_openable_links(view, opts) do
+    if Keyword.get(opts, :link_buttons, false) == true do
+      annotate_openable_links(view, opts)
+    else
+      view
+    end
+  end
+
+  defp annotate_openable_links(view, opts) do
+    tables =
+      Enum.map(view.tables, fn table ->
+        Map.put(
+          table,
+          :openable_links,
+          openable_links(view, table.resource, table.component.fields, opts)
+        )
+      end)
+
+    details =
+      Enum.map(view.details, fn detail ->
+        resource = view.contexts[detail.context].resource
+        Map.put(detail, :openable_links, openable_links(view, resource, detail.fields, opts))
+      end)
+
+    %{view | tables: tables, details: details}
+  end
+
+  defp openable_links(view, resource, fields, opts) do
+    case AshA2ui.Links.context(resource, view.fields, fields, opts) do
+      %{specs: specs} ->
+        for %{field: field, surface: surface, cardinality: cardinality} <- specs,
+            is_binary(surface) and cardinality in [:one, :path],
+            into: MapSet.new(),
+            do: field
+
+      nil ->
+        MapSet.new()
+    end
+  end
 
   # --- select options ---
 
@@ -1537,7 +1597,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     row_components =
       case table.component.row_layout do
         nil -> flat_row_components(view, table, action_ids, sfx)
-        layout -> card_row_components(view, layout, action_ids, sfx)
+        layout -> card_row_components(view, table, layout, action_ids, sfx)
       end
 
     # Bulk tables add the row CheckBox (no-op otherwise).
@@ -1633,7 +1693,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # right-hand Row of the badge Text (when declared) plus the row's action
   # anchors and select button — above the meta grid (see grid_components/4:
   # Rows of equal-weight Columns, each a caption label over the bound value).
-  defp card_row_components(view, layout, action_ids, sfx) do
+  defp card_row_components(view, table, layout, action_ids, sfx) do
     base = "record_row#{sfx}"
 
     badge =
@@ -1652,21 +1712,43 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     {meta_row_ids, meta_components} =
       grid_components("#{base}_meta", layout.columns, layout.meta, fn field ->
-        {["#{base}_meta_label_#{field}", "#{base}_meta_value_#{field}"],
+        {value_id, value_components} =
+          linked_value(
+            table,
+            field,
+            %{
+              "id" => "#{base}_meta_value_#{field}",
+              "component" => "Text",
+              "text" => cell_text(view.fields[field])
+            },
+            ""
+          )
+
+        {["#{base}_meta_label_#{field}", value_id],
          [
            %{
              "id" => "#{base}_meta_label_#{field}",
              "component" => "Text",
              "text" => view.fields[field].label,
              "variant" => "caption"
-           },
-           %{
-             "id" => "#{base}_meta_value_#{field}",
-             "component" => "Text",
-             "text" => cell_text(view.fields[field])
            }
+           | value_components
          ]}
       end)
+
+    {title_id, title_components} =
+      linked_value(
+        table,
+        layout.title,
+        %{
+          "id" => "#{base}_title",
+          "component" => "Text",
+          "text" => cell_text(view.fields[layout.title]),
+          "variant" => "h4",
+          "weight" => 1
+        },
+        ""
+      )
 
     [
       %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
@@ -1680,22 +1762,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "component" => "Row",
         "justify" => "spaceBetween",
         "align" => "center",
-        "children" => ["#{base}_title", "#{base}_header_right"]
-      },
-      %{
-        "id" => "#{base}_title",
-        "component" => "Text",
-        "text" => cell_text(view.fields[layout.title]),
-        "variant" => "h4",
-        "weight" => 1
-      },
-      %{
-        "id" => "#{base}_header_right",
-        "component" => "Row",
-        "align" => "center",
-        "children" => Enum.map(badge, & &1["id"]) ++ action_ids
+        "children" => [title_id, "#{base}_header_right"]
       }
-    ] ++ badge ++ meta_components
+    ] ++
+      title_components ++
+      [
+        %{
+          "id" => "#{base}_header_right",
+          "component" => "Row",
+          "align" => "center",
+          "children" => Enum.map(badge, & &1["id"]) ++ action_ids
+        }
+      ] ++ badge ++ meta_components
   end
 
   # An N-column grid: items chunked into Rows of `columns` equal-weight cell
@@ -1807,24 +1885,69 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       field = view.fields[field_name]
       base = "table_cell#{sfx}_#{field_name}"
 
+      {value_id, value_components} =
+        linked_value(
+          table,
+          field_name,
+          %{"id" => "#{base}_value", "component" => "Text", "text" => cell_text(field)},
+          ""
+        )
+
       [
         %{
           "id" => base,
           "component" => "Row",
-          "children" => ["#{base}_label", "#{base}_value"]
+          "children" => ["#{base}_label", value_id]
         },
         %{
           "id" => "#{base}_label",
           "component" => "Text",
           "text" => humanize(field_name),
           "variant" => "caption"
-        },
-        %{
-          "id" => "#{base}_value",
-          "component" => "Text",
-          "text" => cell_text(field)
         }
+        | value_components
       ]
+    end
+  end
+
+  # A to-one reference link in the basic catalog: the value Text becomes
+  # the child of a borderless Button (`<value id>_link`, any layout weight
+  # moved onto it) dispatching `open_surface` with the field name and the
+  # bound `_links/<field>` surface and record id (`links_prefix` is "" for
+  # template-relative rows, "/detail/<context>/" for details). The server
+  # validates the field/surface pair (not the record id — the opened
+  # surface authorizes its read) and the transport navigates — the
+  # `open_surface_url` / `:open_surface` contract the admin catalog's link
+  # cells reach through `"a2ui:open_surface"` (see `AshA2ui.LiveRenderer`).
+  # A row without a link for the field (nil reference, unreadable target)
+  # sends no surface, which the handler acknowledges without navigating.
+  # Fields that do not link in this render keep the bare value Text.
+  defp linked_value(scope, field, %{"id" => value_id} = value, links_prefix) do
+    if MapSet.member?(Map.get(scope, :openable_links, MapSet.new()), field) do
+      {weight, value} = Map.pop(value, "weight")
+
+      button =
+        %{
+          "id" => "#{value_id}_link",
+          "component" => "Button",
+          "variant" => "borderless",
+          "child" => value_id,
+          "action" => %{
+            "event" => %{
+              "name" => "open_surface",
+              "context" => %{
+                "field" => to_string(field),
+                "surface" => %{"path" => "#{links_prefix}_links/#{field}/surface"},
+                "recordId" => %{"path" => "#{links_prefix}_links/#{field}/recordId"}
+              }
+            }
+          }
+        }
+        |> maybe_put("weight", weight)
+
+      {button["id"], [button, value]}
+    else
+      {value_id, [value]}
     end
   end
 
@@ -2612,23 +2735,31 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     field_rows =
       Enum.flat_map(detail.fields, fn field ->
+        {value_id, value_components} =
+          linked_value(
+            detail,
+            field,
+            %{
+              "id" => "#{base}_value_#{field}",
+              "component" => "Text",
+              "text" => %{"path" => "/detail/#{detail.context}/#{field}"}
+            },
+            "/detail/#{detail.context}/"
+          )
+
         [
           %{
             "id" => "#{base}_field_#{field}",
             "component" => "Row",
-            "children" => ["#{base}_label_#{field}", "#{base}_value_#{field}"]
+            "children" => ["#{base}_label_#{field}", value_id]
           },
           %{
             "id" => "#{base}_label_#{field}",
             "component" => "Text",
             "text" => detail_field_label(view, field),
             "variant" => "h5"
-          },
-          %{
-            "id" => "#{base}_value_#{field}",
-            "component" => "Text",
-            "text" => %{"path" => "/detail/#{detail.context}/#{field}"}
           }
+          | value_components
         ]
       end)
 

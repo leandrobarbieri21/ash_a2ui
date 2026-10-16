@@ -140,34 +140,76 @@ defmodule AshA2ui.RelatedTablesTest do
     end)
   end
 
+  # Every component id whose action dispatches `event`, sorted.
+  defp ids_dispatching(comps, event) do
+    for {id, %{"action" => %{"event" => %{"name" => ^event}}}} <- comps, do: id
+  end
+
+  defp texts(comps), do: for({_id, %{"component" => "Text", "text" => t}} <- comps, do: t)
+
   describe "task affordances on a surface with a related table" do
     setup do
       on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
       :ok
     end
 
-    test "the related table gets no View/Edit controls and no create button" do
+    test "basic: only the master table gets View/Edit and the one create button" do
       messages = AshA2ui.Info.build_surface(PeopleTaskUI)
       Enum.each(messages, &assert_valid_server_message/1)
       comps = components_by_id(messages)
 
-      # The master table (over the surface's own resource) keeps both.
-      assert comps["create_table_button"]["action"]["event"]["name"] == "start_create"
-      assert comps["view_table_button"]["action"]["event"]["name"] == "view_record"
+      # The master table (over the surface's own resource) keeps all three.
+      assert ids_dispatching(comps, "view_record") == ["view_table_button"]
+      assert ids_dispatching(comps, "start_edit") == ["edit_table_button"]
+      assert ids_dispatching(comps, "start_create") == ["create_table_button"]
+
       assert "view_table_button" in comps["record_row_table_content"]["children"]
+      assert "edit_table_button" in comps["record_row_table_content"]["children"]
       assert "create_table_button" in comps["root"]["children"]
 
-      # The related table is a read-only view of Note records.
-      refute Map.has_key?(comps, "view_their_notes_button")
-      refute Map.has_key?(comps, "edit_their_notes_button")
-      refute Map.has_key?(comps, "create_their_notes_button")
-      refute "create_their_notes_button" in comps["root"]["children"]
+      # The related tables — one with a query of its own — are read-only
+      # views of Note / Participant records: no controls, no create button.
+      for table <- ["their_notes", "participations"] do
+        refute Map.has_key?(comps, "view_#{table}_button")
+        refute Map.has_key?(comps, "edit_#{table}_button")
+        refute Map.has_key?(comps, "create_#{table}_button")
+        refute "create_#{table}_button" in comps["root"]["children"]
+      end
 
       assert comps["record_row_their_notes_content"]["children"] == [
                "table_cell_their_notes_title",
                "table_cell_their_notes_status",
                "table_cell_their_notes_amount"
              ]
+
+      assert comps["record_row_participations_content"]["children"] == [
+               "table_cell_participations_note_title"
+             ]
+
+      # One create label in the whole tree, never repeated per table.
+      label = comps["create_table_text"]["text"]
+      assert label =~ ~r/^Create /
+      assert Enum.count(texts(comps), &(&1 == label)) == 1
+    end
+
+    test "admin_v1: only the master grid gets View/Edit and the one create button" do
+      Application.put_env(:ash_a2ui, :catalog, :admin_v1)
+      comps = components_by_id(AshA2ui.Info.build_surface(PeopleTaskUI))
+
+      master = Enum.map(comps["data_grid_table"]["rowActions"], & &1["action"])
+      assert "view_record" in master
+      assert "start_edit" in master
+
+      for grid <- ["data_grid_their_notes", "data_grid_participations"] do
+        actions = Enum.map(comps[grid]["rowActions"], & &1["action"])
+        refute "view_record" in actions
+        refute "start_edit" in actions
+        refute Map.has_key?(comps[grid], "rowClick")
+      end
+
+      assert ids_dispatching(comps, "start_create") == ["create_table_button"]
+      label = comps["create_table_text"]["text"]
+      assert Enum.count(texts(comps), &(&1 == label)) == 1
     end
 
     test "the select_context button says it selects, in both compositions" do
@@ -177,6 +219,7 @@ defmodule AshA2ui.RelatedTablesTest do
       assert basic["row_context_table_text"]["text"] == "Select person"
       # distinct from the task panel's own row control
       assert basic["view_table_button_text"]["text"] == "View"
+      refute "View person" in texts(basic)
 
       Application.put_env(:ash_a2ui, :catalog, :admin_v1)
       admin = components_by_id(AshA2ui.Info.build_surface(PeopleTaskUI))
@@ -188,6 +231,8 @@ defmodule AshA2ui.RelatedTablesTest do
 
       assert Enum.any?(master_actions, &(&1["action"] == "view_record"))
       assert admin["data_grid_table"]["rowClick"]["action"] == "context_select"
+      assert admin["data_grid_table"]["rowClick"]["label"] == "Select person"
+      refute Enum.any?(master_actions, &(&1["label"] == "View person"))
 
       # admin: the related grid has no task controls, no row click into the
       # panel, and no create button
@@ -218,6 +263,50 @@ defmodule AshA2ui.RelatedTablesTest do
       # enum values read as their labels on both paths, never raw
       assert Enum.map(refreshed, & &1["status"]) == ["Open", "Open"]
       assert refreshed != []
+    end
+
+    test "a related table's rows read the same on every path: initial, deep link, " <>
+           "context_select, back/forward and query refresh",
+         %{ada: ada, bob: bob} do
+      # Bob participates in Ada's Kickoff note: the participations table
+      # carries a source column and a link, the notes table an enum.
+      _ = bob
+      ids = %{"person" => ada.id}
+
+      # Deep link: the ctx ids from the URL, validated through the
+      # authorized reads (AshA2ui.LiveRenderer's mount does exactly this).
+      state = AshA2ui.Info.context_state_for(PeopleUI, ids)
+      deep_link = root(AshA2ui.Info.build_surface(PeopleUI, context_state: state))["records"]
+
+      # Back/forward to the same ctx params: the handle_params refresh.
+      %{"updateDataModel" => %{"value" => back_forward}} =
+        AshA2ui.Info.build_data_model(PeopleUI, context_state: state)
+
+      # The row-button selection.
+      {:ok, selected} =
+        ActionHandler.handle(
+          PeopleUI,
+          envelope("context_select", %{"context" => "person", "value" => ada.id})
+        )
+
+      # A query refresh of the related table under the same selection.
+      {:ok, queried} =
+        ActionHandler.handle(
+          PeopleUI,
+          envelope("query", %{"component" => "their_notes", "query" => %{}, "contexts" => state})
+        )
+
+      notes = deep_link["their_notes"]
+      participations = deep_link["participations"]
+
+      assert Enum.map(notes, & &1["status"]) == ["Open", "Open"]
+      assert [%{"note_title" => "Review", "_links" => %{"note_title" => _}}] = participations
+
+      assert back_forward["records"]["their_notes"] == notes
+      assert back_forward["records"]["participations"] == participations
+      assert value_at(selected, "/records/their_notes") == notes
+      assert value_at(selected, "/records/participations") == participations
+      assert value_at(queried, "/records/their_notes") == notes
     end
 
     test "a surface table's rows read the same after a query refresh" do

@@ -116,6 +116,15 @@ defmodule AshA2ui.Info do
       `createSurface` payload's `surfaceProperties` (e.g.
       `%{"agentDisplayName" => "Support Agent"}`). Ignored on v0.9.1
       surfaces (the v0.9 `theme` block was never emitted).
+    * `:link_buttons` — basic catalog only: `true` renders each to-one
+      reference link (`link :relationship` / `link {surface, id_path}`)
+      as a borderless `Button` dispatching the `"open_surface"` action
+      (see the Relationships topic). Defaults to `false` (plain value
+      Text): pass it only from a transport that navigates on an accepted
+      `"open_surface"`. `AshA2ui.LiveRenderer` sets it when it has an
+      `:open_surface` callback or an `:open_surface_url` template.
+      Admin-catalog link columns and FieldDisplays render their links
+      regardless; only its basic-component fallbacks follow this option.
   """
   @spec build_surface(module | Spark.Dsl.t(), keyword) :: [map]
   def build_surface(resource_or_ui_module, opts \\ []) do

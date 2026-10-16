@@ -14,8 +14,6 @@ defmodule AshA2ui.Canvas.ProgressiveDisclosureTest do
   alias AshA2ui.Canvas.ObjectRef
   alias Elixir.Canvas
 
-  require Ash.Query
-
   @registry Canvas.Test.Registry
 
   @tag ac: "A2UI-103/AC-4"

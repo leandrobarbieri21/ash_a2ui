@@ -7,10 +7,10 @@ defmodule AshA2ui.Dynamic do
 
   A spec is *not* raw A2UI. It is a declarative mirror of the DSL vocabulary
   (components, fields, queries, presets, groups, row layouts, nested forms,
-  actions, contexts) that references resources, attributes and actions **by
-  name**; the server resolves, validates, and encodes everything. The spec
-  composer never controls the wire payload, only the same knobs a DSL author
-  has.
+  actions, contexts, related tables, reference links) that references
+  resources, attributes and actions **by name**; the server resolves,
+  validates, and encodes everything. The spec composer never controls the
+  wire payload, only the same knobs a DSL author has.
 
   ## Pipeline
 
@@ -43,7 +43,8 @@ defmodule AshA2ui.Dynamic do
 
   `allowlist/1` names each resource by its short module name
   (`"Feedback"`); pass a `%{"name" => Module}` map to control naming. The
-  allowlist gates the surface's own resource and every `context` resource.
+  allowlist gates the surface's own resource, every `context` resource,
+  every related table's `resource` and every `sections` source.
   Relationship traversal (selects, `source` columns, search paths) is
   bounded the same way it is for declared surfaces: only the resource's own
   public relationships are walkable, and every read is authorized against
@@ -545,6 +546,16 @@ defmodule AshA2ui.Dynamic do
             "Actions rendered as per-row buttons (update/destroy/generic actions of the resource)."
           ),
         "query" => Map.put(name, "description", "Name of a declared query (tables only)."),
+        "resource" => %{
+          "type" => "string",
+          "enum" => resource_names,
+          "description" =>
+            "Related table (tables only): the resource this table reads when it is not " <>
+              "the surface's, scoped by a context via context_filter/require_context " <>
+              "(e.g. a selected user's orders). Its fields, query, context_filter keys, " <>
+              "source paths and links refer to this resource. Read-only: no row_actions " <>
+              "or sections."
+        },
         "context_filter" => %{
           "type" => "object",
           "additionalProperties" => name,
@@ -580,6 +591,14 @@ defmodule AshA2ui.Dynamic do
               "type" => "object",
               "additionalProperties" => %{"type" => "string"},
               "description" => "Display text per badge value, e.g. {\"true\": \"Active\"}."
+            },
+            "badge_tones" => %{
+              "type" => "object",
+              "additionalProperties" => %{
+                "type" => "string",
+                "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
+              },
+              "description" => "Semantic tone per badge value, e.g. {\"true\": \"success\"}."
             },
             "meta" =>
               Map.put(
@@ -803,6 +822,44 @@ defmodule AshA2ui.Dynamic do
             name_list,
             "description",
             "Destination string attributes searched; makes a relationship select searchable."
+          ),
+        "link" => %{
+          "anyOf" => [
+            Map.put(
+              name,
+              "description",
+              "A public to-one relationship (belongs_to/has_one): the cell links to the " <>
+                "related record's surface."
+            ),
+            %{
+              "type" => "object",
+              "description" =>
+                "A bare-id reference: the surface key that shows the record and the " <>
+                  ~s(attribute path holding its id, e.g. {"surface": "user", "path": ) <>
+                  ~s(["subject_id"]}.),
+              "properties" => %{
+                "surface" => %{"type" => "string", "minLength" => 1, "maxLength" => 64},
+                "path" => Map.put(name_list, "minItems", 1)
+              },
+              "required" => ["surface", "path"],
+              "additionalProperties" => false
+            }
+          ],
+          "description" =>
+            "Render this table/detail field as a reference link. Table/detail only."
+        },
+        "links" =>
+          Map.put(
+            name,
+            "description",
+            "A public to-many relationship (has_many/many_to_many) rendered as a list of " <>
+              "reference links. Table/detail only."
+          ),
+        "link_label" =>
+          Map.put(
+            name,
+            "description",
+            "Destination attribute labelling each link (relationship links only)."
           )
       },
       "required" => ["name"],

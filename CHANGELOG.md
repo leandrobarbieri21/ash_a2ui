@@ -8,6 +8,64 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+### Features:
+
+- **Reference links can render in the basic catalog (opt-in).** Rows and
+  detail records carried `_links`, but only the admin catalog drew them.
+  With the new `link_buttons: true` option to
+  `AshA2ui.Info.build_surface/2`, a to-one link (`link :relationship` or
+  `link {surface, id_path}`) in the basic composition wraps its value Text
+  (same id, same binding) in a borderless `Button`, `<value id>_link`, in
+  flat table cells, card-row titles and meta values, and detail values.
+  The Button dispatches the new `"open_surface"` action with the field
+  name and the bound `_links/<field>` surface and record id.
+  `AshA2ui.ActionHandler` accepts it only when the field is a to-one link
+  of the surface whose resolved surface, for this actor, is the one sent,
+  and returns no messages. It does not check the record id: the opened
+  surface authorizes its own read, as for any typed URL.
+  `AshA2ui.LiveRenderer` then navigates exactly as for
+  `"a2ui:open_surface"` (the `:open_surface` callback, else the
+  `:open_surface_url` template), and sets `link_buttons: true` itself when
+  it has either. Without the option nothing changes: link values stay
+  plain Text, so hosts whose transport does not navigate (a plain
+  `ActionHandler.handle/3` call) never show a control that does nothing.
+  Only fields the `AshA2ui.LinkResolver` resolves in that render get a
+  Button, so a vetoed field keeps its plain value. The Button is in the
+  row template, so a row with no link for that field (a nil reference, an
+  unreadable target) still gets one; clicking it is acknowledged and
+  opens nothing. `links` (to-many) fields stay plain text, and row data is
+  unchanged. Built from basic-catalog components only, on v0.9.1 and v1.0
+  (the v0.9.1 `openUrl` takes only a literal URL, so it cannot open a
+  per-row target). Hosts with their own transport pass `link_buttons:
+  true` only once they navigate on an accepted `"open_surface"`.
+- **The dynamic spec carries related tables and reference links.** A table
+  component takes `"resource"` (an allowlisted name) to read another
+  resource, and fields take `"link"` (a relationship name or `{"surface",
+  "path"}`), `"links"` and `"link_label"`. `row_layout` takes
+  `"badge_tones"`. Parser, `spec_schema/1`, Importer and promotion
+  (`to_dsl_source/2`) all handle them, and the related-table and link rules
+  are the DSL verifiers'. Link surface keys stay strings; resources only
+  come from the allowlist.
+- The composer's preview lists a table's `resource` and a field's `link` /
+  `links`.
+
+### Bug Fixes:
+
+- **Importing a master/detail surface dropped its related tables and
+  links.** The Importer silently dropped a table's `resource`, every
+  `link` / `links` / `link_label` field option and `badge_tones`, so an
+  imported master/detail surface (contexts plus related tables) no longer
+  resolved. They now import as spec vocabulary, and the imported spec
+  renders exactly like the declared surface (tested on initial render, a
+  context selection, v1.0, serialization and promotion).
+- **Tests now pin the related-table fixes of #18** on a surface with
+  create and update actions, two related tables and a related query: no
+  View/Edit row controls and no second create button on related tables
+  (basic and admin_v1), the "Select <context>" label in both compositions,
+  and identical related-table rows on the initial render, a deep-linked
+  mount, back/forward, a `context_select` refresh and a related query
+  refresh.
+
 ### Breaking Changes:
 
 - **Removed experience v1 and the version switch.** The experience layer

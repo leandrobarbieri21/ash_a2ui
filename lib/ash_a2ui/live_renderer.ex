@@ -62,7 +62,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         reference links, with `{surface}` and `{recordId}` placeholders
         (e.g. `"/app/r/{surface}/{recordId}"`). Defaults to
         `config :ash_a2ui, :open_surface_url`; without either, link
-        activations are acknowledged and ignored.
+        activations are acknowledged and ignored. With either this or
+        `:open_surface`, the initial surface is built with
+        `link_buttons: true`, so basic-catalog to-one links render as
+        link Buttons; without both they stay plain text.
       * `:pubsub` (optional) — enables live refresh:
         `pubsub: [module: MyApp.PubSub, topics: ["providers:created", ...]]`.
         Topics are explicit configuration: pass the topics your resource's
@@ -117,8 +120,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Reference links
 
-    The shipped JS hook pushes `"a2ui:open_surface"` when a reference link
-    is activated (see `AshA2ui.Links`). The default handling navigates
+    The shipped JS hook pushes `"a2ui:open_surface"` when an admin-catalog
+    reference link is activated (see `AshA2ui.Links`). Basic-catalog link
+    Buttons dispatch an `"open_surface"` action instead, which
+    `AshA2ui.ActionHandler` validates against the surface's link fields;
+    an accepted one takes the same path. Those Buttons are only rendered
+    when this LiveView can navigate (an `:open_surface` callback or an
+    `:open_surface_url` template, see `AshA2ui.Info.build_surface/2`'s
+    `:link_buttons`). The default handling navigates
     (`push_navigate`) to the `:open_surface_url` template; pass
     `:open_surface` to do anything else.
 
@@ -269,7 +278,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           # validated inside the task (authorized context reads).
           start_async(socket, :ash_a2ui_surface, fn ->
             opts = [actor: actor, tenant: tenant]
-            config.surface_fn.(config.ui, opts ++ initial_state_opts(config.ui, url_state, opts))
+
+            config.surface_fn.(
+              config.ui,
+              opts ++ initial_state_opts(config.ui, url_state, opts) ++ link_button_opts(config)
+            )
           end)
         else
           socket
@@ -315,6 +328,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp query_params(_none), do: nil
+
+    # Basic-catalog link Buttons only when an accepted "open_surface" can
+    # navigate somewhere (a callback or a URL template); otherwise link
+    # values stay plain Text rather than controls that do nothing.
+    defp link_button_opts(config) do
+      if navigates?(config), do: [link_buttons: true], else: []
+    end
+
+    defp navigates?(config) do
+      is_function(config.open_surface, 2) or
+        is_binary(config.open_surface_url || Application.get_env(:ash_a2ui, :open_surface_url))
+    end
 
     defp initial_state_opts(ui, url_state, opts) do
       context =
@@ -411,11 +436,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc false
     def handle_action(config, envelope, socket) do
-      messages =
-        case config.action_fn.(config.ui, envelope, call_opts(socket)) do
-          {:ok, messages} -> messages
-          {:error, messages} -> messages
-        end
+      {outcome, messages} = config.action_fn.(config.ui, envelope, call_opts(socket))
 
       previous_context = socket.assigns.ash_a2ui_context_state
 
@@ -426,8 +447,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> push_messages(messages)
         |> maybe_patch_context(config, previous_context)
 
-      {:noreply, socket}
+      maybe_open_surface(config, outcome, envelope, socket)
     end
+
+    # A basic-catalog reference link arrives as an "open_surface" action.
+    # Once the handler accepted it (the field links to that surface for
+    # this actor), it navigates exactly like the "a2ui:open_surface" event
+    # the admin catalog's link cells push.
+    defp maybe_open_surface(
+           config,
+           :ok,
+           %{"action" => %{"name" => "open_surface"} = action},
+           socket
+         ) do
+      context = Map.get(action, "context") || %{}
+      handle_open_surface(config, Map.take(context, ["surface", "recordId"]), socket)
+    end
+
+    defp maybe_open_surface(_config, _outcome, _envelope, socket), do: {:noreply, socket}
 
     # deep_link: a changed /context is written back to the URL (the ctx
     # params), so the selection is shareable and back-button friendly.

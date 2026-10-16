@@ -36,6 +36,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       live("/live-renderer/multi-table", AshA2ui.Test.MultiTableLive)
       live("/live-renderer/context-pubsub", AshA2ui.Test.ContextPubsubLive)
       live("/live-renderer/deep-link", AshA2ui.Test.DeepLinkLive)
+      live("/live-renderer/people-deep-link", AshA2ui.Test.PeopleDeepLinkLive)
       live("/live-renderer/open-surface-callback", AshA2ui.Test.OpenSurfaceCallbackLive)
 
       # The actor picker, reachable both ways hosts wire it: standalone
@@ -59,6 +60,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # The same composer with a host-NAMED allowlist map (the escape hatch
       # for colliding resource short names).
       live("/composer/named", AshA2ui.Test.ComposerNamedAllowlistLive)
+
+      # A master/detail surface whose related tables read other resources.
+      live("/composer/related", AshA2ui.Test.ComposerRelatedLive)
     end
   end
 

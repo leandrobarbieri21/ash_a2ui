@@ -381,7 +381,8 @@ defmodule MyApp.A2uiLinks do
 end
 ```
 
-It is called once per linked field per render (never per row). Without a
+It is called once per linked field per table or detail per render pass
+(never per row). Without a
 resolver, `{:surface, key}` keeps its key and `{:resource, mod}` maps to
 the underscored short name (`"person"`).
 
@@ -394,6 +395,47 @@ host: by default the shipped hook pushes `"a2ui:open_surface"` and
 `AshA2ui.LiveRenderer` navigates to `:open_surface_url` (see
 [Rendering clients](rendering-clients.md)). Non-web clients read
 `columns[].link.path` and `_links` directly.
+
+The basic catalog has no link component and its `openUrl` function takes
+only a literal URL on v0.9.1, so a to-one link (`link :relationship` or
+`link {surface, id_path}`) renders with basic components, and only when
+the surface is built with `link_buttons: true` (see
+`AshA2ui.Info.build_surface/2`; `AshA2ui.LiveRenderer` passes it when it
+has an `:open_surface` callback or an `:open_surface_url` template).
+Without it the value stays plain Text. With it, the value Text of a table
+cell, a card row's title or meta value, or a detail value keeps its id
+and binding and becomes the child of a borderless `Button`
+(`<value id>_link`) dispatching the `"open_surface"` action:
+
+```json
+{"event": {"name": "open_surface", "context": {
+  "field": "person_name",
+  "surface": {"path": "_links/person_name/surface"},
+  "recordId": {"path": "_links/person_name/recordId"}}}}
+```
+
+(details bind `/detail/<context>/_links/<field>/…`). `AshA2ui.ActionHandler`
+checks the field/surface pair: it accepts the request only when `field`
+is a to-one link field of the surface whose resolved surface, for this
+actor, is the one sent, and answers with no messages. It does not check
+`recordId`, so a forged request can name any record id on an allowed
+surface. That is no more than typing the URL: the opened surface
+authorizes its own read (links are UX, not authorization — see
+`AshA2ui.LinkResolver`). `AshA2ui.LiveRenderer` then navigates exactly as
+for `"a2ui:open_surface"` — the `:open_surface` callback, else the
+`:open_surface_url` template, with the URL built server-side. Only fields
+the resolver resolves in this render get a Button (a vetoed field keeps
+its plain value Text), and `links` (to-many) fields stay plain text. Row
+data is unchanged on every path. Transports other than the LiveRenderer
+pass `link_buttons: true` only once they navigate on an accepted
+`"open_surface"`.
+
+One limitation: the Button sits in the row template, so every row gets
+it, including rows with no link for that field (a nil reference, or a
+target the authorized load pruned). On those rows `_links/<field>` is
+absent, the Button sends no surface, and the handler acknowledges it
+without navigating — a control that does nothing, usually around an
+empty value. The basic catalog has no per-row conditional to avoid it.
 
 ## Deferred (roadmap)
 
