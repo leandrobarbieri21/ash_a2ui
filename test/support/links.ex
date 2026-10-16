@@ -40,6 +40,12 @@ defmodule AshA2ui.Test.Links.Person do
 
   actions do
     defaults [:read, :destroy, create: [:name, :visible]]
+
+    # Non-primary: only PeopleTaskUI's form names it, so its master table
+    # carries an Edit control the related tables must not inherit.
+    update :rename do
+      accept [:name]
+    end
   end
 
   policies do
@@ -47,7 +53,7 @@ defmodule AshA2ui.Test.Links.Person do
       authorize_if expr(visible == true)
     end
 
-    policy action_type([:create, :destroy]) do
+    policy action_type([:create, :update, :destroy]) do
       authorize_if always()
     end
   end
@@ -296,10 +302,11 @@ end
 
 defmodule AshA2ui.Test.Links.PeopleTaskUI do
   @moduledoc """
-  `PeopleUI` with a record task panel (a create form): the master table's
-  rows get the task controls and the surface its create affordance, while
-  the related notes table — a read-only view of another resource — gets
-  neither.
+  `PeopleUI` with a record task panel (a create + update form): the master
+  table's rows get the task controls (View and Edit) and the surface its
+  create affordance, while the related tables — read-only views of other
+  resources, one with a query of its own, as in a clinic's patient →
+  appointments master/detail — get none of them.
   """
 
   use AshA2ui.Standalone
@@ -314,6 +321,13 @@ defmodule AshA2ui.Test.Links.PeopleTaskUI do
       picker false
     end
 
+    query :notes do
+      filters [:status]
+      sortable [:title]
+      default_sort title: :asc
+      page_size 10
+    end
+
     component :table do
       fields [:name]
       select_context :person
@@ -322,6 +336,14 @@ defmodule AshA2ui.Test.Links.PeopleTaskUI do
     component :table, :their_notes do
       resource AshA2ui.Test.Links.Note
       fields [:title, :status, :amount]
+      query :notes
+      context_filter person_id: :person
+      require_context [:person]
+    end
+
+    component :table, :participations do
+      resource AshA2ui.Test.Links.Participant
+      fields [:note_title]
       context_filter person_id: :person
       require_context [:person]
     end
@@ -329,6 +351,13 @@ defmodule AshA2ui.Test.Links.PeopleTaskUI do
     component :form do
       fields [:name]
       create_action :create
+      update_action :rename
+    end
+
+    field :note_title do
+      label "Note"
+      source [:note, :title]
+      link :note
     end
   end
 end
