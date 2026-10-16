@@ -12,8 +12,6 @@ defmodule AshA2ui.Canvas.ObjectResolverTest do
   # expand into the wrong namespace — pin the fixture namespace explicitly.
   alias Elixir.Canvas
 
-  require Ash.Query
-
   alias AshA2ui.Canvas.ObjectRef
 
   @registry Canvas.Test.Registry
