@@ -183,4 +183,82 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
         false
     end)
   end
+
+  describe "every rejection reaches the typed feedback" do
+    # Before /ui/status was removed these paths wrote only /ui/status, which
+    # nothing bound once the status Text read /ui/feedback/message.
+    defp assert_error_feedback(messages, pattern) do
+      values = by_path(messages)
+      refute Map.has_key?(values, "/ui/status")
+      assert %{"kind" => "error", "message" => message} = values["/ui/feedback"]
+      assert message =~ pattern
+      values
+    end
+
+    test "a forbidden start_edit" do
+      record = Ash.create!(Protected, %{name: "Locked"}, authorize?: false)
+
+      assert {:error, messages} =
+               ActionHandler.handle(
+                 Protected,
+                 envelope("start_edit", %{"recordId" => record.id}),
+                 actor: %{id: "viewer", admin: false}
+               )
+
+      values = assert_error_feedback(messages, "not authorized")
+      refute Map.has_key?(values, "/form")
+      refute Map.has_key?(values, "/ui/panel")
+    end
+
+    test "a malformed envelope and an unknown action" do
+      assert {:error, messages} = ActionHandler.handle(Task, %{"bogus" => true})
+      assert_error_feedback(messages, "Malformed action message")
+
+      assert {:error, messages} = ActionHandler.handle(Task, envelope("explode"))
+      assert_error_feedback(messages, ~s(Unknown action "explode"))
+    end
+
+    test "a query allowlist rejection" do
+      envelope = %{
+        "version" => "v0.9.1",
+        "action" => %{
+          "name" => "query",
+          "context" => %{"query" => %{"sort" => %{"field" => "category", "dir" => "asc"}}}
+        }
+      }
+
+      assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.Paginated, envelope)
+      values = assert_error_feedback(messages, "category")
+      refute Map.has_key?(values, "/records")
+    end
+
+    test "on v1.0 the rejection keeps the /ui/response contract and mirrors into /ui/feedback" do
+      envelope = %{
+        "version" => "v1.0",
+        "action" => %{
+          "name" => "explode",
+          "surfaceId" => "kitchen_sink_v1",
+          "sourceComponentId" => "test_component",
+          "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
+          "actionId" => "a-1",
+          "wantResponse" => true,
+          "context" => %{}
+        }
+      }
+
+      assert {:error, [response | messages]} =
+               ActionHandler.handle(AshA2ui.Test.KitchenSinkV1UI, envelope)
+
+      assert response["actionResponse"]["error"]["code"] == "INVALID_ACTION"
+
+      values = by_path(messages)
+      assert values["/ui/response"]["status"] == "error"
+      assert values["/ui/response"]["message"] =~ "Unknown action"
+
+      assert values["/ui/feedback"] == %{
+               "kind" => "error",
+               "message" => values["/ui/response"]["message"]
+             }
+    end
+  end
 end
