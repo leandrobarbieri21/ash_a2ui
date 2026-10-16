@@ -20,6 +20,16 @@ end
 - **The allowlist is host configuration, not client input.** It gates the
   surface's resource and every context resource. Keep it to resources an
   operator may reasonably see end-to-end.
+- Other `resolve/2` options: `:surface_id`, `:spec_version` (`"0.9.1"` or
+  `"1.0"`), and `:via_allowlist` — the modules a spec's `via`-delegated row
+  actions may dispatch to. It defaults to none, so a spec carrying `via` is
+  rejected unless the host passes it; like `:allowlist`, it is host
+  configuration.
+- The spec vocabulary covers components, fields, queries (presets, range
+  filters), `row_layout`, form `groups` and `nested_forms`, sectioned tables
+  (`sections`), `action` metadata (`refreshes`, `prompt_fields`,
+  `visible_when`, `via`) and contexts. It has no vocabulary for inline
+  editing, file export or wizard steps.
 - Validation runs the **same verifier modules** the DSL compiles with, over
   a synthetic DSL state — same checks, same messages. Every verifier runs,
   so the error list covers multiple mistakes at once.
@@ -68,6 +78,19 @@ end
   `AshA2ui.Dynamic.to_dsl_source(spec, module: MyApp.UI.FooUI, allowlist: ...)`;
   commit the generated module and drop (or archive) the stored spec so
   there is one source of truth.
+
+## Importing declared surfaces and the composer
+
+- `AshA2ui.Dynamic.Importer.import/1` turns a declared surface (a resource or
+  `AshA2ui.Standalone` module) into the equivalent spec. It returns
+  `{:ok, spec, rejections}`: every declared feature the spec cannot carry
+  (inline editing, export, wizard steps, `surface_id`, `record_label`,
+  `spec_version`) is a visible rejection with a reason, never a silent drop.
+  Show the rejections to whoever edits the spec.
+- `AshA2ui.Web.ComposerLive` (`use AshA2ui.Web.ComposerLive, surfaces: [...]`)
+  is the self-hosted editor over that pipeline: import, edit, resolve on
+  every change, export as a standalone module. Mount it behind the same
+  authentication as any admin tool; its `:allowlist` follows the rules above.
 
 ## Avoid list
 

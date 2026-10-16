@@ -53,8 +53,8 @@ allowlist (blank inputs are unset), casts them against the action's
 arguments, and runs the action **actor-scoped and authorized like any other
 invocation**. Returned rows are serialized down to the declared `fields`
 (atom or string keys accepted; values JSON-serialized like record fields)
-and written wholesale to `/report/<name>/rows`. On v0.9.1 the status text
-lands at `/ui/status`; on v1.0 the structured `/ui/response` carries
+and written wholesale to `/report/<name>/rows`. On v0.9.1 the outcome text
+lands in the typed `/ui/feedback`; on v1.0 the structured `/ui/response` carries
 `{"status": "ok", "result": {"count": n}}` and mirrors into the
 `actionResponse`.
 

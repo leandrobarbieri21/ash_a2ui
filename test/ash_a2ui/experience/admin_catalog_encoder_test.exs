@@ -17,11 +17,9 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
   alias AshA2ui.Test.KitchenSink
 
   setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
     on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 
@@ -74,7 +72,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       assert comps["record_panel"]["component"] == "recordPanel"
       assert comps["status_banner"]["component"] == "statusBanner"
 
-      # no basic-v2 core composition anywhere: no form-slot List, no
+      # no basic core composition anywhere: no form-slot List, no
       # sentinel-bound pagination row, no standalone view/edit buttons,
       # no "Save" submit, no status Text
       refute Map.has_key?(comps, "form_slot")
@@ -131,7 +129,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
              ] = actions
 
       # the view/edit envelopes carry the exact recordId path binding the
-      # basic-v2 record controls emit
+      # basic record controls emit
       assert %{
                "context" => %{
                  "recordId" => %{"path" => "id"},
@@ -171,7 +169,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
 
       assert [
                %{
-                 "label" => "View appointment",
+                 "label" => "Select appointment",
                  "action" => "context_select",
                  "context" => %{
                    "context" => "appointment",
@@ -240,7 +238,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
                _other -> false
              end)
 
-      # the data model carries the plain booleans alongside the v2 sentinels
+      # the data model carries the plain booleans alongside the pagination sentinels
       %{"updateDataModel" => %{"value" => model}} = data
       query = model["query"]
 
@@ -319,7 +317,6 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       "report",
       "export",
       "edit_cell",
-      "select_row",
       "query",
       "context_search",
       "context_select",
@@ -351,7 +348,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       assert Enum.sort(names) == Enum.sort(@dispatch_names)
 
       # behavioral: every event produces the same contract-relevant writes
-      # under admin and basic-v2 (admin /query additionally carries the
+      # under admin and basic (admin /query additionally carries the
       # plain boolean props)
       record = Ash.create!(Task, %{name: "Target"}, authorize?: false)
 

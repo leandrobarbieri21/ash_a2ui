@@ -40,7 +40,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
 
       Enum.each(messages, &assert_valid_server_message/1)
 
-      assert value_at(messages, "/ui/status") ==
+      assert value_at(messages, "/ui/feedback")["message"] ==
                "Action #{inspect(action)} is not allowed: it is not listed in the view's " <>
                  "bulk_actions."
 
@@ -83,7 +83,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
     assert %{"ok" => 1, "refused" => 4, "failed" => 0, "skipped" => 0} =
              value_at(messages, "/bulk/table/result")
 
-    assert value_at(messages, "/ui/status") ==
+    assert value_at(messages, "/ui/feedback")["message"] ==
              "Reject: 1 of 5 selected records done; 4 refused."
   end
 
@@ -101,7 +101,8 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
                "records" => rows(tasks, [])
              })
 
-    assert value_at(empty_messages, "/ui/status") == "Select at least one record first."
+    assert value_at(empty_messages, "/ui/feedback")["message"] ==
+             "Select at least one record first."
 
     # six selected on a table whose query caps pages at five
     assert {:error, oversized_messages} =
@@ -111,7 +112,8 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
                "records" => rows(tasks, tasks)
              })
 
-    assert value_at(oversized_messages, "/ui/status") =~ ~r/^Too many records selected \(6\)/
+    assert value_at(oversized_messages, "/ui/feedback")["message"] =~
+             ~r/^Too many records selected \(6\)/
 
     for messages <- [empty_messages, oversized_messages] do
       Enum.each(messages, &assert_valid_server_message/1)

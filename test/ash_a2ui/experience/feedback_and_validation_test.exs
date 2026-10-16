@@ -1,6 +1,6 @@
 defmodule AshA2ui.Experience.FeedbackAndValidationTest do
   @moduledoc """
-  A2UI-101/AC-14..AC-16: experience v2 typed feedback — validation failures
+  A2UI-101/AC-14..AC-16: experience-layer typed feedback — validation failures
   retain the open task and its values while flagging errors, successes close
   the panel with success feedback and refresh the collection, and forged
   events still hit the same authorized actions as before.
@@ -11,16 +11,6 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Experience.Protected
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   defp envelope(name, context \\ %{}) do
     %{
@@ -102,7 +92,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
     @tag ac: "A2UI-101/AC-15"
     test "every invoke success carries typed feedback on the rendered path" do
       # The audit's headline failure: invoke successes wrote /ui/status —
-      # which nothing renders under v2 — so a successful row action looked
+      # which nothing rendered — so a successful row action looked
       # like a no-op. The feedback region binds /ui/feedback/message.
       record = Ash.create!(Task, %{name: "Doomed"}, authorize?: false)
 
@@ -114,7 +104,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
       values = by_path(messages)
 
-      # typed success on the path the v2 status Text binds...
+      # typed success on the path the status Text binds...
       assert values["/ui/feedback"] == %{
                "kind" => "success",
                "message" => ~s(Action "destroy" completed.)
@@ -122,7 +112,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
       # ...with the classic status text still flowing alongside (the
       # programmatic contract, unchanged)...
-      assert values["/ui/status"] == ~s(Action "destroy" completed.)
+      assert values["/ui/feedback"]["message"] == ~s(Action "destroy" completed.)
 
       # ...and no panel/mode writes: a browse-mode invoke never closes a task
       refute Map.has_key?(values, "/ui/intent")
@@ -183,7 +173,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
   defp unauthorized?(messages) do
     Enum.any?(messages, fn
-      %{"updateDataModel" => %{"path" => "/ui/status", "value" => value}} ->
+      %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => value}}} ->
         value =~ "not authorized"
 
       %{"updateDataModel" => %{"path" => "/ui/response", "value" => %{"message" => value}}} ->
@@ -192,5 +182,83 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
       _other ->
         false
     end)
+  end
+
+  describe "every rejection reaches the typed feedback" do
+    # Before /ui/status was removed these paths wrote only /ui/status, which
+    # nothing bound once the status Text read /ui/feedback/message.
+    defp assert_error_feedback(messages, pattern) do
+      values = by_path(messages)
+      refute Map.has_key?(values, "/ui/status")
+      assert %{"kind" => "error", "message" => message} = values["/ui/feedback"]
+      assert message =~ pattern
+      values
+    end
+
+    test "a forbidden start_edit" do
+      record = Ash.create!(Protected, %{name: "Locked"}, authorize?: false)
+
+      assert {:error, messages} =
+               ActionHandler.handle(
+                 Protected,
+                 envelope("start_edit", %{"recordId" => record.id}),
+                 actor: %{id: "viewer", admin: false}
+               )
+
+      values = assert_error_feedback(messages, "not authorized")
+      refute Map.has_key?(values, "/form")
+      refute Map.has_key?(values, "/ui/panel")
+    end
+
+    test "a malformed envelope and an unknown action" do
+      assert {:error, messages} = ActionHandler.handle(Task, %{"bogus" => true})
+      assert_error_feedback(messages, "Malformed action message")
+
+      assert {:error, messages} = ActionHandler.handle(Task, envelope("explode"))
+      assert_error_feedback(messages, ~s(Unknown action "explode"))
+    end
+
+    test "a query allowlist rejection" do
+      envelope = %{
+        "version" => "v0.9.1",
+        "action" => %{
+          "name" => "query",
+          "context" => %{"query" => %{"sort" => %{"field" => "category", "dir" => "asc"}}}
+        }
+      }
+
+      assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.Paginated, envelope)
+      values = assert_error_feedback(messages, "category")
+      refute Map.has_key?(values, "/records")
+    end
+
+    test "on v1.0 the rejection keeps the /ui/response contract and mirrors into /ui/feedback" do
+      envelope = %{
+        "version" => "v1.0",
+        "action" => %{
+          "name" => "explode",
+          "surfaceId" => "kitchen_sink_v1",
+          "sourceComponentId" => "test_component",
+          "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
+          "actionId" => "a-1",
+          "wantResponse" => true,
+          "context" => %{}
+        }
+      }
+
+      assert {:error, [response | messages]} =
+               ActionHandler.handle(AshA2ui.Test.KitchenSinkV1UI, envelope)
+
+      assert response["actionResponse"]["error"]["code"] == "INVALID_ACTION"
+
+      values = by_path(messages)
+      assert values["/ui/response"]["status"] == "error"
+      assert values["/ui/response"]["message"] =~ "Unknown action"
+
+      assert values["/ui/feedback"] == %{
+               "kind" => "error",
+               "message" => values["/ui/response"]["message"]
+             }
+    end
   end
 end

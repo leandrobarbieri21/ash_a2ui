@@ -4,7 +4,7 @@ defmodule AshA2ui.MixProject do
   @version "0.1.0"
 
   @description """
-  An Ash extension that generates A2UI (Agent to UI) v0.9.1 payloads from Ash resources.
+  An Ash extension that generates A2UI (Agent to UI) v0.9.1 or v1.0 payloads from Ash resources.
   """
 
   def project do

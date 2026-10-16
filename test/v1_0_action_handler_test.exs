@@ -294,7 +294,7 @@ defmodule AshA2ui.V10ActionHandlerTest do
 
       refute Enum.any?(messages, &Map.has_key?(&1, "actionResponse"))
       assert Enum.all?(messages, &(&1["version"] == "v0.9.1"))
-      assert is_binary(value_at(messages, "/ui/status"))
+      assert is_binary(value_at(messages, "/ui/feedback")["message"])
     end
 
     test "actionResponses for distinct actionIds echo each id exactly once" do

@@ -14,12 +14,6 @@ defmodule AshA2ui.Wizard.WizardSecurityTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Enrollment
 
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-    on_exit(fn -> Application.delete_env(:ash_a2ui, :experience_version) end)
-    :ok
-  end
-
   defp handle(name, context) do
     message = %{"version" => "v0.9.1", "action" => %{"name" => name, "context" => context}}
     {tag, messages} = ActionHandler.handle(Enrollment, message)
@@ -140,7 +134,7 @@ defmodule AshA2ui.Wizard.WizardSecurityTest do
 
     for index <- [bogus, %{"path" => "/ui/wizard/index"}, 1.5, nil, [1]] do
       assert {:error, messages} = handle("wizard_next", %{"values" => %{}, "index" => index})
-      assert value_at(messages, "/ui/status") =~ "Malformed wizard action"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "Malformed wizard action"
       refute value_at(messages, "/ui/wizard")
 
       assert {:error, _messages} = handle("wizard_back", %{"index" => index})
@@ -158,6 +152,6 @@ defmodule AshA2ui.Wizard.WizardSecurityTest do
     }
 
     assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.Promotion, message)
-    assert value_at(messages, "/ui/status") =~ "does not declare steps"
+    assert value_at(messages, "/ui/feedback")["message"] =~ "does not declare steps"
   end
 end

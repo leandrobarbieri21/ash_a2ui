@@ -126,7 +126,7 @@ defmodule AshA2ui.Dynamic.Importer do
       {:surface_id, Extension.get_opt(module, [:a2ui], :surface_id, nil),
        "surface ids are resolve/deploy metadata — pass it as the resolve :surface_id option"},
       {:record_label, Extension.get_opt(module, [:a2ui], :record_label, nil),
-       "record labels drive the v2 task labels and have no spec key — keep them in the promoted module"},
+       "record labels drive the task-panel labels and have no spec key — keep them in the promoted module"},
       {:spec_version, Extension.get_opt(module, [:a2ui], :spec_version, "0.9.1"),
        "the wire version is a resolve option (:spec_version), not part of the spec"}
     ]

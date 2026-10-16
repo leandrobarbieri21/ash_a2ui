@@ -1,7 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
       "surfaceId": "tickets"
     },
     "version": "v0.9.1"
@@ -11,83 +11,192 @@
       "components": [
         {
           "children": [
-            "table_heading",
-            "records_list",
-            "form",
-            "status_text",
+            "form_slot",
+            "status_banner",
+            "create_button",
+            "data_grid",
             "action_result_panel"
           ],
-          "component": "Column",
-          "id": "root"
-        },
-        {
-          "component": "Text",
-          "id": "table_heading",
-          "text": "Ticket",
-          "variant": "h2"
-        },
-        {
-          "children": {
-            "componentId": "record_row",
-            "path": "/records"
-          },
-          "component": "List",
-          "id": "records_list"
-        },
-        {
-          "child": "record_row_content",
-          "component": "Card",
-          "id": "record_row"
-        },
-        {
-          "children": [
-            "table_cell_subject",
-            "row_select_button"
-          ],
-          "component": "Row",
-          "id": "record_row_content"
-        },
-        {
-          "children": [
-            "table_cell_subject_label",
-            "table_cell_subject_value"
-          ],
-          "component": "Row",
-          "id": "table_cell_subject"
-        },
-        {
-          "component": "Text",
-          "id": "table_cell_subject_label",
-          "text": "Subject",
-          "variant": "caption"
-        },
-        {
-          "component": "Text",
-          "id": "table_cell_subject_value",
-          "text": {
-            "path": "subject"
-          }
+          "component": "entityPage",
+          "id": "root",
+          "title": "Ticket"
         },
         {
           "action": {
             "event": {
+              "context": {},
+              "name": "start_create"
+            }
+          },
+          "child": "create_text",
+          "component": "Button",
+          "id": "create_button",
+          "variant": "primary"
+        },
+        {
+          "component": "Text",
+          "id": "create_text",
+          "text": "Create Ticket"
+        },
+        {
+          "children": [
+            "empty_state"
+          ],
+          "columns": [
+            {
+              "label": "Subject",
+              "path": "subject"
+            }
+          ],
+          "component": "dataGrid",
+          "id": "data_grid",
+          "label": "Ticket",
+          "rowActions": [
+            {
+              "action": "view_record",
               "context": {
                 "component": "table",
                 "recordId": {
                   "path": "id"
                 }
               },
-              "name": "select_row"
+              "label": "View"
+            },
+            {
+              "action": "start_edit",
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "Edit"
             }
+          ],
+          "rowClick": {
+            "action": "view_record",
+            "context": {
+              "component": "table",
+              "recordId": {
+                "path": "id"
+              }
+            },
+            "label": "View"
           },
-          "child": "row_select_text",
-          "component": "Button",
-          "id": "row_select_button"
+          "rowId": "id",
+          "rows": {
+            "path": "/records"
+          }
+        },
+        {
+          "children": [],
+          "component": "emptyState",
+          "id": "empty_state",
+          "message": {
+            "path": "_empty_message"
+          }
+        },
+        {
+          "children": {
+            "componentId": "form",
+            "path": "/ui/panel/visible"
+          },
+          "component": "List",
+          "id": "form_slot"
+        },
+        {
+          "child": "form_body",
+          "component": "Card",
+          "id": "form"
+        },
+        {
+          "children": [
+            "form_title",
+            "panel_view_slot",
+            "form_fields_slot",
+            "form_footer_divider",
+            "form_footer"
+          ],
+          "component": "Column",
+          "id": "form_body"
+        },
+        {
+          "component": "Divider",
+          "id": "form_footer_divider"
+        },
+        {
+          "children": [
+            "form_submit_slot",
+            "form_cancel_button"
+          ],
+          "component": "Column",
+          "id": "form_footer"
+        },
+        {
+          "children": {
+            "componentId": "panel_view",
+            "path": "/ui/panel/view_visible"
+          },
+          "component": "List",
+          "id": "panel_view_slot"
+        },
+        {
+          "children": [
+            "panel_view_subject",
+            "panel_view_author_id"
+          ],
+          "component": "Column",
+          "id": "panel_view"
+        },
+        {
+          "children": [
+            "panel_view_subject_label",
+            "panel_view_subject_value"
+          ],
+          "component": "Row",
+          "id": "panel_view_subject"
         },
         {
           "component": "Text",
-          "id": "row_select_text",
-          "text": "Select"
+          "id": "panel_view_subject_label",
+          "text": "Subject",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "panel_view_subject_value",
+          "text": {
+            "path": "/ui/panel/record/subject"
+          }
+        },
+        {
+          "children": [
+            "panel_view_author_id_label",
+            "panel_view_author_id_value"
+          ],
+          "component": "Row",
+          "id": "panel_view_author_id"
+        },
+        {
+          "component": "Text",
+          "id": "panel_view_author_id_label",
+          "text": "Author id",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "panel_view_author_id_value",
+          "text": {
+            "path": "/ui/panel/record/author_id"
+          }
+        },
+        {
+          "children": {
+            "componentId": "form_fields",
+            "path": "/ui/panel/form_visible"
+          },
+          "component": "List",
+          "id": "form_fields_slot"
         },
         {
           "children": [
@@ -96,11 +205,10 @@
             "form_input_author_id",
             "form_error_author_id",
             "nested_notes",
-            "nested_tags",
-            "form_submit_button"
+            "nested_tags"
           ],
           "component": "Column",
-          "id": "form"
+          "id": "form_fields"
         },
         {
           "component": "TextField",
@@ -346,6 +454,22 @@
           "variant": "caption"
         },
         {
+          "component": "Text",
+          "id": "form_title",
+          "text": {
+            "path": "/ui/panel/title"
+          },
+          "variant": "h3"
+        },
+        {
+          "children": {
+            "componentId": "form_submit_button",
+            "path": "/ui/panel/submit_visible"
+          },
+          "component": "List",
+          "id": "form_submit_slot"
+        },
+        {
           "action": {
             "event": {
               "context": {
@@ -367,13 +491,34 @@
         {
           "component": "Text",
           "id": "form_submit_text",
-          "text": "Save"
+          "text": {
+            "path": "/ui/panel/primary_label"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {},
+              "name": "cancel_record_task"
+            }
+          },
+          "child": "form_cancel_text",
+          "component": "Button",
+          "id": "form_cancel_button"
         },
         {
           "component": "Text",
-          "id": "status_text",
-          "text": {
-            "path": "/ui/status"
+          "id": "form_cancel_text",
+          "text": "Cancel"
+        },
+        {
+          "component": "statusBanner",
+          "id": "status_banner",
+          "kind": {
+            "path": "/ui/feedback/kind"
+          },
+          "message": {
+            "path": "/ui/feedback/message"
           }
         },
         {
@@ -400,6 +545,12 @@
       "path": "/",
       "surfaceId": "tickets",
       "value": {
+        "_empty_message": "No Ticket records yet.",
+        "_empty_visible": [
+          {
+            "id": "on"
+          }
+        ],
         "errors": {},
         "form": {
           "notes": [],
@@ -419,7 +570,21 @@
         "ui": {
           "action_result": {},
           "action_result_text": "",
-          "status": ""
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          }
         }
       }
     },

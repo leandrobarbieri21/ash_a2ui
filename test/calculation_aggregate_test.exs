@@ -203,7 +203,7 @@ defmodule AshA2ui.CalculationAggregateTest do
         })
 
       assert {:error, messages} = ActionHandler.handle(Article, env)
-      assert value_at(messages, "/ui/status") =~ "not allowlisted"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not allowlisted"
     end
   end
 end

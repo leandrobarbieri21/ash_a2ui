@@ -20,18 +20,6 @@ defmodule AshA2ui.SectionsTest do
   alias AshA2ui.Test.BucketWordsUI
   alias AshA2ui.Test.BucketWordsV1UI
 
-  setup do
-    # This suite asserts the v1 wire shapes; v2 is the default, so the
-    # legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   defp envelope(name, context, version \\ "v0.9.1", surface \\ "bucket_words") do
     %{
       "version" => version,
@@ -203,17 +191,20 @@ defmodule AshA2ui.SectionsTest do
       zebra_sfx = "_#{runtime_name(ctx.zebra)}"
 
       assert components["root"]["children"] == [
+               "status_text",
                "table_heading_new_words",
                "records_list_new_words",
+               "empty_state_new_words",
                "table_heading#{alpha_sfx}",
                "query#{alpha_sfx}_controls",
                "records_list#{alpha_sfx}",
+               "empty_state#{alpha_sfx}",
                "query#{alpha_sfx}_pagination",
                "table_heading#{zebra_sfx}",
                "query#{zebra_sfx}_controls",
                "records_list#{zebra_sfx}",
+               "empty_state#{zebra_sfx}",
                "query#{zebra_sfx}_pagination",
-               "status_text",
                "action_result_panel"
              ]
 

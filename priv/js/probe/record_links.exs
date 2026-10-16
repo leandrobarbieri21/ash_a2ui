@@ -6,7 +6,6 @@
 
 alias AshA2ui.Test.Links.{Note, Participant, Person, NotesUI, PagedNotesUI}
 
-Application.put_env(:ash_a2ui, :experience_version, 2)
 Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 Application.put_env(:ash_a2ui, :open_surface_url, "/app/r/{surface}/{recordId}")
 

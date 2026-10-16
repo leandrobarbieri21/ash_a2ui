@@ -84,18 +84,22 @@ leading noun; single-table surfaces keep today's unsuffixed ids:
 | `records_list` / `record_row` | `records_list_<name>` / `record_row_<name>` |
 | `table_cell_<field>` | `table_cell_<name>_<field>` |
 | `row_action_<action>_button` | `row_action_<name>_<action>_button` |
-| `row_select_button` | `row_select_<name>_button` |
+| `view_button` / `edit_button` / `create_button` | `view_<name>_button` / `edit_<name>_button` / `create_<name>_button` |
+| `row_context_button` | `row_context_<name>_button` |
+| `empty_state` | `empty_state_<name>` |
 | `query_controls`, `query_search_input`, `query_filter_<f>`, `query_apply_button`, `query_pagination`, `query_prev_button`, `query_next_button`, `query_page_text` | `query_<name>_controls`, `query_<name>_search_input`, `query_<name>_filter_<f>`, `query_<name>_apply_button`, `query_<name>_pagination`, `query_<name>_prev_button`, `query_<name>_next_button`, `query_<name>_page_text` |
 
-Root children order: per table in declaration order — heading, query
-controls (if any), records list, pagination (if any) — then the form, the
-status text, and the action-result panel.
+Root children order: the task panel (`form_slot`, when there is a form) and
+the status text first, then the context pickers, then per table in
+declaration order — heading, query controls (if any), create button (if
+any), records list, empty state, pagination (if any) — and the
+action-result panel last.
 
 ## Action contexts carry `"component"`
 
-- Row-action buttons and row-select buttons additively include
-  `"component": "<component_name>"` in their `invoke`/`select_row` contexts
-  (the handler tolerates its absence — older clients keep working).
+- Row-action buttons and the View/Edit row controls additively include
+  `"component": "<component_name>"` in their `invoke`/`view_record`/
+  `start_edit` contexts (the handler tolerates its absence).
 - The `query` action **requires** `"component"` on multi-table surfaces (the
   emitted controls always send it); its context `"query"` value is that
   table's state map, and the response targets `/records/<name>` +
@@ -223,7 +227,7 @@ lane is an ordinary expanded table: runtime name `<template_key>_<value>`
 records is kept and shows its empty state.
 
 **Rendering.** `display :board` emits one root child, `board_<template_key>`:
-a `Column` holding an h2 heading, the create affordance (v2, when the
+a `Column` holding an h2 heading, the create affordance (when the
 surface has a create action) and `board_<template_key>_lanes`, a **horizontal
 `List`** of lane `Column`s. It is a `List`, not a `Row`, because the basic
 `Row` cannot wrap (see the Layout topic); renderers typically scroll a
@@ -236,7 +240,7 @@ horizontal list. Each lane `Column` (`lane_<lane>`) holds:
   presets, filters or ranges,
 - `records_list_<lane>` with the `row_layout` cards, row actions and
   visibility slots of the list composition,
-- the v2 empty state and the lane's pagination and export controls.
+- the empty state and the lane's pagination and export controls.
 
 `display :list` (the default) keeps the stacked rendering above, unchanged.
 The admin catalog renders boards with this basic composition, as it does

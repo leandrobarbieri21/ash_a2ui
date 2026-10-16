@@ -1,6 +1,6 @@
 defmodule AshA2ui.Experience.PaginationVisibilityTest do
   @moduledoc """
-  A2UI-101/AC-1..AC-5: experience v2 conditional pagination — the
+  A2UI-101/AC-1..AC-5: experience-layer conditional pagination — the
   `_pagination_visible` / `_previous_visible` / `_next_visible` sentinels
   and the `_range_text` result range, plus the data-driven empty state.
   """
@@ -11,16 +11,6 @@ defmodule AshA2ui.Experience.PaginationVisibilityTest do
   alias AshA2ui.Experience
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   defp seed!(count) do
     for i <- 1..count do

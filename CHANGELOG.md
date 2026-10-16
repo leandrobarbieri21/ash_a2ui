@@ -8,6 +8,74 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+### Breaking Changes:
+
+- **Removed experience v1 and the version switch.** The experience layer
+  (`AshA2ui.Experience`: task panel, View/Edit row controls, create button,
+  conditional pagination, empty states, typed feedback, h1 title, carded
+  form) is now the only composition. Removed outright, with no shim and no
+  deprecation path:
+  - the `:experience_version` setting and `AshA2ui.Experience.version/0`,
+    `v2?/0` and `effective_admin?/0` (use `admin?/0`; the admin catalog is
+    active exactly when `catalog: :admin_v1` is selected). A leftover
+    `experience_version` in host config is ignored.
+  - the pre-experience composition it pinned: the always-visible form with
+    a "Save" button, the per-row "Select" button (`row_select_button`) and
+    the always-present pagination row.
+  - the `"select_row"` client action (dispatch, AG-UI decoding and docs).
+    It is now an unknown action. Send `"start_edit"` to load a record into
+    the form, or `"view_record"` to show it read-only.
+  - the `/ui/status` path, on both wire versions. Every outcome is the
+    typed `/ui/feedback` value (`%{"kind" => "success" | "warning" |
+    "error", "message" => text}`); the status Text binds
+    `/ui/feedback/message`. v1.0 surfaces keep `/ui/response` and the
+    `actionResponse` handshake, and write `/ui/feedback` alongside every
+    `/ui/response` outcome (report runs and CSV exports included).
+  - `/ui/wizard/nav/submit_visible` (the panel's
+    `/ui/panel/submit_visible` gates the stepped form's submit).
+
+  Migration: drop `config :ash_a2ui, :experience_version, ...`; move
+  anything bound to `/ui/status` to `/ui/feedback/message` (or the whole
+  `/ui/feedback` value); replace `select_row` with `start_edit` /
+  `view_record`.
+
+### Bug Fixes:
+
+- **Rejections on v0.9.1 surfaces reached no visible path.** Many
+  rejections (a forbidden `start_edit`, a malformed envelope, a query
+  allowlist refusal, context, prompt, inline-edit and report errors) wrote
+  only `/ui/status`, which no component bound once the status Text read
+  `/ui/feedback/message`. Every error path now writes a typed
+  `/ui/feedback` error (on v1.0 alongside `/ui/response`).
+- **v1.0 report and export successes left the status line stale.** A
+  report run or CSV export on a v1.0 surface wrote only `/ui/response`, so
+  the status Text (bound to `/ui/feedback/message`) kept the previous
+  outcome. Its "ok" message is now mirrored into a `"success"`
+  `/ui/feedback`.
+- **The v1.0 capped-selection notice answered as an error.** A
+  `bulk_select` capped at the bulk limit succeeds, but on v1.0 its notice
+  wrote an `"error"`/`INVALID_ACTION` `/ui/response`, so the
+  `actionResponse` read as a failure. It now writes an `"ok"` response
+  carrying the text, beside the `"warning"` `/ui/feedback`.
+- **A context selection could leave an admin row action spinning.**
+  `context_select` and `context_clear` wrote no outcome, so the admin
+  dataGrid's "Select <context>" button stayed busy until some later action.
+  A settled selection now clears `/ui/feedback` (as opening or cancelling a
+  task does), which also removes a stale error.
+- **Related tables offered controls that could not work.** A related table
+  (a `:table` with its own `resource`) got View/Edit row controls that
+  failed with "Request failed" and a second "Create <surface resource>"
+  button under it. Related tables are read-only views and now render
+  neither, in the basic and admin compositions.
+- **The `select_context` row button read "View <context>"** right next to
+  the task panel's "View". It now reads "Select <context>", in the basic
+  and admin compositions.
+- **Refreshed rows read differently from the initial render.** After a
+  context selection, query or action refresh, table rows showed raw enum
+  values (`scheduled`) where the initial render showed labels
+  (`Scheduled`). The handler's refresh now uses the encoder's own row
+  serializer, so both emit identical rows.
+
 ### Features:
 
 - **Bulk actions** (A2UI-104) — `bulk_actions [:approve, :reject]` on a
@@ -23,7 +91,7 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `visible_when`, and runs each remaining record through the same dispatch
   as `invoke` with no shared transaction; `bulk_select` rewrites the
   page's selection from an authorized re-read, marking at most the bulk
-  cap on a table without a query. Typed v2 feedback gains `"warning"` for
+  cap on a table without a query. Typed feedback gains `"warning"` for
   partial success (the admin catalog's `statusBanner` documents it).
   Compile-time checks reject read/create actions, generic actions without
   a `:record_id` argument, `prompt_fields` and related tables. Basic-composed on both spec versions and under the

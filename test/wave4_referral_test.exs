@@ -17,18 +17,6 @@ defmodule AshA2ui.Wave4ReferralTest do
   alias AshA2ui.Test.{Author, Referral}
 
   setup do
-    # These assertions cover the exact v1 message shapes; v2 is the default,
-    # so the legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
-  setup do
     referrer = Ash.create!(Author, %{name: "Rita Referrer", email: "rita@referrals.test"})
     referred = Ash.create!(Author, %{name: "Ned Newcomer", email: "ned@referrals.test"})
 
@@ -148,7 +136,15 @@ defmodule AshA2ui.Wave4ReferralTest do
       assert {:error, messages} =
                handle!("query", %{"query" => %{"filters" => %{"notes" => "x"}}})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ "not allowlisted"
     end
   end
@@ -200,7 +196,15 @@ defmodule AshA2ui.Wave4ReferralTest do
       assert {:error, messages} =
                handle!("query", %{"query" => %{"preset" => "everything"}})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ ~s(Preset "everything" is not allowlisted)
     end
 
@@ -264,8 +268,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                "child" => "record_row_content"
              }
 
-      # No row_select_button: the Referral surface declares no :form, so
-      # there is nothing for select_row to populate.
+      # No View/Edit controls: the Referral surface declares no :form, so
+      # there is no task panel to open.
       assert components["record_row_content"]["children"] == [
                "table_cell_code",
                "table_cell_status",
@@ -294,11 +298,21 @@ defmodule AshA2ui.Wave4ReferralTest do
   end
 
   describe "visible_when enforcement" do
-    test "invoking a non-visible action is rejected with /ui/status", %{approved: approved} do
+    test "invoking a non-visible action is rejected with an /ui/feedback error", %{
+      approved: approved
+    } do
       assert {:error, messages} =
                handle!("invoke", %{"action" => "approve", "recordId" => approved.id})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ ~s("approve" is not available for this record)
     end
 
@@ -307,17 +321,27 @@ defmodule AshA2ui.Wave4ReferralTest do
                handle!("invoke", %{"action" => "approve", "recordId" => pending.id})
 
       values = by_path(messages)
-      assert values["/ui/status"] =~ "completed"
+      assert values["/ui/feedback"]["message"] =~ "completed"
 
       row = Enum.find(values["/records"], &(&1["code"] == "PEND-1"))
-      assert row["status"] == "approved"
+      # the refreshed row reads like the initial render's: the enum label
+      assert row["status"] == "Approved"
       assert row["_visible_approve"] == []
       assert "approve" not in row["_actions"]
     end
 
     test "an invoke without recordId on a conditional action is rejected" do
       assert {:error, messages} = handle!("invoke", %{"action" => "approve"})
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ "requires a \"recordId\""
     end
   end
@@ -399,7 +423,15 @@ defmodule AshA2ui.Wave4ReferralTest do
       assert {:error, messages} =
                handle!("prompt", %{"action" => "approve", "recordId" => pending.id})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ "does not declare prompt_fields"
     end
 
@@ -407,7 +439,15 @@ defmodule AshA2ui.Wave4ReferralTest do
       assert {:error, messages} =
                handle!("prompt", %{"action" => "decline", "recordId" => declined.id})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ ~s("decline" is not available for this record)
     end
 
@@ -415,7 +455,15 @@ defmodule AshA2ui.Wave4ReferralTest do
       assert {:error, messages} =
                handle!("prompt", %{"action" => "update", "recordId" => pending.id})
 
-      assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] = messages
+      assert [
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => status}
+                 }
+               }
+             ] = messages
+
       assert status =~ "not allowed"
     end
   end
@@ -449,7 +497,7 @@ defmodule AshA2ui.Wave4ReferralTest do
 
       values = by_path(messages)
       assert values["/errors/notes"] =~ "is required"
-      assert values["/ui/status"] =~ "Validation failed"
+      assert values["/ui/feedback"]["message"] =~ "Validation failed"
     end
 
     test "filters values outside the declared prompt_fields", %{pending: pending} do

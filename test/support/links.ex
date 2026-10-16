@@ -293,3 +293,42 @@ defmodule AshA2ui.Test.Links.PeopleUI do
     end
   end
 end
+
+defmodule AshA2ui.Test.Links.PeopleTaskUI do
+  @moduledoc """
+  `PeopleUI` with a record task panel (a create form): the master table's
+  rows get the task controls and the surface its create affordance, while
+  the related notes table — a read-only view of another resource — gets
+  neither.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Links.Person
+    surface_id "people_tasks"
+
+    context :person do
+      resource AshA2ui.Test.Links.Person
+      option_label :name
+      picker false
+    end
+
+    component :table do
+      fields [:name]
+      select_context :person
+    end
+
+    component :table, :their_notes do
+      resource AshA2ui.Test.Links.Note
+      fields [:title, :status, :amount]
+      context_filter person_id: :person
+      require_context [:person]
+    end
+
+    component :form do
+      fields [:name]
+      create_action :create
+    end
+  end
+end

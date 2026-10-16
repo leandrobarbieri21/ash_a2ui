@@ -1,7 +1,7 @@
 /**
  * CLIN-10 anatomy probe — the verification gate for the neobrutalist
  * surface overrides (merged-catalog Text/Button anatomy + theme type
- * tiers + the encoder's v2 title/carded-form shapes).
+ * tiers + the encoder's title/carded-form shapes).
  *
  *   node priv/js/probe/anatomy_probe.mjs [--node-modules DIR] [--port N]
  *
@@ -506,7 +506,7 @@ async function main() {
   page = await openCase(browser, base, "payload=paginated");
 
   await check("pagination: the quiet utility pair", async () => {
-    // Make the pager visible: flip the v2 visibility sentinels (the same
+    // Make the pager visible: flip the pagination visibility sentinels (the same
     // zero-or-one gates the server writes on a real query reply).
     await page.evaluate(() => {
       const surfaceId = window.__surfaceId;

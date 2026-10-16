@@ -101,10 +101,9 @@ entity: label, `refreshes`, `visible_when` and `via` all apply per record.
    This keeps policies, changes, hooks, notifications and `via` delegates
    identical to clicking each row. Selections are page-bounded, so the extra
    round trips are bounded too.
-6. The handler writes `/bulk/<table>/result` and a status line
-   ("Approved 4 of 5; 1 refused"). Under v2 it also writes typed
-   `/ui/feedback`, which is `warning` on partial success and `error` when
-   nothing succeeded. Then it refreshes targets once, as `invoke` does.
+6. The handler writes `/bulk/<table>/result` and typed `/ui/feedback`
+   ("Approved 4 of 5; 1 refused"), which is `warning` on partial success
+   and `error` when nothing succeeded. Then it refreshes targets once, as `invoke` does.
    Nothing is refreshed when every record failed.
 
 **Not exposed to agents.** Bulk actions are not added to the AG-UI tool
@@ -248,8 +247,10 @@ end
 - `start_create`, `cancel_record_task` and a successful submit reset the
   index to 0.
 
-**Experience v2.** `panel_state` labels the primary button "Next" before the
-last step, then the existing "Create X" / "Save changes".
+**Task panel.** `panel_state` labels the primary button "Next" before the
+last step, then the existing "Create X" / "Save changes"; the panel's submit
+gate opens on the last step. (Experience v1, under which the submit sat
+behind its own wizard sentinel, was removed on 2026-10-16.)
 
 **Scope note.** Linear, server-validated steps over one Ash action are
 supported. Branching flows, uploads and steps that wait on background work

@@ -148,7 +148,7 @@ contexts, as on every write action. The handler then:
    false). When none was, it returns an error status and refreshes
    nothing.
 
-Under experience v2 the typed `/ui/feedback` kind is `"success"` when every
+The typed `/ui/feedback` kind is `"success"` when every
 selected record was written, `"warning"` on partial success and `"error"`
 when nothing was written. On v1.0 surfaces the `actionResponse` value
 carries the result map under `"result"`.

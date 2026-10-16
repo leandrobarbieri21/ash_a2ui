@@ -1,6 +1,6 @@
 defmodule AshA2ui.Experience.AffordancesTest do
   @moduledoc """
-  A2UI-101/AC-11..AC-13: experience v2 affordances — the View/Edit row
+  A2UI-101/AC-11..AC-13: experience-layer affordances — the View/Edit row
   controls (gated on the view's update action) and the create affordance
   (gated on the view's create action).
   """
@@ -10,16 +10,6 @@ defmodule AshA2ui.Experience.AffordancesTest do
   alias AshA2ui.Test.Experience.NoUpdate
   alias AshA2ui.Test.Experience.ReadOnly
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   defp surface!(resource) do
     [_create, components, data] = AshA2ui.Info.build_surface(resource, actor: nil)

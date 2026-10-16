@@ -2,7 +2,7 @@ defmodule AshA2ui.Experience.AdminCatalogUpgradeTest do
   @moduledoc """
   A2UI-101B/AC-10: the v1.0 upgrade pass — custom admin kinds and their
   bindings go through untouched, and the /ui/response collapse preserves
-  the A2UI-101 v2 behavior.
+  the A2UI-101 behavior.
   """
 
   use ExUnit.Case, async: false
@@ -11,11 +11,9 @@ defmodule AshA2ui.Experience.AdminCatalogUpgradeTest do
   alias AshA2ui.Test.Experience.Task
 
   setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
     on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 
@@ -40,7 +38,7 @@ defmodule AshA2ui.Experience.AdminCatalogUpgradeTest do
     assert comps["status_banner"]["component"] == "statusBanner"
     assert comps["pagination"]["component"] == "pagination"
 
-    # bindings are not rewritten (only the /ui/status family is)
+    # bindings are not rewritten (only the /ui/action_result family is)
     assert comps["status_banner"]["kind"] == %{"path" => "/ui/feedback/kind"}
     assert comps["status_banner"]["message"] == %{"path" => "/ui/feedback/message"}
     assert comps["record_panel"]["mode"] == %{"path" => "/ui/panel/mode"}
@@ -69,7 +67,7 @@ defmodule AshA2ui.Experience.AdminCatalogUpgradeTest do
              }
            }
 
-    # the /ui/response collapse preserves the A2UI-101 v2 state: the
+    # the /ui/response collapse preserves the A2UI-101 state: the
     # structured response replaces the status trio, the experience state
     # (intent/panel/feedback) survives alongside it
     ui = create["dataModel"]["ui"]

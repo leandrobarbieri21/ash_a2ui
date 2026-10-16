@@ -58,8 +58,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "version" => "v0.9.1",
           "updateDataModel" => %{
             "surfaceId" => @surface_id,
-            "path" => "/ui/status",
-            "value" => "saved"
+            "path" => "/ui/feedback",
+            "value" => %{"kind" => "success", "message" => "saved"}
           }
         }
       ]
@@ -79,8 +79,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           "version" => "v0.9.1",
           "updateDataModel" => %{
             "surfaceId" => @surface_id,
-            "path" => "/ui/status",
-            "value" => "error"
+            "path" => "/ui/feedback",
+            "value" => %{"kind" => "error", "message" => "error"}
           }
         }
       ]

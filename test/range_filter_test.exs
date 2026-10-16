@@ -148,12 +148,12 @@ defmodule AshA2ui.RangeFilterTest do
       assert {:error, messages} =
                query_with_ranges(owner, %{"title" => %{"from" => "A", "to" => ""}})
 
-      assert value_at(messages, "/ui/status") =~ "not allowlisted"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not allowlisted"
 
       assert {:error, messages} =
                query_with_ranges(owner, %{"scheduled_for" => %{"from" => "yesterday", "to" => ""}})
 
-      assert value_at(messages, "/ui/status") =~ "value is invalid"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "value is invalid"
     end
   end
 

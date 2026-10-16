@@ -97,12 +97,18 @@ defmodule AshA2ui.EnumTypeTest do
     assert %{"updateDataModel" => %{"path" => "/records", "value" => [record]}} =
              Enum.find(messages, &match?(%{"updateDataModel" => %{"path" => "/records"}}, &1))
 
-    assert record["severity"] == "very_high"
+    # table rows read enum values as their labels, on refreshes as on the
+    # initial render
+    assert record["severity"] == "Very high"
 
     bogus = put_in(envelope, ["action", "context", "query", "filters", "severity"], "bogus")
     assert {:error, error_messages} = AshA2ui.ActionHandler.handle(EnumRecord, bogus, actor: nil)
 
-    assert [%{"updateDataModel" => %{"path" => "/ui/status", "value" => status}}] =
+    assert [
+             %{
+               "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
+             }
+           ] =
              error_messages
 
     assert status =~ "invalid"

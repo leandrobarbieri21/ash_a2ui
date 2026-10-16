@@ -16,9 +16,6 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
   alias AshA2ui.Test.{BulkCardsUI, BulkPresetsUI, BulkTasksUI}
 
   setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-    on_exit(fn -> Application.delete_env(:ash_a2ui, :experience_version) end)
-
     reset!()
     %{project: project!("Apollo")}
   end
@@ -62,7 +59,9 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     assert length(records) == 4
     assert Enum.all?(records, &(&1["_selected"] == false))
 
-    assert value_at(messages, "/ui/status") == "Approve: 3 of 3 selected records done."
+    assert value_at(messages, "/ui/feedback")["message"] ==
+             "Approve: 3 of 3 selected records done."
+
     assert value_at(messages, "/ui/feedback")["kind"] == "success"
   end
 
@@ -84,7 +83,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     assert %{"ok" => 2, "skipped" => 1, "refused" => 0, "failed" => 0} =
              value_at(messages, "/bulk/table/result")
 
-    assert value_at(messages, "/ui/status") ==
+    assert value_at(messages, "/ui/feedback")["message"] ==
              "Approve: 2 of 3 selected records done; 1 skipped."
 
     assert value_at(messages, "/ui/feedback")["kind"] == "warning"
@@ -123,7 +122,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     assert bad_id == bad.id
     assert message =~ ~r/^score: must be greater than or equal to 0/
 
-    assert value_at(messages, "/ui/status") ==
+    assert value_at(messages, "/ui/feedback")["message"] ==
              "Approve: 2 of 3 selected records done; 1 failed."
 
     assert value_at(messages, "/ui/feedback") == %{
@@ -265,7 +264,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
       assert Enum.count(rows, & &1["_selected"]) == cap
       assert rows |> Enum.take(cap) |> Enum.all?(& &1["_selected"])
 
-      assert value_at(messages, "/ui/status") ==
+      assert value_at(messages, "/ui/feedback")["message"] ==
                "Selected the first 250 of 251 records: a bulk action runs on at most 250 records."
 
       # the selection the page now holds is one a bulk run accepts
@@ -281,6 +280,31 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
                )
 
       assert %{"ok" => 250, "refused" => 0} = value_at(messages, "/bulk/inbox/result")
+    end
+
+    test "on v1.0 the capped-selection notice answers ok, with a warning feedback" do
+      cap = AshA2ui.Bulk.cap(inbox_table())
+      for n <- 1..(cap + 1), do: task!("Task #{String.pad_leading(to_string(n), 3, "0")}")
+
+      message = %{
+        "version" => "v1.0",
+        "action" => %{
+          "name" => "bulk_select",
+          "surfaceId" => "bulk_cards",
+          "actionId" => "sel_1",
+          "context" => %{"component" => "inbox", "selected" => true}
+        }
+      }
+
+      assert {:ok, [response | followups]} =
+               ActionHandler.handle(BulkCardsUI, message, actor: actor(), spec_version: "1.0")
+
+      text = "Selected the first 250 of 251 records: a bulk action runs on at most 250 records."
+
+      assert response["actionId"] == "sel_1"
+      assert %{"value" => %{"status" => "ok", "message" => ^text}} = response["actionResponse"]
+      assert %{"status" => "ok", "message" => ^text} = value_at(followups, "/ui/response")
+      assert value_at(followups, "/ui/feedback") == %{"kind" => "warning", "message" => text}
     end
   end
 end

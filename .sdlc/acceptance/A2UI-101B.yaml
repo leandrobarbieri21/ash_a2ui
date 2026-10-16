@@ -112,6 +112,14 @@ criteria:
       test/ash_a2ui/experience/admin_catalog_fallback_test.exs::basic_catalog_output_is_unchanged
 
   - id: A2UI-101B/AC-9
+    status: retired
+    retired: >-
+      2026-10-16, with the removal of experience v1 (clean break). There is
+      no experience version left for the admin catalog to depend on, so the
+      given/when/then below (kept as written) can no longer hold. The id
+      stays, and its evidence now checks the one remaining precedence rule:
+      the catalog selection alone activates the admin emission, whatever a
+      leftover experience_version setting says.
     given: "experience_version 1 with config catalog: :admin_v1"
     when: any surface is encoded
     then: >-
@@ -120,7 +128,7 @@ criteria:
     verify: unit
     risk: high
     test: >-
-      test/ash_a2ui/experience/admin_catalog_fallback_test.exs::admin_catalog_requires_experience_v2
+      test/ash_a2ui/experience/no_version_switch_test.exs::the_admin_catalog_selection_alone_activates_the_admin_emission
 
   - id: A2UI-101B/AC-10
     given: an admin surface encoded under spec_version 1.0

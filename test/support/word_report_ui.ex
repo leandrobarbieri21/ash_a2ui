@@ -78,3 +78,26 @@ defmodule AshA2ui.Test.ExportWordsV1UI do
     end
   end
 end
+
+defmodule AshA2ui.Test.ExportAppointmentsV1UI do
+  @moduledoc """
+  Fixture surface for table CSV export of an enum column (v1.0): the table
+  renders `status` as its label, the export keeps the stored value.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Appointment
+    surface_id "export_appointments_v1"
+    spec_version "1.0"
+
+    component :table do
+      fields [:title, :status]
+
+      export do
+        limit 100
+      end
+    end
+  end
+end

@@ -90,10 +90,12 @@ DSL:
 
 ### Agent usage rules
 
-AshA2ui ships LLM usage rules (`usage-rules.md` plus `usage-rules/actions.md`,
+AshA2ui ships LLM usage rules (`usage-rules.md` plus the
+`usage-rules/actions.md`, `usage-rules/ag-ui.md`, `usage-rules/contexts.md`,
+`usage-rules/dynamic.md`, `usage-rules/layout.md`,
 `usage-rules/liveview.md`, `usage-rules/queries.md`,
-`usage-rules/relationships.md`, `usage-rules/layout.md`,
-`usage-rules/contexts.md`, and `usage-rules/zero-jank.md` sub-rules)
+`usage-rules/relationships.md`, `usage-rules/reports.md`, and
+`usage-rules/zero-jank.md` sub-rules)
 compatible with
 [`usage_rules`](https://hexdocs.pm/usage_rules). To sync them into your
 project's AGENTS.md, add `{:usage_rules, "~> 1.1", only: [:dev]}` and
@@ -431,45 +433,45 @@ Records are loaded through the resource's read action with `authorize?: true`
 and your `actor:`/`tenant:` — policies apply exactly as everywhere else in
 Ash.
 
-### Experience v2 (the default)
+### The experience layer
 
-> **Breaking change:** experience v2 is now the default. Hosts upgrading from
-> an earlier release get the v2 layer without any configuration: rows show
-> semantic **View** / **Edit** controls instead of **Select**, a gated
-> **Create <Resource>** affordance appears on create-capable surfaces (the
-> form renders inside a task panel with an explicit heading and a mode-aware
-> primary label), pagination hides when it has nothing to do, empty tables
-> render a data-driven empty state, and action outcomes carry typed feedback
-> (`/ui/feedback` kind + message). To keep the previous rendering
-> byte-identical, pin the legacy experience in your config:
->
->     config :ash_a2ui, :experience_version, 1
->
-> Under the pin the v2 task-mode client actions (`start_create`,
-> `view_record`, `start_edit`, `cancel_record_task`) are rejected like any
-> unknown action.
+Every surface composes through the experience layer (`AshA2ui.Experience`):
+an h1 title, a record **task panel** (browse / create / view / edit) driven
+by the `start_create` / `view_record` / `start_edit` / `cancel_record_task`
+client actions, **View** / **Edit** row controls (View only on surfaces with
+a form, Edit only with a declared `update_action`, neither on a related
+table), a **Create <Resource>** button on create-capable surfaces, pagination
+that hides when there is one page, data-driven empty states, and typed
+feedback for every action outcome at `/ui/feedback` (`kind` + `message`).
+View is read-only (`/ui/panel/record`); edit is the explicit transition onto
+the form buffer. Every detail of the reserved `/ui/*` state, the sentinels
+and the task modes is documented on the `AshA2ui.Experience` moduledoc.
 
-The experience v2 layer is `AshA2ui.Experience`; every detail of the
-reserved `/ui/*` state, the sentinels, and the task modes is documented on
-its moduledoc.
+> **Removed (breaking):** the `experience_version` setting, the
+> pre-experience composition it pinned (the always-visible form with a
+> "Save" button and a per-row "Select" button), the `select_row` action and
+> the `/ui/status` path. Drop `config :ash_a2ui, :experience_version, ...`
+> from your config, bind status text to `/ui/feedback/message` instead of
+> `/ui/status`, and send `start_edit` (to load a record into the form) or
+> `view_record` (to show it read-only) instead of `select_row`. See the
+> CHANGELOG.
 
 ### Admin catalog
 
-On top of experience v2, `config :ash_a2ui, :catalog, :admin_v1` selects
-the semantic admin catalog (`AshA2ui.Experience.effective_admin?/0`):
-surfaces are emitted as an `entityPage` of `dataGrid` (with `emptyState` /
-`pagination` children and destructive-confirmed row actions), a
-`recordPanel` (`fieldDisplay` for view mode, `formSection` + `actionBar`
-for create/edit), and a `statusBanner` — declared in
+`config :ash_a2ui, :catalog, :admin_v1` selects the semantic admin catalog
+(the default is `:basic`; `AshA2ui.Experience.admin?/0`): surfaces are
+emitted as an `entityPage` of `dataGrid` (with `emptyState` / `pagination`
+children and destructive-confirmed row actions), a `recordPanel`
+(`fieldDisplay` for view mode, `formSection` + `actionBar` for
+create/edit), and a `statusBanner` bound to `/ui/feedback` — declared in
 `priv/a2ui/admin_v1/catalog.json`. Advanced-feature subtrees (sections,
-reports, export, editable, nested forms) stay basic-composed, and query
-states carry plain boolean pagination props alongside the v2 sentinels.
-Precedence is deterministic: the catalog selection requires experience v2 —
-under version `1` it is ignored and output stays basic v1, byte-identical;
-version `2` with the default `:basic` catalog stays byte-identical to the
-experience v2 emission. The Lit renderer registration ships separately in
-`priv/js/ash_admin_catalog.js` (`createAshAdminCatalog(deps)`), a plain ES
-module consumed by the host's bundler.
+reports, export, editable, nested forms, bulk actions, wizard steps,
+boards) stay basic-composed, and query states carry plain boolean
+pagination props alongside the pagination sentinels. The default `:basic`
+catalog leaves the output unchanged. The Lit renderer registration ships
+separately in `priv/js/ash_admin_catalog.js`
+(`createAshAdminCatalog(deps)`), a plain ES module consumed by the host's
+bundler.
 
 ## Transports
 
@@ -590,10 +592,9 @@ Shipped beyond the v0 core:
   activity binding, with a per-call `spec_version:` override to pin the
   wire version to the consuming renderer (see
   [External Transports](documentation/topics/external-transports.md)).
-- ✅ **`usage_rules` support** — the package ships `usage-rules.md` plus
-  `usage-rules/actions.md`, `usage-rules/liveview.md`, `usage-rules/queries.md`,
-  `usage-rules/relationships.md`, `usage-rules/contexts.md`, and
-  `usage-rules/zero-jank.md` sub-rules,
+- ✅ **`usage_rules` support** — the package ships `usage-rules.md` plus ten
+  sub-rules (`actions`, `ag-ui`, `contexts`, `dynamic`, `layout`,
+  `liveview`, `queries`, `relationships`, `reports`, `zero-jank`),
   syncable into a consumer's
   AGENTS.md via [`mix usage_rules.sync`](https://hexdocs.pm/usage_rules) (see
   [Agent usage rules](#agent-usage-rules)).
@@ -737,9 +738,6 @@ Documented as roadmap (not built):
   agent-to-agent consumer.
 - **Raw WebSocket transport.**
 - **Custom component catalogs** beyond the basic catalog.
-- **Dynamic `nested_form` composition** — nested relationship forms remain
-  DSL-only (they depend on `manage_relationship` change knowledge an
-  agent-composed spec shouldn't guess at).
 
 ## Documentation
 

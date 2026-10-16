@@ -14,18 +14,6 @@ defmodule AshA2ui.EncoderTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{KitchenSink, Minimal}
 
-  setup do
-    # This suite asserts the v1 wire shapes; v2 is the default, so the
-    # legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   @catalog_id "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
   # A struct with NO Jason implementation anywhere — what a custom Ash type
@@ -95,8 +83,16 @@ defmodule AshA2ui.EncoderTest do
 
       assert %{"component" => "Column", "children" => children} = components["root"]
 
-      assert children ==
-               ["table_heading", "records_list", "form", "status_text", "action_result_panel"]
+      # the task panel and the feedback line lead; the table follows
+      assert children == [
+               "form_slot",
+               "status_text",
+               "table_heading",
+               "create_button",
+               "records_list",
+               "empty_state",
+               "action_result_panel"
+             ]
 
       assert Enum.all?(children, &Map.has_key?(components, &1))
     end
@@ -108,9 +104,19 @@ defmodule AshA2ui.EncoderTest do
       components = components_by_id(messages)
 
       assert components["root"]["children"] ==
-               ["table_heading", "records_list", "status_text", "action_result_panel"]
+               [
+                 "status_text",
+                 "table_heading",
+                 "records_list",
+                 "empty_state",
+                 "action_result_panel"
+               ]
 
       refute Map.has_key?(components, "form")
+      refute Map.has_key?(components, "form_slot")
+      # no create action, no form: no create button and no View control
+      refute Map.has_key?(components, "create_button")
+      refute Map.has_key?(components, "view_button")
     end
   end
 
@@ -140,7 +146,12 @@ defmodule AshA2ui.EncoderTest do
                  "table_cell_name",
                  "table_cell_inserted_at"
                ] ++
-                 ["row_action_update_button", "row_action_destroy_button", "row_select_button"]
+                 [
+                   "row_action_update_button",
+                   "row_action_destroy_button",
+                   "view_button",
+                   "edit_button"
+                 ]
     end
 
     test "cells are labeled Rows: a caption label plus the bound value Text" do
@@ -196,18 +207,28 @@ defmodule AshA2ui.EncoderTest do
                components["row_action_destroy_button"]["action"]
     end
 
-    test "the row select button carries the frozen select_row contract" do
+    test "the View and Edit row controls carry the task-panel contract" do
       components = encode_kitchen_sink() |> components_by_id()
 
-      assert %{
-               "component" => "Button",
-               "action" => %{
-                 "event" => %{
-                   "name" => "select_row",
-                   "context" => %{"recordId" => %{"path" => "id"}}
+      for {id, event, label} <- [
+            {"view_button", "view_record", "View"},
+            {"edit_button", "start_edit", "Edit"}
+          ] do
+        assert %{
+                 "component" => "Button",
+                 "child" => child,
+                 "action" => %{
+                   "event" => %{
+                     "name" => ^event,
+                     "context" => %{"recordId" => %{"path" => "id"}, "component" => "table"}
+                   }
                  }
-               }
-             } = components["row_select_button"]
+               } = components[id]
+
+        assert components[child]["text"] == label
+      end
+
+      refute Map.has_key?(components, "row_select_button")
     end
 
     test "the table heading is a humanized resource name" do
@@ -230,16 +251,30 @@ defmodule AshA2ui.EncoderTest do
   end
 
   describe "form composition" do
-    test "the form Column contains input+error pairs per field plus the submit button" do
+    test "the carded form panel holds the field pairs and the gated submit" do
       components = encode_kitchen_sink() |> components_by_id()
 
-      assert %{"component" => "Column", "children" => children} = components["form"]
+      assert %{"component" => "List", "children" => %{"componentId" => "form"}} =
+               components["form_slot"]
+
+      assert %{"component" => "Card", "child" => "form_body"} = components["form"]
+
+      assert %{"component" => "Column", "children" => children} = components["form_fields"]
 
       assert children ==
                Enum.flat_map(
                  [:active, :count, :price, :birthday, :scheduled_at, :status, :name],
                  &["form_input_#{&1}", "form_error_#{&1}"]
-               ) ++ ["form_submit_button"]
+               )
+
+      assert components["form_footer"]["children"] == ["form_submit_slot", "form_cancel_button"]
+
+      assert components["form_submit_slot"]["children"] == %{
+               "componentId" => "form_submit_button",
+               "path" => "/ui/panel/submit_visible"
+             }
+
+      assert components["form_submit_text"]["text"] == %{"path" => "/ui/panel/primary_label"}
     end
 
     test "inputs use the resolved widget and bind values into /form/<field>" do
@@ -327,10 +362,10 @@ defmodule AshA2ui.EncoderTest do
   end
 
   describe "status text" do
-    test "a status Text bound to /ui/status is always present" do
+    test "a status Text bound to the typed feedback message is always present" do
       components = encode_kitchen_sink() |> components_by_id()
 
-      assert %{"component" => "Text", "text" => %{"path" => "/ui/status"}} =
+      assert %{"component" => "Text", "text" => %{"path" => "/ui/feedback/message"}} =
                components["status_text"]
     end
   end
@@ -360,14 +395,20 @@ defmodule AshA2ui.EncoderTest do
                    "form" => %{},
                    "errors" => %{},
                    "options" => %{},
+                   "_empty_visible" => [%{"id" => "on"}],
+                   "_empty_message" => "No Kitchen sink records yet.",
                    "ui" => %{
-                     "status" => "",
                      "action_result" => %{},
-                     "action_result_text" => ""
+                     "action_result_text" => "",
+                     "intent" => "browse",
+                     "feedback" => %{"kind" => nil, "message" => ""},
+                     "panel" => %{"visible" => [], "mode" => nil}
                    }
                  }
                }
              } = message
+
+      refute Map.has_key?(message["updateDataModel"]["value"]["ui"], "status")
     end
 
     test "records are serialized to JSON-safe maps with stringified values" do
@@ -446,10 +487,11 @@ defmodule AshA2ui.EncoderTest do
                  "surfaceId" => "kitchen_sink",
                  "path" => "/",
                  "value" => %{
-                   "records" => [%{"id" => "x", "name" => "A"}],
+                   "records" => [%{"id" => "x", "name" => "A", "status" => "Draft"}],
                    "form" => %{},
                    "errors" => %{},
-                   "ui" => %{"status" => ""}
+                   "_empty_visible" => [],
+                   "ui" => %{"feedback" => %{"kind" => nil, "message" => ""}}
                  }
                }
              } = message

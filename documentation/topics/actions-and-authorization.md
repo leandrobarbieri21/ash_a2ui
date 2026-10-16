@@ -49,7 +49,10 @@ The v0 `action.name` vocabulary:
 | `"submit_form"` | The form component was submitted | The form's `create_action` or `update_action` (with `recordId` → update, without → create) |
 | `"invoke"` | A row action button was clicked (or a prompt Modal confirmed) | The named action in `row_actions` |
 | `"prompt"` | A prompt Modal's trigger was clicked | No Ash write — pre-fills `/prompt/values/<action>` for the Modal inputs |
-| `"select_row"` | A table row was selected | Selection state (e.g. loading a record into the form) |
+| `"start_create"` | The Create button was clicked | No Ash write — opens the task panel in create mode over a fresh `/form` |
+| `"view_record"` | A row's View control was clicked | An authorized read — the record shows read-only in the panel (`/ui/panel/record`); `/form` is untouched |
+| `"start_edit"` | A row's Edit control was clicked | An authorized read plus an update-authorization pre-flight — `/form` is populated and the panel opens in edit mode |
+| `"cancel_record_task"` | The panel's Cancel was clicked | No Ash write — back to browse, `/form` and `/errors` reset |
 | `"query"` | Query controls were applied | The table's `query` allowlist (see [Queries and Pagination](queries-and-pagination.md)) |
 | `"bulk_invoke"` | A bulk toolbar button was clicked over a row selection | The named action in the table's `bulk_actions`, once per re-read selected record (see [Bulk Actions](bulk-actions.md)) |
 | `"bulk_select"` | Select page / Clear was clicked | No Ash write — the table's rows are re-read and rewritten with `_selected` set |
@@ -60,9 +63,38 @@ resource's **primary** create/update/read action — so minimal surfaces work
 without spelling every action out.
 
 Both result tuples carry valid server→client messages: on success, a data
-refresh plus `/ui/status` feedback; on failure, validation errors mapped onto
-`/errors/<field>` paths (see
+refresh plus typed `/ui/feedback`; on failure, validation errors mapped onto
+`/errors/<field>` paths and an `/ui/feedback` error (see
 [Data Model Conventions](data-model-conventions.md)).
+
+## The task panel
+
+Every surface with a `:form` component composes a **record task panel**: a
+small state machine over the form buffer, with its state in the data model at
+`/ui/intent` and `/ui/panel/*` (see
+[Data Model Conventions](data-model-conventions.md)).
+
+| Mode | Entered by | What shows |
+|---|---|---|
+| browse | the initial render, `cancel_record_task`, a successful `submit_form` | the panel is closed |
+| create | `start_create` (the "Create <Resource>" button; only with a create action) | the editable form over a fresh `/form`, the create submit and Cancel |
+| view | `view_record` (a row's View control) | the record **read-only** from `/ui/panel/record`; no submit, Cancel only. `/form` is never written |
+| edit | `start_edit` (a row's Edit control; only with a declared `update_action`) | the editable form over the record's values, "Save changes" and Cancel |
+
+`view_record` and `start_edit` read the record through the surface's read
+action with the actor, and `start_edit` also pre-flights the update
+authorization with `Ash.can?`, so the edit panel never opens on a write the
+server would refuse. A failed `submit_form` keeps the mode, the panel and the
+submitted values, with the field errors at `/errors/<field>`. Every outcome is
+written to the typed `/ui/feedback`, whose message the status line just under
+the panel shows.
+
+A **related table** (a `:table` with its own `resource`, scoped by a context)
+lists another resource's records, so it is read-only: it gets neither the
+View/Edit controls nor the create button. A table with `select_context` gets a
+"Select <context>" row button that makes the row's record the context's
+selection, which fills the `:detail` components and related tables bound to it
+(see [Contexts and Details](contexts-and-details.md)).
 
 ## Row actions with argument prompts (`prompt_fields`)
 
@@ -132,7 +164,7 @@ Two halves, with different guarantees:
 - **Enforcement (mandatory):** on every `invoke` (and `prompt`) of a
   conditional action, the handler fetches the identified record (loading any
   condition calculations) and re-evaluates the conditions. A non-visible
-  action is rejected with a `/ui/status` error before touching the write —
+  action is rejected with an `/ui/feedback` error before touching the write —
   regardless of what the client rendered.
 - **Rendering (best-effort):** the v0.9.1 basic catalog has no `visible`
   property or template conditionals, so visibility is server-computed data:

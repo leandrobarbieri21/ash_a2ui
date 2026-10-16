@@ -127,7 +127,7 @@ end
   Both `""` means inactive; a non-empty bound is ANDed onto the read as an
   **inclusive** `>=` / `<=` condition.
 - Bounds travel as strings and are cast to the attribute's type before any
-  read — a value that doesn't cast is rejected via `/ui/status`, exactly
+  read — a value that doesn't cast is rejected with an `/ui/feedback` error, exactly
   like an uncastable filter value. Fields not in `range_filters` are
   rejected too.
 - **Date convenience on datetime fields:** a plain `YYYY-MM-DD` bound on a
@@ -192,7 +192,7 @@ Queries stay **per-table**: each named table component may reference its own
 [Multi-Section Surfaces](multi-section-surfaces.md)) the emitted controls
 bind to that table's scoped state at `/query/<component_name>`, the `query`
 action context **requires** `"component": "<component_name>"` (the controls
-always send it; a missing or unknown component is rejected via `/ui/status`,
+always send it; a missing or unknown component is rejected with an `/ui/feedback` error,
 as is targeting a table with no query), and the response messages go to
 `/records/<component_name>` + `/query/<component_name>`. Single-table
 surfaces keep the plain `/query` paths and need no `"component"`.
@@ -211,8 +211,8 @@ surfaces keep the plain `/query` paths and need no `"component"`.
 - a search on a query with no `search_fields` → rejected,
 - requested `pageSize` is clamped to `1..max_page_size`, `page` to ≥ 1.
 
-Rejections return `{:error, [message]}` with a human-readable explanation on
-`/ui/status` — the same convention as every other handler error — and **no
+Rejections return `{:error, [message]}` with a human-readable explanation as
+an `/ui/feedback` error — the same convention as every other handler error — and **no
 read is executed**. Unknown extra keys inside the submitted `"query"` map
 (such as the echoed `totalCount`/`hasMore`) are ignored.
 

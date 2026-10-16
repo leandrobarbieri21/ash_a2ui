@@ -17,14 +17,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     @endpoint AshA2ui.Test.Endpoint
 
     setup do
-      # These assertions cover the exact v1 emission; v2 is the default, so
-      # the legacy behavior is pinned (and restored) per test.
-      Application.put_env(:ash_a2ui, :experience_version, 1)
-
-      on_exit(fn ->
-        Application.delete_env(:ash_a2ui, :experience_version)
-      end)
-
       Application.put_env(:ash_a2ui, :live_renderer_test_listener, self())
 
       on_exit(fn ->
@@ -96,7 +88,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert_push_event(view, "a2ui:messages", %{
           messages:
-            [_, %{"updateDataModel" => %{"path" => "/ui/status", "value" => "saved"}}] = messages
+            [
+              _,
+              %{
+                "updateDataModel" => %{
+                  "path" => "/ui/feedback",
+                  "value" => %{"message" => "saved"}
+                }
+              }
+            ] = messages
         })
 
         Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
@@ -211,11 +211,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert [
                  %{"updateDataModel" => %{"path" => "/records", "value" => []}},
+                 %{"updateDataModel" => %{"path" => "/_empty_visible", "value" => [_on]}},
                  %{"updateDataModel" => %{"path" => "/query", "value" => query_state}}
                ] = messages
 
-        assert %{"search" => "nothing matches this", "page" => 1, "hasMore" => false} =
-                 query_state
+        assert %{
+                 "search" => "nothing matches this",
+                 "page" => 1,
+                 "hasMore" => false,
+                 "_pagination_visible" => []
+               } = query_state
       end
 
       test "a PubSub refresh re-runs the client's last query state, not the defaults", %{
@@ -236,7 +241,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         }
 
         render_hook(view, "a2ui:action", envelope)
-        assert_push_event(view, "a2ui:messages", %{messages: [_records, _query]})
+        assert_push_event(view, "a2ui:messages", %{messages: [_records, _empty_state, _query]})
 
         Phoenix.PubSub.broadcast(
           AshA2ui.Test.PubSub,

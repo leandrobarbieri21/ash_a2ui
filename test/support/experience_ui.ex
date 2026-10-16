@@ -9,7 +9,7 @@ end
 
 defmodule AshA2ui.Test.Experience.Task do
   @moduledoc """
-  Experience v2 fixture: a query-backed table (page size 2) with a
+  Experience-layer fixture: a query-backed table (page size 2) with a
   create/update form. `name` carries a `min_length` constraint so submitted
   blank values fail action validation with a field-tied error.
   """
@@ -60,7 +60,7 @@ end
 
 defmodule AshA2ui.Test.Experience.NoUpdate do
   @moduledoc """
-  Experience v2 fixture: a resource with a create action but **no** update
+  Experience-layer fixture: a resource with a create action but **no** update
   action — rows must offer View but never Edit.
   """
 
@@ -100,7 +100,7 @@ end
 
 defmodule AshA2ui.Test.Experience.ReadOnly do
   @moduledoc """
-  Experience v2 fixture: neither create nor update actions, and no form
+  Experience-layer fixture: neither create nor update actions, and no form
   component — rows must offer View only.
   """
 
@@ -135,7 +135,7 @@ end
 
 defmodule AshA2ui.Test.Experience.Protected do
   @moduledoc """
-  Experience v2 fixture: policy-guarded — reads/creates need an actor,
+  Experience-layer fixture: policy-guarded — reads/creates need an actor,
   updates additionally need `%{admin: true}` (drives the forged-event
   authorization tests).
   """
@@ -189,7 +189,7 @@ end
 
 defmodule AshA2ui.Test.Experience.EstateUser do
   @moduledoc """
-  Experience v2 fixture for surface naming: a module whose short name is the
+  Experience-layer fixture for surface naming: a module whose short name is the
   *wrong* word for the page. It stands in for a strangler read model over
   another application's estate — a list of that system's users, which the
   derived label would head "User": singular, and wrong about whose users they

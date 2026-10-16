@@ -25,7 +25,6 @@ defmodule AshA2ui.LinksTest do
     on_exit(fn ->
       Application.delete_env(:ash_a2ui, :link_resolver)
       Application.delete_env(:ash_a2ui, :open_surface_url)
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 
@@ -96,7 +95,6 @@ defmodule AshA2ui.LinksTest do
   end
 
   defp admin! do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
   end
 

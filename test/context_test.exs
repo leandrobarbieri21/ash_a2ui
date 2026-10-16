@@ -17,18 +17,6 @@ defmodule AshA2ui.ContextTest do
   alias AshA2ui.Test.{Appointment, AppointmentsUI, Clinic, ClinicMembership, Owner}
 
   setup do
-    # These assertions cover the exact v1 message shapes; v2 is the default,
-    # so the legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
-  setup do
     on_exit(fn ->
       for resource <- [Appointment, ClinicMembership, Clinic, Owner] do
         Ets.stop(resource)
@@ -258,25 +246,27 @@ defmodule AshA2ui.ContextTest do
       assert "context_owner_search_input" in ids
       refute "context_clinic_search_input" in ids
 
-      # Root renders contexts first, then components in declaration order.
+      # Root: the feedback line, then contexts, then components in
+      # declaration order (no form, so no task panel and no create button).
       root = Enum.find(components, &(&1["id"] == "root"))
 
       assert root["children"] ==
                [
+                 "status_text",
                  "context_owner",
                  "context_clinic",
                  "detail_owner_card",
                  "table_heading",
                  "query_controls",
                  "records_list",
+                 "empty_state",
                  "query_pagination",
                  "detail_appointment_detail",
-                 "status_text",
                  "action_result_panel"
                ]
     end
 
-    test "formless surfaces render no row Select button (nothing to populate)" do
+    test "formless surfaces render no View/Edit row controls (no panel to open)" do
       seed()
 
       [_create, %{"updateComponents" => %{"components" => components}}, _data] =
@@ -284,15 +274,19 @@ defmodule AshA2ui.ContextTest do
 
       ids = MapSet.new(components, & &1["id"])
 
-      # AppointmentsUI declares no :form — select_row's only effect is a
-      # /form write nothing binds to, so the dead button is omitted; the
-      # context-select button remains the row's selection affordance.
-      refute "row_select_button" in ids
-      refute "row_select_text" in ids
+      # AppointmentsUI declares no :form — there is no task panel for View
+      # to open, so the dead controls are omitted; the context-select button
+      # remains the row's selection affordance.
+      refute "view_button" in ids
+      refute "edit_button" in ids
       assert "row_context_button" in ids
 
       row_content = Enum.find(components, &(&1["id"] == "record_row_content"))
-      refute "row_select_button" in row_content["children"]
+      assert "row_context_button" in row_content["children"]
+      refute "view_button" in row_content["children"]
+
+      label = Enum.find(components, &(&1["id"] == "row_context_text"))
+      assert label["text"] == "Select appointment"
     end
 
     test "row select_context button dispatches context_select with bindings" do
@@ -368,7 +362,7 @@ defmodule AshA2ui.ContextTest do
                  authorize?: false
                )
 
-      assert value_at(messages, "/ui/status") =~ "not declared"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not declared"
 
       assert {:error, messages} =
                ActionHandler.handle(
@@ -377,7 +371,7 @@ defmodule AshA2ui.ContextTest do
                  authorize?: false
                )
 
-      assert value_at(messages, "/ui/status") =~ "not searchable"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not searchable"
     end
   end
 
@@ -420,6 +414,10 @@ defmodule AshA2ui.ContextTest do
                ["Ada North checkup", "Ada South dental"]
 
       assert value_at(messages, "/query")["totalCount"] == 2
+
+      # a settled selection clears the previous outcome (and so settles the
+      # admin dataGrid's busy "Select <context>" row action)
+      assert value_at(messages, "/ui/feedback") == %{"kind" => nil, "message" => ""}
     end
 
     test "auto_select_single cascades a sole dependent option into selection" do
@@ -474,7 +472,7 @@ defmodule AshA2ui.ContextTest do
                  authorize?: false
                )
 
-      assert value_at(messages, "/ui/status") =~ "not found"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not found"
     end
 
     test "re-selecting the parent clears stale dependent selections" do
@@ -536,7 +534,7 @@ defmodule AshA2ui.ContextTest do
                  authorize?: false
                )
 
-      assert value_at(messages, "/ui/status") =~ "not found"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not found"
 
       assert {:error, messages} =
                ActionHandler.handle(
@@ -545,7 +543,7 @@ defmodule AshA2ui.ContextTest do
                  authorize?: false
                )
 
-      assert value_at(messages, "/ui/status") =~ "not declared"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not declared"
     end
   end
 
@@ -575,6 +573,7 @@ defmodule AshA2ui.ContextTest do
       assert value_at(messages, "/detail/owner") == %{}
       assert value_at(messages, "/records") == []
       assert value_at(messages, "/query")["totalCount"] == 0
+      assert value_at(messages, "/ui/feedback") == %{"kind" => nil, "message" => ""}
     end
 
     test "clearing only the dependent keeps the parent" do

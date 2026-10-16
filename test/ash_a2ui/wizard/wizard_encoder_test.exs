@@ -1,8 +1,8 @@
 defmodule AshA2ui.Wizard.WizardEncoderTest do
   @moduledoc """
   A2UI-106/AC-1: a stepped form encodes the /ui/wizard state and the
-  wizard composition on v0.9.1 and v1.0, under both experience versions,
-  and forms without steps carry none of it.
+  wizard composition on v0.9.1 and v1.0, and forms without steps carry none
+  of it.
   """
 
   use ExUnit.Case, async: false
@@ -18,7 +18,6 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
   setup do
     on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 
@@ -27,7 +26,9 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
   # Full surfaces of forms without steps, captured from the base branch
   # (notes/pyro-maniac-borrowings, 08f8173) before wizard steps existed:
-  # v0.9.1 and v1.0, under experience v1, v2 and the v2 admin catalog.
+  # v0.9.1 and v1.0, under the basic and admin catalogs. (Re-baselined when
+  # experience v1 and /ui/status were removed: the only change is the
+  # dropped `ui.status` key.)
   @baseline_dir Path.expand("baseline", __DIR__)
 
   @baseline_fixtures [
@@ -39,9 +40,8 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
   ]
 
   @baseline_configs [
-    {"exp1_basic", 1, :basic},
-    {"exp2_basic", 2, :basic},
-    {"exp2_admin", 2, :admin_v1}
+    {"basic", :basic},
+    {"admin", :admin_v1}
   ]
 
   defp v0_9_1(module) do
@@ -78,8 +78,7 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
     assert wizard["nav"] == %{
              "back_visible" => [],
-             "next_visible" => [%{"id" => "on"}],
-             "submit_visible" => []
+             "next_visible" => [%{"id" => "on"}]
            }
   end
 
@@ -142,61 +141,44 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
   @tag ac: "A2UI-106/AC-1"
   test "encodes steps for both versions" do
-    for version <- [1, 2] do
-      Application.put_env(:ash_a2ui, :experience_version, version)
+    {comps, model} = v0_9_1(Enrollment)
+    assert_wizard_state(model)
+    assert_wizard_components(comps)
 
-      {comps, model} = v0_9_1(Enrollment)
-      assert_wizard_state(model)
-      assert_wizard_components(comps)
+    {comps_v1, model_v1} = v1_0(EnrollmentV1UI)
+    assert_wizard_state(model_v1)
+    assert_wizard_components(comps_v1)
+    assert comps_v1["form_wizard_next_button"]["action"]["event"]["wantResponse"] == true
 
-      {comps_v1, model_v1} = v1_0(EnrollmentV1UI)
-      assert_wizard_state(model_v1)
-      assert_wizard_components(comps_v1)
-      assert comps_v1["form_wizard_next_button"]["action"]["event"]["wantResponse"] == true
+    # The wizard is the panel's form content; the Next label is the panel's
+    # primary label and the submit keeps the panel's submit gate.
+    for comps <- [comps, comps_v1] do
+      assert comps["form_fields"]["children"] == ["form_wizard"]
+      assert comps["form_wizard_next_text"]["text"] == %{"path" => "/ui/panel/primary_label"}
+      refute Map.has_key?(comps, "form_wizard_submit_slot")
 
-      if version == 1 do
-        # v1: the form Column holds the wizard and the gated submit
-        assert comps["form"]["children"] == ["form_wizard", "form_wizard_submit_slot"]
-
-        assert comps["form_wizard_submit_slot"]["children"] == %{
-                 "componentId" => "form_submit_button",
-                 "path" => "/ui/wizard/nav/submit_visible"
-               }
-
-        assert comps["form_wizard_next_text"]["text"] == "Next"
-      else
-        # v2: the wizard is the panel's form content; the Next label is the
-        # panel's primary label and the submit keeps the panel gate
-        assert comps["form_fields"]["children"] == ["form_wizard"]
-        assert comps["form_wizard_next_text"]["text"] == %{"path" => "/ui/panel/primary_label"}
-        refute Map.has_key?(comps, "form_wizard_submit_slot")
-      end
+      assert comps["form_submit_slot"]["children"] == %{
+               "componentId" => "form_submit_button",
+               "path" => "/ui/panel/submit_visible"
+             }
     end
   end
 
   @tag ac: "A2UI-106/AC-1"
   test "forms without steps carry no wizard state or components" do
-    for version <- [1, 2] do
-      Application.put_env(:ash_a2ui, :experience_version, version)
+    for {comps, model} <- [v0_9_1(KitchenSink), v1_0(KitchenSinkV1UI)] do
+      refute Map.has_key?(model["ui"], "wizard")
 
-      for {comps, model} <- [v0_9_1(KitchenSink), v1_0(KitchenSinkV1UI)] do
-        refute Map.has_key?(model["ui"], "wizard")
+      refute Enum.any?(Map.keys(comps), fn id ->
+               String.starts_with?(id, "form_wizard") or String.starts_with?(id, "form_step_")
+             end)
 
-        refute Enum.any?(Map.keys(comps), fn id ->
-                 String.starts_with?(id, "form_wizard") or String.starts_with?(id, "form_step_")
-               end)
-
-        if version == 1 do
-          assert List.last(comps["form"]["children"]) == "form_submit_button"
-        end
-      end
+      assert List.first(comps["form_fields"]["children"]) == "form_input_active"
     end
   end
 
   @tag ac: "A2UI-106/AC-1"
   test "removing the steps from a stepped view restores the plain form encoding" do
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
     view = ResolvedView.resolve(Enrollment)
 
     plain =
@@ -210,9 +192,10 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
     refute Enum.any?(ids, &String.starts_with?(&1, "form_wizard"))
     refute Map.has_key?(data["updateDataModel"]["value"]["ui"], "wizard")
 
-    form = Enum.find(components["updateComponents"]["components"], &(&1["id"] == "form"))
+    fields =
+      Enum.find(components["updateComponents"]["components"], &(&1["id"] == "form_fields"))
 
-    assert form["children"] == [
+    assert fields["children"] == [
              "form_input_name",
              "form_error_name",
              "form_input_email",
@@ -220,16 +203,14 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
              "form_input_role",
              "form_error_role",
              "form_input_team",
-             "form_error_team",
-             "form_submit_button"
+             "form_error_team"
            ]
   end
 
   @tag ac: "A2UI-106/AC-1"
   test "forms without steps encode exactly as they did before wizard steps" do
-    for {config, experience, catalog} <- @baseline_configs,
+    for {config, catalog} <- @baseline_configs,
         {fixture, module} <- @baseline_fixtures do
-      Application.put_env(:ash_a2ui, :experience_version, experience)
       Application.put_env(:ash_a2ui, :catalog, catalog)
 
       path = Path.join(@baseline_dir, "#{fixture}.#{config}.json")
@@ -242,17 +223,13 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
   @tag ac: "A2UI-106/AC-1"
   test "the review step shows a searchable select's label, not its id" do
-    for version <- [1, 2] do
-      Application.put_env(:ash_a2ui, :experience_version, version)
+    {comps, model} = v0_9_1(AshA2ui.Test.TicketWizardUI)
 
-      {comps, model} = v0_9_1(AshA2ui.Test.TicketWizardUI)
+    assert comps["form_review_author_id_value"]["text"] == %{
+             "path" => "/select/author_id/label"
+           }
 
-      assert comps["form_review_author_id_value"]["text"] == %{
-               "path" => "/select/author_id/label"
-             }
-
-      assert comps["form_review_subject_value"]["text"] == %{"path" => "/form/subject"}
-      assert model["select"]["author_id"] == %{"search" => "", "label" => ""}
-    end
+    assert comps["form_review_subject_value"]["text"] == %{"path" => "/form/subject"}
+    assert model["select"]["author_id"] == %{"search" => "", "label" => ""}
   end
 end

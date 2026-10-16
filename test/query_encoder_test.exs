@@ -15,18 +15,6 @@ defmodule AshA2ui.QueryEncoderTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{KitchenSink, Paginated}
 
-  setup do
-    # This suite asserts the v1 wire shapes; v2 is the default, so the
-    # legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   defp encode(records \\ [], opts \\ []) do
     Paginated |> ResolvedView.resolve() |> V0_9_1.encode_surface(records, opts)
   end
@@ -44,12 +32,14 @@ defmodule AshA2ui.QueryEncoderTest do
       components = components_by_id(messages)
 
       assert components["root"]["children"] == [
+               "form_slot",
+               "status_text",
                "table_heading",
                "query_controls",
+               "create_button",
                "records_list",
+               "empty_state",
                "query_pagination",
-               "form",
-               "status_text",
                "action_result_panel"
              ]
     end
@@ -138,11 +128,29 @@ defmodule AshA2ui.QueryEncoderTest do
     test "prev/next pagination buttons carry the frozen pageDelta contract" do
       components = encode() |> components_by_id()
 
+      # the row hides behind the /query sentinels; each button behind its own
+      assert %{
+               "component" => "List",
+               "children" => %{
+                 "componentId" => "query_pagination_row",
+                 "path" => "/query/_pagination_visible"
+               }
+             } = components["query_pagination"]
+
       assert %{
                "component" => "Row",
-               "children" => ["query_prev_button", "query_page_text", "query_next_button"]
-             } =
-               components["query_pagination"]
+               "children" => ["query_prev_slot", "query_page_text", "query_next_slot"]
+             } = components["query_pagination_row"]
+
+      assert components["query_prev_slot"]["children"] == %{
+               "componentId" => "query_prev_button",
+               "path" => "/query/_previous_visible"
+             }
+
+      assert components["query_next_slot"]["children"] == %{
+               "componentId" => "query_next_button",
+               "path" => "/query/_next_visible"
+             }
 
       assert %{
                "component" => "Button",
@@ -164,7 +172,7 @@ defmodule AshA2ui.QueryEncoderTest do
                }
              } = components["query_next_button"]
 
-      assert %{"component" => "Text", "text" => %{"path" => "/query/page"}} =
+      assert %{"component" => "Text", "text" => %{"path" => "/query/_range_text"}} =
                components["query_page_text"]
     end
 
@@ -173,10 +181,12 @@ defmodule AshA2ui.QueryEncoderTest do
       components = components_by_id(messages)
 
       assert components["root"]["children"] == [
-               "table_heading",
-               "records_list",
-               "form",
+               "form_slot",
                "status_text",
+               "table_heading",
+               "create_button",
+               "records_list",
+               "empty_state",
                "action_result_panel"
              ]
 
@@ -244,7 +254,16 @@ defmodule AshA2ui.QueryEncoderTest do
       assert [_, _, message] = encode([], query_state: state)
       assert_valid_server_message(message)
 
-      assert message["updateDataModel"]["value"]["query"] == state
+      # the carried state, adorned with the pagination sentinels derived
+      # from it (no rows, one page: everything hidden)
+      assert message["updateDataModel"]["value"]["query"] ==
+               Map.merge(state, %{
+                 "_pagination_visible" => [],
+                 "_previous_visible" => [],
+                 "_next_visible" => [],
+                 "_range_text" => ""
+               })
+
       assert message["updateDataModel"]["value"]["records"] == []
     end
 

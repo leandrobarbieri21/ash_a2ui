@@ -17,18 +17,6 @@ defmodule AshA2uiTest do
   alias AshA2ui.Info
   alias AshA2ui.Test.{KitchenSink, Minimal, MinimalUI}
 
-  setup do
-    # This suite asserts the v1 wire shapes; v2 is the default, so the
-    # legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   defp envelope(name, surface_id, context) do
     %{
       "version" => "v0.9.1",
@@ -65,13 +53,23 @@ defmodule AshA2uiTest do
     assert {:ok, follow_ups} = ActionHandler.handle(KitchenSink, create_env)
     Enum.each(follow_ups, &assert_valid_server_message/1)
 
+    # the refresh, the cleared buffers, the closed task panel, and the typed
+    # success feedback
     assert [
              %{"updateDataModel" => %{"path" => "/records", "value" => [row]}},
+             %{"updateDataModel" => %{"path" => "/_empty_visible", "value" => []}},
              %{"updateDataModel" => %{"path" => "/form", "value" => %{}}},
              %{"updateDataModel" => %{"path" => "/errors", "value" => %{}}},
-             %{"updateDataModel" => %{"path" => "/ui/status", "value" => status}},
              %{"updateDataModel" => %{"path" => "/ui/action_result", "value" => %{}}},
-             %{"updateDataModel" => %{"path" => "/ui/action_result_text", "value" => ""}}
+             %{"updateDataModel" => %{"path" => "/ui/action_result_text", "value" => ""}},
+             %{"updateDataModel" => %{"path" => "/ui/intent", "value" => "browse"}},
+             %{"updateDataModel" => %{"path" => "/ui/panel", "value" => %{"visible" => []}}},
+             %{
+               "updateDataModel" => %{
+                 "path" => "/ui/feedback",
+                 "value" => %{"kind" => "success", "message" => status}
+               }
+             }
            ] = follow_ups
 
     assert row["name"] == "E2E Provider"
@@ -119,7 +117,7 @@ defmodule AshA2uiTest do
              _other -> false
            end)
 
-    assert %{"updateDataModel" => %{"path" => "/ui/status"}} = List.last(error_messages)
+    assert %{"updateDataModel" => %{"path" => "/ui/feedback"}} = List.last(error_messages)
     assert Ash.read!(KitchenSink) == []
   end
 

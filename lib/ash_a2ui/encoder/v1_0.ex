@@ -18,14 +18,17 @@ defmodule AshA2ui.Encoder.V1_0 do
       `actionId` per interaction and can hold a per-component pending state
       until the server's `actionResponse` arrives (see
       `AshA2ui.ActionHandler` for the response contract).
-    * **`/ui/response`** — the v0.9.1 status trio (`/ui/status`,
-      `/ui/action_result`, `/ui/action_result_text`) collapses into one
-      structured reserved path. The initial data model carries
+    * **`/ui/response`** — the v0.9.1 action-result pair
+      (`/ui/action_result`, `/ui/action_result_text`) collapses into one
+      structured reserved path that also carries the outcome status and
+      message. The initial data model carries
       `"ui" => %{"response" => %{"status" => "", "message" => "",
-      "result" => %{}, "resultText" => ""}}`; the `status_text` component
-      binds `/ui/response/message` and the `action_result_text` component
-      binds `/ui/response/resultText` (component ids are unchanged so
-      custom themes/catalogs keep working).
+      "result" => %{}, "resultText" => ""}}`; the `action_result_text`
+      component binds `/ui/response/resultText` (component ids are unchanged
+      so custom themes/catalogs keep working). The `status_text` component
+      binds the typed `/ui/feedback/message` on both wire versions; the
+      handler writes `/ui/feedback` alongside every `/ui/response` outcome
+      (errors, and successes such as report runs and CSV exports).
     * **No wire metadata on function calls** — v1.0 removed `returnType`
       (and `callableFrom`) from wire-level FunctionCall payloads; `formatDate`
       cells are emitted without them.
@@ -90,10 +93,10 @@ defmodule AshA2ui.Encoder.V1_0 do
     [%{"version" => @version, "createSurface" => create}]
   end
 
-  # The admin catalog (v2 + `catalog: :admin_v1`) surfaces declare the admin
+  # The admin catalog (`catalog: :admin_v1`) surfaces declare the admin
   # catalog id on their inline createSurface too.
   defp catalog_id do
-    if Experience.effective_admin?(), do: Experience.admin_catalog_id(), else: @catalog_id
+    if Experience.admin?(), do: Experience.admin_catalog_id(), else: @catalog_id
   end
 
   @doc """
@@ -110,8 +113,8 @@ defmodule AshA2ui.Encoder.V1_0 do
   @doc """
   Upgrades a v0.9.1-shaped server->client message emitted by the shared
   composition code to the v1.0 wire contract: the `"v1.0"` version string,
-  `/ui/status`-family paths rewritten to the structured `/ui/response`
-  path, and full data-model writes upgraded shape-wise. Used by
+  `/ui/action_result`-family paths rewritten to the structured
+  `/ui/response` path, and full data-model writes upgraded shape-wise. Used by
   `AshA2ui.ActionHandler` for v1.0 follow-up messages.
   """
   @spec upgrade_message(map) :: map
@@ -132,7 +135,7 @@ defmodule AshA2ui.Encoder.V1_0 do
   # The v0.9.1 component list carries three v0.9-isms: wire `returnType` on
   # FunctionCall values (dropped in v1.0), no `wantResponse` on action events
   # (added — every AshA2ui action is server-handled and answered), and the
-  # /ui/status-family bindings (rewritten to /ui/response subpaths).
+  # /ui/action_result-family bindings (rewritten to /ui/response subpaths).
   defp upgrade_components(components), do: Enum.map(components, &upgrade_value/1)
 
   # v1.0's basic catalog dropped the h1–h5 Text variants (only "caption" and
@@ -185,22 +188,20 @@ defmodule AshA2ui.Encoder.V1_0 do
 
   defp markdown_heading(other, _prefix), do: other
 
-  defp upgrade_path("/ui/status"), do: "/ui/response/message"
   defp upgrade_path("/ui/action_result_text"), do: "/ui/response/resultText"
   defp upgrade_path("/ui/action_result"), do: "/ui/response/result"
   defp upgrade_path(path), do: path
 
   # --- data model -------------------------------------------------------------
 
-  # The full data model's reserved "ui" region: the v0.9.1 status trio
-  # becomes the single structured response object. Any other "ui" keys —
-  # the experience v2 intent/panel/feedback state — pass through untouched
-  # (under experience v1 the trio is the whole region, so the result is
-  # byte-identical to the previous wholesale replacement).
+  # The full data model's reserved "ui" region: the v0.9.1 action-result
+  # pair becomes the single structured response object. Every other "ui"
+  # key — the experience layer's intent/panel/feedback state, the wizard —
+  # passes through untouched.
   defp upgrade_data_model(%{"ui" => ui} = value) do
     ui =
       ui
-      |> Map.drop(["status", "action_result", "action_result_text"])
+      |> Map.drop(["action_result", "action_result_text"])
       |> Map.put("response", @initial_response)
 
     Map.put(value, "ui", ui)

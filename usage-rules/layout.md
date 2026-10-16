@@ -65,8 +65,9 @@ topics for the full contracts.
   option label.
 - State lives at `/ui/wizard` (`index`, `steps`, `<step>_visible`, `nav`) —
   see the Data Model Conventions topic. Forms without steps are unchanged.
-- Under experience v2 the panel's primary label reads "Next" until the last
-  step, then the usual "Create X" / "Save changes".
+- The panel's primary label reads "Next" until the last step, then the
+  usual "Create X" / "Save changes"; the submit button appears only on the
+  last step.
 - Use steps for linear, server-validated flows. Branching flows, uploads,
   and steps that wait on background jobs belong in a LiveView. Agent-composed
   (`AshA2ui.Dynamic`) specs have no step vocabulary; the importer rejects
@@ -89,11 +90,18 @@ topics for the full contracts.
 
 - `title`/`badge`/`meta` must reference the table's fields, each at most
   once (compile-verified). Row actions, prompts, `visible_when`, and the
-  select button are unchanged — they move into the card header.
+  View/Edit controls are unchanged — they move into the card header.
 - The badge binds the computed `_badge_<field>` row key (display text), not
   the raw value: declare `badge_text` for boolean/enum values you want to
-  read well; unmatched values humanize. The raw field value stays in the
-  row for `select_row` and filters.
+  read well; unmatched values humanize. The field's own row key reads as the
+  table cell does (enum values as their labels, on the initial render and
+  every refresh alike).
+- Give the badge a semantic tone with `badge_tones` (matched like
+  `badge_text`, e.g. `badge_tones true: :success, false: :neutral`). Tones
+  are `:neutral`, `:info`, `:success`, `:warning`, `:danger` and `:accent`;
+  unmatched values are `:neutral`. Rows carry the tone at
+  `_badge_tone_<field>` and the admin dataGrid's badge column binds it as
+  `tonePath`. Use tones for meaning (state), not decoration.
 - Without a `row_layout`, rows stay flat cell Rows — both layouts are
   byte-identical to the pre-layout encoder when undeclared, so adding one
   never breaks existing renderers.

@@ -8,7 +8,8 @@ defmodule AshA2ui.V10EncoderTest do
     * inline `createSurface` (one message; no create-then-update flash),
     * `wantResponse: true` on every emitted action event,
     * the structured `/ui/response` reserved path (replacing the v0.9.1
-      `/ui/status` / `/ui/action_result` / `/ui/action_result_text` trio),
+      `/ui/action_result` / `/ui/action_result_text` pair; the typed
+      `/ui/feedback` stays on both wire versions),
     * no `returnType`/`callableFrom` on wire FunctionCalls (v1.0 dropped
       wire-level function metadata; only draft-2020-12's
       `unevaluatedProperties` would catch it, which our draft-7 validator
@@ -29,19 +30,6 @@ defmodule AshA2ui.V10EncoderTest do
   alias AshA2ui.Encoder.V1_0
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{KitchenSink, KitchenSinkV1UI}
-
-  setup do
-    # This suite asserts the v1 wire shapes (upgraded to the v1.0 envelope);
-    # v2 is the default, so the legacy emission is pinned (and restored)
-    # per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   @catalog_id "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
 
@@ -89,8 +77,15 @@ defmodule AshA2ui.V10EncoderTest do
 
       assert %{"component" => "Column", "children" => children} = components["root"]
 
-      assert children ==
-               ["table_heading", "records_list", "form", "status_text", "action_result_panel"]
+      assert children == [
+               "form_slot",
+               "status_text",
+               "table_heading",
+               "create_button",
+               "records_list",
+               "empty_state",
+               "action_result_panel"
+             ]
 
       assert Enum.all?(children, &Map.has_key?(components, &1))
     end
@@ -98,14 +93,19 @@ defmodule AshA2ui.V10EncoderTest do
     test "the initial data model seeds the structured /ui/response object" do
       data_model = create_payload()["dataModel"]
 
-      assert data_model["ui"] == %{
-               "response" => %{
-                 "status" => "",
-                 "message" => "",
-                 "result" => %{},
-                 "resultText" => ""
-               }
+      assert data_model["ui"]["response"] == %{
+               "status" => "",
+               "message" => "",
+               "result" => %{},
+               "resultText" => ""
              }
+
+      # the experience layer's /ui state passes through the upgrade
+      assert data_model["ui"]["feedback"] == %{"kind" => nil, "message" => ""}
+      assert data_model["ui"]["intent"] == "browse"
+      assert data_model["ui"]["panel"]["visible"] == []
+      refute Map.has_key?(data_model["ui"], "action_result")
+      refute Map.has_key?(data_model["ui"], "status")
 
       assert data_model["records"] == []
       assert data_model["form"] == %{}
@@ -152,10 +152,11 @@ defmodule AshA2ui.V10EncoderTest do
       end
     end
 
-    test "status components bind the /ui/response paths, and no /ui/status binding remains" do
+    test "result components bind the /ui/response paths, and no v0.9.1 result binding remains" do
       components = create_payload() |> components_by_id()
 
-      assert components["status_text"]["text"] == %{"path" => "/ui/response/message"}
+      # the status line is the typed feedback on both wire versions
+      assert components["status_text"]["text"] == %{"path" => "/ui/feedback/message"}
       assert components["action_result_text"]["text"] == %{"path" => "/ui/response/resultText"}
 
       walk(create_payload()["components"], fn map ->
@@ -199,14 +200,16 @@ defmodule AshA2ui.V10EncoderTest do
 
       assert %{"path" => "/", "value" => value} = message["updateDataModel"]
 
-      assert value["ui"] == %{
-               "response" => %{
-                 "status" => "",
-                 "message" => "",
-                 "result" => %{},
-                 "resultText" => ""
-               }
+      assert value["ui"]["response"] == %{
+               "status" => "",
+               "message" => "",
+               "result" => %{},
+               "resultText" => ""
              }
+
+      assert value["ui"]["feedback"] == %{"kind" => nil, "message" => ""}
+      refute Map.has_key?(value["ui"], "action_result_text")
+      refute Map.has_key?(value["ui"], "status")
     end
 
     test "always carries a value key (an omitted value would delete the key in v1.0)" do

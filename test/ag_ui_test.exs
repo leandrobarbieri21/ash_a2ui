@@ -271,8 +271,8 @@ defmodule AshA2ui.AgUiTest do
     end
 
     test "decodes a bare user-action map and an enveloped action" do
-      assert {:ok, %{"action" => %{"name" => "select_row", "context" => %{}}}} =
-               AgUi.decode_action(%{"name" => "select_row"})
+      assert {:ok, %{"action" => %{"name" => "start_create", "context" => %{}}}} =
+               AgUi.decode_action(%{"name" => "start_create"})
 
       assert {:ok, %{"action" => %{"name" => "query"}}} =
                AgUi.decode_action(%{"action" => %{"name" => "query", "context" => %{}}})
@@ -294,7 +294,7 @@ defmodule AshA2ui.AgUiTest do
       {:ok, envelope} =
         AgUi.decode_action(%{
           "userAction" => %{
-            "name" => "select_row",
+            "name" => "view_record",
             "surfaceId" => "minimal_standalone",
             "timestamp" => "2026-07-13T12:00:00Z",
             "context" => %{"recordId" => record.id}
@@ -305,6 +305,11 @@ defmodule AshA2ui.AgUiTest do
 
       assert {:ok, messages} = AshA2ui.ActionHandler.handle(MinimalUI, envelope)
       assert Enum.any?(messages, &match?(%{"updateDataModel" => _}, &1))
+
+      assert Enum.any?(
+               messages,
+               &match?(%{"updateDataModel" => %{"path" => "/ui/intent", "value" => "view"}}, &1)
+             )
     end
   end
 

@@ -10,9 +10,13 @@
 # to the host-app Playwright suite and is tracked by the later A2UI-101B item;
 # nothing here requires a browser.
 #
-# Toggle under test: `config :ash_a2ui, :experience_version` —
-#   1 (default) = today's byte-identical behavior
-#   2           = experience layer described below
+# History: this item shipped behind `config :ash_a2ui, :experience_version`
+# (2 = the experience layer below, which became the default in 5d4326b;
+# 1 = the pre-experience composition). The switch and the version-1
+# composition were removed on 2026-10-16 as a clean break, so the experience
+# layer is now the only composition. "An experience v2 surface" in the
+# criteria below means any surface; the wording is kept because criterion
+# text is part of the reviewed oracle. AC-17 is retired (see its entry).
 item: A2UI-101
 
 criteria:
@@ -109,7 +113,7 @@ criteria:
     verify: unit
     risk: medium
     test: >-
-      test/ash_a2ui/experience/mode_state_machine_test.exs::view_record_populates_read_only_panel
+      test/ash_a2ui/experience/mode_state_machine_test.exs::view_record_populates_the_read_only_display_never_the_form_buffer
 
   - id: A2UI-101/AC-9
     given: an experience v2 surface and a client event start_edit with a
@@ -205,6 +209,15 @@ criteria:
       test/ash_a2ui/experience/feedback_and_validation_test.exs::forged_events_still_hit_authorized_actions
 
   - id: A2UI-101/AC-17
+    status: retired
+    retired: >-
+      2026-10-16, with the removal of experience v1 (clean break, no
+      compatibility shim). The version-1 composition this criterion protected
+      no longer exists, so its given/when/then (kept below as written) can no
+      longer hold. The id stays, and its evidence now checks that the removal
+      is complete: a leftover experience_version setting changes nothing, the
+      surface carries the experience layer's shapes, and select_row is
+      rejected as an unknown action.
     given: the default configuration (experience_version not set, or set to 1)
     when: any existing surface is built and any existing client event is
       handled
@@ -216,4 +229,5 @@ criteria:
     verify: unit
     risk: high
     test: >-
-      test/ash_a2ui/experience/compat_v1_test.exs::version_one_output_is_unchanged
+      test/ash_a2ui/experience/no_version_switch_test.exs::a_leftover_experience_version_setting_is_inert
+      and ::select_row_is_an_unknown_action

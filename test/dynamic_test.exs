@@ -59,18 +59,6 @@ defmodule AshA2ui.DynamicTest do
 
   @allowlist Dynamic.allowlist([KitchenSink, Minimal, Guarded])
 
-  setup do
-    # These assertions cover the exact v1 message shapes; v2 is the default,
-    # so the legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   defp resolve!(spec, opts \\ []) do
     {:ok, surface} = Dynamic.resolve(spec, Keyword.put_new(opts, :allowlist, @allowlist))
     surface
@@ -722,7 +710,10 @@ defmodule AshA2ui.DynamicTest do
 
       assert {:error, [message]} = Dynamic.handle_action(surface, envelope, authorize?: false)
 
-      assert %{"updateDataModel" => %{"path" => "/ui/status", "value" => status}} = message
+      assert %{
+               "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
+             } = message
+
       assert status =~ "not listed in the view's row_actions"
       assert [_still_there] = Ash.read!(Minimal, authorize?: false)
     end
@@ -742,7 +733,11 @@ defmodule AshA2ui.DynamicTest do
       }
 
       assert {:error, [message]} = Dynamic.handle_action(surface, envelope, authorize?: false)
-      assert %{"updateDataModel" => %{"path" => "/ui/status", "value" => status}} = message
+
+      assert %{
+               "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
+             } = message
+
       assert status =~ "sort"
     end
 
@@ -763,7 +758,11 @@ defmodule AshA2ui.DynamicTest do
       }
 
       assert {:error, [message]} = Dynamic.handle_action(surface, envelope, [])
-      assert %{"updateDataModel" => %{"path" => "/ui/status", "value" => status}} = message
+
+      assert %{
+               "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
+             } = message
+
       assert status =~ "not authorized"
       assert [] = Ash.read!(Guarded, authorize?: false)
 
