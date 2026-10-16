@@ -56,11 +56,9 @@ The compiler checks the declaration (`AshA2ui.Verifiers.VerifySteps`):
 | `"submit_form"` | unchanged | The usual create/update, over the same filtered values Next validated. On failure the index jumps to the earliest step owning an erroring field; an error on no step's field stays on the last step with the status line. |
 
 `start_create`, `view_record`, `start_edit`, `cancel_record_task` and a
-successful `submit_form` reset the index to step 0. Under experience v1,
-`select_row` (which loads a record into the form) and every other
-successful action (which clears `/form`) reset it as well. Under v2 a
-successful row action leaves an open task's step alone, so the step and
-the panel's primary label stay in agreement.
+successful `submit_form` reset the index to step 0. A successful row action
+leaves an open task's step alone, so the step and the panel's primary label
+stay in agreement.
 
 Everything the client carries is re-checked:
 
@@ -98,8 +96,7 @@ Only surfaces whose form has steps carry `/ui/wizard`:
   "confirm_visible": [],
   "nav": {
     "back_visible": [],
-    "next_visible": [{"id": "on"}],
-    "submit_visible": []
+    "next_visible": [{"id": "on"}]
   }
 }
 ```
@@ -126,10 +123,7 @@ works on v0.9.1 and v1.0 alike:
     record's label shows, not its id);
   - `form_wizard_nav` — a `Row` with the Back and Next buttons, each behind
     its `/ui/wizard/nav/*_visible` sentinel.
-- Experience v1: the form `Column`'s submit is wrapped in
-  `form_wizard_submit_slot` (behind `/ui/wizard/nav/submit_visible`), so it
-  appears on the last step only.
-- Experience v2: the wizard is the task panel's form content. The Next
+- The wizard is the task panel's form content. The Next
   button's label binds `/ui/panel/primary_label`, which reads "Next" before
   the last step and the usual "Create X" / "Save changes" on it; the
   panel's `submit_visible` hides the submit until the last step.

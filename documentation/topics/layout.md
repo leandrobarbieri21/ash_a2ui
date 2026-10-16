@@ -126,13 +126,14 @@ surfaces infix the table name as everywhere else), but the row becomes:
 - `record_row_header` — a `Row` (`justify: spaceBetween`, `align: center`)
   of the title `Text` (variant `h4`, `weight: 1`) and `record_row_header_right`
   — a `Row` of the badge `Text` (variant `caption`, when declared), the
-  row-action anchors, and the `row_select_button` (surfaces with a `:form`
-  component only — formless surfaces omit it),
+  row-action anchors, the `select_context` button, and the `view_button` /
+  `edit_button` task controls (surfaces with a `:form` component only, and
+  never on a related table),
 - `record_row_meta_row_<i>` — the metadata grid: each cell a `weight: 1`
   `Column` (`record_row_meta_cell_<field>`) of a caption `Text` with the
   field's label over a `Text` bound to the value (honoring `format`).
 
-Row actions, prompts, `visible_when` slots, and the select button work
+Row actions, prompts, `visible_when` slots, and the row controls work
 unchanged — only their placement moves into the card header.
 
 ### Badge text
@@ -142,9 +143,10 @@ badge `Text` therefore binds a **computed row key** — `_badge_<field>` —
 served alongside the record fields (like the `_actions` / `_visible_<action>`
 visibility keys): the `badge_text` entry matching the value when declared,
 else the humanized value (`:pending_review` → `"Pending review"`,
-`true` → `"True"`), and `""` for `nil`. The raw field value stays untouched
-in the row, so `select_row` form population and filters are unaffected.
-Refreshes written by the action handler serialize the key identically.
+`true` → `"True"`), and `""` for `nil`. The field's own row key is not
+changed by the badge mapping. Refreshes written by the action handler
+serialize every row key identically to the initial render (one shared
+serializer).
 
 ## Protocol constraints worth knowing
 

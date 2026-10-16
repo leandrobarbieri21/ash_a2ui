@@ -106,6 +106,34 @@ The rendered container is
 
 v0 limitation: one surface per hook instance.
 
+## Optional host-side pieces
+
+These ship with the package but are opt-in; none of them changes the wire.
+
+- **Presence** (`AshA2ui.Presence` + `AshA2ui.PresenceBar`): who else is on
+  a surface, as an avatar stack. `use AshA2ui.Presence, pubsub_server:
+  MyApp.PubSub` in a host module, add it to the supervision tree, call
+  `AshA2ui.Presence.mount_surface/4` in mount (`key:` a stable identity,
+  `label:` the display name), route `handle_info` through
+  `AshA2ui.Presence.handle_broadcast/3`, and render
+  `<AshA2ui.PresenceBar.bar presences={@a2ui_presences} />`. Tracking is per
+  surface id; it rides the surface's own topic.
+- **Combobox wiring** (`AshA2ui.Combobox.ids/1`): the merged catalog upgrades
+  context pickers and searchable selects into a typeahead combobox by
+  matching the emitted id contract. A host hook that needs to find those
+  composites gets the ids from `ids(context: name)` /
+  `ids(field: name, searchable: true)` instead of hand-writing them.
+- **NB components** (`priv/js/nb_components.js`, `defineNbComponents()`):
+  dependency-free custom elements (`nb-menu`, `nb-sheet`, `nb-tabs`,
+  `nb-table`, `nb-calendar`, `nb-pagination`, …) for host-rendered chrome
+  around surfaces, themed by the same `--a2ui-*` variables. They are host
+  primitives, not catalog components — never emit them in surface payloads.
+- **Canvas** (`AshA2ui.Canvas`): a structural graph of the host's registered
+  domains (`build_graph/1`) and opaque object refs resolved with the actor
+  (`resolve/2`, server-derived capabilities). The host implements
+  `AshA2ui.Canvas.Registry`; what it does not list does not exist. Never
+  turn a client-supplied string into a module or atom to reach it.
+
 ## When not to use it
 
 A plain JSON endpoint returning `AshA2ui.Info.build_surface/2`'s message

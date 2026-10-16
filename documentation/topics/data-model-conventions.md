@@ -13,12 +13,15 @@ custom hooks, and tests can rely on them.
 |---|---|---|
 | `/records` | The list of records backing the table component (multi-table surfaces: an object keyed by table component name — see below) | Initial render; every refresh (action follow-ups, PubSub) |
 | `/records/<component_name>` | One table's record list on a **multi-table** surface | Initial render; every refresh that targets that table |
-| `/form` | The form component's current field values (nested-form arguments: arrays of row maps) | Initial render; row selection (edit); after submit; `nested_add`/`nested_remove` |
+| `/form` | The form component's current field values (nested-form arguments: arrays of row maps) — the task panel's edit buffer | Initial render; `start_create` (fresh); `start_edit` (the record's values); `cancel_record_task` and after submit (reset); `nested_add`/`nested_remove` |
 | `/errors/<field>` | Human-readable validation error text for `<field>` | A submitted action fails validation |
 | `/errors/<argument>/<index>/<field>` | Validation error text for one field of one nested-form row (index into the submitted array) | A submit with nested rows fails validation |
 | `/options/<name>` | The option list of a relationship-backed form select **or** a pick_existing nested form (keyed by field / argument name) | Initial render; full data-model refreshes; every `option_search` |
-| `/select/<name>` | Client-side state of searchable selects (`{"search", "label"}`) and pick_existing pickers (`{"search", "picked"}`) | Initial render (only on surfaces using them); `option_select`; row selection; after submit |
-| `/ui/status` | Operation feedback text (the flash-equivalent) | After every handled action (success/error) |
+| `/select/<name>` | Client-side state of searchable selects (`{"search", "label"}`) and pick_existing pickers (`{"search", "picked"}`) | Initial render (only on surfaces using them); `option_select`; `start_edit`; after submit |
+| `/ui/feedback` | The typed outcome of the last action: `{"kind", "message"}`, kind `"success"` / `"warning"` / `"error"` (`null` when cleared) — the flash-equivalent | After every handled action (success, rejection, validation failure, refusal); cleared by task open/cancel |
+| `/ui/intent` | The task the surface is in: `"browse"`, `"create"`, `"view"` or `"edit"` | Initial render (`"browse"`); every task-panel action; a successful `submit_form` (back to `"browse"`) |
+| `/ui/panel` | The task panel: `visible`, `mode`, `title`, `primary_label`, `record_id`, the `submit_visible` / `form_visible` / `view_visible` sentinels, and `record` (the read-only display values of a `view_record`) | Same as `/ui/intent`; `wizard_next`/`wizard_back` rewrite `primary_label` and `submit_visible` |
+| `/_empty_visible` / `/_empty_message` | A table's empty-state sentinel (`[]` while records exist) and its text (multi-table: `/_empty_visible_<table>`, `/_empty_message_<table>`) | Initial render; every records rewrite |
 | `/ui/action_result` | The raw map returned by a map-returning generic action | An `invoke`d generic action returns a plain map (cleared by every subsequent successful action) |
 | `/ui/action_result_text` | The human-readable rendering of `/ui/action_result` | Same as `/ui/action_result` |
 | `/query` | The current search/filter/preset/sort/pagination state of a query-enabled table (multi-table surfaces: an object keyed by table component name) | Initial render; after every `query` action; alongside query-aware success refreshes |
@@ -29,7 +32,7 @@ custom hooks, and tests can rely on them.
 | `/options/<context>` | A picker context's option list (same `{"label","value"}` shape; shares the `/options` namespace) | Initial render; `context_search`; cascades that re-derive a dependent context's options |
 | `/detail/<context>` | The selected record of a context rendered by `:detail` components (`{}` while unselected) | Initial render; every selection change of that context |
 | `/report/<name>` | One `:report` component's state: `{"params" => %{<param> => ""}, "rows" => []}` — only on surfaces with `:report` components | Initial render (empty params, no rows); every `report` action rewrites `/report/<name>/rows` |
-| `/ui/wizard` | A stepped form's wizard state: `index`, `steps` (`[{"name","label","state"}]`), the `<step>_visible` sentinels and the `nav` sentinels — only on surfaces whose form declares `step`s | Initial render (step 0); `wizard_next`/`wizard_back`; a failed `submit_form` (jumps to the owning step); reset to step 0 by task open/cancel and every successful write |
+| `/ui/wizard` | A stepped form's wizard state: `index`, `steps` (`[{"name","label","state"}]`), the `<step>_visible` sentinels and the `nav` sentinels — only on surfaces whose form declares `step`s | Initial render (step 0); `wizard_next`/`wizard_back`; a failed `submit_form` (jumps to the owning step); reset to step 0 by task open/cancel and a successful `submit_form` |
 | `/export/<name>/columns` | The column-selection booleans of a `column_select` export (`%{<column> => true}`, all checked initially) — only on surfaces with column-selectable `export` blocks | Initial render; toggled client-side by the checkboxes (never rewritten by the server) |
 | `/bulk/<table>/result` | The last bulk run's outcome on a table with `bulk_actions`: `{"ok", "failed", "refused", "skipped", "errors"}` (`errors`: `[{"id", "message"}]`) — only on surfaces with bulk actions | Initial render (all zero); every `bulk_invoke` that passes the allowlist and selection checks |
 
@@ -107,7 +110,7 @@ multi-table rules above under its runtime name (`/records/board_open`,
 - `/_lane_total_<lane>` — the lane's total as a **string**, bound by the
   lane heading: the lane query's `totalCount` when present, else the number
   of rows in the lane, suffixed `+` when the query reports more rows but no
-  count. It sits at the root beside the v2 `_empty_visible_<table>`
+  count. It sits at the root beside the `_empty_visible_<table>`
   sentinels. The initial render, action refreshes (`refreshes`) and
   `query` actions rewrite it beside the lane's records. A records-only
   push (`encode_data_model(view, records, scope: :records)`) replaces
@@ -134,9 +137,11 @@ follow-up semantics are never affected by `refreshes`.
 
 ## `/form` — form state
 
-Form inputs bind to `/form/<field>`. Selecting a row (the `select_row`
-action) loads that record's editable values into `/form`; a successful create
-or update clears it back to its initial shape. Clients that keep local edit
+Form inputs bind to `/form/<field>`. Opening an edit task (the `start_edit`
+action) loads that record's editable values into `/form`; `start_create` and
+`cancel_record_task` reset it, and a successful create or update clears it
+back to its initial shape. A view task (`view_record`) never writes `/form`:
+it renders the record read-only from `/ui/panel/record`. Clients that keep local edit
 state should treat a server write to `/form` as authoritative.
 
 On surfaces without nested forms the initial (and post-success) `/form` is
@@ -159,7 +164,7 @@ the argument cast:
   `nested_remove` and the template key. Never an array index.
 - `"_error_<field>"` — the row-scoped validation error mirror (below).
 
-`select_row` populates the arrays from the record's currently-related
+`start_edit` populates the arrays from the record's currently-related
 records (loaded through the argument's relationship). Rows are mutated only
 by the `"nested_add"` / `"nested_remove"` actions — the server replaces the
 whole array in one `updateDataModel` — and by create_inline row inputs
@@ -190,7 +195,7 @@ Conventions:
 - A subsequent successful submit **clears** the error paths (`/errors` is
   reset wholesale to `{}`).
 - Errors that can't be attributed to a field (e.g. a policy denial) go to
-  `/ui/status` instead.
+  the `/ui/feedback` error instead.
 - Errors on **nested-form rows** carry Ash's error path and land at
   `/errors/<argument>/<index>/<field>` — `<index>` is the row's position in
   the submitted array. The same text is additionally mirrored into the
@@ -203,28 +208,36 @@ Renderers bind error `Text` components next to each input at
 `/errors/<field>` and get inline validation for free — no error-specific
 message types needed.
 
-## `/ui/status` — the flash-equivalent
+## `/ui/feedback` — the flash-equivalent
 
-Stateless protocols have no "flash" concept, so AshA2ui reserves `/ui/status`
-for operation lifecycle feedback. The value is display-ready text:
+Stateless protocols have no "flash" concept, so AshA2ui reserves
+`/ui/feedback` for the typed outcome of every action. The message is
+display-ready text; the kind says what happened:
 
 ```json
 {
   "version": "v0.9.1",
   "updateDataModel": {
     "surfaceId": "tickets",
-    "path": "/ui/status",
-    "value": "Created successfully."
+    "path": "/ui/feedback",
+    "value": { "kind": "success", "message": "Created successfully." }
   }
 }
 ```
 
 `AshA2ui.ActionHandler` writes it after every handled action — a success text
-on completion, an explanation on rejected/unknown actions, a "not authorized"
-text on policy denials (deliberately without detail), and a generic failure
-text when errors can't be attributed to a field. The emitted surface includes
-a `Text` component bound to `/ui/status`, so it behaves like a flash bar out
-of the box.
+on completion, `"warning"` when a bulk run partly succeeded, and `"error"` with
+an explanation on rejected/unknown actions, a "not authorized" text on policy
+denials (deliberately without detail), and a generic failure text when errors
+can't be attributed to a field. Task open/cancel clear it (`kind: null`,
+`message: ""`). The emitted surface binds its `status_text` Text to
+`/ui/feedback/message` (right under the task panel, above the tables), and
+the admin catalog's `statusBanner` binds both keys. On v1.0 surfaces the
+same outcome is also the structured `/ui/response` object (see
+[A2UI 1.0](a2ui-1-0.md)).
+
+There is no `/ui/status`: it was removed with the pre-experience
+composition. Consumers that read it move to `/ui/feedback/message`.
 
 ## `/ui/action_result` and `/ui/action_result_text` — generic action results
 
@@ -327,7 +340,7 @@ One entry per name:
 
 - searchable selects: `{"search": "", "label": ""}` — `search` is the
   search input's binding, `label` the display text of the current selection
-  (written by `"option_select"` and by `select_row`).
+  (written by `"option_select"` and by `start_edit`).
 - pick_existing pickers: `{"search": "", "picked": []}` — `picked` is the
   (non-searchable) ChoicePicker's value binding, read by the add button's
   context.
@@ -383,8 +396,8 @@ Conventions:
 
 The `query` client action's context is `{"query": <the /query map>}` plus an
 optional literal `"page"` override or relative `"pageDelta"`; everything in
-it is validated against the DSL-declared allowlist and rejected via
-`/ui/status` when not declared.
+it is validated against the DSL-declared allowlist and rejected with an
+`/ui/feedback` error when not declared.
 
 ## `/prompt/values/<action>` — row-action prompt state
 
@@ -437,8 +450,9 @@ Present **only** on surfaces whose form declares `step` entities (see
 - `"<step>_visible"` — one zero-or-one sentinel per step (`[{"id": "on"}]`
   on the current step, `[]` elsewhere); each step page is a `List`
   templated over it;
-- `"nav"` — `"back_visible"`, `"next_visible"` and `"submit_visible"`
-  sentinels for the navigation controls.
+- `"nav"` — `"back_visible"` and `"next_visible"` sentinels for the
+  navigation controls (the submit is gated by the panel's
+  `/ui/panel/submit_visible`, which opens on the last step).
 
 The server rewrites the whole `/ui/wizard` value on every move. `/form` is
 carried across steps unchanged: the `wizard_next` / `wizard_back` contexts

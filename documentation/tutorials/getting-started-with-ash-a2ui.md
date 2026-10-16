@@ -253,8 +253,8 @@ A2UI `action` envelope, the hook forwards it as `"a2ui:action"`, and
    the allowlist.
 2. Invokes the corresponding Ash action with the mounted actor and
    `authorize?: true`.
-3. On success, pushes an `updateDataModel` refresh (and sets the
-   `/ui/status` feedback path).
+3. On success, pushes an `updateDataModel` refresh (and writes the typed
+   `/ui/feedback` outcome).
 4. On validation errors, pushes the error text onto the reserved
    `/errors/<field>` data-model paths so the renderer can show them inline.
 

@@ -139,7 +139,7 @@ allowlisted `option_search` fields only, clamps to `option_limit`, sorts by
 `option_sort`, and answers with one `updateDataModel` at
 `/options/<field>`. An empty `search` returns the default first page.
 Unknown fields, fields without `option_search`, and non-string search values
-are rejected via `/ui/status`.
+are rejected with an `/ui/feedback` error.
 
 **`"option_select"`** — commit a choice (the selection mechanism):
 
@@ -150,7 +150,7 @@ are rejected via `/ui/status`.
 
 Selection round-trips through the server on purpose: the value is
 re-fetched from the destination (policies apply — a spoofed or unauthorized
-id is rejected via `/ui/status`), and the server writes **two** messages:
+id is rejected with an `/ui/feedback` error), and the server writes **two** messages:
 `/form/<field>` gets the value (what `submit_form` later casts), and
 `/select/<field>` gets `{"search": "", "label": "<canonical label>"}` so the
 UI shows what was picked. Non-searchable selects keep the frozen

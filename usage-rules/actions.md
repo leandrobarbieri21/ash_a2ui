@@ -27,10 +27,42 @@ AshA2ui.ActionHandler.handle(resource_or_ui_module, envelope,
   `{:error, _}`** — error messages carry the validation feedback the
   renderer must display.
 
+## The task panel
+
+Every surface with a `:form` component composes a record task panel: a
+three-mode machine (browse, create, view, edit) over the form buffer, with
+its state at `/ui/intent` and `/ui/panel/*`. The encoder emits the
+affordances; the handler owns the transitions:
+
+- `"start_create"` — context `%{}`. Opens the panel in create mode over a
+  fresh `/form` (intent `"create"`, primary label `"Create <Resource>"`).
+  Rejected when the surface declares no create action. The emitted
+  `create_button` only appears when a create action is declared, and never
+  under a related table.
+- `"view_record"` — context `%{"recordId" => id}`. An authorized read of the
+  record, rendered **read-only** at `/ui/panel/record/<field>` (intent
+  `"view"`). `/form` is never written and no submit is offered; Cancel is
+  the only exit. The `view_button` row control appears only on surfaces
+  with a form, and only on tables over the surface's own resource.
+- `"start_edit"` — context `%{"recordId" => id}`. Rejected unless the
+  surface declares an `update_action`. Pre-flights the update authorization
+  (`Ash.can?`) so the panel never opens on a write the server would refuse,
+  then populates `/form` with the record's values (including `"id"`, nested
+  form rows and `/select` labels) in edit mode (primary label
+  `"Save changes"`). The `edit_button` row control follows the same gates.
+- `"cancel_record_task"` — context `%{}`. Back to browse: panel closed,
+  `/form` and `/errors` reset, feedback cleared.
+
+A successful `submit_form` closes the panel and returns to browse; a failed
+one keeps the mode, the panel and the submitted values for correction.
+Related tables (a `:table` with its own `resource`) are read-only: they get
+neither the View/Edit controls nor the create button. Their master/detail
+hook is `select_context`, whose row button reads "Select <context>".
+
 ## The core action names
 
 The core envelope names are `"submit_form"`, `"invoke"`, `"prompt"`,
-`"select_row"` and `"query"`. Feature-specific names exist only when the
+`"query"` and the four task-panel actions above. Feature-specific names exist only when the
 surface declares the feature: the context actions (`ash_a2ui:contexts`),
 the relationship-picker actions (`ash_a2ui:relationships`), `"edit_cell"`
 (tables with an `editable` block — commits one field of one record through
@@ -42,7 +74,8 @@ callFunction; `ash_a2ui:reports`), `"bulk_invoke"` / `"bulk_select"`
 (tables with `bulk_actions` — see "Bulk actions" below) and `"wizard_next"` /
 `"wizard_back"` (forms declaring `step`s — Next builds the form action's
 changeset over the carried `/form` through the same path `submit_form` writes
-with, without submitting it, and keeps only errors of reached steps;
+with, without submitting it, and keeps only errors of reached steps; both
+rewrite `/ui/wizard` and the panel's primary label and submit gate;
 `ash_a2ui:layout`). Don't invent new `action.name` values;
 add a proper Ash action and expose it via `row_actions` instead.
 
@@ -56,7 +89,7 @@ add a proper Ash action and expose it via `row_actions` instead.
   handler tolerates its absence). **The named action must be listed in the
   surface's `row_actions`** — that list is the server-side allowlist and the
   authorization surface for client-triggered actions. Anything not listed is
-  rejected with a `/ui/status` error before Ash is ever called. Destroy,
+  rejected with an `/ui/feedback` error before Ash is ever called. Destroy,
   update and generic actions are supported; a generic action with a
   `:record_id` argument receives the context's `"recordId"`.
 
@@ -71,24 +104,18 @@ add a proper Ash action and expose it via `row_actions` instead.
 
   If the action's entity declares `visible_when` conditions, the handler
   fetches the identified record and re-evaluates them on **every** invoke —
-  a non-visible action is rejected via `/ui/status` no matter what the
-  client rendered. Never rely on the rendering to hide a button; the
+  a non-visible action is rejected with an `/ui/feedback` error no matter
+  what the client rendered. Never rely on the rendering to hide a button; the
   handler enforcement is the guarantee.
 - `"prompt"` — context `%{"action" => name, "recordId" => id}`. Sent by the
   trigger of a prompt Modal (an action with `prompt_fields`). No Ash write:
   the handler validates the allowlist + `visible_when`, pre-fills
   `/prompt/values/<action>` from the record, and clears `/errors`. The
   actual write is the subsequent `"invoke"` with `"values"`.
-- `"select_row"` — context `%{"recordId" => id}`. Returns one
-  `updateDataModel` populating `/form` with the record's values (edit-form
-  population). The per-row Select button is emitted only on surfaces with
-  a `:form` component — with nothing to populate it would be a dead
-  control (row selection on formless master/detail surfaces is the
-  `select_context` button instead).
 - `"query"` — context `%{"query" => <the query state map>}` plus optional
   `"page"`/`"pageDelta"`. Requires the table to declare a `query` entity;
   every search/sort/filter/page value is validated against that allowlist
-  and rejected via `/ui/status` when undeclared. Returns `updateDataModel`
+  and rejected with an `/ui/feedback` error when undeclared. Returns `updateDataModel`
   messages for `/records` and `/query`. On multi-table surfaces the context
   **requires** `"component" => table_name` and the messages target
   `/records/<name>` + `/query/<name>`. Full rules in `ash_a2ui:queries`.
@@ -100,13 +127,23 @@ never invent ad-hoc paths or custom message types; renderers depend on
 them:
 
 - `/records` — the re-read table rows after a successful write (each row
-  includes `"id"`). Multi-table surfaces scope refreshes per table at
+  includes `"id"`, and reads exactly like the initial render's rows — enum
+  labels, links, badges). Multi-table surfaces scope refreshes per table at
   `/records/<component_name>`.
-- `/form` — cleared to `%{}` on success; populated by `select_row`.
+- `/form` — the edit buffer: cleared to `%{}` on success and on
+  `start_create`/`cancel_record_task`; populated by `start_edit`.
 - `/errors/<field>` — per-field validation error text; `/errors` is cleared
   to `%{}` on success.
-- `/ui/status` — human-readable lifecycle feedback (success text, rejection
-  reasons, "not authorized").
+- `/ui/feedback` — the typed outcome of **every** action:
+  `%{"kind" => "success" | "warning" | "error", "message" => text}`
+  (success text, validation summary, rejection reason, "not authorized").
+  The status Text binds `/ui/feedback/message`; the admin statusBanner binds
+  both keys. On v1.0 surfaces the same outcome is also the structured
+  `/ui/response` object and the `actionResponse` handshake.
+- `/ui/intent` and `/ui/panel/*` — the task panel's state (`visible`,
+  `mode`, `title`, `primary_label`, `record_id`, the `submit_visible` /
+  `form_visible` / `view_visible` sentinels, and `record` — the read-only
+  display values of a `view_record`).
 - `/ui/action_result` — the map result of a map-returning generic action
   (an AshA2ui handler convention, not part of the A2UI spec).
 - `/query` — the authoritative query state on query-enabled surfaces,
@@ -118,7 +155,7 @@ them:
 - `/bulk/<table>/result` — the last bulk run's outcome (`ok`, `failed`,
   `refused`, `skipped`, `errors`); rows of bulk tables carry `_selected`.
 
-On `Ash.Error.Forbidden` only a `/ui/status` "not authorized" message is
+On `Ash.Error.Forbidden` only an `/ui/feedback` "not authorized" error is
 emitted — no field errors, to avoid leaking policy details.
 
 ## Scoping refreshes with `action` entities
@@ -186,9 +223,9 @@ end
   dispatch as `invoke`, one call per record, without a shared transaction.
 - A **generic** bulk action must declare `argument :record_id` (compile-time
   verified): each call gets the record's id there.
-- The handler writes `/bulk/<table>/result` and a status line, sends
-  typed v2 feedback (`"warning"` on partial success, `"error"` when
-  nothing was written) and refreshes the targets once. Nothing is
+- The handler writes `/bulk/<table>/result` and typed `/ui/feedback`
+  (`"success"`, `"warning"` on partial success, `"error"` when nothing was
+  written) and refreshes the targets once. Nothing is
   refreshed when nothing was written.
 - `"bulk_select"` — context `%{"component", "selected" => true | false}`:
   the server re-reads the page and rewrites its rows with `_selected` set

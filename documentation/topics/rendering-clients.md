@@ -35,8 +35,11 @@ Client → server is one envelope shape:
 }
 ```
 
-The `action.name` values AshA2ui emits and accepts in v0 are `"submit_form"`,
-`"select_row"`, and `"invoke"` (generic/row actions). See
+The core `action.name` values AshA2ui emits and accepts are `"submit_form"`,
+`"invoke"` (generic/row actions), `"prompt"`, `"query"` and the task-panel
+actions `"start_create"`, `"view_record"`, `"start_edit"` and
+`"cancel_record_task"`; feature-specific names exist only where a surface
+declares the feature. See
 [Actions and Authorization](actions-and-authorization.md).
 
 ## Transport 1: `AshA2ui.LiveRenderer` (LiveView)

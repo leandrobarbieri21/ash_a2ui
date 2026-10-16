@@ -17,21 +17,26 @@
 
 ### Precedence rules (deterministic, tested)
 
-| `experience_version` | `:catalog` | Effective emission |
-|---|---|---|
-| 1 (default) | `:basic` | basic v1 — byte-identical to before A2UI-101 |
-| 1 | `:admin_v1` | **basic v1** (admin requires v2; config is ignored, not an error) |
-| 2 | `:basic` | basic v2 — byte-identical to A2UI-101 output |
-| 2 | `:admin_v1` | admin v1 (this catalog) |
+| `:catalog` | Effective emission |
+|---|---|
+| `:basic` (default) | the basic composition of the experience layer (A2UI-101 output) |
+| `:admin_v1` | admin v1 (this catalog) |
+
+Admin is active exactly when `:admin_v1` is selected
+(`AshA2ui.Experience.admin?/0`). Until 2026-10-16 the selection also
+required `experience_version: 2` and was ignored under version 1; the
+version switch and the version-1 composition were removed as a clean break,
+so the catalog selection is the only rule. A leftover `experience_version`
+setting is ignored.
 
 ### Feature fallback
 
 The admin encoder upgrades the **core table + form + pagination + status**
 subtree to semantic components. Surfaces using advanced features — `sections`,
 `reports`, `export`, `editable`, `nested_form` — emit those parts with
-**basic v2 composition** (byte-equal to `:basic` output for those subtrees).
-The whole surface never regresses below v2; only the unsupported subtree stays
-basic-composed. Context pickers and query controls (search/filters/apply)
+**basic composition** (byte-equal to `:basic` output for those subtrees).
+Only the unsupported subtree stays basic-composed; the rest of the surface
+stays admin. Context pickers and query controls (search/filters/apply)
 always remain basic components inside `EntityPage`.
 
 ## Components
@@ -119,12 +124,12 @@ Property values are literals or data-model path bindings using the same
 
 ## Data model additions (admin only)
 
-Alongside the v2 sentinels (which remain for basic compat), each `/query`
+Alongside the pagination sentinels (which remain for basic compat), each `/query`
 state under admin gains plain booleans `paginationVisible`, `previousVisible`,
 `nextVisible` derived from `AshA2ui.Experience.pagination_state/2`. Everything
 else reuses the A2UI-101 `/ui` state verbatim.
 
-## Encoder mapping (v2 + admin_v1)
+## Encoder mapping (admin_v1)
 
 `build_surface` root becomes `EntityPage {title: resource label}` with children:
 1. context pickers (basic components, unchanged order)
@@ -134,16 +139,17 @@ else reuses the A2UI-101 `/ui` state verbatim.
 4. `RecordPanel` per the form-capable table (mode-bound children as above)
 5. `StatusBanner`
 
-The pagination row, form slot composition, select/view/edit button
-primitives, and status_text of the basic-v2 emission are **replaced** by the
+The pagination row, form slot composition, view/edit button primitives, and
+status_text of the basic emission are **replaced** by the
 semantic components above — no dual emission.
 
 ## v1.0 upgrade path
 
 `AshA2ui.Encoder.V1_0` rewrites basic component kinds and collapses the
-`/ui` status trio. Custom kinds (`entityPage`, `dataGrid`, ...) and their
-bindings pass through untouched. `/ui/response` collapse keeps the v2/AC-5
-behavior from A2UI-101.
+`/ui` action-result pair into `/ui/response`. Custom kinds (`entityPage`,
+`dataGrid`, ...) and their bindings pass through untouched; the
+`statusBanner` keeps binding `/ui/feedback`, which the handler writes on
+both wire versions (the AC-5 behavior from A2UI-101).
 
 ## JS registration expectations (renderer lane)
 

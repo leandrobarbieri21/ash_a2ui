@@ -143,9 +143,17 @@ themselves authorized); authorization stays in Ash policies.
   selected, the table renders `[]` and **no read executes** (the query
   state reports `totalCount: 0`). Required contexts must appear in the
   table's `context_filter`.
-- `select_context :visit` — adds a per-row button (`row_context_button`)
+- `select_context :visit` — adds a per-row button (`row_context_button`,
+  labelled "Select visit" in both the basic and admin compositions)
   dispatching `context_select` for the named context with the row's id: the
   master/detail hook. The context's resource must be the table's resource.
+  The label says what it does — the task panel's own "View" opens the record
+  in the panel; "Select" makes it the context's selection.
+- A **related table** (`resource` on the `:table`, scoped through
+  `context_filter`) is a read-only view of another resource: it renders no
+  View/Edit controls and no create button, whatever the surface's form
+  declares. Its rows read exactly as the initial render's after a context
+  selection refreshes them (enum labels, links, badges).
 
 ## `:detail` components
 
