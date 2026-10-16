@@ -13,7 +13,9 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 - **`label` on the action entity.** `action :confirm_merge do label
   "Confirm match" end` names the action's row button and bulk toolbar
   button in both compositions, its admin `rowActions` entry, its prompt
-  heading (unless `prompt_title` is set) and its bulk status line. No
+  heading (unless `prompt_title` is set), its bulk status line and its
+  success status ("Confirm match: done."; an action without a label keeps
+  `Action "confirm_merge" completed.`). No
   wrapper action is needed just to get a readable button. The dynamic spec
   carries it too (`"label"` on an action; parser, `spec_schema/1`,
   Importer and promotion).
@@ -27,7 +29,10 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `/prompt/select/<action>/<field>`); its `option_select` carries
   `"prompt"` and writes the picked value to `/prompt/values/<action>/<field>`
   after an authorized re-read. Values are cast and validated server-side as
-  before. The merged catalog's combobox upgrades these composites too.
+  before, and a relationship prompt value is re-read as the actor before
+  the write: one the picker would not have offered (a spoofed or stale id)
+  fails on `/errors/<field>` with "is not one of the available options".
+  The merged catalog's combobox upgrades these composites too.
 - **`select_context` on boards.** A `display :board` table may declare
   `select_context`: every card gets the "Select <context>" control, so a
   board can fill a `:detail` instead of deep-linking away. List-mode
@@ -93,7 +98,8 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `visible_when` actions carry `visiblePath` (`_visible_<action>`), so the
   grid offers them only on the rows they apply to. The read-only View panel
   shows the action bar's Cancel, which closes it. Row action buttons wrap
-  inside their cell. See the contract note's 1.2 addendum.
+  inside their cell. The prompt dialog keeps Tab and Shift+Tab inside it.
+  See the contract note's 1.2 addendum.
 - **Board lanes no longer size to their cards.** Lanes were a horizontal
   `List`, whose items shrink-wrap their content (a three-lane board rendered
   2266px wide on a 1280px viewport). They are now a `Row` of lane Columns at
@@ -107,7 +113,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   message for field-less errors (an invalid change, a `via` function's
   string refusal), "You are not authorized to perform this action." for any
   Forbidden class, and names field errors the action shows no input for
-  ("Status: must equal :claimed."). Field errors stay on `/errors/<field>`.
+  ("Status: must equal :claimed.") — an invoke's non-prompt fields and a
+  submitted form's fields without an input. Field errors stay on
+  `/errors/<field>`. Only messages someone wrote for the user are shown: a
+  bare string, an UnknownError carrying one, an Invalid-class error. Any
+  other error — a raw exception Splode wrapped (its text is the
+  `Exception.format/2` output), a data-layer error, a Framework-class
+  error — can carry row values or PII, so it reads "The action failed." and
+  its text goes to `Logger.error/1`.
 
 - **Importing a master/detail surface dropped its related tables and
   links.** The Importer silently dropped a table's `resource`, every

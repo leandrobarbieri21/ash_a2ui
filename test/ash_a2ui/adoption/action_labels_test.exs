@@ -89,6 +89,35 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
     assert feedback["message"] == "Take it: 1 of 1 selected records done."
   end
 
+  test "a single-row invoke's success status uses the label", %{job: job} do
+    invoke = fn ui, surface_id, action ->
+      ActionHandler.handle(
+        ui,
+        %{
+          "version" => "v0.9.1",
+          "action" => %{
+            "name" => "invoke",
+            "surfaceId" => surface_id,
+            "sourceComponentId" => "test",
+            "timestamp" => "2026-10-16T00:00:00Z",
+            "context" => %{"action" => action, "recordId" => job.id, "component" => "table"}
+          }
+        },
+        actor: @red
+      )
+    end
+
+    feedback = fn messages ->
+      Enum.find_value(messages, fn
+        %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => value}} -> value
+        _other -> nil
+      end)
+    end
+
+    assert {:ok, messages} = invoke.(LabelledJobsUI, "adoption_labelled_jobs", "claim")
+    assert feedback.(messages) == %{"kind" => "success", "message" => "Take it: done."}
+  end
+
   test "the dynamic spec carries the label: resolve, import and promote" do
     allowlist = Dynamic.allowlist([Job])
 

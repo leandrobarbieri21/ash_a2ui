@@ -7,16 +7,21 @@ defmodule AshA2ui.Adoption.ErrorFeedbackTest do
 
     * `Ash.Error.Forbidden` → a not-authorized sentence;
     * an invalid error without a field → its message(s);
-    * a plain string or exception from a host `via` function → its text;
+    * a plain string from a host `via` function → its text;
+    * a raw (non-Ash) exception — from a change, a `via` function or the
+      data layer — can carry row values: it reads as "The action failed."
+      and its text is only logged;
     * field errors stay on `/errors/<field>`; those on fields the action
-      does not show (an invoke without prompt fields) are also named in
-      the feedback.
+      does not show (an invoke without prompt fields, a form without an
+      input for the field) are also named in the feedback.
   """
 
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias AshA2ui.ActionHandler
-  alias AshA2ui.Test.Adoption.{Job, JobsUI, ViaJobsUI}
+  alias AshA2ui.Test.Adoption.{Job, JobsUI, LeakyJobsUI, ViaJobsUI}
 
   @red %{id: "u-red", team: "red"}
 
@@ -90,6 +95,83 @@ defmodule AshA2ui.Adoption.ErrorFeedbackTest do
              "kind" => "error",
              "message" => "Validation failed. Please review the field errors."
            }
+  end
+
+  test "a raw exception from a change reads as a generic sentence, not its text", %{job: job} do
+    log =
+      capture_log(fn ->
+        assert {:error, messages} = invoke(LeakyJobsUI, "adoption_leaky_jobs", :explode, job)
+        send(self(), {:messages, messages})
+      end)
+
+    assert_received {:messages, messages}
+
+    assert write_at(messages, "/ui/feedback") == %{
+             "kind" => "error",
+             "message" => "The action failed."
+           }
+
+    refute inspect(messages) =~ "alice@example.com"
+    refute inspect(messages) =~ "23505"
+    assert log =~ "alice@example.com"
+  end
+
+  test "a raw exception from a host function reads as a generic sentence", %{job: job} do
+    log =
+      capture_log(fn ->
+        assert {:error, messages} = invoke(LeakyJobsUI, "adoption_leaky_jobs", :claim, job)
+        send(self(), {:messages, messages})
+      end)
+
+    assert_received {:messages, messages}
+    assert write_at(messages, "/ui/feedback")["message"] == "The action failed."
+    refute inspect(messages) =~ "bob@example.com"
+    assert log =~ "bob@example.com"
+  end
+
+  test "a form's error on a field it shows no input for is named in the feedback" do
+    assert {:error, messages} =
+             ActionHandler.handle(
+               JobsUI,
+               %{
+                 "version" => "v0.9.1",
+                 "action" => %{
+                   "name" => "submit_form",
+                   "surfaceId" => "adoption_jobs",
+                   "sourceComponentId" => "test",
+                   "timestamp" => "2026-10-16T00:00:00Z",
+                   "context" => %{"values" => %{"title" => "New job"}}
+                 }
+               },
+               actor: @red
+             )
+
+    team_error = write_at(messages, "/errors/team")
+    assert is_binary(team_error)
+    assert write_at(messages, "/ui/feedback")["message"] == "Team: #{team_error}."
+  end
+
+  test "a form's error on a field it shows stays on the field" do
+    assert {:error, messages} =
+             ActionHandler.handle(
+               JobsUI,
+               %{
+                 "version" => "v0.9.1",
+                 "action" => %{
+                   "name" => "submit_form",
+                   "surfaceId" => "adoption_jobs",
+                   "sourceComponentId" => "test",
+                   "timestamp" => "2026-10-16T00:00:00Z",
+                   "context" => %{"values" => %{"team" => "red"}}
+                 }
+               },
+               actor: @red
+             )
+
+    assert is_binary(write_at(messages, "/errors/title"))
+
+    assert write_at(messages, "/ui/feedback")["message"] ==
+             "Validation failed. Please review the field errors."
   end
 
   test "a field error no input shows is named in the feedback", %{job: job} do

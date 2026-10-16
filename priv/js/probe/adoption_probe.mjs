@@ -6,7 +6,7 @@
  *     - a prompt row action opens a prompt dialog that collects its values,
  *       pre-fills through `prompt`, dispatches `invoke` with the typed
  *       values, stays open (showing the error) on a failed confirm and
- *       closes on success;
+ *       closes on success; Tab and Shift+Tab stay inside the dialog;
  *     - relationship and enum prompt fields render as pickers;
  *     - row actions with `visible_when` show only on the rows they apply to;
  *     - the read-only View panel has a control that closes it.
@@ -261,6 +261,40 @@ async function main() {
       await page.waitForTimeout(150);
       expect(await page.evaluate(() => !!window.__dialog()), false, "closed");
       expect(await page.evaluate(() => window.__dispatched.length), 0, "nothing dispatched");
+    });
+
+    await check("admin: Tab and Shift+Tab stay inside the prompt dialog", async () => {
+      await page.evaluate(() => {
+        window.__rowButtons("Open job").find((b) => b.textContent.trim() === "Annotate").click();
+      });
+      await page.waitForTimeout(200);
+      // What has focus inside the dialog's shadow root: "heading", a
+      // button's text, "inside" (a nested input) or "outside".
+      const focused = () =>
+        page.evaluate(() => {
+          const dialog = window.__dialog();
+          if (!dialog) return "no dialog";
+          const active = dialog.getRootNode().activeElement;
+          if (!active || !dialog.contains(active)) return "outside";
+          if (active.hasAttribute("data-prompt-heading")) return "heading";
+          if (active.tagName === "BUTTON") return active.textContent.trim();
+          return "inside";
+        });
+      expect(await focused(), "heading", "focus starts on the heading");
+      await page.keyboard.press("Shift+Tab");
+      expect(await focused(), "Confirm", "Shift+Tab from the heading wraps to the last button");
+      await page.keyboard.press("Tab");
+      expect(await focused(), "heading", "Tab from the last button wraps to the heading");
+      await page.keyboard.press("Tab");
+      expect(await focused(), "inside", "Tab from the heading reaches the input");
+      await page.keyboard.press("Shift+Tab");
+      expect(await focused(), "Confirm", "Shift+Tab from the first input wraps to the last button");
+      await page.evaluate(() => {
+        [...window.__dialog().querySelectorAll("button")]
+          .find((b) => b.textContent.trim() === "Cancel")
+          .click();
+      });
+      await page.waitForTimeout(100);
     });
 
     await check("admin: relationship and enum prompt fields render as pickers", async () => {

@@ -101,7 +101,8 @@ defmodule AshA2ui.Test.Adoption.Job do
     * `:annotate` — a plain text prompt (the required `note` argument);
     * `:lock` — fails with a field-less error;
     * `:escalate` — forbidden unless the actor is an admin;
-    * `:finish` — fails a validation on `status`, a field no prompt shows.
+    * `:finish` — fails a validation on `status`, a field no prompt shows;
+    * `:explode` — fails with a raw exception carrying row values.
   """
 
   use Ash.Resource,
@@ -191,6 +192,12 @@ defmodule AshA2ui.Test.Adoption.Job do
       validate attribute_equals(:status, :claimed)
       change set_attribute(:status, :done)
     end
+
+    update :explode do
+      accept []
+      require_atomic? false
+      change AshA2ui.Test.Adoption.Exploded
+    end
   end
 
   policies do
@@ -212,6 +219,24 @@ defmodule AshA2ui.Test.Adoption.Locked do
   @impl true
   def change(changeset, _opts, _context) do
     Ash.Changeset.add_error(changeset, "This job is locked by another team.")
+  end
+end
+
+defmodule AshA2ui.Test.Adoption.Exploded do
+  @moduledoc """
+  A change that fails the action with a raw (non-Ash) exception whose text
+  carries row values, as a data-layer error would.
+  """
+
+  use Ash.Resource.Change
+
+  @impl true
+  def change(changeset, _opts, _context) do
+    Ash.Changeset.add_error(changeset, %RuntimeError{
+      message:
+        "ERROR 23505 (unique_violation)\n\n    table: users\n" <>
+          "    detail: Key (email)=(alice@example.com) already exists."
+    })
   end
 end
 
@@ -256,9 +281,35 @@ defmodule AshA2ui.Test.Adoption.JobsUI do
 end
 
 defmodule AshA2ui.Test.Adoption.Desk do
-  @moduledoc "A host facade refusing a `via` row action with a plain string."
+  @moduledoc """
+  A host facade refusing a `via` row action: with a plain string (`refuse`)
+  or with a raw exception carrying row values (`crash`).
+  """
 
   def refuse(_context), do: {:error, "Only the holder can complete this task."}
+
+  def crash(_context),
+    do: {:error, %RuntimeError{message: "internal: Key (email)=(bob@example.com)"}}
+end
+
+defmodule AshA2ui.Test.Adoption.LeakyJobsUI do
+  @moduledoc "Row actions failing with raw exceptions: a change's and a `via` function's."
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Adoption.Job
+    surface_id "adoption_leaky_jobs"
+
+    component :table do
+      fields [:title]
+      row_actions [:explode, :claim]
+    end
+
+    action :claim do
+      via {AshA2ui.Test.Adoption.Desk, :crash, []}
+    end
+  end
 end
 
 defmodule AshA2ui.Test.Adoption.ViaJobsUI do

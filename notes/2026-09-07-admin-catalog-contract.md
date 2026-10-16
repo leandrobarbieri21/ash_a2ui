@@ -243,8 +243,10 @@ View panel that could not be closed, and every row action on every row.
   content in a dialog headed `title`; Confirm dispatches the entry itself
   (its `invoke` context already binds `values` to
   `/prompt/values/<action>`). The dialog stays open, showing the
-  `/ui/feedback` message, on an error outcome and closes on success. Prompt
-  contents are never rendered outside their dialog. The server contract
+  `/ui/feedback` message, on an error outcome and closes on success. It is
+  modal (`aria-modal`): focus moves to its heading on open, and Tab and
+  Shift+Tab wrap between its heading and its last enabled button; Escape
+  closes it. Prompt contents are never rendered outside their dialog. The server contract
   (`prompt`, `invoke` with `values`) is unchanged.
 - `recordPanel` in view mode renders its `actionBar` child after the field
   displays: the primary is hidden there (empty `primaryLabel`), and the

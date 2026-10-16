@@ -848,7 +848,7 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`label`](#a2ui-action-label){: #a2ui-action-label } | `String.t` |  | The text of this action's buttons — its row button, bulk toolbar button, admin `rowActions` entry and (unless `prompt_title` is set) its prompt heading — and the name in its bulk status line. A plain string, so a host can pass translated text. Defaults to the humanized action name. |
+| [`label`](#a2ui-action-label){: #a2ui-action-label } | `String.t` |  | The text of this action's buttons — its row button, bulk toolbar button, admin `rowActions` entry and (unless `prompt_title` is set) its prompt heading — and the name in its bulk status line and its success status ("<label>: done."). A plain string, so a host can pass translated text. Defaults to the humanized action name. |
 | [`refreshes`](#a2ui-action-refreshes){: #a2ui-action-refreshes } | `list(atom)` |  | The table components refreshed after this action succeeds, by component name (`refreshes [:new_items]`; the unnamed table is `:table`). `[]` refreshes no table. Omitted (and for actions without an `action` entity) every table is refreshed (the default). |
 | [`prompt_fields`](#a2ui-action-prompt_fields){: #a2ui-action-prompt_fields } | `list(atom)` | `[]` | Arguments/accepts of the Ash action collected from the user in a per-row Modal prompt before the action is invoked (row actions only). Clicking the row button opens the Modal instead of invoking directly; its confirm button sends `invoke` with a `"values"` map. |
 | [`prompt_title`](#a2ui-action-prompt_title){: #a2ui-action-prompt_title } | `String.t` |  | Heading shown inside the prompt Modal. Defaults to the action's `label`, else the humanized action name. |

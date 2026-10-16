@@ -1091,6 +1091,14 @@ function defineAdminElements(deps, {adminApis}) {
             box-shadow: var(--am-shadow-3);
             padding: var(--am-space-xl);
           }
+          .prompt-focus-guard {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            outline: none;
+          }
           .prompt-title {
             margin: 0 0 var(--am-space-m);
             font-size: var(--am-font-size-l);
@@ -1544,18 +1552,33 @@ function defineAdminElements(deps, {adminApis}) {
         }
         if (event.key === "Tab") {
           // Focus trap over the dialog's own buttons (the inputs live in
-          // nested shadow roots and take focus in between).
-          const buttons = [...this.renderRoot.querySelectorAll(".prompt-dialog button")].filter(
-            (element) => !element.hasAttribute("disabled"),
-          );
-          if (buttons.length === 0) return;
-          const last = buttons[buttons.length - 1];
+          // nested shadow roots and take focus in between): Tab from the
+          // last button wraps to the heading, Shift+Tab from the heading to
+          // the last button. Shift+Tab from the first input lands on the
+          // start guard, which does the same (onPromptGuardFocus).
+          const last = this.lastPromptButton();
+          if (!last) return;
           const active = this.shadowRoot?.activeElement;
+          const heading = this.renderRoot.querySelector("[data-prompt-heading]");
           if (!event.shiftKey && active === last) {
             event.preventDefault();
-            this.renderRoot.querySelector("[data-prompt-heading]")?.focus();
+            heading?.focus();
+          } else if (event.shiftKey && active === heading) {
+            event.preventDefault();
+            last.focus();
           }
         }
+      }
+
+      lastPromptButton() {
+        const buttons = [...this.renderRoot.querySelectorAll(".prompt-dialog button")].filter(
+          (element) => !element.hasAttribute("disabled"),
+        );
+        return buttons[buttons.length - 1] ?? null;
+      }
+
+      onPromptGuardFocus() {
+        (this.lastPromptButton() ?? this.renderRoot.querySelector("[data-prompt-heading]"))?.focus();
       }
 
       renderPrompt(promptRefs) {
@@ -1572,6 +1595,12 @@ function defineAdminElements(deps, {adminApis}) {
             }}
           >
             <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="am-prompt-title">
+              <span
+                class="prompt-focus-guard"
+                tabindex="0"
+                data-prompt-focus-guard
+                @focus=${() => this.onPromptGuardFocus()}
+              ></span>
               <h2 class="prompt-title" id="am-prompt-title" tabindex="-1" data-prompt-heading>
                 ${title}
               </h2>

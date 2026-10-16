@@ -234,7 +234,9 @@ success text on completion (submits, invokes, report runs, CSV exports),
 an explanation on rejected/unknown actions, a "not authorized" text on policy
 denials (deliberately without detail), and the error's own message when it
 can't be attributed to a field (an invalid change, a `via` function's string
-refusal). Field errors on fields the action shows no input for are named in
+refusal; any other error, such as a raw exception, reads "The action
+failed." and is only logged). Field errors on fields the action shows no
+input for are named in
 it as "<Label>: <message>" (see
 [Actions and Authorization](actions-and-authorization.md)). Task open/cancel and context
 select/clear clear it (`kind: null`, `message: ""`). Actions that only fetch

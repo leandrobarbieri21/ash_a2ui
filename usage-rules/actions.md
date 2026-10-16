@@ -164,10 +164,14 @@ them:
 On `Ash.Error.Forbidden` only an `/ui/feedback` "not authorized" error is
 emitted — no field errors, to avoid leaking policy details. Errors without a
 field put their own message in `/ui/feedback`; field errors stay on
-`/errors/<field>`, and those on fields the action shows no input for are
-also named in the feedback ("Status: must equal :claimed."). Return a plain
-string or an `Ash.Error` with a readable message from a `via` function or a
-custom change — that text is what the user reads.
+`/errors/<field>`, and those on fields the action shows no input for (an
+invoke's non-prompt fields, a form's fields without an input) are also named
+in the feedback ("Status: must equal :claimed."). Return a plain string or
+an Invalid-class `Ash.Error` with a readable message from a `via` function
+or a custom change — that text is what the user reads. Any other error (a
+raw exception such as `RuntimeError`, a data-layer error, a Framework-class
+error) can carry row values, so it reads only "The action failed." and its
+text goes to `Logger.error/1`.
 
 ## Scoping refreshes with `action` entities
 
@@ -199,7 +203,8 @@ end
 ```
 
 - `label` is the text of the action's row, bulk and admin buttons, its
-  prompt heading and its bulk status line. Use it instead of a thin
+  prompt heading, its bulk status line and its success status ("Confirm
+  match: done."; without a label, `Action "confirm_merge" completed.`). Use it instead of a thin
   wrapper action that exists only to rename a button.
 - `prompt_fields` renders the row action as a Modal (trigger button +
   inputs + Confirm; under the admin catalog, a dialog the dataGrid opens
@@ -212,7 +217,13 @@ end
   when the `field` declares `option_search` (its `option_select` carries
   `"prompt"` and writes `/prompt/values/<action>/<field>`); an enumerated
   argument is a ChoicePicker; booleans and dates get CheckBox and
-  DateTimeInput. The server still casts and validates the values.
+  DateTimeInput. The server still casts and validates the values, and
+  re-reads a relationship prompt value as the actor before the write: a
+  value the picker would not have offered (a spoofed or stale id) fails on
+  `/errors/<field>` ("is not one of the available options"). Form
+  relationship selects are not re-checked on submit — there, as for any
+  write, the resource's own validations and policies decide which related
+  ids are allowed.
 - `visible_when` is simple ANDed equality on public attributes or
   expression calculations (`nil` = is_nil, list = membership) —
   deliberately not a rules engine. Rendering hides the button per row in

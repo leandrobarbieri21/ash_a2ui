@@ -207,7 +207,9 @@ end
   selections). The MFA returns the direct path's shapes — `:ok`,
   `{:ok, term}`, or `{:error, Ash.Error.t()}` — and the result renders
   through the standard channels unchanged (refreshes honoring `refreshes`,
-  `/ui/feedback`, `/errors/<field>` mapping). The client is unaware `via`
+  `/ui/feedback`, `/errors/<field>` mapping; refuse with a string or an
+  Invalid-class error — a raw exception reads only "The action failed.").
+  The client is unaware `via`
   exists. `via` applies to row and bulk actions only (a bulk run calls the
   MFA once per record) and is mutually exclusive with `prompt_fields`
   (compile-time verified); the named Ash action must still

@@ -73,9 +73,10 @@ The error's message is a readable sentence, by Ash error class:
 | Failure | `/errors/<field>` | `/ui/feedback` message |
 |---|---|---|
 | `Ash.Error.Forbidden` (or an error that is one as a class) | nothing (no policy details leak) | "You are not authorized to perform this action." |
-| An error without a field (an invalid change, a `via` function's string refusal, an unknown error) | nothing | the error's own message(s), as sentences |
+| An error without a field someone wrote for the user (an Invalid-class error such as a change's `add_error`, a `via` function's string refusal) | nothing | the error's own message(s), as sentences |
+| Any other error (a raw exception such as `RuntimeError`, a data-layer error, a Framework-class error) | nothing | "The action failed." — its text can carry row values, so it only goes to `Logger.error/1` |
 | Field errors on fields the action shows an input for (a form's fields, an invoke's prompt fields) | each field's message | "Validation failed. Please review the field errors." |
-| Field errors on fields the action shows no input for (an invoke without that prompt field) | each field's message | "<Label>: <message>" per field |
+| Field errors on fields the action shows no input for (an invoke without that prompt field, a form without an input for that field) | each field's message | "<Label>: <message>" per field |
 
 Field-less messages and unshown field errors combine into one feedback
 message when both occur.

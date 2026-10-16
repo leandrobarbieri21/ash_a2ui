@@ -5,7 +5,9 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
   options, loaded as the actor like a form select's; a ChoicePicker over an
   enumerated argument; the searchable-select composite when the field
   declares `option_search`. Values are still cast and validated
-  server-side against the action.
+  server-side against the action, and a relationship value is re-read as
+  the actor before the write: one the picker would not have offered is
+  refused.
   """
 
   use ExUnit.Case, async: false
@@ -132,6 +134,38 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
              )
 
     assert Ash.get!(Job, job.id, actor: @red).clerk_id == ravi.id
+  end
+
+  test "a relationship prompt value the actor cannot read is refused on its field", %{
+    job: job,
+    rhea: rhea,
+    bea: bea
+  } do
+    # Another team's clerk, sent past the picker: as a ChoicePicker list and
+    # as a searchable select's single value.
+    for {ui, surface_id, value} <- [
+          {JobsUI, "adoption_jobs", [bea.id]},
+          {SearchJobsUI, "adoption_search_jobs", bea.id},
+          {SearchJobsUI, "adoption_search_jobs", Ash.UUID.generate()}
+        ] do
+      assert {:error, messages} =
+               ActionHandler.handle(
+                 ui,
+                 envelope(surface_id, "invoke", %{
+                   "action" => "assign",
+                   "recordId" => job.id,
+                   "values" => %{"clerk_id" => value}
+                 }),
+                 actor: @red
+               )
+
+      assert write_at(messages, "/errors/clerk_id") == "is not one of the available options"
+
+      assert write_at(messages, "/ui/feedback")["message"] ==
+               "Validation failed. Please review the field errors."
+
+      assert Ash.get!(Job, job.id, actor: @red).clerk_id == rhea.id
+    end
   end
 
   describe "a searchable relationship prompt field" do

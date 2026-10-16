@@ -1137,9 +1137,9 @@ defmodule AshA2ui do
         doc: """
         The text of this action's buttons — its row button, bulk toolbar
         button, admin `rowActions` entry and (unless `prompt_title` is set)
-        its prompt heading — and the name in its bulk status line. A plain
-        string, so a host can pass translated text. Defaults to the
-        humanized action name.
+        its prompt heading — and the name in its bulk status line and its
+        success status ("<label>: done."). A plain string, so a host can
+        pass translated text. Defaults to the humanized action name.
         """
       ],
       refreshes: [
