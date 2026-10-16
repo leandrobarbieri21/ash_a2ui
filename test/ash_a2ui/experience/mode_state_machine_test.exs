@@ -1,6 +1,6 @@
 defmodule AshA2ui.Experience.ModeStateMachineTest do
   @moduledoc """
-  A2UI-101/AC-6..AC-10: the experience v2 task-mode state machine — the
+  A2UI-101/AC-6..AC-10: the task-panel state machine — the
   browse start state, the create/view/edit task transitions, and the cancel
   path back to browse.
   """
@@ -12,16 +12,6 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Experience.NoUpdate
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   defp envelope(name, context \\ %{}) do
     %{
@@ -91,7 +81,7 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
 
       ui = create["dataModel"]["ui"]
 
-      # the /ui/response collapse does not drop the v2 state
+      # the /ui/response collapse does not drop the experience-layer state
       assert ui["intent"] == "browse"
       assert ui["panel"]["visible"] == []
       assert ui["panel"]["submit_visible"] == []
@@ -228,7 +218,12 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
                ActionHandler.handle(NoUpdate, envelope("start_edit", %{"recordId" => record.id}))
 
       assert Enum.any?(messages, fn
-               %{"updateDataModel" => %{"path" => "/ui/status", "value" => value}} ->
+               %{
+                 "updateDataModel" => %{
+                   "path" => "/ui/feedback",
+                   "value" => %{"message" => value}
+                 }
+               } ->
                  value =~ "does not declare an update action"
 
                _other ->
@@ -268,8 +263,8 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
     Map.new(components_message["updateComponents"]["components"], &{&1["id"], &1})
   end
 
-  describe "CLIN-10 v2 surface anatomy (title + carded form panel)" do
-    test "a declared title becomes the surface's first root child (v2)" do
+  describe "CLIN-10 surface anatomy (title + carded form panel)" do
+    test "a declared title becomes the surface's first root child" do
       messages = AshA2ui.Info.build_surface(AshA2ui.Test.Experience.EstateUser)
       comps = components_by_id(Enum.find(messages, &Map.has_key?(&1, "updateComponents")))
 
@@ -290,7 +285,7 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
       assert hd(comps["root"]["children"]) == "form_slot"
     end
 
-    test "the form panel is carded with a footer zone (v2)" do
+    test "the form panel is carded with a footer zone" do
       messages = AshA2ui.Info.build_surface(Task)
       comps = components_by_id(Enum.find(messages, &Map.has_key?(&1, "updateComponents")))
 

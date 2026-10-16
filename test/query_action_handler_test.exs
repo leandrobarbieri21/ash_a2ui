@@ -4,7 +4,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
   query-aware success refreshes of `submit_form`/`invoke`. Pins the frozen
   wire contract: context `{"query" => <the /query map>}` (plus optional
   `"page"`/`"pageDelta"`), follow-ups on `/records` and `/query`, and
-  allowlist rejections on `/ui/status` that never reach Ash.
+  allowlist rejections on `/ui/feedback` that never reach Ash.
   """
 
   use ExUnit.Case, async: true
@@ -88,22 +88,27 @@ defmodule AshA2ui.QueryActionHandlerTest do
       assert values["/query"]["filters"] == %{"status" => "closed", "category" => ""}
     end
 
-    test "rejects a non-allowlisted sort with a /ui/status error and no records" do
+    test "rejects a non-allowlisted sort with a /ui/feedback error and no records" do
       envelope =
         envelope("query", %{"query" => %{"sort" => %{"field" => "status", "dir" => "asc"}}})
 
       assert {:error, [message]} = ActionHandler.handle(Paginated, envelope, actor: nil)
       assert_valid_server_message(message)
 
-      assert %{"path" => "/ui/status", "value" => value} = message["updateDataModel"]
+      assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
+               message["updateDataModel"]
+
       assert value =~ ~s(Sort field "status" is not allowlisted)
     end
 
-    test "rejects a non-allowlisted filter with a /ui/status error" do
+    test "rejects a non-allowlisted filter with a /ui/feedback error" do
       envelope = envelope("query", %{"query" => %{"filters" => %{"name" => "x"}}})
 
       assert {:error, [message]} = ActionHandler.handle(Paginated, envelope, actor: nil)
-      assert %{"path" => "/ui/status", "value" => value} = message["updateDataModel"]
+
+      assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
+               message["updateDataModel"]
+
       assert value =~ ~s(Filter "name" is not allowlisted)
     end
 
@@ -113,7 +118,9 @@ defmodule AshA2ui.QueryActionHandlerTest do
       assert {:error, [message]} =
                ActionHandler.handle(AshA2ui.Test.KitchenSink, envelope, actor: nil)
 
-      assert %{"path" => "/ui/status", "value" => value} = message["updateDataModel"]
+      assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
+               message["updateDataModel"]
+
       assert value =~ ~r/No query is configured/
     end
   end
@@ -137,7 +144,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
       assert Enum.map(values["/records"], & &1["name"]) == ["Item 6", "Item 7", "Zed"]
       assert %{"page" => 2, "totalCount" => 8, "hasMore" => false} = values["/query"]
       assert values["/form"] == %{}
-      assert values["/ui/status"] == "Created successfully."
+      assert values["/ui/feedback"]["message"] == "Created successfully."
     end
 
     test "submit_form without query context refreshes with the query defaults" do

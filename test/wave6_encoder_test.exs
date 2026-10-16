@@ -13,18 +13,6 @@ defmodule AshA2ui.Wave6EncoderTest do
   alias AshA2ui.Test.{KitchenSink, Promotion}
 
   setup do
-    # These assertions cover the exact v1 message shapes; v2 is the default,
-    # so the legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
-  setup do
     on_exit(fn ->
       for resource <- [Promotion, KitchenSink] do
         Ets.stop(resource)
@@ -103,7 +91,7 @@ defmodule AshA2ui.Wave6EncoderTest do
              }
 
       assert components["record_row_header_right"]["children"] ==
-               ["record_row_badge", "row_action_destroy_button", "row_select_button"]
+               ["record_row_badge", "row_action_destroy_button", "view_button", "edit_button"]
 
       assert components["record_row_badge"] == %{
                "id" => "record_row_badge",
@@ -144,7 +132,7 @@ defmodule AshA2ui.Wave6EncoderTest do
     test "rows carry the computed badge display text", %{messages: messages} do
       assert [row] = data_model(messages)["records"]
       assert row["_badge_is_active"] == "Active"
-      # the raw field value is untouched (select_row form population depends on it)
+      # the field's own key is untouched by the badge mapping
       assert row["is_active"] == true
     end
 
@@ -168,12 +156,11 @@ defmodule AshA2ui.Wave6EncoderTest do
     } do
       components = components(messages)
 
-      assert components["form"]["children"] == [
+      assert components["form_fields"]["children"] == [
                "form_group_details",
                "form_group_scheduling",
                "form_input_is_active",
-               "form_error_is_active",
-               "form_submit_button"
+               "form_error_is_active"
              ]
     end
 
@@ -401,7 +388,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       assert Map.has_key?(components, "table_cell_name")
       refute Map.has_key?(components, "record_row_body")
 
-      assert Enum.take(components["form"]["children"], 2) ==
+      assert Enum.take(components["form_fields"]["children"], 2) ==
                ["form_input_active", "form_error_active"]
     end
 

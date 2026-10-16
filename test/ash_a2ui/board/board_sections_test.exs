@@ -17,11 +17,6 @@ defmodule AshA2ui.Board.BoardSectionsTest do
   alias AshA2ui.Test.SeveritySectionsUI
   alias AshA2ui.Test.StatusSectionsUI
 
-  setup do
-    on_exit(fn -> Application.delete_env(:ash_a2ui, :experience_version) end)
-    :ok
-  end
-
   defp create_task!(name, attrs) do
     Ash.create!(BoardTask, Map.put(attrs, :name, name), authorize?: false)
   end
@@ -194,7 +189,7 @@ defmodule AshA2ui.Board.BoardSectionsTest do
     for lane <- ["board_claimed", "board_completed"] do
       assert value["records"][lane] == []
       assert value["_lane_total_#{lane}"] == "0"
-      # The v2 empty state shows (a non-empty sentinel) with its text.
+      # The empty state shows (a non-empty sentinel) with its text.
       assert value["_empty_visible_#{lane}"] == [%{"id" => "on"}]
       assert value["_empty_message_#{lane}"] == "No Board task records yet."
       assert "empty_state_#{lane}" in components["lane_#{lane}"]["children"]

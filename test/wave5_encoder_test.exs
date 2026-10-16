@@ -12,18 +12,6 @@ defmodule AshA2ui.Wave5EncoderTest do
   alias AshA2ui.Test.{Author, Tag, Ticket, TicketNote, TicketSearchUI}
 
   setup do
-    # These assertions cover the exact v1 message shapes; v2 is the default,
-    # so the legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
-  setup do
     on_exit(fn ->
       for resource <- [Ticket, TicketNote, Tag, Author] do
         Ets.stop(resource)
@@ -62,14 +50,13 @@ defmodule AshA2ui.Wave5EncoderTest do
 
       refute Map.has_key?(components, "form_input_author_id")
 
-      assert components["form"]["children"] ==
+      assert components["form_fields"]["children"] ==
                [
                  "form_input_subject",
                  "form_error_subject",
                  "form_select_author_id",
                  "form_error_author_id",
-                 "nested_tags",
-                 "form_submit_button"
+                 "nested_tags"
                ]
 
       assert components["form_select_author_id"]["children"] == [

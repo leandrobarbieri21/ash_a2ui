@@ -1,6 +1,6 @@
 defmodule AshA2ui.Experience.FeedbackAndValidationTest do
   @moduledoc """
-  A2UI-101/AC-14..AC-16: experience v2 typed feedback — validation failures
+  A2UI-101/AC-14..AC-16: experience-layer typed feedback — validation failures
   retain the open task and its values while flagging errors, successes close
   the panel with success feedback and refresh the collection, and forged
   events still hit the same authorized actions as before.
@@ -11,16 +11,6 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Experience.Protected
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
 
   defp envelope(name, context \\ %{}) do
     %{
@@ -102,7 +92,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
     @tag ac: "A2UI-101/AC-15"
     test "every invoke success carries typed feedback on the rendered path" do
       # The audit's headline failure: invoke successes wrote /ui/status —
-      # which nothing renders under v2 — so a successful row action looked
+      # which nothing rendered — so a successful row action looked
       # like a no-op. The feedback region binds /ui/feedback/message.
       record = Ash.create!(Task, %{name: "Doomed"}, authorize?: false)
 
@@ -114,7 +104,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
       values = by_path(messages)
 
-      # typed success on the path the v2 status Text binds...
+      # typed success on the path the status Text binds...
       assert values["/ui/feedback"] == %{
                "kind" => "success",
                "message" => ~s(Action "destroy" completed.)
@@ -122,7 +112,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
       # ...with the classic status text still flowing alongside (the
       # programmatic contract, unchanged)...
-      assert values["/ui/status"] == ~s(Action "destroy" completed.)
+      assert values["/ui/feedback"]["message"] == ~s(Action "destroy" completed.)
 
       # ...and no panel/mode writes: a browse-mode invoke never closes a task
       refute Map.has_key?(values, "/ui/intent")
@@ -183,7 +173,7 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
   defp unauthorized?(messages) do
     Enum.any?(messages, fn
-      %{"updateDataModel" => %{"path" => "/ui/status", "value" => value}} ->
+      %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => value}}} ->
         value =~ "not authorized"
 
       %{"updateDataModel" => %{"path" => "/ui/response", "value" => %{"message" => value}}} ->

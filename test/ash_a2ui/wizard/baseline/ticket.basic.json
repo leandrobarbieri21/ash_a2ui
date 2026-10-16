@@ -1,8 +1,8 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-      "surfaceId": "tickets_search"
+      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "surfaceId": "tickets"
     },
     "version": "v0.9.1"
   },
@@ -12,14 +12,29 @@
         {
           "children": [
             "form_slot",
-            "status_banner",
+            "status_text",
+            "table_heading",
             "create_button",
-            "data_grid",
+            "records_list",
+            "empty_state",
             "action_result_panel"
           ],
-          "component": "entityPage",
-          "id": "root",
-          "title": "Ticket"
+          "component": "Column",
+          "id": "root"
+        },
+        {
+          "component": "Text",
+          "id": "table_heading",
+          "text": "Ticket",
+          "variant": "h2"
+        },
+        {
+          "children": {
+            "componentId": "record_row",
+            "path": "/records"
+          },
+          "component": "List",
+          "id": "records_list"
         },
         {
           "action": {
@@ -39,60 +54,94 @@
           "text": "Create Ticket"
         },
         {
+          "child": "record_row_content",
+          "component": "Card",
+          "id": "record_row"
+        },
+        {
           "children": [
-            "empty_state"
+            "table_cell_subject",
+            "view_button",
+            "edit_button"
           ],
-          "columns": [
-            {
-              "label": "Subject",
-              "path": "subject"
-            }
+          "component": "Row",
+          "id": "record_row_content"
+        },
+        {
+          "children": [
+            "table_cell_subject_label",
+            "table_cell_subject_value"
           ],
-          "component": "dataGrid",
-          "id": "data_grid",
-          "label": "Ticket",
-          "rowActions": [
-            {
-              "action": "view_record",
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
-              },
-              "label": "View"
-            },
-            {
-              "action": "start_edit",
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
-              },
-              "label": "Edit"
-            }
-          ],
-          "rowClick": {
-            "action": "view_record",
-            "context": {
-              "component": "table",
-              "recordId": {
-                "path": "id"
-              }
-            },
-            "label": "View"
-          },
-          "rowId": "id",
-          "rows": {
-            "path": "/records"
+          "component": "Row",
+          "id": "table_cell_subject"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_subject_label",
+          "text": "Subject",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_subject_value",
+          "text": {
+            "path": "subject"
           }
         },
         {
-          "children": [],
-          "component": "emptyState",
-          "id": "empty_state",
-          "message": {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "view_record"
+            }
+          },
+          "child": "view_button_text",
+          "component": "Button",
+          "id": "view_button"
+        },
+        {
+          "component": "Text",
+          "id": "view_button_text",
+          "text": "View"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "start_edit"
+            }
+          },
+          "child": "edit_button_text",
+          "component": "Button",
+          "id": "edit_button"
+        },
+        {
+          "component": "Text",
+          "id": "edit_button_text",
+          "text": "Edit"
+        },
+        {
+          "children": {
+            "componentId": "empty_state_text",
+            "path": "/_empty_visible"
+          },
+          "component": "List",
+          "id": "empty_state"
+        },
+        {
+          "component": "Text",
+          "id": "empty_state_text",
+          "text": {
             "path": "_empty_message"
           }
         },
@@ -202,8 +251,9 @@
           "children": [
             "form_input_subject",
             "form_error_subject",
-            "form_select_author_id",
+            "form_input_author_id",
             "form_error_author_id",
+            "nested_notes",
             "nested_tags"
           ],
           "component": "Column",
@@ -218,103 +268,133 @@
           }
         },
         {
+          "component": "ChoicePicker",
+          "id": "form_input_author_id",
+          "label": "Author id",
+          "options": [],
+          "value": {
+            "path": "/form/author_id"
+          },
+          "variant": "mutuallyExclusive"
+        },
+        {
           "children": [
-            "form_select_author_id_label",
-            "form_select_author_id_selected",
-            "form_select_author_id_controls",
-            "form_select_author_id_options"
+            "nested_notes_heading",
+            "nested_notes_rows",
+            "nested_notes_add_button"
           ],
           "component": "Column",
-          "id": "form_select_author_id"
+          "id": "nested_notes"
         },
         {
           "component": "Text",
-          "id": "form_select_author_id_label",
-          "text": "Author id",
-          "variant": "h4"
-        },
-        {
-          "component": "Text",
-          "id": "form_select_author_id_selected",
-          "text": {
-            "path": "/select/author_id/label"
-          }
-        },
-        {
-          "children": [
-            "form_select_author_id_search_input",
-            "form_select_author_id_search_button"
-          ],
-          "component": "Row",
-          "id": "form_select_author_id_controls"
-        },
-        {
-          "component": "TextField",
-          "id": "form_select_author_id_search_input",
-          "label": "Search",
-          "value": {
-            "path": "/select/author_id/search"
-          }
-        },
-        {
-          "action": {
-            "event": {
-              "context": {
-                "field": "author_id",
-                "search": {
-                  "path": "/select/author_id/search"
-                }
-              },
-              "name": "option_search"
-            }
-          },
-          "child": "form_select_author_id_search_text",
-          "component": "Button",
-          "id": "form_select_author_id_search_button"
-        },
-        {
-          "component": "Text",
-          "id": "form_select_author_id_search_text",
-          "text": "Search"
+          "id": "nested_notes_heading",
+          "text": "Notes",
+          "variant": "h3"
         },
         {
           "children": {
-            "componentId": "form_select_author_id_option_button",
-            "path": "/options/author_id"
+            "componentId": "nested_notes_row",
+            "path": "/form/notes"
           },
           "component": "List",
-          "id": "form_select_author_id_options"
+          "id": "nested_notes_rows"
+        },
+        {
+          "children": [
+            "nested_notes_input_body",
+            "nested_notes_row_error_body",
+            "nested_notes_input_rating",
+            "nested_notes_row_error_rating",
+            "nested_notes_remove_button"
+          ],
+          "component": "Row",
+          "id": "nested_notes_row"
+        },
+        {
+          "component": "TextField",
+          "id": "nested_notes_input_body",
+          "label": "Body",
+          "value": {
+            "path": "body"
+          }
+        },
+        {
+          "component": "TextField",
+          "id": "nested_notes_input_rating",
+          "label": "Rating",
+          "value": {
+            "path": "rating"
+          },
+          "variant": "number"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_row_error_body",
+          "text": {
+            "path": "_error_body"
+          },
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_row_error_rating",
+          "text": {
+            "path": "_error_rating"
+          },
+          "variant": "caption"
         },
         {
           "action": {
             "event": {
               "context": {
-                "field": "author_id",
-                "value": {
-                  "path": "value"
+                "argument": "notes",
+                "row": {
+                  "path": "_row"
+                },
+                "rows": {
+                  "path": "/form/notes"
                 }
               },
-              "name": "option_select"
+              "name": "nested_remove"
             }
           },
-          "child": "form_select_author_id_option_text",
+          "child": "nested_notes_remove_text",
           "component": "Button",
-          "id": "form_select_author_id_option_button",
-          "variant": "borderless"
+          "id": "nested_notes_remove_button"
         },
         {
           "component": "Text",
-          "id": "form_select_author_id_option_text",
-          "text": {
-            "path": "label"
-          }
+          "id": "nested_notes_remove_text",
+          "text": "Remove"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "argument": "notes",
+                "rows": {
+                  "path": "/form/notes"
+                }
+              },
+              "name": "nested_add"
+            }
+          },
+          "child": "nested_notes_add_text",
+          "component": "Button",
+          "id": "nested_notes_add_button"
+        },
+        {
+          "component": "Text",
+          "id": "nested_notes_add_text",
+          "text": "Add"
         },
         {
           "children": [
             "nested_tags_heading",
             "nested_tags_rows",
-            "nested_tags_controls",
-            "nested_tags_options"
+            "nested_tags_picker",
+            "nested_tags_add_button"
           ],
           "component": "Column",
           "id": "nested_tags"
@@ -373,49 +453,14 @@
           "text": "Remove"
         },
         {
-          "children": [
-            "nested_tags_search_input",
-            "nested_tags_search_button"
-          ],
-          "component": "Row",
-          "id": "nested_tags_controls"
-        },
-        {
-          "component": "TextField",
-          "id": "nested_tags_search_input",
-          "label": "Search",
+          "component": "ChoicePicker",
+          "id": "nested_tags_picker",
+          "label": "Add",
+          "options": [],
           "value": {
-            "path": "/select/tags/search"
-          }
-        },
-        {
-          "action": {
-            "event": {
-              "context": {
-                "field": "tags",
-                "search": {
-                  "path": "/select/tags/search"
-                }
-              },
-              "name": "option_search"
-            }
+            "path": "/select/tags/picked"
           },
-          "child": "nested_tags_search_text",
-          "component": "Button",
-          "id": "nested_tags_search_button"
-        },
-        {
-          "component": "Text",
-          "id": "nested_tags_search_text",
-          "text": "Search"
-        },
-        {
-          "children": {
-            "componentId": "nested_tags_option_button",
-            "path": "/options/tags"
-          },
-          "component": "List",
-          "id": "nested_tags_options"
+          "variant": "mutuallyExclusive"
         },
         {
           "action": {
@@ -426,23 +471,20 @@
                   "path": "/form/tags"
                 },
                 "value": {
-                  "path": "value"
+                  "path": "/select/tags/picked"
                 }
               },
               "name": "nested_add"
             }
           },
-          "child": "nested_tags_option_text",
+          "child": "nested_tags_add_text",
           "component": "Button",
-          "id": "nested_tags_option_button",
-          "variant": "borderless"
+          "id": "nested_tags_add_button"
         },
         {
           "component": "Text",
-          "id": "nested_tags_option_text",
-          "text": {
-            "path": "label"
-          }
+          "id": "nested_tags_add_text",
+          "text": "Add"
         },
         {
           "component": "Text",
@@ -519,12 +561,9 @@
           "text": "Cancel"
         },
         {
-          "component": "statusBanner",
-          "id": "status_banner",
-          "kind": {
-            "path": "/ui/feedback/kind"
-          },
-          "message": {
+          "component": "Text",
+          "id": "status_text",
+          "text": {
             "path": "/ui/feedback/message"
           }
         },
@@ -543,14 +582,14 @@
           }
         }
       ],
-      "surfaceId": "tickets_search"
+      "surfaceId": "tickets"
     },
     "version": "v0.9.1"
   },
   {
     "updateDataModel": {
       "path": "/",
-      "surfaceId": "tickets_search",
+      "surfaceId": "tickets",
       "value": {
         "_empty_message": "No Ticket records yet.",
         "_empty_visible": [
@@ -560,6 +599,7 @@
         ],
         "errors": {},
         "form": {
+          "notes": [],
           "tags": []
         },
         "options": {
@@ -568,10 +608,6 @@
         },
         "records": [],
         "select": {
-          "author_id": {
-            "label": "",
-            "search": ""
-          },
           "tags": {
             "picked": [],
             "search": ""
@@ -594,8 +630,7 @@
             "title": "",
             "view_visible": [],
             "visible": []
-          },
-          "status": ""
+          }
         }
       }
     },

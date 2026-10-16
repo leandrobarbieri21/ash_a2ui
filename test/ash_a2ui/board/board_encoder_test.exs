@@ -19,7 +19,6 @@ defmodule AshA2ui.Board.BoardEncoderTest do
 
   setup do
     on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.delete_env(:ash_a2ui, :catalog)
     end)
 
@@ -94,7 +93,7 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     create_task!("charlie", :open)
     create_task!("delta", :claimed)
 
-    # --- v0.9.1 (experience v2, the default) ---
+    # --- v0.9.1 ---
     {components, value} = v0_9_1_parts(AshA2ui.Test.BoardTaskUI)
 
     # One root child for the whole board; no per-lane root children.
@@ -159,22 +158,6 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     assert length(value["records"]["board_open"]) == 2
     assert value["query"]["board_open"]["_pagination_visible"] == [%{"id" => "on"}]
 
-    # --- v0.9.1, experience v1 (the pinned legacy emission) ---
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-    {legacy, legacy_value} = v0_9_1_parts(AshA2ui.Test.BoardTaskUI)
-
-    assert legacy["root"]["children"] == ["board_board", "status_text", "action_result_panel"]
-
-    assert legacy["lane_board_open"]["children"] == [
-             "lane_board_open_header",
-             "query_board_open_controls",
-             "records_list_board_open",
-             "query_board_open_pagination"
-           ]
-
-    assert legacy_value["_lane_total_board_open"] == "3"
-    Application.delete_env(:ash_a2ui, :experience_version)
-
     # --- v1.0 (no query: totals from the row count, no pagination) ---
     assert [message] = AshA2ui.Info.build_surface(AshA2ui.Test.BoardTaskV1UI, authorize?: false)
     assert_valid_server_message(message, :v1_0)
@@ -217,17 +200,14 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     # List-mode sectioned surfaces encode exactly as on the pre-board base.
     substitutions = seed_bucket_words()
 
-    for {experience, prefix} <- [{1, "exp1"}, {2, "exp2"}],
-        {ui, file} <- [
+    for {ui, file} <- [
           {AshA2ui.Test.BucketWordsUI, "bucket_words_ui"},
           {AshA2ui.Test.BucketWordsV1UI, "bucket_words_v1_ui"}
         ] do
-      Application.put_env(:ash_a2ui, :experience_version, experience)
-
-      golden = @golden_dir |> Path.join("#{prefix}_#{file}.json") |> File.read!()
+      golden = @golden_dir |> Path.join("#{file}.json") |> File.read!()
 
       assert Jason.decode!(normalized_surface(ui, substitutions)) == Jason.decode!(golden),
-             "#{inspect(ui)} (experience v#{experience}) differs from its base golden"
+             "#{inspect(ui)} differs from its base golden"
     end
   end
 end

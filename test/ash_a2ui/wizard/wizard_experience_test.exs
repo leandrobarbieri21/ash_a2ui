@@ -1,6 +1,6 @@
 defmodule AshA2ui.Wizard.WizardExperienceTest do
   @moduledoc """
-  A2UI-106/AC-9: under experience v2 a stepped form's panel primary label
+  A2UI-106/AC-9: a stepped form's panel primary label
   reads "Next" before the last step and the usual create/save label on it,
   and the panel's submit gate follows the step.
   """
@@ -14,12 +14,6 @@ defmodule AshA2ui.Wizard.WizardExperienceTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Enrollment
   alias AshA2ui.Test.Experience.Task
-
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-    on_exit(fn -> Application.delete_env(:ash_a2ui, :experience_version) end)
-    :ok
-  end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn

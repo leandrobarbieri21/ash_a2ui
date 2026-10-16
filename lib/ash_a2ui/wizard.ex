@@ -23,8 +23,7 @@ defmodule AshA2ui.Wizard do
         "what_visible" => [],
         "nav" => %{
           "back_visible" => [],
-          "next_visible" => [%{"id" => "on"}],
-          "submit_visible" => []
+          "next_visible" => [%{"id" => "on"}]
         }
       }
 
@@ -41,11 +40,9 @@ defmodule AshA2ui.Wizard do
   Back (`wizard_back`) and Next (`wizard_next`) buttons behind their nav
   sentinels. A review step renders `form_review_<field>` caption/value rows
   bound to `/form/<field>` (`/select/<field>/label` for a searchable
-  select). Under experience v1 the submit button sits behind
-  `/ui/wizard/nav/submit_visible`; under v2 the panel's
-  `/ui/panel/submit_visible` gate already hides it before the last step, and
-  the Next button's label binds `/ui/panel/primary_label` (which reads
-  "Next" until the last step).
+  select). The panel's `/ui/panel/submit_visible` gate hides the submit
+  button before the last step, and the Next button's label binds
+  `/ui/panel/primary_label` (which reads "Next" until the last step).
   """
 
   alias AshA2ui.Experience
@@ -166,8 +163,7 @@ defmodule AshA2ui.Wizard do
         end),
       "nav" => %{
         "back_visible" => Experience.sentinel(index > 0),
-        "next_visible" => Experience.sentinel(index < last),
-        "submit_visible" => Experience.sentinel(index == last)
+        "next_visible" => Experience.sentinel(index < last)
       }
     })
   end
@@ -181,14 +177,6 @@ defmodule AshA2ui.Wizard do
   @doc false
   # The form's field children on a stepped form: the single wizard Column.
   def field_children, do: ["form_wizard"]
-
-  @doc false
-  # The v1 form Column's submit child: gated on stepped forms.
-  def submit_child(%{steps: [_ | _]}) do
-    if Experience.v2?(), do: "form_submit_button", else: "form_wizard_submit_slot"
-  end
-
-  def submit_child(_form), do: "form_submit_button"
 
   @doc false
   # The wizard subtree. `anchor_ids` maps a field name to its input/error
@@ -321,9 +309,6 @@ defmodule AshA2ui.Wizard do
   end
 
   defp nav_components(_view) do
-    next_text =
-      if Experience.v2?(), do: %{"path" => "/ui/panel/primary_label"}, else: @next_label
-
     [
       %{
         "id" => "form_wizard_nav",
@@ -377,25 +362,12 @@ defmodule AshA2ui.Wizard do
           }
         }
       },
-      %{"id" => "form_wizard_next_text", "component" => "Text", "text" => next_text}
-    ] ++ submit_slot()
-  end
-
-  defp submit_slot do
-    if Experience.v2?() do
-      []
-    else
-      [
-        %{
-          "id" => "form_wizard_submit_slot",
-          "component" => "List",
-          "children" => %{
-            "componentId" => "form_submit_button",
-            "path" => "/ui/wizard/nav/submit_visible"
-          }
-        }
-      ]
-    end
+      %{
+        "id" => "form_wizard_next_text",
+        "component" => "Text",
+        "text" => %{"path" => "/ui/panel/primary_label"}
+      }
+    ]
   end
 
   defp form_fields(%{components: components}) do

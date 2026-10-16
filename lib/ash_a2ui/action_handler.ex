@@ -45,11 +45,11 @@ defmodule AshA2ui.ActionHandler do
       Invokes a destroy/update/generic action by name. The action **must be
       listed in the resolved view's `row_actions`** — that allowlist is the
       authorization surface for client-triggered actions; anything else is
-      rejected with a `/ui/status` error before touching Ash. When the
+      rejected with an error outcome before touching Ash. When the
       action's `action` entity declares `visible_when` conditions, the
       identified record is fetched (with any condition calculations loaded)
       and the conditions are evaluated server-side — an invoke on a
-      non-visible action is rejected with a `/ui/status` error, regardless
+      non-visible action is rejected with an error outcome, regardless
       of what the client rendered. Destroy- and
       update-type actions run **the named action** on the record identified
       by `"recordId"`. Params are empty unless the action's `action` entity
@@ -72,7 +72,7 @@ defmodule AshA2ui.ActionHandler do
       action name, surface id, and context selections; whatever the delegate
       returns — `:ok`, `{:ok, term}`, or `{:error, Ash.Error.t()}` — renders
       through the standard channels (refreshes honoring `refreshes`, status
-      text, `/errors/<field>` mapping, v2 `/ui/feedback`) unchanged. The
+      text, `/errors/<field>` mapping, `/ui/feedback`) unchanged. The
       client neither knows nor needs to know `via` exists.
 
     * `"prompt"` — context `%{"action" => name, "recordId" => id}`. Sent by
@@ -95,32 +95,29 @@ defmodule AshA2ui.ActionHandler do
       the read does not return are refused, records failing `visible_when`
       are skipped, and every remaining record runs through the same
       dispatch as `invoke` (one call each, no shared transaction). The
-      outcome goes to `/bulk/<table>/result` and the status line (typed v2
-      feedback is `"warning"` on partial success); targets refresh once,
+      outcome goes to `/bulk/<table>/result` and `/ui/feedback` (kind
+      `"warning"` on partial success); targets refresh once,
       and not at all when nothing was written. `bulk_select` takes
       `%{"component", "selected" => boolean}` and rewrites the table's
       re-read rows with `"_selected"` set.
 
-    * `"select_row"` — context `%{"recordId" => id}`. Returns a single
-      `updateDataModel` populating `/form` with the record's field values
-      (edit-form population), including `"id"`.
-
     * `"start_create"` / `"view_record"` / `"start_edit"` /
-      `"cancel_record_task"` — the experience v2 task-mode actions (see
-      `AshA2ui.Experience`; accepted by default and rejected under an
-      `experience_version: 1` pin like any unknown action). `start_create` opens the record
-      panel in create mode over a fresh `/form`; `view_record`/`start_edit`
-      take `%{"recordId" => id}`, fetch the record through an authorized
-      read (`start_edit` additionally pre-flights the update authorization,
-      so the edit panel never opens on a task the server would refuse to
-      commit) and populate `/form` exactly like `select_row`; the panel
-      state (intent, mode, heading, primary label, submit visibility)
-      carries the mode. `cancel_record_task` closes the panel, resets
-      `/form`, and clears feedback. Task submissions (`submit_form` under
-      v2) report typed outcomes at `/ui/feedback` (`{"kind", "message"}` —
-      success closes the panel and returns to browse; errors keep the mode,
-      panel, and submitted values), and `invoke` failures under v2 carry an
-      `/ui/feedback` error write alongside the classic `/ui/status` text.
+      `"cancel_record_task"` — the task-panel actions (see
+      `AshA2ui.Experience`). `start_create` opens the record panel in create
+      mode over a fresh `/form` (rejected without a create action);
+      `view_record` and `start_edit` take `%{"recordId" => id}` and fetch the
+      record through an authorized read. `view_record` writes the read-only
+      display values to `/ui/panel/record` and never touches `/form`;
+      `start_edit` (rejected without a declared `update_action`) pre-flights
+      the update authorization, so the edit panel never opens on a task the
+      server would refuse to commit, then populates `/form` with the
+      record's field values (including `"id"` and nested-form rows) and
+      `/select` with the searchable selects' labels. The panel state
+      (intent, mode, heading, primary label, submit visibility) carries the
+      mode. `cancel_record_task` closes the panel, resets `/form`, and
+      clears feedback. A successful `submit_form` closes the panel and
+      returns to browse; a failed one keeps the mode, panel, and submitted
+      values for correction.
 
     * `"wizard_next"` / `"wizard_back"` — the wizard-step actions of a form
       declaring `step` entities (see `AshA2ui.Wizard`). `wizard_next` takes
@@ -136,20 +133,20 @@ defmodule AshA2ui.ActionHandler do
       clears and `/ui/wizard` moves to the next step. `wizard_back` takes
       `%{"index" => step}` and moves back without validating or touching
       `/form`. The carried index is clamped into the step range; a
-      non-integer index is refused. Under v2 both also rewrite
+      non-integer index is refused. Both also rewrite
       `/ui/panel/primary_label` and `/ui/panel/submit_visible`. A failed
       `submit_form` on a stepped form moves `/ui/wizard` to the earliest
       step owning an erroring field (the last step when none does).
-      `start_create`, `start_edit`, `cancel_record_task`, a successful
-      `submit_form` and, under v1, `select_row` and every other success
-      reset it to step 0. Surfaces without steps reject both names.
+      `start_create`, `view_record`, `start_edit`, `cancel_record_task` and a
+      successful `submit_form` reset it to step 0. Surfaces without steps
+      reject both names.
 
     * `"query"` — context `%{"query" => <the /query map>}` plus an optional
       literal `"page"` override or relative `"pageDelta"` (used by the
       emitted Apply / prev / next controls). Requires the surface's table to
       declare a `query`; every requested search/sort/filter/page value is
       validated against that named allowlist by `AshA2ui.QueryRunner` —
-      non-allowlisted values are rejected with a `/ui/status` error before
+      non-allowlisted values are rejected with an error outcome before
       Ash is called. On success returns `updateDataModel` messages for
       `/records` and `/query`.
 
@@ -171,27 +168,35 @@ defmodule AshA2ui.ActionHandler do
   `require_context` render no records (no read executes), and
   `context_filter` entries become equality filters ANDed onto the read.
 
-  Unknown action names and malformed messages return
-  `{:error, [updateDataModel]}` with an explanation at `/ui/status`.
+  Unknown action names (including the removed `"select_row"`) and malformed
+  messages return `{:error, [updateDataModel]}` with an error outcome.
 
   ## Follow-up messages
 
-  All returned messages are A2UI v0.9.1 `updateDataModel` server messages
-  using the reserved data-model paths (see `topics/data-model-conventions`):
+  All returned messages are A2UI `updateDataModel` server messages using the
+  reserved data-model paths (see `topics/data-model-conventions`). Every
+  outcome — success, validation failure, rejection, refusal — is written
+  as typed feedback to `/ui/feedback` (`%{"kind" => "success" | "warning" |
+  "error", "message" => text}`), the path the status Text and the admin
+  statusBanner bind:
 
     * on success: `/records` (re-read row maps, each including `"id"`;
       `source` columns are re-loaded and walked), `/form` cleared to `%{}`,
-      `/errors` cleared to `%{}`, `/ui/status` set to a success text, and
+      `/errors` cleared to `%{}`, `/ui/feedback` set to a success value, and
       `/ui/action_result` + `/ui/action_result_text` cleared — then set for
       map-returning generic actions. On query-enabled surfaces the re-read
       runs through
       the query (`submit_form`/`invoke` contexts may carry the current
       `/query` map under `"query"`; missing or invalid state falls back to
       the query's defaults) and a `/query` state message is included;
-    * on validation errors: `/errors/<field>` per failing field and
-      `/ui/status`;
-    * on `Ash.Error.Forbidden`: only a `/ui/status` "not authorized" message
+    * on validation errors: `/errors/<field>` per failing field and an
+      `/ui/feedback` error;
+    * on `Ash.Error.Forbidden`: only an `/ui/feedback` "not authorized" error
       (no field errors, to avoid leaking policy details).
+
+  On v1.0 surfaces the outcome is additionally the structured `/ui/response`
+  object and the `actionResponse` handshake (see `AshA2ui.Encoder.V1_0`);
+  `/ui/feedback` carries the same message.
 
   Values are serialized JSON-safe (dates/datetimes to ISO 8601, decimals to
   strings, atoms to strings).
@@ -206,6 +211,7 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.Conditions
   alias AshA2ui.ContextRunner
   alias AshA2ui.Csv
+  alias AshA2ui.Encoder.V0_9_1
   alias AshA2ui.Encoder.V1_0
   alias AshA2ui.Experience
   alias AshA2ui.QueryRunner
@@ -220,7 +226,7 @@ defmodule AshA2ui.ActionHandler do
 
   Returns `{:ok, messages}` with follow-up server->client messages or
   `{:error, messages}` carrying error information on the reserved
-  `/errors/<field>` and `/ui/status` data-model paths. See the moduledoc for
+  `/errors/<field>` and `/ui/feedback` data-model paths. See the moduledoc for
   the accepted message shapes and emitted messages.
 
   ## Options
@@ -249,18 +255,37 @@ defmodule AshA2ui.ActionHandler do
 
             name
             |> dispatch(context, env)
+            |> put_error_feedback(view)
             |> attach_action_response(view, action_id)
 
           {:error, error} ->
             {:error, error_messages(view, error)}
+            |> put_error_feedback(view)
             |> attach_action_response(view, action_id)
         end
 
       {:error, action_id} ->
         {:error, [status(view, "Malformed action message: expected an A2UI action envelope.")]}
+        |> put_error_feedback(view)
         |> attach_action_response(view, action_id)
     end
   end
+
+  # Every failed action reports a typed /ui/feedback error — the path the
+  # status Text and the admin statusBanner bind — whatever the rejection
+  # path. On v0.9.1 status/3 already writes it; on v1.0 the outcome lives in
+  # the structured /ui/response object (the actionResponse contract), and
+  # this mirrors its message into /ui/feedback.
+  defp put_error_feedback({:error, messages}, view) do
+    if Enum.any?(messages, &match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, &1)) do
+      {:error, messages}
+    else
+      feedback = Experience.feedback("error", feedback_message(messages))
+      {:error, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
+    end
+  end
+
+  defp put_error_feedback(result, _view), do: result
 
   # --- v1.0 actionResponse ----------------------------------------------------
 
@@ -370,7 +395,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp dispatch("submit_form", context, env) do
     values = Map.get(context, "values") || %{}
-    env = env |> Map.put(:submitted, values) |> Map.put(:task, Experience.v2?())
+    env = Map.put(env, :submitted, values)
 
     case Map.get(context, "recordId") do
       nil -> create(env, values)
@@ -378,19 +403,9 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp dispatch("invoke", context, %{view: view} = env) do
-    case invoke_dispatch(context, env) do
-      {:error, messages} -> {:error, messages ++ invoke_feedback(view, messages)}
-      ok -> ok
-    end
-  end
+  defp dispatch("invoke", context, env), do: invoke_dispatch(context, env)
 
-  defp dispatch("bulk_invoke", context, %{view: view} = env) do
-    case bulk_invoke(context, env) do
-      {:error, messages} -> {:error, messages ++ invoke_feedback(view, messages)}
-      ok -> ok
-    end
-  end
+  defp dispatch("bulk_invoke", context, env), do: bulk_invoke(context, env)
 
   defp dispatch("bulk_select", context, env), do: bulk_select(context, env)
 
@@ -449,16 +464,6 @@ defmodule AshA2ui.ActionHandler do
         _missing ->
           {:error, [status(view, ~s(Malformed edit_cell action: context is missing "recordId".))]}
       end
-    end
-  end
-
-  defp dispatch("select_row", context, %{view: view, ash_opts: ash_opts}) do
-    case Map.get(context, "recordId") do
-      nil ->
-        {:error, [status(view, ~s(Malformed select_row action: context is missing "recordId".))]}
-
-      record_id ->
-        select_row(view, record_id, ash_opts)
     end
   end
 
@@ -609,28 +614,12 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # --- experience v2 task modes ----------------------------------------------
+  # --- task panel ------------------------------------------------------------
 
-  # The task-mode actions exist only under experience v2; under v1 the names
-  # fall through to the unknown-action error, exactly as before.
-
-  defp dispatch("start_create", _context, %{view: view} = env) do
-    if Experience.v2?(), do: start_create(env), else: unknown_action(view, "start_create")
-  end
-
-  defp dispatch("view_record", context, %{view: view} = env) do
-    if Experience.v2?(), do: view_record(env, context), else: unknown_action(view, "view_record")
-  end
-
-  defp dispatch("start_edit", context, %{view: view} = env) do
-    if Experience.v2?(), do: start_edit(env, context), else: unknown_action(view, "start_edit")
-  end
-
-  defp dispatch("cancel_record_task", _context, %{view: view} = env) do
-    if Experience.v2?(),
-      do: cancel_record_task(env),
-      else: unknown_action(view, "cancel_record_task")
-  end
+  defp dispatch("start_create", _context, env), do: start_create(env)
+  defp dispatch("view_record", context, env), do: view_record(env, context)
+  defp dispatch("start_edit", context, env), do: start_edit(env, context)
+  defp dispatch("cancel_record_task", _context, env), do: cancel_record_task(env)
 
   defp dispatch("wizard_next", context, env), do: wizard_next(env, context)
   defp dispatch("wizard_back", context, env), do: wizard_back(env, context)
@@ -744,23 +733,6 @@ defmodule AshA2ui.ActionHandler do
 
   defp unknown_action(view, name) do
     {:error, [status(view, "Unknown action #{inspect(name)}.")]}
-  end
-
-  # v2 typed feedback: an invoke failure carries an /ui/feedback error write
-  # alongside the classic /ui/status text (no visual change required of the
-  # basic catalog — the kind is there for renderers that want it).
-  defp invoke_feedback(view, messages) do
-    if Experience.v2?() do
-      [
-        update_data_model(
-          view,
-          "/ui/feedback",
-          Experience.feedback("error", feedback_message(messages))
-        )
-      ]
-    else
-      []
-    end
   end
 
   defp invoke_dispatch(context, %{view: view} = env) do
@@ -1305,7 +1277,7 @@ defmodule AshA2ui.ActionHandler do
   # receives the dispatch context plus its extra args, and its return value
   # — the same shapes a direct invocation produces — renders through the
   # standard channels (status text, refreshes honoring the action entity,
-  # typed /ui/feedback under v2) unchanged.
+  # typed /ui/feedback) unchanged.
   defp invoke_via(_module, _function, _extra_args, nil, %{view: view, invoked: action_name}) do
     {:error,
      [
@@ -1649,7 +1621,7 @@ defmodule AshA2ui.ActionHandler do
 
   # The run's follow-ups: the /bulk/<table>/result write, then — when at
   # least one record was written — the standard success follow-ups
-  # (refreshes honoring `refreshes`, status, and typed v2 feedback that is
+  # (refreshes honoring `refreshes`, and typed feedback that is
   # "warning" on partial success); otherwise an error status and no refresh.
   defp bulk_messages(table, action_name, selected, result, %{view: view} = env) do
     text = Bulk.status_text(action_name, selected, result)
@@ -1708,9 +1680,20 @@ defmodule AshA2ui.ActionHandler do
 
     case Bulk.capped_selection_text(table, count, selected) do
       nil -> []
-      text -> [status(view, text)]
+      text -> notice(view, text)
     end
   end
+
+  # An informational outcome on an otherwise successful action: a typed
+  # "warning" /ui/feedback (plus, on v1.0, the /ui/response status write).
+  defp notice(%{spec_version: :v1_0} = view, text),
+    do: [
+      status(view, text),
+      update_data_model(view, "/ui/feedback", Experience.feedback("warning", text))
+    ]
+
+  defp notice(view, text),
+    do: [update_data_model(view, "/ui/feedback", Experience.feedback("warning", text))]
 
   defp mark_selected(
          %{"updateDataModel" => %{"path" => path, "value" => rows} = update} = message,
@@ -1724,30 +1707,12 @@ defmodule AshA2ui.ActionHandler do
 
   defp mark_selected(message, _table, _selected), do: message
 
-  # --- select_row ------------------------------------------------------------
+  # --- record population -----------------------------------------------------
 
-  # Populates /form with the record's field values plus one row array per
-  # nested-form argument (loaded through the argument's relationship), and
-  # rewrites /select with the searchable selects' current labels (surfaces
-  # without wave-5 relationship inputs emit the single frozen /form message).
-  #
-  # Under experience v1 the row select is what loads a record into the
-  # form, so a stepped form goes back to its first step with it. Under v2
-  # the start_edit task open does that (task_open_messages/3).
-  defp select_row(view, record_id, ash_opts) do
-    case fetch_record(view, record_id, ash_opts, ResolvedView.form_loads(view)) do
-      {:ok, record} ->
-        reset = if Experience.v2?(), do: [], else: wizard_reset(view)
-        {:ok, form_population(view, record) ++ reset}
-
-      {:error, error} ->
-        {:error, error_messages(view, error)}
-    end
-  end
-
-  # The shared /form population for select_row (v1's row-select) and the v2
-  # start_edit task: the record's field values plus nested rows, then the
-  # searchable selects' label rewrite.
+  # The /form population of the start_edit task: the record's field values
+  # plus one row array per nested-form argument (loaded through the
+  # argument's relationship), then the searchable selects' label rewrite
+  # (/select).
   defp form_population(view, record) do
     form =
       view
@@ -1962,7 +1927,11 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp report_status(view, count) do
-    update_data_model(view, "/ui/status", report_status_text(count))
+    update_data_model(
+      view,
+      "/ui/feedback",
+      Experience.feedback("success", report_status_text(count))
+    )
   end
 
   defp report_status_text(1), do: "Report complete: 1 row."
@@ -2285,18 +2254,7 @@ defmodule AshA2ui.ActionHandler do
       [update_data_model(view, "/errors", %{}) | field_messages] ++
         [status(view, error_status(field_messages, nil), "VALIDATION_FAILED")]
 
-    feedback =
-      if Experience.v2?(),
-        do: [
-          update_data_model(
-            view,
-            "/ui/feedback",
-            Experience.feedback("error", feedback_message(messages))
-          )
-        ],
-        else: []
-
-    {:error, messages ++ feedback ++ wizard_moves(view, Map.get(context, "recordId"), index)}
+    {:error, messages ++ wizard_moves(view, Map.get(context, "recordId"), index)}
   end
 
   defp wizard_back(%{view: view}, context) do
@@ -2320,28 +2278,21 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # The /ui/wizard state for `index` plus — under experience v2 — the panel's
-  # primary label and submit gate for that step (create without a record
-  # id, edit with one).
+  # The /ui/wizard state for `index` plus the panel's primary label and
+  # submit gate for that step (create without a record id, edit with one).
   defp wizard_moves(view, record_id, index) do
-    panel =
-      if Experience.v2?() do
-        mode = if is_nil(record_id), do: :create, else: :edit
-        state = Experience.panel_state(mode, view, record_id, index)
+    mode = if is_nil(record_id), do: :create, else: :edit
+    state = Experience.panel_state(mode, view, record_id, index)
 
-        [
-          update_data_model(view, "/ui/panel/primary_label", state["primary_label"]),
-          update_data_model(view, "/ui/panel/submit_visible", state["submit_visible"])
-        ]
-      else
-        []
-      end
-
-    [update_data_model(view, "/ui/wizard", AshA2ui.Wizard.state(view, index)) | panel]
+    [
+      update_data_model(view, "/ui/wizard", AshA2ui.Wizard.state(view, index)),
+      update_data_model(view, "/ui/panel/primary_label", state["primary_label"]),
+      update_data_model(view, "/ui/panel/submit_visible", state["submit_visible"])
+    ]
   end
 
-  # Every /form reset (task open/cancel, row select under v1, a successful
-  # submit) returns a stepped form to its first step. A no-op without steps.
+  # Every /form reset (task open/cancel, a successful submit) returns a
+  # stepped form to its first step. A no-op without steps.
   defp wizard_reset(view) do
     if AshA2ui.Wizard.stepped?(view),
       do: [update_data_model(view, "/ui/wizard", AshA2ui.Wizard.state(view, 0))],
@@ -2350,7 +2301,7 @@ defmodule AshA2ui.ActionHandler do
 
   # A failed submit_form on a stepped form jumps to the earliest step owning
   # an erroring field; an error on no step's field stays on the last step.
-  # The submitted /form carries "id" on edit tasks (it only picks the v2
+  # The submitted /form carries "id" on edit tasks (it only picks the
   # panel label — the write already ran against the context's recordId).
   defp wizard_submit_failure(%{submitted: submitted, view: view}, error) do
     if AshA2ui.Wizard.stepped?(view) do
@@ -2369,16 +2320,11 @@ defmodule AshA2ui.ActionHandler do
   defp wizard_submit_failure(_env, _error), do: []
 
   # A successful submit_form ends the stepped form's run: back to step 0
-  # (under v2 the panel is closed by task_success/2 in the same batch).
-  # Under v1 every other success clears /form too, so the stepped form
-  # restarts with it. Under v2 any other success (a row action) leaves the
-  # open task alone: its step and the panel's primary label and submit
-  # gate stay in step with each other.
-  defp wizard_success_reset(%{view: view} = env) do
-    if Map.has_key?(env, :submitted) or not Experience.v2?(),
-      do: wizard_reset(view),
-      else: []
-  end
+  # (the panel is closed by task_success/2 in the same batch). Any other
+  # success (a row action) leaves the open task alone: its step and the
+  # panel's primary label and submit gate stay in step with each other.
+  defp wizard_success_reset(%{view: view, submitted: _values}), do: wizard_reset(view)
+  defp wizard_success_reset(_env), do: []
 
   # --- success follow-ups ----------------------------------------------------
 
@@ -2387,7 +2333,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp after_write({:error, error}, %{view: view} = env, _status_text) do
     messages = error_messages(view, error) ++ nested_error_mirrors(env, error)
-    {:error, messages ++ task_error_feedback(env, messages) ++ wizard_submit_failure(env, error)}
+    {:error, messages ++ wizard_submit_failure(env, error)}
   end
 
   # A success re-reads and re-emits every refresh-target table (each table's
@@ -2442,7 +2388,6 @@ defmodule AshA2ui.ActionHandler do
            [
              update_data_model(view, "/form", ResolvedView.initial_form(view)),
              update_data_model(view, "/errors", %{}),
-             update_data_model(view, "/ui/status", status_text),
              update_data_model(view, "/ui/action_result", %{}),
              update_data_model(view, "/ui/action_result_text", "")
            ] ++
@@ -2458,10 +2403,10 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # v2: a successful task submission (submit_form) closes the panel and
+  # A successful task submission (submit_form) closes the panel and
   # returns to browse. The typed success feedback itself is written for
   # EVERY success (see success_feedback/2).
-  defp task_success(%{task: true, view: view}, _status_text) do
+  defp task_success(%{submitted: _values, view: view}, _status_text) do
     [
       update_data_model(view, "/ui/intent", "browse"),
       update_data_model(view, "/ui/panel", Experience.panel_state(:hidden))
@@ -2470,43 +2415,22 @@ defmodule AshA2ui.ActionHandler do
 
   defp task_success(_env, _status_text), do: []
 
-  # v2 typed feedback — for EVERY action outcome, invoke and submit alike:
-  # successes write the /ui/feedback success value, the path the v2 status
-  # Text actually binds (the classic /ui/status keeps flowing alongside for
-  # programmatic consumers — under v2 nothing renders it). Failures carry
-  # the error value through invoke_feedback/2 and task_error_feedback/2.
-  # A bulk run passes `:feedback_kind` ("warning" on partial success).
+  # Typed feedback for EVERY successful outcome, invoke and submit alike:
+  # the /ui/feedback success value is what the status Text and the admin
+  # statusBanner bind. A bulk run passes `:feedback_kind` ("warning" on
+  # partial success). Failures get theirs from status/3 (v0.9.1) or
+  # put_error_feedback/2 (v1.0).
   defp success_feedback(%{view: view} = env, status_text) do
-    if Experience.v2?() do
-      kind = Map.get(env, :feedback_kind, "success")
-      [update_data_model(view, "/ui/feedback", Experience.feedback(kind, status_text))]
-    else
-      []
-    end
+    kind = Map.get(env, :feedback_kind, "success")
+    [update_data_model(view, "/ui/feedback", Experience.feedback(kind, status_text))]
   end
 
-  # v2: a failed task submission reports typed error feedback; the mode,
-  # panel, and submitted /form values are deliberately left untouched (the
-  # client keeps its state for correction).
-  defp task_error_feedback(%{task: true, view: view}, messages) do
-    [
-      update_data_model(
-        view,
-        "/ui/feedback",
-        Experience.feedback("error", feedback_message(messages))
-      )
-    ]
-  end
-
-  defp task_error_feedback(_env, _messages), do: []
-
-  # The human-readable text of the batch's /ui/status (or v1.0 /ui/response)
-  # write — reused as the typed feedback message.
+  # The human-readable text of the batch's outcome write — the /ui/feedback
+  # value (v0.9.1) or the /ui/response object (v1.0).
   defp feedback_message(messages) do
     Enum.find_value(messages, "", fn
-      %{"updateDataModel" => %{"path" => "/ui/status", "value" => text}}
-      when is_binary(text) ->
-        text
+      %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => message}}} ->
+        message
 
       %{"updateDataModel" => %{"path" => "/ui/response", "value" => %{"message" => message}}} ->
         message
@@ -2597,8 +2521,8 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # The records rewrite, plus (v2) the table's `_empty_visible` sentinel so
-  # the empty state stays data-driven across refreshes (no-op under v1).
+  # The records rewrite, plus the table's `_empty_visible` sentinel so the
+  # empty state stays data-driven across refreshes.
   defp records_messages(view, table, rows) do
     [update_data_model(view, table.records_path, rows)]
     |> Kernel.++(empty_state_messages(view, table, rows))
@@ -2618,20 +2542,16 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp empty_state_messages(view, table, rows) do
-    if Experience.v2?() do
-      [
-        update_data_model(
-          view,
-          Experience.empty_visible_path(view, table),
-          Experience.sentinel(rows == [])
-        )
-      ]
-    else
-      []
-    end
+    [
+      update_data_model(
+        view,
+        Experience.empty_visible_path(view, table),
+        Experience.sentinel(rows == [])
+      )
+    ]
   end
 
-  # The query-state rewrite, with (v2) the pagination sentinels re-derived
+  # The query-state rewrite, with the pagination sentinels re-derived
   # from the refreshed rows and — when the admin catalog is effective — the
   # plain boolean pagination props (both adornments are gated no-ops
   # outside their mode; the handler learns no new actions for either).
@@ -2647,23 +2567,14 @@ defmodule AshA2ui.ActionHandler do
     ] ++ lane_total_messages(view, table, rows, state)
   end
 
-  # Table rows carry the per-row visibility data (`"_actions"` +
-  # `"_visible_<action>"`, see AshA2ui.Conditions) when any of the table's
-  # row actions declare visible_when conditions, and the `_badge_<field>`
-  # display text when the table declares a row_layout badge — matching the
-  # encoder's initial serialization exactly.
+  # Table rows go through the encoder's own row serialization, so a refresh
+  # emits exactly the row the initial render did: display values (enum
+  # labels), the per-row visibility data (`"_actions"` + `"_visible_<action>"`,
+  # see AshA2ui.Conditions), the row_layout badge text, `_links` and the bulk
+  # `_selected` flag.
   defp rows(view, table, records, ash_opts) do
     links = AshA2ui.Links.context(table.resource, view.fields, table_fields(table), ash_opts)
-
-    Enum.map(records, fn record ->
-      row = record_values(view, record, table_fields(table))
-
-      row
-      |> Map.merge(Conditions.row_visibility(view, table, record))
-      |> Map.merge(AshA2ui.RowLayout.badge_data(table.component.row_layout, record))
-      |> Map.merge(AshA2ui.Links.row_data(links, record, row))
-      |> Map.merge(AshA2ui.Bulk.row_data(table))
-    end)
+    Enum.map(records, &V0_9_1.serialize_row(view, table, &1, links))
   end
 
   # Human-readable, selectable text for a map-returning generic action:
@@ -2704,7 +2615,7 @@ defmodule AshA2ui.ActionHandler do
     |> Ash.read()
   end
 
-  # Record lookups (updates, destroys, select_row) go through the single
+  # Record lookups (updates, destroys, view/edit tasks) go through the single
   # table's read action; on multi-table surfaces — where per-table reads may
   # be filtered slices — through the resource's primary read. `loads` covers
   # visible_when condition calculations when enforcement needs them.
@@ -2929,10 +2840,12 @@ defmodule AshA2ui.ActionHandler do
 
   # --- message + value construction ------------------------------------------
 
-  # An error/rejection status: the v0.9.1 `/ui/status` text, or (v1.0) the
+  # An error/rejection status: the typed `/ui/feedback` error (v0.9.1 — the
+  # path the status Text and the admin statusBanner bind), or (v1.0) the
   # structured `/ui/response` object whose `code` also drives the
-  # actionResponse error (see attach_action_response/3). Dispatch rejections
-  # default to "INVALID_ACTION"; error_messages/2 passes the mapped code.
+  # actionResponse error (see attach_action_response/3; put_error_feedback/2
+  # mirrors it into /ui/feedback). Dispatch rejections default to
+  # "INVALID_ACTION"; error_messages/2 passes the mapped code.
   defp status(view, text, code \\ "INVALID_ACTION")
 
   defp status(%{spec_version: :v1_0} = view, text, code) do
@@ -2949,7 +2862,8 @@ defmodule AshA2ui.ActionHandler do
     )
   end
 
-  defp status(view, text, _code), do: update_data_model(view, "/ui/status", text)
+  defp status(view, text, _code),
+    do: update_data_model(view, "/ui/feedback", Experience.feedback("error", text))
 
   defp update_data_model(view, path, value) do
     %{

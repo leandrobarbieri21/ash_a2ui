@@ -30,7 +30,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       `action` envelope through `AshA2ui.ActionHandler.handle/3` and pushes
       the follow-up messages — for both `{:ok, messages}` and
       `{:error, messages}` results (error messages carry validation feedback
-      on the reserved `/errors/<field>` and `/ui/status` data-model paths).
+      on the reserved `/errors/<field>` and `/ui/feedback` data-model paths).
     - With `:pubsub` configured it subscribes on the connected mount and
       pushes debounced `AshA2ui.Info.build_data_model/2` refreshes when
       broadcasts arrive (see "PubSub live refresh" below).

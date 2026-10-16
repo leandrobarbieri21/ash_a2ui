@@ -1,7 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
       "surfaceId": "tickets_search"
     },
     "version": "v0.9.1"
@@ -12,29 +12,14 @@
         {
           "children": [
             "form_slot",
-            "status_text",
-            "table_heading",
+            "status_banner",
             "create_button",
-            "records_list",
-            "empty_state",
+            "data_grid",
             "action_result_panel"
           ],
-          "component": "Column",
-          "id": "root"
-        },
-        {
-          "component": "Text",
-          "id": "table_heading",
-          "text": "Ticket",
-          "variant": "h2"
-        },
-        {
-          "children": {
-            "componentId": "record_row",
-            "path": "/records"
-          },
-          "component": "List",
-          "id": "records_list"
+          "component": "entityPage",
+          "id": "root",
+          "title": "Ticket"
         },
         {
           "action": {
@@ -54,94 +39,60 @@
           "text": "Create Ticket"
         },
         {
-          "child": "record_row_content",
-          "component": "Card",
-          "id": "record_row"
-        },
-        {
           "children": [
-            "table_cell_subject",
-            "view_button",
-            "edit_button"
+            "empty_state"
           ],
-          "component": "Row",
-          "id": "record_row_content"
-        },
-        {
-          "children": [
-            "table_cell_subject_label",
-            "table_cell_subject_value"
+          "columns": [
+            {
+              "label": "Subject",
+              "path": "subject"
+            }
           ],
-          "component": "Row",
-          "id": "table_cell_subject"
-        },
-        {
-          "component": "Text",
-          "id": "table_cell_subject_label",
-          "text": "Subject",
-          "variant": "caption"
-        },
-        {
-          "component": "Text",
-          "id": "table_cell_subject_value",
-          "text": {
-            "path": "subject"
+          "component": "dataGrid",
+          "id": "data_grid",
+          "label": "Ticket",
+          "rowActions": [
+            {
+              "action": "view_record",
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "View"
+            },
+            {
+              "action": "start_edit",
+              "context": {
+                "component": "table",
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "label": "Edit"
+            }
+          ],
+          "rowClick": {
+            "action": "view_record",
+            "context": {
+              "component": "table",
+              "recordId": {
+                "path": "id"
+              }
+            },
+            "label": "View"
+          },
+          "rowId": "id",
+          "rows": {
+            "path": "/records"
           }
         },
         {
-          "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
-              },
-              "name": "view_record"
-            }
-          },
-          "child": "view_button_text",
-          "component": "Button",
-          "id": "view_button"
-        },
-        {
-          "component": "Text",
-          "id": "view_button_text",
-          "text": "View"
-        },
-        {
-          "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
-              },
-              "name": "start_edit"
-            }
-          },
-          "child": "edit_button_text",
-          "component": "Button",
-          "id": "edit_button"
-        },
-        {
-          "component": "Text",
-          "id": "edit_button_text",
-          "text": "Edit"
-        },
-        {
-          "children": {
-            "componentId": "empty_state_text",
-            "path": "/_empty_visible"
-          },
-          "component": "List",
-          "id": "empty_state"
-        },
-        {
-          "component": "Text",
-          "id": "empty_state_text",
-          "text": {
+          "children": [],
+          "component": "emptyState",
+          "id": "empty_state",
+          "message": {
             "path": "_empty_message"
           }
         },
@@ -568,9 +519,12 @@
           "text": "Cancel"
         },
         {
-          "component": "Text",
-          "id": "status_text",
-          "text": {
+          "component": "statusBanner",
+          "id": "status_banner",
+          "kind": {
+            "path": "/ui/feedback/kind"
+          },
+          "message": {
             "path": "/ui/feedback/message"
           }
         },
@@ -640,8 +594,7 @@
             "title": "",
             "view_visible": [],
             "visible": []
-          },
-          "status": ""
+          }
         }
       }
     },

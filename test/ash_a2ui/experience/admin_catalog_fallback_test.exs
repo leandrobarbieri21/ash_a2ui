@@ -1,10 +1,9 @@
 defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
   @moduledoc """
-  A2UI-101B/AC-7..AC-9: the catalog selection's fallback rules — advanced
-  features stay basic-composed (byte-equal subtrees), the default
-  configuration stays byte-identical to the A2UI-101 basic-v2 emission, and
-  an `:admin_v1` selection under experience v1 is ignored (basic v1,
-  byte-identical).
+  A2UI-101B/AC-7..AC-8: the catalog selection's fallback rules — advanced
+  features stay basic-composed (byte-equal subtrees), and the default
+  configuration stays the basic emission. (AC-9, admin under experience v1,
+  is retired with the version switch; see no_version_switch_test.exs.)
   """
 
   use ExUnit.Case, async: false
@@ -13,17 +12,11 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
 
   alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.Task
-  alias AshA2ui.Test.Paginated
   alias AshA2ui.Test.Ticket
 
   setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-      Application.put_env(:ash_a2ui, :catalog, :basic)
-    end)
+    on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
 
     :ok
   end
@@ -37,7 +30,7 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
     test "advanced features stay basic composed" do
       # Ticket's form carries nested_form entities (the contract's
       # advanced-feature list): its form subtree must stay byte-equal to
-      # the basic-v2 emission while the core subtree upgrades.
+      # the basic emission while the core subtree upgrades.
       admin_surface = AshA2ui.Info.build_surface(Ticket, actor: nil)
 
       Application.put_env(:ash_a2ui, :catalog, :basic)
@@ -75,7 +68,7 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
       assert "form_submit_button" in shared
 
       Enum.each(shared, fn id ->
-        assert admin[id] == basic[id], "shared component #{id} diverged from basic-v2"
+        assert admin[id] == basic[id], "shared component #{id} diverged from basic"
       end)
 
       # and the whole data model is byte-equal (the ticket table has no
@@ -89,17 +82,16 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
     test "basic catalog output is unchanged" do
       Application.delete_env(:ash_a2ui, :catalog)
       refute Experience.admin?()
-      refute Experience.effective_admin?()
 
       unset_surface = AshA2ui.Info.build_surface(Task, actor: nil)
 
       Application.put_env(:ash_a2ui, :catalog, :basic)
       assert Experience.catalog() == :basic
-      refute Experience.effective_admin?()
+      refute Experience.admin?()
 
       basic_surface = AshA2ui.Info.build_surface(Task, actor: nil)
 
-      # byte-identical to the A2UI-101 basic-v2 emission
+      # byte-identical to the A2UI-101 basic emission
       assert unset_surface == basic_surface
       Enum.each(basic_surface, &assert_valid_server_message/1)
 
@@ -115,42 +107,6 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
       %{"updateDataModel" => %{"value" => model}} = data
       assert Map.has_key?(model["query"], "_pagination_visible")
       refute Map.has_key?(model["query"], "paginationVisible")
-    end
-  end
-
-  describe "admin under experience v1" do
-    @tag ac: "A2UI-101B/AC-9"
-    test "admin catalog requires experience v2" do
-      Application.put_env(:ash_a2ui, :experience_version, 1)
-      Application.put_env(:ash_a2ui, :catalog, :admin_v1)
-
-      refute Experience.v2?()
-      assert Experience.admin?()
-      refute Experience.effective_admin?()
-
-      admin_selected_surface = AshA2ui.Info.build_surface(Paginated, actor: nil)
-
-      Application.put_env(:ash_a2ui, :catalog, :basic)
-      basic_surface = AshA2ui.Info.build_surface(Paginated, actor: nil)
-
-      # byte-identical to basic v1 — the configuration is ignored, not
-      # partially applied
-      assert admin_selected_surface == basic_surface
-      Enum.each(basic_surface, &assert_valid_server_message/1)
-
-      [create, components, _data] = basic_surface
-
-      assert create["createSurface"]["catalogId"] ==
-               "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
-
-      comps = components_by_id(components)
-
-      # basic v1 markers intact
-      assert comps["root"]["component"] == "Column"
-      assert %{"text" => "Select"} = comps["row_select_text"]
-      assert %{"text" => "Save"} = comps["form_submit_text"]
-      assert Map.has_key?(comps, "query_pagination")
-      refute Map.has_key?(comps, "data_grid")
     end
   end
 end

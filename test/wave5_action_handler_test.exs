@@ -3,7 +3,8 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
   ActionHandler tests for Wave 5: the `option_search` / `option_select` /
   `nested_add` / `nested_remove` client actions, nested-value preparation on
   `submit_form`, nested validation-error paths + in-row mirrors, and the
-  extended `select_row` / success resets. Every emitted message is validated
+  `start_edit` population of nested rows and select labels, and success
+  resets. Every emitted message is validated
   against the vendored v0.9.1 JSON Schemas.
   """
 
@@ -114,7 +115,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                )
 
       assert_all_valid(messages)
-      assert value_at(messages, "/ui/status") =~ "not a searchable select"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not a searchable select"
     end
 
     test "rejects unknown fields and malformed contexts" do
@@ -124,12 +125,12 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  envelope("option_search", %{"field" => "nope", "search" => "x"})
                )
 
-      assert value_at(messages, "/ui/status") =~ "not a searchable select"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not a searchable select"
 
       assert {:error, messages} =
                ActionHandler.handle(TicketSearchUI, envelope("option_search", %{}))
 
-      assert value_at(messages, "/ui/status") =~ ~s(missing "field")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(missing "field")
 
       assert {:error, messages} =
                ActionHandler.handle(
@@ -137,7 +138,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  envelope("option_search", %{"field" => "author_id", "search" => 5})
                )
 
-      assert value_at(messages, "/ui/status") =~ ~s("search" must be a string)
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s("search" must be a string)
     end
   end
 
@@ -181,7 +182,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                )
 
       assert_all_valid(messages)
-      assert value_at(messages, "/ui/status") =~ "was not found"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "was not found"
     end
 
     test "rejects non-searchable selects" do
@@ -193,7 +194,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  envelope("option_select", %{"field" => "author_id", "value" => author.id})
                )
 
-      assert value_at(messages, "/ui/status") =~ "not a searchable select"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not a searchable select"
     end
   end
 
@@ -251,7 +252,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  })
                )
 
-      assert value_at(messages, "/ui/status") =~ "was not found"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "was not found"
     end
 
     test "nested_remove drops the identified row" do
@@ -274,10 +275,10 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
       assert {:error, messages} =
                ActionHandler.handle(Ticket, envelope("nested_add", %{"argument" => "nope"}))
 
-      assert value_at(messages, "/ui/status") =~ "not a nested form"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not a nested form"
 
       assert {:error, messages} = ActionHandler.handle(Ticket, envelope("nested_add", %{}))
-      assert value_at(messages, "/ui/status") =~ ~s(missing "argument")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(missing "argument")
 
       assert {:error, messages} =
                ActionHandler.handle(
@@ -285,7 +286,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  envelope("nested_remove", %{"argument" => "notes", "rows" => []})
                )
 
-      assert value_at(messages, "/ui/status") =~ ~s(missing "row")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(missing "row")
 
       assert {:error, messages} =
                ActionHandler.handle(
@@ -293,7 +294,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
                  envelope("nested_add", %{"argument" => "tags", "rows" => []})
                )
 
-      assert value_at(messages, "/ui/status") =~ ~s(missing "value")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(missing "value")
     end
   end
 
@@ -416,7 +417,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
     end
   end
 
-  describe "select_row with nested forms and searchable selects" do
+  describe "start_edit with nested forms and searchable selects" do
     test "populates nested rows and searchable-select labels" do
       author = create_author("Ada", nil)
       tag = create_tag("urgent")
@@ -440,7 +441,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
       assert {:ok, messages} =
                ActionHandler.handle(
                  TicketSearchUI,
-                 envelope("select_row", %{"recordId" => ticket.id})
+                 envelope("start_edit", %{"recordId" => ticket.id})
                )
 
       assert_all_valid(messages)
@@ -458,7 +459,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
 
       # the on-resource surface loads the create_inline rows
       assert {:ok, messages} =
-               ActionHandler.handle(Ticket, envelope("select_row", %{"recordId" => ticket.id}))
+               ActionHandler.handle(Ticket, envelope("start_edit", %{"recordId" => ticket.id}))
 
       form = value_at(messages, "/form")
 

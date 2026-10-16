@@ -178,7 +178,7 @@ defmodule AshA2ui.EditableTest do
       assert {:error, messages} =
                ActionHandler.handle(EditableWordsUI, message, authorize?: false)
 
-      assert value_at(messages, "/ui/status") =~ "not editable"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "not editable"
       assert Ash.get!(BucketWord, word.id, authorize?: false).word == "teh"
     end
 
@@ -188,7 +188,7 @@ defmodule AshA2ui.EditableTest do
       assert {:error, messages} =
                ActionHandler.handle(EditableWordsUI, message, authorize?: false)
 
-      assert value_at(messages, "/ui/status") =~ ~s(missing "recordId")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(missing "recordId")
     end
   end
 

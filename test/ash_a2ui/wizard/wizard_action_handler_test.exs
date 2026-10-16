@@ -11,15 +11,6 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Enrollment
 
-  setup do
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    # Enrollment's Ets table is private to the test process: no cleanup.
-    on_exit(fn -> Application.delete_env(:ash_a2ui, :experience_version) end)
-
-    :ok
-  end
-
   defp envelope(name, context) do
     %{
       "version" => "v0.9.1",
@@ -110,13 +101,16 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
     assert value_at(messages, "/ui/wizard")["index"] == 1
 
     # once every field step is valid the review step opens with the submit
+    # (the panel's submit gate opens and its label becomes the create label)
     filled = put_in(context, ["values", "team"], "Core")
     assert {:ok, messages} = handle("wizard_next", %{filled | "index" => 1})
     wizard = value_at(messages, "/ui/wizard")
     assert wizard["index"] == 2
     assert wizard["confirm_visible"] == [%{"id" => "on"}]
-    assert wizard["nav"]["submit_visible"] == [%{"id" => "on"}]
     assert wizard["nav"]["next_visible"] == []
+    refute Map.has_key?(wizard["nav"], "submit_visible")
+    assert value_at(messages, "/ui/panel/submit_visible") == [%{"id" => "on"}]
+    assert value_at(messages, "/ui/panel/primary_label") =~ "Create"
     assert records() == []
   end
 
@@ -142,14 +136,23 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
   test "back does not validate" do
     assert {:ok, messages} = handle("wizard_back", %{"index" => 1})
 
-    assert paths(messages) == ["/ui/wizard"]
+    # the step moves (and the panel's label and submit gate with it);
+    # nothing validates and /form is untouched
+    assert paths(messages) == [
+             "/ui/wizard",
+             "/ui/panel/primary_label",
+             "/ui/panel/submit_visible"
+           ]
+
     assert value_at(messages, "/ui/wizard")["index"] == 0
+    assert value_at(messages, "/ui/panel/primary_label") == "Next"
 
     # no validation even when the carried form is invalid
     assert {:ok, messages} =
              handle("wizard_back", %{"index" => 2, "values" => %{"name" => ""}})
 
-    assert paths(messages) == ["/ui/wizard"]
+    refute "/errors" in paths(messages)
+    refute "/form" in paths(messages)
     assert value_at(messages, "/ui/wizard")["index"] == 1
   end
 
@@ -186,8 +189,6 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
     assert value_at(messages, "/ui/wizard")["index"] == 0
     assert [%{name: "Ada"}] = records()
 
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
     assert {:ok, messages} = handle("start_create", %{})
     assert value_at(messages, "/ui/wizard")["index"] == 0
 
@@ -198,7 +199,7 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
     assert {:ok, messages} = handle("start_edit", %{"recordId" => record.id})
     assert value_at(messages, "/ui/wizard")["index"] == 0
 
-    # a successful v2 task submission also resets
+    # a successful edit-task submission also resets
     edit = %{
       "values" => %{"id" => record.id, "name" => "Grace", "email" => "g@example.com"},
       "recordId" => record.id
@@ -209,34 +210,15 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
   end
 
   @tag ac: "A2UI-106/AC-6"
-  test "a v1 row select resets the step; a v2 row action leaves the open task alone" do
+  test "a row action leaves the open task's step alone" do
     record =
       Ash.create!(Enrollment, %{name: "Ada", email: "ada@example.com", team: "Core"},
         authorize?: false
       )
 
-    # v1: select_row loads the record into the form and restarts the wizard
-    assert {:ok, messages} = handle("select_row", %{"recordId" => record.id})
-    assert value_at(messages, "/form")["name"] == "Ada"
-    assert value_at(messages, "/ui/wizard")["index"] == 0
-    assert List.last(paths(messages)) == "/ui/wizard"
-
-    # v1: any other success clears /form, and the wizard restarts with it
-    other = Ash.create!(Enrollment, %{name: "Bob", team: "Ops"}, authorize?: false)
-
-    assert {:ok, messages} =
-             handle_on(AshA2ui.Test.EnrollmentRowActionsUI, "invoke", %{
-               "action" => "destroy",
-               "recordId" => other.id
-             })
-
-    assert value_at(messages, "/ui/wizard")["index"] == 0
-
-    # v2: a row action is not the task. The open task's step, panel label
-    # and submit gate are left as they are (nothing moves /ui/wizard
-    # without also rewriting the label).
-    Application.put_env(:ash_a2ui, :experience_version, 2)
-
+    # A row action is not the task. The open task's step, panel label and
+    # submit gate are left as they are (nothing moves /ui/wizard without
+    # also rewriting the label).
     assert {:ok, messages} =
              handle_on(AshA2ui.Test.EnrollmentRowActionsUI, "invoke", %{
                "action" => "destroy",
@@ -247,9 +229,10 @@ defmodule AshA2ui.Wizard.WizardActionHandlerTest do
     refute "/ui/wizard" in paths(messages)
     refute "/ui/panel/primary_label" in paths(messages)
 
-    # v2: select_row is not a task open either
+    # select_row no longer exists, so it cannot move the step either
     kept = Ash.create!(Enrollment, %{name: "Cy", team: "Ops"}, authorize?: false)
-    assert {:ok, messages} = handle("select_row", %{"recordId" => kept.id})
+    assert {:error, messages} = handle("select_row", %{"recordId" => kept.id})
     refute "/ui/wizard" in paths(messages)
+    refute "/form" in paths(messages)
   end
 end

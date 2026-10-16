@@ -68,9 +68,9 @@
  * Dispatching components acknowledge clicks at 0 RTT: the ActionBar primary
  * button and every DataGrid row-action button render disabled + spinner the
  * moment they dispatch, and settle when the surface's data model next
- * reports an outcome write (`/ui/feedback/message`, `/ui/status`, or
- * `/ui/response` — at least one is written by every AshA2ui action
- * follow-up, on both wire versions and experience pins). No styling round
+ * reports an outcome write (`/ui/feedback/message` or `/ui/response` — at
+ * least one is written by every AshA2ui action follow-up, on both wire
+ * versions). No styling round
  * trip and no `phx-*-loading`: these components own their shadow DOM, and
  * host CSS cannot reach inside it.
  *
@@ -615,7 +615,7 @@ function errorText(value) {
 }
 
 /**
- * Reconstructs the frozen submit_form context (see the basic-v2 emission's
+ * Reconstructs the frozen submit_form context (see the basic emission's
  * `submit_button/2` / `submit_event/1`): `/form` values + `/form/id`
  * recordId, plus the `/query` and `/context` bindings whenever the surface's
  * data model carries them.
@@ -711,11 +711,10 @@ function defineAdminElements(deps, {adminApis}) {
   // Components that dispatch action envelopes acknowledge the click at 0 RTT
   // (disabled + spinner), then settle when the surface's data model next
   // reports an outcome. Every AshA2ui action follow-up writes at least one
-  // of /ui/feedback (experience v2), /ui/status (v0.9.1 wire) or /ui/response
-  // (v1.0 wire), so subscribing to all three settles on the first outcome
-  // whatever wire/experience combination the host runs. No styling round
+  // of /ui/feedback (both wire versions) or /ui/response (v1.0 wire), so
+  // subscribing to both settles on the first outcome. No styling round
   // trip, no phx-*-loading — these components own their shadow DOM.
-  const SETTLE_PATHS = ["/ui/feedback/message", "/ui/status", "/ui/response"];
+  const SETTLE_PATHS = ["/ui/feedback/message", "/ui/response"];
 
   function markActionBusy(component) {
     if (component._amSettleUnsubscribes) return;
@@ -1779,7 +1778,7 @@ function defineAdminElements(deps, {adminApis}) {
        * encoder emits (`{"name": "query", "context": {...}}`, byte-exact) —
        * its path refs are resolved at click time and dispatched; a legacy
        * callable or `{event: {...}}` envelope is tolerated; when neither is
-       * present the envelope is reconstructed like the basic-v2
+       * present the envelope is reconstructed like the basic
        * `query_button/2` emission: the query path is derived from the `page`
        * binding, `component` is added for multi-table surfaces, and the
        * `contexts` binding rides along when the surface carries context
@@ -2403,7 +2402,7 @@ function defineAdminElements(deps, {adminApis}) {
        * Dispatches the existing `submit_form` envelope: the `action`
        * envelope prop the encoder emits (GenericBinder-resolved into a
        * callable, byte-exact) wins; otherwise the frozen context is
-       * reconstructed from the data model's shape (matching the basic-v2
+       * reconstructed from the data model's shape (matching the basic
        * emission's `submit_button/2`).
        */
       submit() {

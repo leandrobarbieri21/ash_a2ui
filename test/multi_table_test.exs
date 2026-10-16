@@ -14,18 +14,6 @@ defmodule AshA2ui.MultiTableTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.ReviewItem
 
-  setup do
-    # This suite asserts the v1 wire shapes; v2 is the default, so the
-    # legacy emission is pinned (and restored) per test.
-    Application.put_env(:ash_a2ui, :experience_version, 1)
-
-    on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
-    end)
-
-    :ok
-  end
-
   defp envelope(name, context) do
     %{
       "version" => "v0.9.1",
@@ -117,14 +105,18 @@ defmodule AshA2ui.MultiTableTest do
 
     test "root interleaves per-table sections in declaration order", %{components: components} do
       assert components["root"]["children"] == [
+               "form_slot",
+               "status_text",
                "table_heading_new_items",
                "query_new_items_controls",
+               "create_new_items_button",
                "records_list_new_items",
+               "empty_state_new_items",
                "query_new_items_pagination",
                "table_heading_done_items",
+               "create_done_items_button",
                "records_list_done_items",
-               "form",
-               "status_text",
+               "empty_state_done_items",
                "action_result_panel"
              ]
     end
@@ -157,7 +149,8 @@ defmodule AshA2ui.MultiTableTest do
                "table_cell_new_items_count",
                "row_action_new_items_approve_button",
                "row_action_new_items_destroy_button",
-               "row_select_new_items_button"
+               "view_new_items_button",
+               "edit_new_items_button"
              ]
 
       assert components["table_cell_done_items_state_value"]["text"] == %{"path" => "state"}
@@ -203,7 +196,7 @@ defmodule AshA2ui.MultiTableTest do
                }
              } = components["query_new_items_apply_button"]
 
-      assert %{"text" => %{"path" => "/query/new_items/page"}} =
+      assert %{"text" => %{"path" => "/query/new_items/_range_text"}} =
                components["query_new_items_page_text"]
 
       # the query-less table gets no controls
@@ -263,7 +256,7 @@ defmodule AshA2ui.MultiTableTest do
       # the standard form/errors/ui follow-ups are unaffected by refreshes
       assert value_at(messages, "/form") == %{}
       assert value_at(messages, "/errors") == %{}
-      assert value_at(messages, "/ui/status") =~ "approve"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "approve"
     end
 
     test "an action without refreshes metadata refreshes every table" do
@@ -323,7 +316,12 @@ defmodule AshA2ui.MultiTableTest do
       assert {:ok, messages} = ActionHandler.handle(ReviewItem, env)
       Enum.each(messages, &assert_valid_server_message/1)
 
-      assert paths(messages) == ["/records/new_items", "/query/new_items"]
+      assert paths(messages) == [
+               "/records/new_items",
+               "/_empty_visible_new_items",
+               "/query/new_items"
+             ]
+
       assert [%{"name" => "Alpha"}] = value_at(messages, "/records/new_items")
     end
 
@@ -331,21 +329,21 @@ defmodule AshA2ui.MultiTableTest do
       env = envelope("query", %{"query" => %{"search" => "x"}})
 
       assert {:error, messages} = ActionHandler.handle(ReviewItem, env)
-      assert value_at(messages, "/ui/status") =~ ~s(require "component")
+      assert value_at(messages, "/ui/feedback")["message"] =~ ~s(require "component")
     end
 
     test "a query action naming an unknown component is rejected" do
       env = envelope("query", %{"component" => "nope", "query" => %{}})
 
       assert {:error, messages} = ActionHandler.handle(ReviewItem, env)
-      assert value_at(messages, "/ui/status") =~ "Unknown table component"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "Unknown table component"
     end
 
     test "a query action targeting a table without a query is rejected" do
       env = envelope("query", %{"component" => "done_items", "query" => %{}})
 
       assert {:error, messages} = ActionHandler.handle(ReviewItem, env)
-      assert value_at(messages, "/ui/status") =~ "No query is configured"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "No query is configured"
     end
   end
 end

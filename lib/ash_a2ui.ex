@@ -1072,9 +1072,9 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         A declared context (over the same resource as this table) the table's
-        per-row Select button selects into — the master/detail pattern: the
-        button sends `"context_select"` with the row's record id instead of
-        `"select_row"`.
+        per-row "Select <context>" button selects into — the master/detail
+        pattern: the button sends `"context_select"` with the row's record id,
+        and the detail panels and related tables bound to the context follow.
         """
       ],
       context: [
@@ -1191,7 +1191,7 @@ defmodule AshA2ui do
         `/errors/<field>`) — and the result renders through the standard
         success/error channels unchanged: success refreshes the tables
         (honoring `refreshes`) and reports the action's status text; errors go
-        to `/ui/status` (and typed `/ui/feedback` under experience v2). The
+        to the typed `/ui/feedback` error. The
         client is unaware `via` exists: the emitted button is the ordinary
         `invoke` row action, addressed by the same action name. The named Ash
         action must still exist (it remains the row-action allowlist entry and

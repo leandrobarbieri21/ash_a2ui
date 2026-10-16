@@ -167,7 +167,7 @@ defmodule AshA2ui.ReportTest do
                %{"word" => "abcdef", "length" => 6, "state" => "new"}
              ]
 
-      assert value_at(messages, "/ui/status") == "Report complete: 1 row."
+      assert value_at(messages, "/ui/feedback")["message"] == "Report complete: 1 row."
     end
 
     test "missing params run the action with defaults" do
@@ -213,7 +213,7 @@ defmodule AshA2ui.ReportTest do
       message = envelope("report", %{"params" => %{}}, "broken_report")
 
       assert {:error, messages} = ActionHandler.handle(BrokenReportUI, message, authorize?: false)
-      assert value_at(messages, "/ui/status") =~ "Request failed"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "Request failed"
     end
 
     test "a surface without reports rejects the action" do
@@ -222,7 +222,7 @@ defmodule AshA2ui.ReportTest do
       assert {:error, messages} =
                ActionHandler.handle(AshA2ui.Test.EditableWordsUI, message, authorize?: false)
 
-      assert value_at(messages, "/ui/status") =~ "declares no :report components"
+      assert value_at(messages, "/ui/feedback")["message"] =~ "declares no :report components"
     end
   end
 

@@ -23,13 +23,11 @@ defmodule AshA2ui.Experience.SurfaceNamingTest do
   alias AshA2ui.Test.Experience.Task
 
   setup do
-    Application.put_env(:ash_a2ui, :experience_version, 2)
     # The heading lives on the admin catalog's `entityPage` root, so the
     # catalog has to be on for the encoder assertions to have anything to read.
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
     on_exit(fn ->
-      Application.delete_env(:ash_a2ui, :experience_version)
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 

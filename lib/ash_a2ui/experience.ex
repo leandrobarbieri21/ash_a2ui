@@ -1,21 +1,14 @@
 defmodule AshA2ui.Experience do
   @moduledoc """
-  The "experience v2" layer: explicit task modes (browse / create /
-  view / edit), conditional pagination, semantic action labels, typed
-  feedback, and data-driven empty states. **This is the default experience.**
+  The experience layer: explicit task modes (browse / create / view / edit),
+  conditional pagination, semantic action labels, typed feedback, and
+  data-driven empty states. This is how every ash_a2ui surface composes; there
+  is no version switch.
 
-  Hosts pin the previous behavior per application:
+  ## The /ui reserved state
 
-      config :ash_a2ui, :experience_version, 1
-
-  The pinned version (`1`, or any non-`2` value) is the pre-v2 behavior byte
-  for byte: nothing in the encoders or the action handler consults this
-  module unless `v2?/0` is true.
-
-  ## The /ui reserved state (v2)
-
-  The initial data model's `"ui"` region gains (alongside the classic
-  `"status"` / `"action_result"` / `"action_result_text"` entries):
+  The initial data model's `"ui"` region holds (alongside the
+  `"action_result"` / `"action_result_text"` entries):
 
     * `"intent"` — the client-facing task intent: `"browse"`, `"create"`,
       `"view"`, or `"edit"`.
@@ -27,7 +20,7 @@ defmodule AshA2ui.Experience do
     * `"feedback"` — the last action outcome: `"kind"` (`nil`, `"success"`,
       or `"error"`) and `"message"`.
 
-  ## The task state machine (v2)
+  ## The task state machine
 
   The panel is a three-mode machine over the record buffer:
 
@@ -53,7 +46,7 @@ defmodule AshA2ui.Experience do
   `"cancel_record_task"` returns to browse from any mode: panel closed,
   `/form` and `/errors` reset, feedback cleared.
 
-  ## Query-state sentinels (v2)
+  ## Query-state sentinels
 
   Every `/query` state (initial and refreshed) carries
   `"_pagination_visible"`, `"_previous_visible"`, `"_next_visible"` (the
@@ -61,7 +54,7 @@ defmodule AshA2ui.Experience do
   templated over) and `"_range_text"` (the result-range text, e.g.
   `"1–5 of 42"` / `"Showing 1–5"`). See `pagination_state/2`.
 
-  ## Per-table empty-state sentinels (v2)
+  ## Per-table empty-state sentinels
 
   The data model carries `"_empty_visible"` (`"_empty_visible_<table>"` on
   multi-table surfaces) — the same sentinel shape, `[]` while records exist —
@@ -69,36 +62,20 @@ defmodule AshA2ui.Experience do
   text. Every records rewrite refreshes the sentinel, so the empty state
   toggles with the data.
 
-  ## New client actions (v2)
+  ## Task-panel client actions
 
     * `"start_create"` — open the panel in create mode over a fresh `/form`.
-    * `"view_record"` — authorized read + form population in view mode
-      (no submit offered).
-    * `"start_edit"` — authorized read + form population in edit mode
+    * `"view_record"` — authorized read rendered into the read-only
+      `/ui/panel/record` display (no submit offered, `/form` untouched).
+    * `"start_edit"` — authorized read + `/form` population in edit mode
       ("Save changes" submit).
     * `"cancel_record_task"` — back to browse, form reset, feedback cleared.
-
-  Under experience v1 these names are rejected like any unknown action.
   """
 
   alias AshA2ui.ResolvedView
 
   @typedoc "The record task panel modes (`:hidden` for the closed state)."
   @type mode :: :create | :view | :edit | :hidden
-
-  @doc """
-  The configured experience version: `2` (the default — the experience
-  layer) or `1` (the pinned legacy behavior, byte-identical to the
-  pre-v2 release).
-  """
-  @spec version() :: 1 | 2
-  def version, do: Application.get_env(:ash_a2ui, :experience_version, 2)
-
-  @doc """
-  Whether the experience v2 layer is enabled.
-  """
-  @spec v2?() :: boolean
-  def v2?, do: version() == 2
 
   @admin_catalog_id "https://ash-a2ui.dev/catalogs/admin/v1"
 
@@ -111,20 +88,12 @@ defmodule AshA2ui.Experience do
   def catalog, do: Application.get_env(:ash_a2ui, :catalog, :basic)
 
   @doc """
-  Whether the admin catalog is selected (regardless of the experience
-  version — see `effective_admin?/0` for the gated predicate).
+  Whether the admin catalog is selected — the admin emission is active
+  exactly when this is true (a surface the admin composition cannot carry
+  still falls back to basic per component; see the contract note).
   """
   @spec admin?() :: boolean
   def admin?, do: catalog() == :admin_v1
-
-  @doc """
-  Whether the admin emission is actually active: it requires BOTH the
-  experience v2 layer and the `:admin_v1` catalog selection. Under
-  experience v1 an `:admin_v1` selection is ignored (not an error) — the
-  output stays basic v1, byte-identical to before.
-  """
-  @spec effective_admin?() :: boolean
-  def effective_admin?, do: v2?() and admin?()
 
   @doc false
   # The admin catalog id emitted on createSurface when the admin emission
@@ -406,11 +375,11 @@ defmodule AshA2ui.Experience do
   defp range_text(first, last, _total), do: "Showing #{first}–#{last}"
 
   @doc false
-  # Adorns a `/query` state map with the v2 sentinel keys (a no-op under
-  # v1). Idempotent, so callers that already-adorned states pass through
+  # Adorns a `/query` state map with the pagination sentinel keys.
+  # Idempotent, so callers that already-adorned states pass through
   # unchanged in value.
   def with_pagination_sentinels(query_state, record_count) do
-    if v2?() and is_map(query_state) do
+    if is_map(query_state) do
       state = pagination_state(query_state, record_count)
 
       Map.merge(query_state, %{
@@ -427,11 +396,11 @@ defmodule AshA2ui.Experience do
   @doc false
   # Adorns a `/query` state map with the admin catalog's plain boolean
   # pagination props (`paginationVisible`/`previousVisible`/`nextVisible`)
-  # — a no-op unless the admin emission is effective. The v2 sentinels stay
+  # — a no-op unless the admin catalog is selected. The sentinels stay
   # (basic renderers keep working); the admin Pagination component binds
   # these plain booleans instead.
   def with_admin_pagination_booleans(query_state, record_count) do
-    if effective_admin?() and is_map(query_state) do
+    if admin?() and is_map(query_state) do
       state = pagination_state(query_state, record_count)
 
       Map.merge(query_state, %{

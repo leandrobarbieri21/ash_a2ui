@@ -494,7 +494,7 @@ defmodule AshA2ui.ResolvedView do
   end
 
   @doc """
-  The `Ash.Query.load/2` statement `select_row` record fetches need beyond
+  The `Ash.Query.load/2` statement `start_edit` record fetches need beyond
   the table loads: the relationship behind every searchable select (to
   derive the current selection's label) and behind every nested form (to
   populate the argument's rows).
