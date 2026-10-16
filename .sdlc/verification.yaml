@@ -26,4 +26,4 @@ suites:
 # never an agent's.
 ci:
   provider: github-actions
-  status_context: ci/elixir
+  status_context: "mix test (JUnit report)"
