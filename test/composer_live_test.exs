@@ -281,6 +281,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     describe "host-named allowlist map" do
+      test "a master/detail surface imports its context, related tables and links", %{
+        conn: conn
+      } do
+        {:ok, view, _html} = live(conn, "/composer/related")
+
+        html = render_click(view, "import", %{"module" => "AshA2ui.Test.Links.PeopleUI"})
+
+        assert html =~ "Preview — resolves"
+        assert html =~ "resource: AshA2ui.Test.Links.Note"
+        assert html =~ "resource: AshA2ui.Test.Links.Participant"
+        assert html =~ "link: note"
+        assert html =~ "links: participants"
+        assert html =~ "context person"
+
+        socket = assigns(view)
+        assert [%{feature: "surface_id"}] = socket.rejections
+        assert %Dynamic.Surface{} = socket.surface
+
+        assert Enum.map(socket.spec["components"], &Map.get(&1, "resource")) ==
+                 [nil, nil, "Note", "Participant"]
+      end
+
       test "a short-name import does not resolve until the resource is renamed", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/composer/named")
 

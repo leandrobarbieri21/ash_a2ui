@@ -9,8 +9,9 @@ defmodule AshA2ui.Dynamic.Parser do
   as they do to DSL blocks. The parser's own job is shape conversion —
   JSON strings/objects/arrays to the atoms, keyword lists, and tuples the
   schemas expect — plus the dynamic-only checks that need spec-level
-  context (identifier format, widget/format vocabulary, resource-allowlist
-  lookups for contexts).
+  context (identifier format, widget/format/tone vocabulary, the link
+  shape, resource-allowlist lookups for contexts, related tables and
+  section sources).
 
   Identifier atoms (component/query/group/preset/context names and field
   references) are created from validated spec strings (`^[a-zA-Z]\\w*$`, at
@@ -138,14 +139,54 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp parse_component(entry, path, allowlist) when is_map(entry) do
     with :ok <- require_kind(entry, path),
-         {:ok, opts} <- convert_options(entry, @component_keys, @component_nested, path),
+         {:ok, resource} <- component_resource(entry, path, allowlist),
+         {:ok, opts} <-
+           convert_options(
+             Map.delete(entry, "resource"),
+             @component_keys,
+             ["resource" | @component_nested],
+             path
+           ),
          {:ok, nested} <- parse_component_nested(entry, path, allowlist) do
+      opts = if resource, do: opts ++ [resource: resource], else: opts
       build_entity(:component, entity_def(:component), opts, nested, path)
     end
   end
 
   defp parse_component(_entry, path, _allowlist),
     do: {:error, [Error.new(path, "each component must be a JSON object")]}
+
+  # A related table's `resource` (a :table reading another resource, scoped
+  # by a context): named like a context resource and resolved through the
+  # allowlist, so a spec can only read resources the host offers. Whether
+  # the component may carry one (tables only, read-only, its fields and
+  # context_filter keys on that resource) is the shared verifiers' call.
+  defp component_resource(entry, path, allowlist) do
+    case Map.fetch(entry, "resource") do
+      :error -> {:ok, nil}
+      {:ok, name} -> allowlisted_resource(name, "#{path}.resource", allowlist, "resource")
+    end
+  end
+
+  defp allowlisted_resource(name, path, allowlist, _option) when is_binary(name) do
+    case Map.fetch(allowlist, name) do
+      {:ok, resource} ->
+        {:ok, resource}
+
+      :error ->
+        {:error,
+         [
+           Error.new(
+             path,
+             "resource #{inspect(name)} is not available to dynamic surfaces — " <>
+               "use one of: #{Enum.join(Enum.sort(Map.keys(allowlist)), ", ")}"
+           )
+         ]}
+    end
+  end
+
+  defp allowlisted_resource(_name, path, _allowlist, option),
+    do: {:error, [Error.new(path, ~s(#{option} must name an allowlisted resource string))]}
 
   defp require_kind(entry, path) do
     if Map.has_key?(entry, "kind") do
@@ -189,9 +230,14 @@ defmodule AshA2ui.Dynamic.Parser do
     "title" => :title,
     "badge" => :badge,
     "badge_text" => :badge_text,
+    "badge_tones" => :badge_tones,
     "meta" => :meta,
     "columns" => :columns
   }
+
+  # The badge tone vocabulary, string -> atom over AshA2ui.RowLayout.tones/0:
+  # a tone is looked up, never created from input.
+  @tones Map.new(AshA2ui.RowLayout.tones(), &{Atom.to_string(&1), &1})
 
   defp parse_row_layout(nil, _def, _path), do: {:ok, []}
 
@@ -414,7 +460,10 @@ defmodule AshA2ui.Dynamic.Parser do
     "option_value" => :option_value,
     "option_sort" => :option_sort,
     "option_limit" => :option_limit,
-    "option_search" => :option_search
+    "option_search" => :option_search,
+    "link" => :link,
+    "links" => :links,
+    "link_label" => :link_label
   }
 
   defp parse_field(entry, path) when is_map(entry) do
@@ -711,16 +760,34 @@ defmodule AshA2ui.Dynamic.Parser do
   # special-cased passes through for Spark's schema validation to type-check.
   defp convert_option(option, value, path) do
     case option_shape(option) do
-      :name -> convert_name(option, value, path, true)
-      :name_list -> convert_name_list(option, value, path)
-      :name_keyword -> convert_keyword(option, value, path, &convert_name(option, &1, path, true))
-      :raw_keyword -> convert_keyword(option, value, path, &{:ok, &1})
-      :string_keyword -> convert_keyword(option, value, path, &convert_string(option, &1, path))
-      :search_fields -> convert_search_fields(value, path)
-      :default_sort -> convert_default_sort(value, path)
-      :raw -> {:ok, value}
+      :name ->
+        convert_name(option, value, path, true)
+
+      :name_list ->
+        convert_name_list(option, value, path)
+
+      :link ->
+        convert_link(value, path)
+
+      :search_fields ->
+        convert_search_fields(value, path)
+
+      :default_sort ->
+        convert_default_sort(value, path)
+
+      :raw ->
+        {:ok, value}
+
+      keyword_shape ->
+        convert_keyword(option, value, path, keyword_value(keyword_shape, option, path))
     end
   end
+
+  # The per-value conversion of a keyword-shaped (JSON object) option.
+  defp keyword_value(:name_keyword, option, path), do: &convert_name(option, &1, path, true)
+  defp keyword_value(:raw_keyword, _option, _path), do: &{:ok, &1}
+  defp keyword_value(:string_keyword, option, path), do: &convert_string(option, &1, path)
+  defp keyword_value(:tone_keyword, _option, path), do: &convert_tone(&1, path)
 
   defp option_shape(option)
        when option in [
@@ -744,7 +811,9 @@ defmodule AshA2ui.Dynamic.Parser do
               :default_preset,
               :scope_by,
               :value,
-              :sort
+              :sort,
+              :links,
+              :link_label
             ],
        do: :name
 
@@ -768,6 +837,8 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:context_filter), do: :name_keyword
   defp option_shape(option) when option in [:visible_when, :filter], do: :raw_keyword
   defp option_shape(:badge_text), do: :string_keyword
+  defp option_shape(:badge_tones), do: :tone_keyword
+  defp option_shape(:link), do: :link
   defp option_shape(:search_fields), do: :search_fields
   defp option_shape(:default_sort), do: :default_sort
   defp option_shape(_option), do: :raw
@@ -836,6 +907,61 @@ defmodule AshA2ui.Dynamic.Parser do
   defp convert_keyword(option, _object, path, _convert_value) do
     {:error,
      [Error.new("#{path}.#{option}", "#{option} must be a JSON object of key/value pairs")]}
+  end
+
+  defp convert_tone(value, path) do
+    case Map.fetch(@tones, value) do
+      {:ok, tone} ->
+        {:ok, tone}
+
+      :error ->
+        {:error,
+         [
+           Error.new(
+             "#{path}.badge_tones",
+             "tone #{inspect(value)} is not supported — use one of: " <>
+               Enum.join(Enum.sort(Map.keys(@tones)), ", ")
+           )
+         ]}
+    end
+  end
+
+  # A field's `link`: a to-one relationship name ("owner"), or an explicit
+  # {"surface": "<key>", "path": ["subject_id"]} for bare-id / polymorphic
+  # references. The surface key stays a string (the DSL accepts either; it
+  # is only ever handed to the LinkResolver as a string); path steps are
+  # names like every other field reference.
+  defp convert_link(value, path) when is_binary(value), do: convert_name(:link, value, path, true)
+
+  defp convert_link(%{"surface" => surface, "path" => steps} = value, path)
+       when is_binary(surface) and map_size(value) == 2 do
+    cond do
+      surface == "" or byte_size(surface) > @max_name_bytes ->
+        link_error(path)
+
+      not (is_list(steps) and steps != []) ->
+        link_error(path)
+
+      true ->
+        case convert_name_list(:link, steps, path) do
+          {:ok, names} -> {:ok, {surface, names}}
+          {:error, errors} -> {:error, errors}
+        end
+    end
+  end
+
+  defp convert_link(_value, path), do: link_error(path)
+
+  defp link_error(path) do
+    {:error,
+     [
+       Error.new(
+         "#{path}.link",
+         ~s(link must be a relationship name, or {"surface": "<surface key>", "path": ) <>
+           ~s(["<attribute>", ...]} for a bare-id reference \(a non-empty surface key of at ) <>
+           "most #{@max_name_bytes} bytes and a non-empty name path)"
+       )
+     ]}
   end
 
   defp convert_string(_option, value, _path) when is_binary(value), do: {:ok, value}

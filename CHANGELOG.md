@@ -29,6 +29,33 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   (the v0.9.1 `openUrl` takes only a literal URL, so it cannot open a
   per-row target). Hosts with their own transport navigate on an accepted
   `"open_surface"`.
+- **The dynamic spec carries related tables and reference links.** A table
+  component takes `"resource"` (an allowlisted name) to read another
+  resource, and fields take `"link"` (a relationship name or `{"surface",
+  "path"}`), `"links"` and `"link_label"`. `row_layout` takes
+  `"badge_tones"`. Parser, `spec_schema/1`, Importer and promotion
+  (`to_dsl_source/2`) all handle them, and the related-table and link rules
+  are the DSL verifiers'. Link surface keys stay strings; resources only
+  come from the allowlist.
+- The composer's preview lists a table's `resource` and a field's `link` /
+  `links`.
+
+### Bug Fixes:
+
+- **Importing a master/detail surface dropped its related tables and
+  links.** The Importer silently dropped a table's `resource`, every
+  `link` / `links` / `link_label` field option and `badge_tones`, so an
+  imported master/detail surface (contexts plus related tables) no longer
+  resolved. They now import as spec vocabulary, and the imported spec
+  renders exactly like the declared surface (tested on initial render, a
+  context selection, v1.0, serialization and promotion).
+- **Tests now pin the related-table fixes of #18** on a surface with
+  create and update actions, two related tables and a related query: no
+  View/Edit row controls and no second create button on related tables
+  (basic and admin_v1), the "Select <context>" label in both compositions,
+  and identical related-table rows on the initial render, a deep-linked
+  mount, back/forward, a `context_select` refresh and a related query
+  refresh.
 
 ### Breaking Changes:
 

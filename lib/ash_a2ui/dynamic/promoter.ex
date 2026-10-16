@@ -38,6 +38,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     title: :name,
     badge: :name,
     badge_text: :string_keyword,
+    badge_tones: :name_keyword,
     meta: :name_list,
     columns: :raw
   ]
@@ -88,7 +89,10 @@ defmodule AshA2ui.Dynamic.Promoter do
     option_value: :name,
     option_sort: :name,
     option_limit: :raw,
-    option_search: :name_list
+    option_search: :name_list,
+    link: :link,
+    links: :name,
+    link_label: :name
   ]
 
   @action_options [
@@ -190,7 +194,19 @@ defmodule AshA2ui.Dynamic.Promoter do
       |> List.flatten()
       |> Enum.filter(& &1)
 
-    block("component #{args}", option_lines(entry, @component_options) ++ nested)
+    block(
+      "component #{args}",
+      related_resource_line(entry, allowlist) ++ option_lines(entry, @component_options) ++ nested
+    )
+  end
+
+  # A related table's resource, emitted as a module literal resolved through
+  # the allowlist like a context's resource.
+  defp related_resource_line(entry, allowlist) do
+    case Map.fetch(entry, "resource") do
+      {:ok, name} -> ["resource #{inspect(Map.fetch!(allowlist, name))}"]
+      :error -> []
+    end
   end
 
   defp row_layout_block(nil), do: nil
@@ -295,6 +311,13 @@ defmodule AshA2ui.Dynamic.Promoter do
   end
 
   defp render(:raw, value), do: inspect(value)
+
+  # A field's link: a relationship name, or the {"surface", "path"} object
+  # back to the DSL's {surface_key, id_path} tuple (surface as a string).
+  defp render(:link, name) when is_binary(name), do: render(:name, name)
+
+  defp render(:link, %{"surface" => surface, "path" => path}),
+    do: "{#{inspect(surface)}, #{render(:name_list, path)}}"
 
   # The spec's {"mfa": "Mod.fun/arity", "args": [...]} back to the DSL's
   # tuple literal — the delegate exists (the parser validated it during the

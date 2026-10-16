@@ -44,8 +44,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         the host opts the delegate module in.
 
     The editor's allowlist is derived from `:surfaces` (each surface's
-    resource, named by short module name — `AshA2ui.Dynamic.allowlist/1`),
-    so an imported spec always resolves against the surfaces it came from.
+    resource, named by short module name — `AshA2ui.Dynamic.allowlist/1`).
+    A surface that also reads other resources — context destinations,
+    related tables (`resource` on a `:table`), section sources — imports
+    them by name; pass those resources in `:allowlist` so the imported spec
+    resolves (until then the resolve names the missing resource).
 
     ## The flow
 
@@ -596,6 +599,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Enum.join(
         List.flatten([
           "fields: #{names(component.fields)}",
+          opt_text("resource", component.resource && inspect(component.resource)),
           opt_text("read", component.read_action),
           opt_text("create", component.create_action),
           opt_text("update", component.update_action),
@@ -903,6 +907,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       """
     end
 
+    defp link_text(nil), do: nil
+    defp link_text({surface, path}), do: "#{surface} via #{names(List.wrap(path))}"
+    defp link_text(relationship), do: relationship
+
     defp title_text(nil), do: ""
     defp title_text(title), do: "· #{title}"
 
@@ -914,7 +922,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           opt_text("format", field.format),
           opt_text("order", field.order),
           list_text("source", field.source),
-          opt_text("relationship", field.relationship)
+          opt_text("relationship", field.relationship),
+          opt_text("link", link_text(field.link)),
+          opt_text("links", field.links)
         ]),
         " · "
       )

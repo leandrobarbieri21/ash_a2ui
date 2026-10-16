@@ -60,6 +60,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # The same composer with a host-NAMED allowlist map (the escape hatch
       # for colliding resource short names).
       live("/composer/named", AshA2ui.Test.ComposerNamedAllowlistLive)
+
+      # A master/detail surface whose related tables read other resources.
+      live("/composer/related", AshA2ui.Test.ComposerRelatedLive)
     end
   end
 

@@ -23,6 +23,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       export_module: "AshA2ui.Test.ComposedSurface"
   end
 
+  defmodule AshA2ui.Test.ComposerRelatedLive do
+    @moduledoc """
+    The master/detail fixture: PeopleUI (a context, two related tables and
+    link columns) with the related tables' resources passed as allowlist
+    extras — the clinic-demo shape whose import used to drop both.
+    """
+
+    use AshA2ui.Web.ComposerLive,
+      surfaces: [AshA2ui.Test.Links.PeopleUI],
+      allowlist: [AshA2ui.Test.Links.Note, AshA2ui.Test.Links.Participant]
+  end
+
   defmodule AshA2ui.Test.ComposerNamedAllowlistLive do
     @moduledoc """
     The map-allowlist fixture: the host names the one resource "renamed", so
