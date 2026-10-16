@@ -217,6 +217,34 @@ defmodule AshA2ui.ExportTest do
       assert %{"value" => %{"status" => "ok", "result" => %{"rows" => 3}}} =
                response["actionResponse"]
     end
+
+    test "a successful export reports a success /ui/feedback for the status Text" do
+      message = envelope("export", %{}, "export_words_v1")
+
+      assert {:ok, messages} = ActionHandler.handle(ExportWordsV1UI, message, authorize?: false)
+
+      assert Enum.find_value(messages, fn
+               %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => value}} -> value
+               _other -> nil
+             end) == %{"kind" => "success", "message" => "Exported table.csv (3 rows)."}
+    end
+  end
+
+  describe "table export of an enum column" do
+    test "cells carry the stored enum value, not the table's display label" do
+      Ash.create!(AshA2ui.Test.Appointment, %{title: "Checkup", status: :completed},
+        authorize?: false
+      )
+
+      message = envelope("export", %{}, "export_appointments_v1")
+
+      assert {:ok, messages} =
+               ActionHandler.handle(AshA2ui.Test.ExportAppointmentsV1UI, message,
+                 authorize?: false
+               )
+
+      assert csv_of(download(messages)) == "Title,Status\r\nCheckup,completed\r\n"
+    end
   end
 
   describe "report export" do

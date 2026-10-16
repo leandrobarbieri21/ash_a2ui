@@ -414,6 +414,10 @@ defmodule AshA2ui.ContextTest do
                ["Ada North checkup", "Ada South dental"]
 
       assert value_at(messages, "/query")["totalCount"] == 2
+
+      # a settled selection clears the previous outcome (and so settles the
+      # admin dataGrid's busy "Select <context>" row action)
+      assert value_at(messages, "/ui/feedback") == %{"kind" => nil, "message" => ""}
     end
 
     test "auto_select_single cascades a sole dependent option into selection" do
@@ -569,6 +573,7 @@ defmodule AshA2ui.ContextTest do
       assert value_at(messages, "/detail/owner") == %{}
       assert value_at(messages, "/records") == []
       assert value_at(messages, "/query")["totalCount"] == 0
+      assert value_at(messages, "/ui/feedback") == %{"kind" => nil, "message" => ""}
     end
 
     test "clearing only the dependent keeps the parent" do

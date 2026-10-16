@@ -27,8 +27,8 @@ defmodule AshA2ui.Encoder.V1_0 do
       component binds `/ui/response/resultText` (component ids are unchanged
       so custom themes/catalogs keep working). The `status_text` component
       binds the typed `/ui/feedback/message` on both wire versions; the
-      handler writes `/ui/feedback` alongside `/ui/response` for every
-      outcome.
+      handler writes `/ui/feedback` alongside every `/ui/response` outcome
+      (errors, and successes such as report runs and CSV exports).
     * **No wire metadata on function calls** — v1.0 removed `returnType`
       (and `callableFrom`) from wire-level FunctionCall payloads; `formatDate`
       cells are emitted without them.

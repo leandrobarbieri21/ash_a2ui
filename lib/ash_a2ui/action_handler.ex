@@ -255,37 +255,49 @@ defmodule AshA2ui.ActionHandler do
 
             name
             |> dispatch(context, env)
-            |> put_error_feedback(view)
+            |> put_feedback(view)
             |> attach_action_response(view, action_id)
 
           {:error, error} ->
             {:error, error_messages(view, error)}
-            |> put_error_feedback(view)
+            |> put_feedback(view)
             |> attach_action_response(view, action_id)
         end
 
       {:error, action_id} ->
         {:error, [status(view, "Malformed action message: expected an A2UI action envelope.")]}
-        |> put_error_feedback(view)
+        |> put_feedback(view)
         |> attach_action_response(view, action_id)
     end
   end
 
-  # Every failed action reports a typed /ui/feedback error — the path the
-  # status Text and the admin statusBanner bind — whatever the rejection
-  # path. On v0.9.1 status/3 already writes it; on v1.0 the outcome lives in
-  # the structured /ui/response object (the actionResponse contract), and
-  # this mirrors its message into /ui/feedback.
-  defp put_error_feedback({:error, messages}, view) do
-    if Enum.any?(messages, &match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, &1)) do
-      {:error, messages}
-    else
-      feedback = Experience.feedback("error", feedback_message(messages))
-      {:error, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
+  # Every outcome reaches the typed /ui/feedback — the path the status Text
+  # and the admin statusBanner bind (and the admin catalog's busy buttons
+  # settle on). Failed actions get an error whatever the rejection path: on
+  # v0.9.1 status/3 already writes it; on v1.0 the outcome lives in the
+  # structured /ui/response object (the actionResponse contract), and this
+  # mirrors its message. A v1.0 success that wrote only an "ok" /ui/response
+  # with a message (report, export) is mirrored as a success the same way.
+  defp put_feedback({tag, messages} = result, view) do
+    cond do
+      Enum.any?(messages, &match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, &1)) ->
+        result
+
+      tag == :error ->
+        feedback = Experience.feedback("error", feedback_message(messages))
+        {:error, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
+
+      true ->
+        case find_response_write(messages) do
+          %{"status" => "ok", "message" => message} when is_binary(message) and message != "" ->
+            feedback = Experience.feedback("success", message)
+            {:ok, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
+
+          _no_outcome ->
+            result
+        end
     end
   end
-
-  defp put_error_feedback(result, _view), do: result
 
   # --- v1.0 actionResponse ----------------------------------------------------
 
@@ -1052,9 +1064,15 @@ defmodule AshA2ui.ActionHandler do
           update_data_model(view, "/options/#{name}", options)
         end
 
+      # A settled selection clears the previous outcome (as task open/cancel
+      # do), so a stale error does not outlive it and the admin dataGrid's
+      # busy "Select <context>" row action settles.
       {:ok,
        [update_data_model(view, "/context", ContextRunner.state(view, change.selected))] ++
-         option_messages ++ detail_messages ++ table_messages}
+         option_messages ++
+         detail_messages ++
+         table_messages ++
+         [update_data_model(view, "/ui/feedback", Experience.clear_feedback())]}
     else
       {:error, error} -> {:error, error_messages(view, error)}
     end
@@ -1685,10 +1703,16 @@ defmodule AshA2ui.ActionHandler do
   end
 
   # An informational outcome on an otherwise successful action: a typed
-  # "warning" /ui/feedback (plus, on v1.0, the /ui/response status write).
+  # "warning" /ui/feedback (plus, on v1.0, an "ok" /ui/response carrying the
+  # text — the action succeeded, so its actionResponse must not read error).
   defp notice(%{spec_version: :v1_0} = view, text),
     do: [
-      status(view, text),
+      update_data_model(view, "/ui/response", %{
+        "status" => "ok",
+        "message" => text,
+        "result" => %{},
+        "resultText" => ""
+      }),
       update_data_model(view, "/ui/feedback", Experience.feedback("warning", text))
     ]
 
@@ -2016,8 +2040,13 @@ defmodule AshA2ui.ActionHandler do
 
       {:ok, scope} ->
         case read_export_table(table, scope, env) do
-          {:ok, records} -> {:ok, rows(view, table, records, env.ash_opts)}
-          {:error, error} -> {:error, error_messages(view, error)}
+          # Raw values, not the table's display rows: a CSV export carries
+          # stored enum values (as report exports do), not their labels.
+          {:ok, records} ->
+            {:ok, Enum.map(records, &record_values(view, &1, table_fields(table)))}
+
+          {:error, error} ->
+            {:error, error_messages(view, error)}
         end
     end
   end
@@ -2419,7 +2448,7 @@ defmodule AshA2ui.ActionHandler do
   # the /ui/feedback success value is what the status Text and the admin
   # statusBanner bind. A bulk run passes `:feedback_kind` ("warning" on
   # partial success). Failures get theirs from status/3 (v0.9.1) or
-  # put_error_feedback/2 (v1.0).
+  # put_feedback/2 (v1.0).
   defp success_feedback(%{view: view} = env, status_text) do
     kind = Map.get(env, :feedback_kind, "success")
     [update_data_model(view, "/ui/feedback", Experience.feedback(kind, status_text))]
@@ -2843,7 +2872,7 @@ defmodule AshA2ui.ActionHandler do
   # An error/rejection status: the typed `/ui/feedback` error (v0.9.1 — the
   # path the status Text and the admin statusBanner bind), or (v1.0) the
   # structured `/ui/response` object whose `code` also drives the
-  # actionResponse error (see attach_action_response/3; put_error_feedback/2
+  # actionResponse error (see attach_action_response/3; put_feedback/2
   # mirrors it into /ui/feedback). Dispatch rejections default to
   # "INVALID_ACTION"; error_messages/2 passes the mapped code.
   defp status(view, text, code \\ "INVALID_ACTION")

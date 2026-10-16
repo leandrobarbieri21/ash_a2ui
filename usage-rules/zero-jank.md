@@ -28,8 +28,11 @@ these mechanisms, in this order of preference:
 2. **Typed feedback (`/ui/feedback`)** — the handler answers every action
    outcome with `{kind, message}`; components bound to it (the basic `status
    text`, the admin `statusBanner`) render the outcome the moment the
-   follow-up lands. The handler always writes it — success, rejection, and
-   error paths — so an action never ends silently.
+   follow-up lands. The handler writes it on every success, rejection and
+   error path, and clears it when a task opens or closes or a context
+   selection settles, so an outcome-bearing action never ends silently.
+   Data-fetch actions (`query`, `option_search`, `context_search`) leave
+   it untouched.
 3. **In-flight states on action buttons** — catalog components acknowledge
    clicks themselves: the admin `actionBar` shows `busy` (disabled + spinner)
    while its submit is in flight, and the admin `dataGrid` row-action buttons

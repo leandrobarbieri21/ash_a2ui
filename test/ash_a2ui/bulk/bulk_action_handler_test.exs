@@ -281,5 +281,30 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
 
       assert %{"ok" => 250, "refused" => 0} = value_at(messages, "/bulk/inbox/result")
     end
+
+    test "on v1.0 the capped-selection notice answers ok, with a warning feedback" do
+      cap = AshA2ui.Bulk.cap(inbox_table())
+      for n <- 1..(cap + 1), do: task!("Task #{String.pad_leading(to_string(n), 3, "0")}")
+
+      message = %{
+        "version" => "v1.0",
+        "action" => %{
+          "name" => "bulk_select",
+          "surfaceId" => "bulk_cards",
+          "actionId" => "sel_1",
+          "context" => %{"component" => "inbox", "selected" => true}
+        }
+      }
+
+      assert {:ok, [response | followups]} =
+               ActionHandler.handle(BulkCardsUI, message, actor: actor(), spec_version: "1.0")
+
+      text = "Selected the first 250 of 251 records: a bulk action runs on at most 250 records."
+
+      assert response["actionId"] == "sel_1"
+      assert %{"value" => %{"status" => "ok", "message" => ^text}} = response["actionResponse"]
+      assert %{"status" => "ok", "message" => ^text} = value_at(followups, "/ui/response")
+      assert value_at(followups, "/ui/feedback") == %{"kind" => "warning", "message" => text}
+    end
   end
 end

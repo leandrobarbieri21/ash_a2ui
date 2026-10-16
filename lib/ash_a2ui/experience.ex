@@ -18,7 +18,7 @@ defmodule AshA2ui.Experience do
       row-action `visible_when` slots use, see `AshA2ui.Conditions`),
       plus `"mode"`, `"title"`, `"primary_label"`, and `"record_id"`.
     * `"feedback"` — the last action outcome: `"kind"` (`nil`, `"success"`,
-      or `"error"`) and `"message"`.
+      `"warning"`, or `"error"`) and `"message"`.
 
   ## The task state machine
 

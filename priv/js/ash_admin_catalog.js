@@ -69,8 +69,9 @@
  * button and every DataGrid row-action button render disabled + spinner the
  * moment they dispatch, and settle when the surface's data model next
  * reports an outcome write (`/ui/feedback/message` or `/ui/response` — at
- * least one is written by every AshA2ui action follow-up, on both wire
- * versions). No styling round
+ * least one is written by every AshA2ui action these components dispatch:
+ * submits, invokes, task open/cancel, context select/clear and every
+ * rejection, on both wire versions). No styling round
  * trip and no `phx-*-loading`: these components own their shadow DOM, and
  * host CSS cannot reach inside it.
  *
@@ -710,9 +711,11 @@ function defineAdminElements(deps, {adminApis}) {
   //
   // Components that dispatch action envelopes acknowledge the click at 0 RTT
   // (disabled + spinner), then settle when the surface's data model next
-  // reports an outcome. Every AshA2ui action follow-up writes at least one
-  // of /ui/feedback (both wire versions) or /ui/response (v1.0 wire), so
-  // subscribing to both settles on the first outcome. No styling round
+  // reports an outcome. Every AshA2ui action these components dispatch
+  // (submits, invokes, task open/cancel, context select/clear, and every
+  // rejection) writes at least one of /ui/feedback (both wire versions) or
+  // /ui/response (v1.0 wire), so subscribing to both settles on the first
+  // outcome. No styling round
   // trip, no phx-*-loading — these components own their shadow DOM.
   const SETTLE_PATHS = ["/ui/feedback/message", "/ui/response"];
 

@@ -225,12 +225,16 @@ display-ready text; the kind says what happened:
 }
 ```
 
-`AshA2ui.ActionHandler` writes it after every handled action — a success text
-on completion, `"warning"` when a bulk run partly succeeded, and `"error"` with
+`AshA2ui.ActionHandler` writes it after every outcome-bearing action — a
+success text on completion (submits, invokes, report runs, CSV exports),
+`"warning"` when a bulk run partly succeeded or a selection was capped, and
+`"error"` with
 an explanation on rejected/unknown actions, a "not authorized" text on policy
 denials (deliberately without detail), and a generic failure text when errors
-can't be attributed to a field. Task open/cancel clear it (`kind: null`,
-`message: ""`). The emitted surface binds its `status_text` Text to
+can't be attributed to a field. Task open/cancel and context
+select/clear clear it (`kind: null`, `message: ""`). Actions that only fetch
+data for the client (`query`, `option_search`, `context_search`) leave it
+untouched. The emitted surface binds its `status_text` Text to
 `/ui/feedback/message` (right under the task panel, above the tables), and
 the admin catalog's `statusBanner` binds both keys. On v1.0 surfaces the
 same outcome is also the structured `/ui/response` object (see

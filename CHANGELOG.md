@@ -29,7 +29,8 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
     typed `/ui/feedback` value (`%{"kind" => "success" | "warning" |
     "error", "message" => text}`); the status Text binds
     `/ui/feedback/message`. v1.0 surfaces keep `/ui/response` and the
-    `actionResponse` handshake, and write `/ui/feedback` alongside.
+    `actionResponse` handshake, and write `/ui/feedback` alongside every
+    `/ui/response` outcome (report runs and CSV exports included).
   - `/ui/wizard/nav/submit_visible` (the panel's
     `/ui/panel/submit_visible` gates the stepped form's submit).
 
@@ -46,6 +47,21 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   only `/ui/status`, which no component bound once the status Text read
   `/ui/feedback/message`. Every error path now writes a typed
   `/ui/feedback` error (on v1.0 alongside `/ui/response`).
+- **v1.0 report and export successes left the status line stale.** A
+  report run or CSV export on a v1.0 surface wrote only `/ui/response`, so
+  the status Text (bound to `/ui/feedback/message`) kept the previous
+  outcome. Its "ok" message is now mirrored into a `"success"`
+  `/ui/feedback`.
+- **The v1.0 capped-selection notice answered as an error.** A
+  `bulk_select` capped at the bulk limit succeeds, but on v1.0 its notice
+  wrote an `"error"`/`INVALID_ACTION` `/ui/response`, so the
+  `actionResponse` read as a failure. It now writes an `"ok"` response
+  carrying the text, beside the `"warning"` `/ui/feedback`.
+- **A context selection could leave an admin row action spinning.**
+  `context_select` and `context_clear` wrote no outcome, so the admin
+  dataGrid's "Select <context>" button stayed busy until some later action.
+  A settled selection now clears `/ui/feedback` (as opening or cancelling a
+  task does), which also removes a stale error.
 - **Related tables offered controls that could not work.** A related table
   (a `:table` with its own `resource`) got View/Edit row controls that
   failed with "Request failed" and a second "Create <surface resource>"

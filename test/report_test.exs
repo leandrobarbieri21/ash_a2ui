@@ -272,6 +272,12 @@ defmodule AshA2ui.ReportTest do
       Enum.each(followups, &assert_valid_server_message(&1, :v1_0))
 
       assert [%{"word" => "abcdef"}] = value_at(followups, "/report/lengths/rows")
+
+      # the status Text binds /ui/feedback/message on v1.0 too
+      assert value_at(followups, "/ui/feedback") == %{
+               "kind" => "success",
+               "message" => "Report complete: 1 row."
+             }
     end
   end
 end
