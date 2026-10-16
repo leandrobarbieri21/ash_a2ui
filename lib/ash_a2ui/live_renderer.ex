@@ -117,8 +117,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Reference links
 
-    The shipped JS hook pushes `"a2ui:open_surface"` when a reference link
-    is activated (see `AshA2ui.Links`). The default handling navigates
+    The shipped JS hook pushes `"a2ui:open_surface"` when an admin-catalog
+    reference link is activated (see `AshA2ui.Links`). Basic-catalog link
+    Buttons dispatch an `"open_surface"` action instead, which
+    `AshA2ui.ActionHandler` validates against the surface's link fields;
+    an accepted one takes the same path. The default handling navigates
     (`push_navigate`) to the `:open_surface_url` template; pass
     `:open_surface` to do anything else.
 
@@ -411,11 +414,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @doc false
     def handle_action(config, envelope, socket) do
-      messages =
-        case config.action_fn.(config.ui, envelope, call_opts(socket)) do
-          {:ok, messages} -> messages
-          {:error, messages} -> messages
-        end
+      {outcome, messages} = config.action_fn.(config.ui, envelope, call_opts(socket))
 
       previous_context = socket.assigns.ash_a2ui_context_state
 
@@ -426,8 +425,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         |> push_messages(messages)
         |> maybe_patch_context(config, previous_context)
 
-      {:noreply, socket}
+      maybe_open_surface(config, outcome, envelope, socket)
     end
+
+    # A basic-catalog reference link arrives as an "open_surface" action.
+    # Once the handler accepted it (the field links to that surface for
+    # this actor), it navigates exactly like the "a2ui:open_surface" event
+    # the admin catalog's link cells push.
+    defp maybe_open_surface(
+           config,
+           :ok,
+           %{"action" => %{"name" => "open_surface"} = action},
+           socket
+         ) do
+      context = Map.get(action, "context") || %{}
+      handle_open_surface(config, Map.take(context, ["surface", "recordId"]), socket)
+    end
+
+    defp maybe_open_surface(_config, _outcome, _envelope, socket), do: {:noreply, socket}
 
     # deep_link: a changed /context is written back to the URL (the ctx
     # params), so the selection is shareable and back-button friendly.

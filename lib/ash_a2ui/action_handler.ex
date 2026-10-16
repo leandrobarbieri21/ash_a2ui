@@ -141,6 +141,19 @@ defmodule AshA2ui.ActionHandler do
       successful `submit_form` reset it to step 0. Surfaces without steps
       reject both names.
 
+    * `"open_surface"` — context `%{"field" => name, "surface" => key,
+      "recordId" => id}`, sent by the basic catalog's reference-link
+      Buttons (see `AshA2ui.Encoder.V0_9_1`). Accepted when `field` is a
+      to-one link field (`link :relationship` or `link {surface, id_path}`)
+      of one of the surface's tables or details and the
+      `AshA2ui.LinkResolver` resolves it, for this actor, to `surface`;
+      anything else is rejected with an error outcome. A missing or empty
+      `"surface"` (a row without a link for that field) is acknowledged.
+      Returns no follow-up messages: the transport navigates —
+      `AshA2ui.LiveRenderer` hands an accepted request to its
+      `"a2ui:open_surface"` handling (the `:open_surface` callback, else
+      the `:open_surface_url` template).
+
     * `"query"` — context `%{"query" => <the /query map>}` plus an optional
       literal `"page"` override or relative `"pageDelta"` (used by the
       emitted Apply / prev / next controls). Requires the surface's table to
@@ -636,6 +649,8 @@ defmodule AshA2ui.ActionHandler do
   defp dispatch("wizard_next", context, env), do: wizard_next(env, context)
   defp dispatch("wizard_back", context, env), do: wizard_back(env, context)
 
+  defp dispatch("open_surface", context, env), do: open_surface(context, env)
+
   defp dispatch(name, _context, %{view: view}) do
     unknown_action(view, name)
   end
@@ -741,6 +756,57 @@ defmodule AshA2ui.ActionHandler do
       update_data_model(view, "/errors", %{}),
       update_data_model(view, "/ui/feedback", Experience.clear_feedback())
     ] ++ wizard_reset(view)
+  end
+
+  # A reference-link activation (the basic catalog's link Buttons, see
+  # AshA2ui.Encoder.V0_9_1): accepted only for a to-one link field of this
+  # view whose LinkResolver answer, for this actor, is the requested
+  # surface — compared as strings, nothing from the client becomes an
+  # atom. No follow-ups: navigating is the transport's job
+  # (AshA2ui.LiveRenderer routes an accepted open_surface to its
+  # "a2ui:open_surface" handling). A row without a link for the field binds
+  # no surface: acknowledged, nothing to open.
+  defp open_surface(context, %{view: view, ash_opts: ash_opts}) do
+    field = Map.get(context, "field")
+    surface = Map.get(context, "surface")
+
+    cond do
+      surface in [nil, ""] ->
+        {:ok, []}
+
+      not (is_binary(field) and is_binary(surface)) ->
+        {:error,
+         [
+           status(
+             view,
+             ~s(Malformed open_surface action: context needs "field" and "surface" strings.)
+           )
+         ]}
+
+      surface in link_surfaces(view, field, ash_opts) ->
+        {:ok, []}
+
+      true ->
+        {:error,
+         [status(view, "Field #{inspect(field)} does not link to #{inspect(surface)} here.")]}
+    end
+  end
+
+  # The surfaces `field` (a client string) opens on this view: every table
+  # and detail listing a to-one link field of that name, resolved like the
+  # encoder resolves it for the rows' `_links`.
+  defp link_surfaces(view, field, ash_opts) do
+    scopes =
+      Enum.map(view.tables, &{&1.resource, table_fields(&1)}) ++
+        Enum.map(view.details, &{view.contexts[&1.context].resource, &1.fields})
+
+    for {resource, fields} <- scopes,
+        name <- fields,
+        Atom.to_string(name) == field,
+        %{specs: specs} <- [AshA2ui.Links.context(resource, view.fields, [name], ash_opts)],
+        %{surface: surface, cardinality: cardinality} <- specs,
+        is_binary(surface) and cardinality in [:one, :path],
+        do: surface
   end
 
   defp unknown_action(view, name) do

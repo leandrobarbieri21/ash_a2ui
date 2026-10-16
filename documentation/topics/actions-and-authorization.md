@@ -57,6 +57,7 @@ The v0 `action.name` vocabulary:
 | `"bulk_invoke"` | A bulk toolbar button was clicked over a row selection | The named action in the table's `bulk_actions`, once per re-read selected record (see [Bulk Actions](bulk-actions.md)) |
 | `"bulk_select"` | Select page / Clear was clicked | No Ash write — the table's rows are re-read and rewritten with `_selected` set |
 | `"wizard_next"` / `"wizard_back"` | A stepped form's Next / Back was clicked | No Ash write — Next validates the reached steps through the form's action changeset (see [Wizard Steps](wizard-steps.md)) |
+| `"open_surface"` | A basic-catalog reference link was clicked | No Ash read or write — accepted only for a to-one link field whose resolved surface is the one sent; returns no messages, and the transport navigates (see [Relationships](relationships.md#rendering)) |
 
 When the view declares no form/table action, the handler falls back to the
 resource's **primary** create/update/read action — so minimal surfaces work

@@ -398,6 +398,94 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert_push_event(view, "a2ui:messages", %{messages: [_data_model]})
       end
 
+      test "a deep-linked mount renders the related tables' rows as the library does",
+           %{conn: conn, ada: ada} do
+        alias AshA2ui.Test.Links.{Note, Participant}
+
+        kickoff = Ash.create!(Note, %{title: "Kickoff", person_id: ada.id}, authorize?: false)
+        Ash.create!(Participant, %{note_id: kickoff.id, person_id: ada.id}, authorize?: false)
+
+        {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link?ctx[person]=#{ada.id}")
+        assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
+        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+
+        pushed = List.last(messages)["updateDataModel"]["value"]["records"]
+
+        state = AshA2ui.Info.context_state_for(AshA2ui.Test.Links.PeopleUI, %{"person" => ada.id})
+
+        built =
+          AshA2ui.Test.Links.PeopleUI
+          |> AshA2ui.Info.build_surface(context_state: state)
+          |> List.last()
+
+        assert pushed == built["updateDataModel"]["value"]["records"]
+        assert [%{"status" => "Open"}] = pushed["their_notes"]
+
+        assert [%{"_links" => %{"note_title" => %{"surface" => "note"}}}] =
+                 pushed["participations"]
+      end
+
+      test "a basic-catalog link Button's open_surface action navigates once accepted",
+           %{conn: conn, ada: ada} do
+        alias AshA2ui.Test.Links.{Note, Participant}
+
+        kickoff = Ash.create!(Note, %{title: "Kickoff", person_id: ada.id}, authorize?: false)
+        Ash.create!(Participant, %{note_id: kickoff.id, person_id: ada.id}, authorize?: false)
+
+        {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_hook(view, "a2ui:action", %{
+          "version" => "v0.9.1",
+          "action" => %{
+            "name" => "open_surface",
+            "surfaceId" => "people",
+            "sourceComponentId" => "table_cell_participations_note_title_value_link",
+            "timestamp" => "2026-10-16T12:00:00Z",
+            "context" => %{
+              "field" => "note_title",
+              "surface" => "note",
+              "recordId" => kickoff.id
+            }
+          }
+        })
+
+        assert_redirect(view, "/app/r/note/#{kickoff.id}")
+      end
+
+      test "a rejected open_surface action pushes its error and stays put", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_hook(view, "a2ui:action", %{
+          "version" => "v0.9.1",
+          "action" => %{
+            "name" => "open_surface",
+            "surfaceId" => "people",
+            "sourceComponentId" => "forged",
+            "timestamp" => "2026-10-16T12:00:00Z",
+            "context" => %{"field" => "note_title", "surface" => "admin", "recordId" => "x"}
+          }
+        })
+
+        assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
+
+        assert Enum.any?(
+                 messages,
+                 &match?(
+                   %{
+                     "updateDataModel" => %{
+                       "path" => "/ui/feedback",
+                       "value" => %{"kind" => "error"}
+                     }
+                   },
+                   &1
+                 )
+               )
+
+        refute_redirected(view)
+      end
+
       test "a2ui:open_surface navigates to the open_surface_url template", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/deep-link")
 

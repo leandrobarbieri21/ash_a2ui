@@ -8,6 +8,28 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+### Features:
+
+- **Reference links render in the basic catalog.** Rows and detail records
+  carried `_links`, but only the admin catalog drew them. In the basic
+  composition a to-one link (`link :relationship` or `link {surface,
+  id_path}`) now wraps its value Text (same id, same binding) in a
+  borderless `Button`, `<value id>_link`, in flat table cells, card-row
+  titles and meta values, and detail values. The Button dispatches the new
+  `"open_surface"` action with the field name and the bound
+  `_links/<field>` surface and record id. `AshA2ui.ActionHandler` accepts it
+  only when the field is a to-one link of the surface whose resolved
+  surface, for this actor, is the one sent, and returns no messages;
+  `AshA2ui.LiveRenderer` then navigates exactly as for
+  `"a2ui:open_surface"` (the `:open_surface` callback, else the
+  `:open_surface_url` template). Only fields the `AshA2ui.LinkResolver`
+  resolves in that render get a Button, so a vetoed field keeps its plain
+  value. `links` (to-many) fields stay plain text, and row data is
+  unchanged. Built from basic-catalog components only, on v0.9.1 and v1.0
+  (the v0.9.1 `openUrl` takes only a literal URL, so it cannot open a
+  per-row target). Hosts with their own transport navigate on an accepted
+  `"open_surface"`.
+
 ### Breaking Changes:
 
 - **Removed experience v1 and the version switch.** The experience layer

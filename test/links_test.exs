@@ -1,3 +1,14 @@
+defmodule AshA2ui.LinksTest.PersonVetoResolver do
+  @moduledoc false
+  # Vetoes relationship links to people; keeps {surface, id_path} links.
+  @behaviour AshA2ui.LinkResolver
+
+  @impl true
+  def surface_for({:resource, AshA2ui.Test.Links.Person}, _context), do: nil
+  def surface_for({:surface, "person"}, _context), do: "people"
+  def surface_for(_target, _context), do: nil
+end
+
 defmodule AshA2ui.LinksTest do
   @moduledoc """
   Reference links (`link` / `links` field options): DSL resolution and
@@ -309,6 +320,225 @@ defmodule AshA2ui.LinksTest do
              }
 
       refute Map.has_key?(comps["field_display_title"], "link")
+    end
+  end
+
+  describe "basic catalog link buttons" do
+    defp link_button(comps, value_id) do
+      Map.get(comps, "#{value_id}_link")
+    end
+
+    defp assert_link_button(comps, value_id, field, prefix) do
+      button = link_button(comps, value_id)
+
+      assert %{
+               "component" => "Button",
+               "variant" => "borderless",
+               "child" => ^value_id,
+               "action" => %{"event" => %{"name" => "open_surface", "context" => context}}
+             } = button
+
+      assert context == %{
+               "field" => field,
+               "surface" => %{"path" => "#{prefix}_links/#{field}/surface"},
+               "recordId" => %{"path" => "#{prefix}_links/#{field}/recordId"}
+             }
+
+      # the value Text is unchanged: same id, same binding, now the child
+      assert comps[value_id]["component"] == "Text"
+      button
+    end
+
+    test "card-row meta values link to-one fields; to-many and plain fields stay Text" do
+      messages = AshA2ui.Info.build_surface(NotesUI)
+      Enum.each(messages, &assert_valid_server_message/1)
+      comps = components_by_id(messages)
+
+      # link :person (through a source column) and link {:person, :subject_id}
+      assert_link_button(comps, "record_row_meta_value_person_name", "person_name", "")
+      assert_link_button(comps, "record_row_meta_value_subject_id", "subject_id", "")
+
+      assert comps["record_row_meta_cell_person_name"]["children"] == [
+               "record_row_meta_label_person_name",
+               "record_row_meta_value_person_name_link"
+             ]
+
+      # links :participants is to-many: plain text in the basic catalog
+      refute link_button(comps, "record_row_meta_value_participant_links")
+      refute link_button(comps, "record_row_meta_value_amount")
+      refute link_button(comps, "record_row_title")
+      assert comps["record_row_title"]["weight"] == 1
+    end
+
+    test "flat table cells link to-one fields" do
+      messages = AshA2ui.Info.build_surface(AshA2ui.Test.Links.PagedNotesUI)
+      Enum.each(messages, &assert_valid_server_message/1)
+      comps = components_by_id(messages)
+
+      assert_link_button(comps, "table_cell_person_name_value", "person_name", "")
+
+      assert comps["table_cell_person_name"]["children"] == [
+               "table_cell_person_name_label",
+               "table_cell_person_name_value_link"
+             ]
+
+      refute link_button(comps, "table_cell_title_value")
+    end
+
+    test "related tables link through their own resource's relationships" do
+      comps = components_by_id(AshA2ui.Info.build_surface(AshA2ui.Test.Links.PeopleUI))
+
+      assert_link_button(
+        comps,
+        "table_cell_participations_note_title_value",
+        "note_title",
+        ""
+      )
+
+      refute link_button(comps, "table_cell_their_notes_participant_links_value")
+    end
+
+    test "detail values link through /detail/<context>/_links" do
+      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI))
+
+      assert_link_button(
+        comps,
+        "detail_note_detail_value_person_name",
+        "person_name",
+        "/detail/note/"
+      )
+
+      refute link_button(comps, "detail_note_detail_value_participant_links")
+      refute link_button(comps, "detail_note_detail_value_title")
+    end
+
+    test "the v1.0 surface carries the same link buttons, schema-valid" do
+      [create] = AshA2ui.Info.build_surface(NotesUI, spec_version: "1.0")
+      assert_valid_server_message(create, :v1_0)
+
+      comps = Map.new(create["createSurface"]["components"], &{&1["id"], &1})
+      button = link_button(comps, "record_row_meta_value_person_name")
+      assert button["action"]["event"]["name"] == "open_surface"
+      assert button["action"]["event"]["wantResponse"] == true
+    end
+
+    test "a field the resolver vetoes keeps its plain value Text", %{bob: bob} do
+      Application.put_env(:ash_a2ui, :link_resolver, AshA2ui.LinksTest.PersonVetoResolver)
+      comps = components_by_id(AshA2ui.Info.build_surface(NotesUI))
+
+      refute link_button(comps, "record_row_meta_value_person_name")
+
+      assert comps["record_row_meta_cell_person_name"]["children"] == [
+               "record_row_meta_label_person_name",
+               "record_row_meta_value_person_name"
+             ]
+
+      # the {surface, id_path} link still resolves ("people")
+      assert link_button(comps, "record_row_meta_value_subject_id")
+
+      {:ok, []} =
+        ActionHandler.handle(
+          NotesUI,
+          envelope("open_surface", %{
+            "field" => "subject_id",
+            "surface" => "people",
+            "recordId" => bob.id
+          })
+        )
+
+      assert {:error, _messages} =
+               ActionHandler.handle(
+                 NotesUI,
+                 envelope("open_surface", %{"field" => "person_name", "surface" => "person"})
+               )
+    end
+
+    test "rows are untouched: encoder and handler refresh serialize them identically", %{
+      ada: ada
+    } do
+      initial = NotesUI |> AshA2ui.Info.build_surface() |> data_model() |> Map.fetch!("records")
+
+      {:ok, messages} =
+        ActionHandler.handle(
+          NotesUI,
+          envelope("context_select", %{"context" => "person", "value" => ada.id})
+        )
+
+      refreshed = value_at(messages, "/records")
+      kickoff = Enum.find(refreshed, &(&1["title"] == "Kickoff"))
+
+      assert kickoff == Enum.find(initial, &(&1["title"] == "Kickoff"))
+      assert kickoff["_links"]["person_name"]["surface"] == "person"
+      refute Enum.any?(Map.keys(kickoff), &String.contains?(&1, "open"))
+    end
+  end
+
+  describe "the open_surface action" do
+    test "accepts a to-one link field's resolved surface, with no follow-ups", %{
+      ada: ada,
+      bob: bob
+    } do
+      for {field, record_id} <- [{"person_name", ada.id}, {"subject_id", bob.id}] do
+        assert {:ok, []} =
+                 ActionHandler.handle(
+                   NotesUI,
+                   envelope("open_surface", %{
+                     "field" => field,
+                     "surface" => "person",
+                     "recordId" => record_id
+                   })
+                 )
+      end
+    end
+
+    test "a row without a link for the field binds no surface: acknowledged" do
+      assert {:ok, []} =
+               ActionHandler.handle(
+                 NotesUI,
+                 envelope("open_surface", %{"field" => "person_name"})
+               )
+
+      assert {:ok, []} =
+               ActionHandler.handle(
+                 NotesUI,
+                 envelope("open_surface", %{"field" => "person_name", "surface" => ""})
+               )
+    end
+
+    test "rejects surfaces and fields the view does not link" do
+      for context <- [
+            %{"field" => "person_name", "surface" => "elsewhere"},
+            # to-many links are not opened from the basic catalog
+            %{"field" => "participant_links", "surface" => "person"},
+            %{"field" => "title", "surface" => "person"},
+            %{"field" => "no_such_field", "surface" => "person"},
+            %{"surface" => "person"},
+            %{"field" => "person_name", "surface" => 42}
+          ] do
+        assert {:error, messages} =
+                 ActionHandler.handle(NotesUI, envelope("open_surface", context))
+
+        assert %{"kind" => "error", "message" => message} = value_at(messages, "/ui/feedback")
+        assert is_binary(message) and message != ""
+      end
+    end
+
+    test "on v1.0 an accepted request answers its actionResponse", %{ada: ada} do
+      message = %{
+        "version" => "v1.0",
+        "action" => %{
+          "name" => "open_surface",
+          "surfaceId" => "notes",
+          "sourceComponentId" => "record_row_meta_value_person_name_link",
+          "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
+          "actionId" => "a1",
+          "context" => %{"field" => "person_name", "surface" => "person", "recordId" => ada.id}
+        }
+      }
+
+      assert {:ok, [response]} = ActionHandler.handle(NotesUI, message, spec_version: "1.0")
+      assert response["actionResponse"] == %{"value" => %{"status" => "ok", "message" => ""}}
+      assert_valid_server_message(response, :v1_0)
     end
   end
 
