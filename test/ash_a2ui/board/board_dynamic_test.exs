@@ -241,6 +241,72 @@ defmodule AshA2ui.Board.BoardDynamicTest do
     assert [%{"title" => "No region yet"}] = data["records"]["jobs_new__none"]
   end
 
+  @tag ac: "A2UI-110/AC-4"
+  test "a composed limit below the board's lanes or cells is refused" do
+    lanes = %{
+      "values" => nil,
+      "labels" => %{},
+      "swimlanes_by" => nil,
+      "swimlane_values" => nil,
+      "swimlane_labels" => %{},
+      "swimlane_tones" => %{}
+    }
+
+    cases = [
+      # swimlaned: 2 lanes x 2 swimlanes = 4 cells
+      {board_spec(%{"limit" => 3}), ~r/limit 3 is below the 4 cells \(2 lanes x 2 swimlanes\)/},
+      # swimlaned with every value: 4 lanes x 3 swimlanes = 12 cells
+      {board_spec(%{
+         "values" => nil,
+         "labels" => %{},
+         "swimlane_values" => nil,
+         "swimlane_labels" => %{},
+         "swimlane_tones" => %{},
+         "limit" => 5
+       }), ~r/limit 5 is below the 12 cells \(4 lanes x 3 swimlanes\)/},
+      # lanes only: every status value is a lane
+      {board_spec(Map.put(lanes, "limit", 2)), ~r/limit 2 is below the 4 lanes/}
+    ]
+
+    for {spec, pattern} <- cases do
+      result = Dynamic.resolve(drop_nils(spec), allowlist: @allowlist)
+      assert {:error, _errors} = result, "expected a rejection matching #{inspect(pattern)}"
+
+      assert messages(result) =~ pattern,
+             "expected #{inspect(pattern)}, got:\n#{messages(result)}"
+    end
+
+    # A limit at the cell count is accepted.
+    assert {:ok, _surface} = Dynamic.resolve(board_spec(%{"limit" => 4}), allowlist: @allowlist)
+  end
+
+  test "Board.cell_count/2 counts the chosen values, and errors without an enumeration" do
+    sections = fn overrides ->
+      Map.merge(
+        %{scope_by: :status, values: nil, swimlanes_by: nil, swimlane_values: nil},
+        overrides
+      )
+    end
+
+    assert AshA2ui.Board.cell_count(BoardTask, sections.(%{})) == {:ok, 4}
+
+    assert AshA2ui.Board.cell_count(BoardTask, sections.(%{values: [:open, "claimed"]})) ==
+             {:ok, 2}
+
+    assert AshA2ui.Board.cell_count(
+             BoardTask,
+             sections.(%{values: [:open, :claimed], swimlanes_by: :severity})
+           ) == {:ok, 6}
+
+    # Values outside the enumeration are not counted.
+    assert AshA2ui.Board.cell_count(BoardTask, sections.(%{values: [:open, :nope]})) == {:ok, 1}
+
+    # Without enumerable values there is nothing to count (the verifier's
+    # :error branch reports this instead of crashing).
+    assert AshA2ui.Board.cell_count(BoardTask, sections.(%{scope_by: :name})) == :error
+    assert AshA2ui.Board.cell_count(BoardTask, sections.(%{swimlanes_by: :name})) == :error
+  end
+
   @tag ac: "A2UI-110/AC-3"
   test "a declared swimlaned board exports, promotes and serializes back" do
     {:ok, spec, rejections} = Importer.import(AshA2ui.Test.SwimlaneBoardUI)

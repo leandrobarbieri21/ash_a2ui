@@ -289,20 +289,32 @@ defmodule AshA2ui.Verifiers.VerifySections do
   # its own page read and count, issued on every render and on every
   # refresh of the board, so the cell count is the board's read cost.
   defp verify_cell_limit(sections, resource, lanes, swimlanes, key, module) do
-    {:ok, cells} = AshA2ui.Board.cell_count(resource, sections)
+    case AshA2ui.Board.cell_count(resource, sections) do
+      {:ok, cells} when sections.limit >= cells ->
+        :ok
 
-    if sections.limit >= cells do
-      :ok
-    else
-      sections_error(
-        module,
-        key,
-        :limit,
-        "limit #{sections.limit} is below the #{cells} cells (#{length(lanes)} lanes x " <>
-          "#{length(swimlanes)} swimlanes): on a swimlaned board limit caps the cells, and " <>
-          "each cell is two reads (its page and its count) on every render and every " <>
-          "refresh of the board; narrow values or swimlane_values, or raise limit"
-      )
+      {:ok, cells} ->
+        sections_error(
+          module,
+          key,
+          :limit,
+          "limit #{sections.limit} is below the #{cells} cells (#{length(lanes)} lanes x " <>
+            "#{length(swimlanes)} swimlanes): on a swimlaned board limit caps the cells, and " <>
+            "each cell is two reads (its page and its count) on every render and every " <>
+            "refresh of the board; narrow values or swimlane_values, or raise limit"
+        )
+
+      # The enumerability checks run first, so this is not reached today;
+      # it keeps a reordering of checks a diagnostic instead of a crash.
+      :error ->
+        sections_error(
+          module,
+          key,
+          :limit,
+          "cannot count the board's cells: scope_by #{inspect(sections.scope_by)} and " <>
+            "swimlanes_by #{inspect(sections.swimlanes_by)} both need enumerable values " <>
+            "(an Ash.Type.Enum or a one_of constraint)"
+        )
     end
   end
 

@@ -48,3 +48,18 @@ criteria:
     risk: medium
     test: >-
       test/ash_a2ui/board/board_dynamic_test.exs::a_declared_swimlaned_board_exports_promotes_and_serializes_back
+
+  - id: A2UI-110/AC-4
+    given: composed board specs whose sections limit is below the board's
+      lanes (lanes only) or cells (lanes x swimlanes), with and without
+      explicit values, and one whose limit equals its cells
+    when: they are resolved
+    then: >-
+      the low limits are rejected with the DSL's own messages (the shared
+      VerifySections rule, counted by AshA2ui.Board.cell_count/2) instead
+      of silently dropping lanes or swimlane rows; the equal limit is
+      accepted
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_dynamic_test.exs::a_composed_limit_below_the_boards_lanes_or_cells_is_refused
