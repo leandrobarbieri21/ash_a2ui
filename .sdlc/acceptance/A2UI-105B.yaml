@@ -1,0 +1,89 @@
+---
+# Acceptance criteria for A2UI-105B (board swimlanes: a second axis that
+# splits a display :board into rows by another enumerated attribute, each
+# row tone-coloured). Follows on A2UI-105 (boards). Written BEFORE
+# implementation. Criterion ids are immutable. CI is the only evidence
+# producer. Design: notes/2026-10-15-pyro-maniac-borrowings.md section 2
+# (the 2026-10-17 amendment) and the Boards section of
+# documentation/topics/multi-section-surfaces.md.
+item: A2UI-105B
+
+criteria:
+  - id: A2UI-105B/AC-1
+    given: a source-less sections block on a display board table with
+      swimlanes_by an enumerated attribute, swimlane_values naming a subset
+      in a custom order, swimlane_labels and swimlane_tones
+    when: the view is expanded
+    then: >-
+      one concrete table exists per (swimlane, lane) cell, swimlane-major in
+      the declared orders, named <template_key>_<lane>__<swimlane>, each
+      scoped by both the lane and the swimlane filters; empty cells are kept;
+      no read is issued to enumerate either axis; refreshes on the template
+      key fan out to every cell
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_swimlanes_test.exs::cells_cross_lanes_and_swimlanes
+
+  - id: A2UI-105B/AC-2
+    given: a swimlaned board
+    when: the surface is encoded for v0.9.1 and for v1.0
+    then: >-
+      the board keeps its stage columns side by side under a header row of
+      stage labels and totals, and is split vertically into one row per
+      swimlane headed by its label and total, each row's cells aligned under
+      the stages; the per-cell, per-swimlane and per-stage totals and the
+      swimlane tones are served at reserved root paths; both payloads
+      validate against the vendored schemas, and the admin catalog falls
+      back to the same basic composition
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_swimlanes_test.exs::encodes_swimlane_rows_under_the_stages
+
+  - id: A2UI-105B/AC-3
+    given: a card in one cell and a transition row action refreshing the
+      template key
+    when: the action is invoked on the card
+    then: >-
+      every cell is refreshed, so the card leaves its cell and appears in the
+      cell of its new lane in the same swimlane, and the cell, swimlane and
+      stage totals follow
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_swimlanes_test.exs::transition_moves_the_card_between_cells
+
+  - id: A2UI-105B/AC-4
+    given: a query action naming a cell, with a client filter on the lane
+      attribute or on the swimlane attribute that targets another value
+    when: the cell is read
+    then: >-
+      both of the cell's scopes still apply, so no record from another cell
+      is returned
+    verify: sast
+    risk: high
+    test: >-
+      test/ash_a2ui/board/board_swimlanes_test.exs::cell_scope_cannot_be_widened_by_the_client
+
+  - id: A2UI-105B/AC-5
+    given: swimlanes_by without a board, with a source, equal to scope_by or
+      without enumerable values; swimlane values, labels or tones outside the
+      enumeration; a tone outside the tone vocabulary; swimlane options
+      without swimlanes_by; or two swimlanes sharing a runtime name
+    when: the UI module compiles
+    then: a verifier error names the rule
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/board/board_swimlanes_verifier_test.exs::rejects_invalid_swimlanes
+
+  - id: A2UI-105B/AC-6
+    given: a board without swimlanes_by
+    when: the surface is built for v0.9.1, v1.0 and the admin catalog, and a
+      transition is handled
+    then: the payloads are byte-identical to the pre-swimlane goldens
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_golden_test.exs::a_board_without_swimlanes_encodes_as_before

@@ -129,3 +129,97 @@ defmodule AshA2ui.Test.SeveritySectionsUI do
     end
   end
 end
+
+defmodule AshA2ui.Test.SwimlaneBoardUI do
+  @moduledoc """
+  Fixture swimlaned board (v0.9.1): the `AshA2ui.Test.BoardTaskUI` lanes
+  (three of `status`'s values) split into swimlanes by `severity` (an
+  `Ash.Type.Enum`), two of its values in a custom order with one overridden
+  heading and a tone each. The lane query filters on both axes, for the
+  scope-widening checks.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.BoardTask
+    surface_id "swimlane_tasks"
+
+    query :cell_q do
+      filters [:status, :severity]
+      sortable [:name]
+      default_sort name: :asc
+      page_size 2
+    end
+
+    component :table, :board do
+      fields [:name, :priority, :status, :severity]
+      display :board
+      row_actions [:claim, :complete]
+      query :cell_q
+
+      row_layout do
+        title :name
+        badge :priority
+      end
+
+      sections do
+        scope_by :status
+        values [:open, :claimed, :completed]
+        labels open: "To do"
+        swimlanes_by :severity
+        swimlane_values [:very_high, :low]
+        swimlane_labels very_high: "Critical"
+        swimlane_tones very_high: :danger, low: :success
+      end
+    end
+
+    action :claim do
+      visible_when status: :open
+      refreshes [:board]
+    end
+
+    action :complete do
+      visible_when status: :claimed
+      refreshes [:board]
+    end
+  end
+end
+
+defmodule AshA2ui.Test.SwimlaneBoardV1UI do
+  @moduledoc """
+  A swimlaned board with `spec_version "1.0"` and no query (cell totals from
+  the row count, no pagination); every `severity` is a swimlane, `medium`
+  without a tone (neutral).
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.BoardTask
+    surface_id "swimlane_tasks_v1"
+    spec_version "1.0"
+
+    component :table, :board do
+      fields [:name, :status, :severity]
+      display :board
+      row_actions [:claim]
+
+      row_layout do
+        title :name
+      end
+
+      sections do
+        scope_by :status
+        values [:open, :claimed]
+        swimlanes_by :severity
+        swimlane_tones low: :info, very_high: :warning
+      end
+    end
+
+    action :claim do
+      visible_when status: :open
+      refreshes [:board]
+    end
+  end
+end

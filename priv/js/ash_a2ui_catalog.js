@@ -369,7 +369,11 @@ function defineChoicePickerElement({A2uiLitElement, A2uiController, ChoicePicker
 //   `*_badge`           row-layout badge Texts → the badge anatomy
 //   `status_text`       the feedback region → the tone-aware banner
 //   `table_heading*`    section/lane headings → h2 with the section chip
+//   `stage_*_heading`   a swimlaned board's stage headings → the same chip
 //   `surface_title`     the surface's h1 → the display tier
+//   Texts inside a `swimlane_*` row and outside any Card or Button (the
+//   swimlane heading and total, the cell totals, empty-state and
+//   pagination texts) → the swimlane band's ink
 //   `row_action_*_button`, `*_prev_button`, `*_next_button`, and a
 //   calendar's `calendar*_today_button` / `_all_button` / `_day_button`
 //                      → the quiet utility tier (sm, shadowless)
@@ -685,9 +689,22 @@ function defineAnatomyElements({lit, basicCatalog}) {
     updated(changedProperties) {
       super.updated(changedProperties);
       const id = componentIdOf(this);
+      // Texts on a swimlane's band take its ink (--a2ui-swimlane-ink, set
+      // by the swimlane Column from its tone) through the two properties
+      // upstream's Text colour reads — on the host, so it holds whether the
+      // renderer colours the host (0.10.x) or an inner span (0.11.x).
+      if (onSwimlaneBand(this)) {
+        this.style.setProperty("--_a2ui-text-color", "var(--a2ui-swimlane-ink)");
+        this.style.setProperty("--a2ui-text-caption-color", "var(--a2ui-swimlane-ink)");
+        this.dataset.swimlaneInk = "";
+      } else if (this.dataset.swimlaneInk !== undefined) {
+        this.style.removeProperty("--_a2ui-text-color");
+        this.style.removeProperty("--a2ui-text-caption-color");
+        delete this.dataset.swimlaneInk;
+      }
       const span = this.renderRoot.querySelector(".a2ui-text");
       if (!span) return;
-      if (id.startsWith("table_heading")) {
+      if (id.startsWith("table_heading") || /^stage_.+_heading$/.test(id)) {
         span.classList.add("nb-section");
         const variant = this.controller?.props?.variant || "body";
         if (variant === "h2" || variant === "h3") {
@@ -1051,6 +1068,49 @@ function childRefId(child) {
   return typeof child === "object" && child !== null ? child.id : String(child);
 }
 
+// --- Board swimlanes ----------------------------------------------------------
+//
+// A swimlaned board (`swimlanes_by`) splits into rows across its stage
+// columns. The basic catalog has no colour props, so a swimlane's tone is
+// data: `/_swimlane_tone_<swimlane>` holds one of the badge_tones vocabulary
+// (neutral/info/success/warning/danger/accent), read here by the encoder's
+// frozen `swimlane_<swimlane>` id. Each tone maps onto a pair of tokens,
+// `--a2ui-swimlane-<tone>-background` and `--a2ui-swimlane-<tone>-color`
+// (the ink of the headings and totals sitting on the band). The fallbacks
+// below are the ash_a2ui_theme.css defaults: a 200-weight tint with
+// 900-weight ink in light, the reverse in dark — every pair at least
+// 6.9:1, above WCAG AA (4.5:1) for body text.
+const SWIMLANE_TONE_FALLBACKS = {
+  neutral: ["light-dark(#e2e8f0, #334155)", "light-dark(#0f172a, #f1f5f9)"],
+  info: ["light-dark(#bfdbfe, #1e3a8a)", "light-dark(#1e3a8a, #dbeafe)"],
+  success: ["light-dark(#bbf7d0, #14532d)", "light-dark(#14532d, #dcfce7)"],
+  warning: ["light-dark(#fde68a, #713f12)", "light-dark(#713f12, #fef3c7)"],
+  danger: ["light-dark(#fecaca, #7f1d1d)", "light-dark(#7f1d1d, #fee2e2)"],
+  accent: ["light-dark(#ddd6fe, #4c1d95)", "light-dark(#4c1d95, #ede9fe)"],
+};
+
+function swimlaneTone(tone) {
+  return Object.hasOwn(SWIMLANE_TONE_FALLBACKS, tone) ? tone : "neutral";
+}
+
+// Whether a Text sits directly on a swimlane's band: some ancestor (across
+// shadow roots) is part of a `swimlane_<swimlane>` row, and no Card or
+// Button lies in between (those paint their own surface). That covers the
+// swimlane heading and total, each cell's total, empty-state text and
+// pagination text, and nothing outside a swimlaned board. Matched by the
+// encoder's frozen ids, so it holds before the band has painted.
+function onSwimlaneBand(element) {
+  let node = element;
+  while (node) {
+    node = node.parentElement ?? node.getRootNode?.()?.host ?? null;
+    const model = node?.context?.componentModel;
+    if (!model) continue;
+    if (model.type === "Card" || model.type === "Button") return false;
+    if (typeof model.id === "string" && model.id.startsWith("swimlane_")) return true;
+  }
+  return false;
+}
+
 // Defines <ash-a2ui-column> once (idempotent across LiveView remounts and
 // hot reloads).
 function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
@@ -1100,6 +1160,20 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
      *   the lanes scroll (default 18rem).
      * - `--a2ui-board-lane-max-width`: the widest a lane gets (default
      *   none — lanes share the board's width).
+     *
+     * Swimlaned boards (`board_<template>_lanes` is a Column of the
+     * `board_<template>_stages` Row and one `swimlane_<swimlane>` Column per
+     * swimlane) scroll stages and swimlanes together, and paint each
+     * swimlane from its tone (`/_swimlane_tone_<swimlane>`):
+     *
+     * - `--a2ui-swimlane-<tone>-background` / `--a2ui-swimlane-<tone>-color`:
+     *   a tone's band and its ink (tones: neutral, info, success, warning,
+     *   danger, accent; defaults in ash_a2ui_theme.css).
+     * - `--a2ui-swimlane-padding`: the band's inner padding (default
+     *   0.75rem); the stage header row is inset to match, so every cell
+     *   stays under its stage.
+     * - `--a2ui-swimlane-border-radius`: the band's corners (default
+     *   `--a2ui-border-radius`).
      */
     static styles = css`
       :host {
@@ -1113,6 +1187,11 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
         min-width: 0;
         max-width: 100%;
         padding-bottom: var(--a2ui-spacing-s, 0.5rem);
+      }
+      .board-stages {
+        padding-inline: calc(
+          var(--a2ui-swimlane-padding, 0.75rem) + var(--a2ui-border-width, 2px)
+        );
       }
 
       .picker {
@@ -1292,24 +1371,109 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
       if (this.boardLane()) {
         this.style.minWidth = "var(--a2ui-board-lane-min-width, 18rem)";
         this.style.maxWidth = "var(--a2ui-board-lane-max-width, none)";
+      } else if (this.swimlaneGrid()) {
+        // The stages and swimlanes scroll together: the grid is as wide as
+        // its widest row (the lanes at their minimum width), so a band's
+        // background spans every cell instead of stopping at the frame.
+        this.style.minWidth = "min-content";
+        this.style.removeProperty("max-width");
       } else {
         this.style.removeProperty("min-width");
         this.style.removeProperty("max-width");
       }
+      this.paintSwimlane();
     }
 
     // A board lane: the encoder's frozen `lane_<lane>` id with its
-    // `lane_<lane>_header` child, inside a board's lanes Row.
+    // `lane_<lane>_header` child, inside a board's lanes Row — or a
+    // swimlaned board's stage column (`stage_<lane>` with
+    // `stage_<lane>_header`), which keeps the same width as the cells
+    // under it.
     boardLane() {
       const id = this.context?.componentModel?.id;
-      if (typeof id !== "string" || !/^lane_.+/.test(id)) return false;
+      if (typeof id !== "string" || !/^(lane|stage)_.+/.test(id)) return false;
       const children = this.controller?.props?.children;
       return Array.isArray(children) && children.some((child) => childRefId(child) === `${id}_header`);
+    }
+
+    // A swimlaned board's lanes Column: `board_<template>_lanes` holding
+    // its `board_<template>_stages` Row.
+    swimlaneGrid() {
+      return this.swimlaneStagesId() !== null;
+    }
+
+    swimlaneStagesId() {
+      const id = this.context?.componentModel?.id;
+      if (typeof id !== "string") return null;
+      const match = /^(board_.+)_lanes$/.exec(id);
+      if (!match) return null;
+      const stagesId = `${match[1]}_stages`;
+      const children = this.controller?.props?.children;
+      return Array.isArray(children) && children.some((child) => childRefId(child) === stagesId)
+        ? stagesId
+        : null;
+    }
+
+    // A swimlane row: the encoder's frozen `swimlane_<swimlane>` id with its
+    // `_header` and `_cells` children. Returns the swimlane's runtime name.
+    swimlaneName() {
+      const id = this.context?.componentModel?.id;
+      if (typeof id !== "string" || !/^swimlane_.+/.test(id)) return null;
+      const children = (this.controller?.props?.children ?? []).map(childRefId);
+      if (!children.includes(`${id}_header`) || !children.includes(`${id}_cells`)) return null;
+      return id.slice("swimlane_".length);
+    }
+
+    // Paints a swimlane row from its tone: the band background, a border in
+    // the board's line colour, and `--a2ui-swimlane-ink` for the texts on
+    // the band (the merged Text override reads it). The tone is data the
+    // server writes once with the surface; the subscription re-paints when
+    // it arrives after the components (v0.9.1 sends the data model last).
+    paintSwimlane() {
+      const name = this.swimlaneName();
+      if (name === null) {
+        if (this.dataset.swimlaneTone) {
+          delete this.dataset.swimlaneTone;
+          for (const property of [
+            "background",
+            "border",
+            "border-radius",
+            "padding",
+            "--a2ui-swimlane-ink",
+          ]) {
+            this.style.removeProperty(property);
+          }
+        }
+        return;
+      }
+      const path = `/_swimlane_tone_${name}`;
+      let tone = "neutral";
+      try {
+        const {dataModel} = this.surface;
+        if (!this.swimlaneSubscription) {
+          this.swimlaneSubscription = dataModel.subscribe(path, () => this.requestUpdate());
+        }
+        tone = swimlaneTone(String(dataModel.get(path) ?? ""));
+      } catch {
+        // No surface yet: the next update paints.
+      }
+      const [background, ink] = SWIMLANE_TONE_FALLBACKS[tone];
+      this.dataset.swimlaneTone = tone;
+      this.style.background = `var(--a2ui-swimlane-${tone}-background, ${background})`;
+      this.style.setProperty("--a2ui-swimlane-ink", `var(--a2ui-swimlane-${tone}-color, ${ink})`);
+      this.style.color = "var(--a2ui-swimlane-ink)";
+      this.style.border =
+        "var(--a2ui-border-width, 2px) solid var(--a2ui-color-border, currentColor)";
+      this.style.borderRadius =
+        "var(--a2ui-swimlane-border-radius, var(--a2ui-border-radius, 5px))";
+      this.style.padding = "var(--a2ui-swimlane-padding, 0.75rem)";
     }
 
     disconnectedCallback() {
       super.disconnectedCallback();
       this.teardownPicker();
+      this.swimlaneSubscription?.unsubscribe();
+      this.swimlaneSubscription = null;
     }
 
     teardownPicker() {
@@ -1368,23 +1532,32 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
 
       const children = Array.isArray(props.children) ? props.children : [];
       const lanesId = this.boardLanesId(children);
-      return html`${children.map((child) =>
-        lanesId !== null && childRefId(child) === lanesId
-          ? html`<div class="board-lanes" part="board-lanes">${this.renderNode(child)}</div>`
-          : html`${this.renderNode(child)}`,
-      )}`;
+      const stagesId = this.swimlaneStagesId();
+      return html`${children.map((child) => {
+        const childId = childRefId(child);
+        if (lanesId !== null && childId === lanesId) {
+          return html`<div class="board-lanes" part="board-lanes">${this.renderNode(child)}</div>`;
+        }
+        if (stagesId !== null && childId === stagesId) {
+          return html`<div class="board-stages" part="board-stages">${this.renderNode(child)}</div>`;
+        }
+        return html`${this.renderNode(child)}`;
+      })}`;
     }
 
     // A board container (the encoder's frozen `board_<template>` id with its
-    // `board_<template>_lanes` Row child): the lanes child renders inside a
-    // horizontal scroll frame. Anything else returns null (plain column).
+    // `board_<template>_lanes` child — a Row of lanes, or on a swimlaned
+    // board the Column of stages and swimlanes): the lanes child renders
+    // inside a horizontal scroll frame. Anything else returns null (plain
+    // column).
     boardLanesId(children) {
       const id = this.context?.componentModel?.id;
       if (typeof id !== "string" || !/^board_.+/.test(id)) return null;
       const lanesId = `${id}_lanes`;
       if (!children.some((child) => childRefId(child) === lanesId)) return null;
       try {
-        return this.surface?.componentsModel?.get(lanesId)?.type === "Row" ? lanesId : null;
+        const type = this.surface?.componentsModel?.get(lanesId)?.type;
+        return type === "Row" || type === "Column" ? lanesId : null;
       } catch {
         return null;
       }

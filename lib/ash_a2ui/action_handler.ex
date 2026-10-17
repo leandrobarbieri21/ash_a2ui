@@ -1176,8 +1176,10 @@ defmodule AshA2ui.ActionHandler do
         rows = rows(view, table, records, ash_opts)
 
         {:ok,
-         records_messages(view, table, rows) ++
-           query_state_messages(view, table, query_state, rows)}
+         view
+         |> records_messages(table, rows)
+         |> Kernel.++(query_state_messages(view, table, query_state, rows))
+         |> with_swimlane_totals(view)}
 
       {:error, error} ->
         {:error, error_messages(view, error)}
@@ -1260,6 +1262,7 @@ defmodule AshA2ui.ActionHandler do
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
+    |> with_swimlane_totals(view)
   end
 
   # --- submit_form -----------------------------------------------------------
@@ -2733,6 +2736,31 @@ defmodule AshA2ui.ActionHandler do
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
+    |> with_swimlane_totals(view)
+  end
+
+  # A swimlaned board's swimlane-row and stage-column totals follow the
+  # cell totals a batch rewrote: every row or column whose cells all
+  # refreshed gets its sum (see AshA2ui.Board.aggregate_totals/2); the
+  # others keep theirs. A no-op without swimlaned boards.
+  defp with_swimlane_totals({:ok, messages}, view),
+    do: {:ok, with_swimlane_totals(messages, view)}
+
+  defp with_swimlane_totals({:error, _error} = error, _view), do: error
+
+  defp with_swimlane_totals(messages, view) when is_list(messages) do
+    cell_totals =
+      for %{"updateDataModel" => %{"path" => "/_lane_total_" <> name, "value" => text}} <-
+            messages,
+          into: %{},
+          do: {name, text}
+
+    aggregates =
+      if cell_totals == %{},
+        do: [],
+        else: AshA2ui.Board.aggregate_totals(view.tables, cell_totals)
+
+    messages ++ Enum.map(aggregates, fn {path, text} -> update_data_model(view, path, text) end)
   end
 
   defp refresh_targets(view, invoked) do

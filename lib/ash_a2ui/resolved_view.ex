@@ -150,6 +150,11 @@ defmodule AshA2ui.ResolvedView do
 
   A `display :calendar` table carries its resolved calendar config under
   `calendar` (`nil` on every other table); see `AshA2ui.Calendar`.
+
+  A board cell of a swimlaned board (`swimlanes_by`) adds `lane:` (the
+  stage column's runtime name) and `swimlane:` (`%{value:, label:, tone:,
+  name:, filter: {attribute, value}}`) to `section`; its reads AND on both
+  filters.
   """
   @type table :: %{
           name: atom | String.t(),
@@ -736,7 +741,8 @@ defmodule AshA2ui.ResolvedView do
       value: :value,
       values: sections.values,
       labels: sections.labels,
-      limit: sections.limit
+      limit: sections.limit,
+      swimlanes: resolve_swimlanes(sections)
     }
   end
 
@@ -752,6 +758,19 @@ defmodule AshA2ui.ResolvedView do
       read_action: sections.read_action || primary_action_name(sections.source, :read),
       sort: sections.sort || label,
       limit: sections.limit
+    }
+  end
+
+  # A board's second axis (AshA2ui.Board.swimlanes/2): nil without
+  # swimlanes_by.
+  defp resolve_swimlanes(%{swimlanes_by: nil}), do: nil
+
+  defp resolve_swimlanes(sections) do
+    %{
+      scope_by: sections.swimlanes_by,
+      values: sections.swimlane_values,
+      labels: sections.swimlane_labels,
+      tones: sections.swimlane_tones
     }
   end
 

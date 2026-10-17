@@ -27,7 +27,9 @@ defmodule AshA2ui.Sections do
   read is issued, and the runtime names, scoped paths and per-section
   filters are exactly those of a source-backed set. A `:table` with
   `display :board` renders such a set as side-by-side lanes (see
-  `AshA2ui.Board`).
+  `AshA2ui.Board`); with `swimlanes_by` it expands into one cell per
+  (swimlane, lane), `<template_key>_<lane>__<swimlane>`, scoped by both
+  attributes.
 
   `refreshes` metadata may target the template key (`refreshes
   [:per_bucket]`): after expansion it covers every runtime table of the set.
@@ -50,7 +52,11 @@ defmodule AshA2ui.Sections do
     :read_action,
     :sort,
     :values,
+    :swimlanes_by,
+    :swimlane_values,
     labels: [],
+    swimlane_labels: [],
+    swimlane_tones: [],
     limit: 50,
     __spark_metadata__: nil
   ]
@@ -64,6 +70,10 @@ defmodule AshA2ui.Sections do
           sort: atom | nil,
           values: [atom | String.t()] | nil,
           labels: keyword,
+          swimlanes_by: atom | nil,
+          swimlane_values: [atom | String.t()] | nil,
+          swimlane_labels: keyword,
+          swimlane_tones: keyword(atom),
           limit: pos_integer
         }
 
@@ -103,8 +113,15 @@ defmodule AshA2ui.Sections do
   """
   @spec section_name(atom | String.t(), term) :: String.t()
   def section_name(template_key, value) do
-    "#{template_key}_#{String.replace(section_string(value), ~r/[^a-zA-Z0-9]+/, "_")}"
+    "#{template_key}_#{sanitize(value)}"
   end
+
+  @doc """
+  A section value in runtime-name form: its string form with every
+  non-alphanumeric run collapsed to `_` (`sanitize("a3f4-9") == "a3f4_9"`).
+  """
+  @spec sanitize(term) :: String.t()
+  def sanitize(value), do: String.replace(section_string(value), ~r/[^a-zA-Z0-9]+/, "_")
 
   defp do_expand(view, opts) do
     view.tables
@@ -139,10 +156,51 @@ defmodule AshA2ui.Sections do
     end
   end
 
-  # One concrete table per section record: runtime name, scoped data-model
-  # paths, a copied component (its `as` carries the runtime name so encoder
+  # One concrete table per section record — on a swimlaned board, one per
+  # (swimlane, lane) cell, swimlane-major, scoped by both filters: runtime
+  # name, scoped data-model paths, a copied component (its `as` carries the runtime name so encoder
   # component ids stay unique), and the `section` scope the reads AND on
   # (see AshA2ui.ContextRunner.table_scope/3).
+  # `limit` caps the cells (each one a page read and a count): whole
+  # swimlane rows past it are dropped, as trailing lanes are on a lane-only
+  # board. The verifier rejects such a limit where it can resolve the
+  # resource, so this only guards boards it could not check.
+  defp expand_table(table, %{swimlanes: %{}} = config, lanes) do
+    swimlanes =
+      config.resource
+      |> AshA2ui.Board.swimlanes(config.swimlanes)
+      |> Enum.take(div(config.limit, max(length(lanes), 1)))
+
+    for swimlane <- swimlanes, lane <- lanes do
+      name = AshA2ui.Board.cell_name(table.name, lane.value, swimlane.value)
+      label = section_string(lane.label)
+
+      table
+      |> Map.delete(:sections)
+      |> Map.merge(%{
+        name: name,
+        component: %{table.component | as: name},
+        records_path: "/records/#{name}",
+        query_path: table.query && "/query/#{name}",
+        export: section_export(table, "#{label} #{swimlane.label}"),
+        section: %{
+          value: lane.value,
+          label: label,
+          filter: {config.scope_by, lane.value},
+          template: table.name,
+          lane: section_name(table.name, lane.value),
+          swimlane: %{
+            value: swimlane.value,
+            label: swimlane.label,
+            tone: swimlane.tone,
+            name: AshA2ui.Board.swimlane_name(table.name, swimlane.value),
+            filter: {config.swimlanes.scope_by, swimlane.value}
+          }
+        }
+      })
+    end
+  end
+
   defp expand_table(table, config, section_records) do
     Enum.map(section_records, fn record ->
       value = Map.get(record, config.value)

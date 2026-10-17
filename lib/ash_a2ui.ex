@@ -778,6 +778,11 @@ defmodule AshA2ui do
     enum's label or the humanized value). Combined with `display :board` on
     the table this renders a board: one lane per value, side by side (see the
     multi-section surfaces topic).
+
+    A board may split into **swimlanes** on a second enumerated attribute
+    (`swimlanes_by`): the stage columns stay side by side and every
+    swimlane is a row across them, one cell per (swimlane, lane), headed by
+    its label on a background coloured by its tone (`swimlane_tones`).
     """,
     examples: [
       """
@@ -792,6 +797,14 @@ defmodule AshA2ui do
         scope_by :status
         values [:open, :claimed, :completed]
         labels open: "To do"
+      end
+      """,
+      """
+      sections do
+        scope_by :stage
+        swimlanes_by :severity
+        swimlane_values [:emergency, :urgent, :routine]
+        swimlane_tones emergency: :danger, urgent: :warning, routine: :success
       end
       """
     ],
@@ -833,6 +846,50 @@ defmodule AshA2ui do
         the enum's label, else the humanized value.
         """
       ],
+      swimlanes_by: [
+        type: :atom,
+        doc: """
+        Boards only (`display :board`, sections without a `source`): the
+        public attribute or calculation of the table's resource that splits
+        the board into swimlanes, rows across every lane. It needs
+        enumerable values like a source-less `scope_by` (an `Ash.Type.Enum`
+        or a `one_of` constraint) and must differ from `scope_by`. Each
+        (swimlane, lane) cell is a table of its own, named
+        `<component_key>_<lane>__<swimlane>`, whose reads AND
+        `scope_by == lane` and `swimlanes_by == swimlane`. Records whose
+        swimlane value is nil or not listed appear in no swimlane.
+        """
+      ],
+      swimlane_values: [
+        type: {:list, {:or, [:atom, :string]}},
+        doc: """
+        The enumerated values of `swimlanes_by` that become swimlanes, top
+        to bottom (requires `swimlanes_by`). Defaults to all of them, in
+        declaration order.
+        """
+      ],
+      swimlane_labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Swimlane heading overrides per value (`swimlane_labels emergency:
+        "Emergency"`; requires `swimlanes_by`). Swimlanes without an entry
+        are headed by the enum's label, else the humanized value.
+        """
+      ],
+      swimlane_tones: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The tone per swimlane value, which colours the swimlane's background
+        (`swimlane_tones emergency: :danger, routine: :success`; requires
+        `swimlanes_by`). Tones are the `badge_tones` vocabulary: `:neutral`,
+        `:info`, `:success`, `:warning`, `:danger` and `:accent`; unlisted
+        swimlanes are `:neutral`. Served at the reserved
+        `/_swimlane_tone_<component_key>__<swimlane>` path; the AshA2ui
+        merged catalog maps it onto the `--a2ui-swimlane-<tone>-*` tokens.
+        """
+      ],
       label: [
         type: :atom,
         doc: """
@@ -865,7 +922,7 @@ defmodule AshA2ui do
         type: :pos_integer,
         default: 50,
         doc:
-          "Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count."
+          "Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count; on a swimlaned board it caps the cells (each one a page read and a count on every render and refresh) and may not be below the cell count."
       ]
     ]
   }

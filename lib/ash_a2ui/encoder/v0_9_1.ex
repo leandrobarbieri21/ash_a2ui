@@ -1433,31 +1433,21 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "children" => lane_children(view, table, sfx, controls?)
     }
 
-    header = [
-      %{
-        "id" => "lane#{sfx}_header",
-        "component" => "Row",
-        "align" => "center",
-        "children" => ["table_heading#{sfx}", "lane#{sfx}_total"]
-      },
-      %{
-        "id" => "table_heading#{sfx}",
-        "component" => "Text",
-        "text" => table.section.label,
-        "variant" => "h3"
-      },
-      %{
-        "id" => "lane#{sfx}_total",
-        "component" => "Text",
-        "text" => %{"path" => AshA2ui.Board.total_path(table)},
-        "variant" => "caption"
-      },
-      %{
-        "id" => "records_list#{sfx}",
-        "component" => "List",
-        "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
-      }
-    ]
+    header =
+      lane_header_components(table, sfx) ++
+        [
+          %{
+            "id" => "lane#{sfx}_total",
+            "component" => "Text",
+            "text" => %{"path" => AshA2ui.Board.total_path(table)},
+            "variant" => "caption"
+          },
+          %{
+            "id" => "records_list#{sfx}",
+            "component" => "List",
+            "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
+          }
+        ]
 
     controls = if controls?, do: query_control_components(view, table, sfx), else: []
 
@@ -1470,7 +1460,46 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       empty_state_components(view, table, sfx)
   end
 
-  # The container is emitted once, with the template's first lane.
+  # A lane's header Row: its heading (h3) and total. A swimlaned board's
+  # cell is headed by its stage column and its swimlane row instead, so its
+  # header holds the cell total alone.
+  defp lane_header_components(%{section: %{swimlane: %{}}}, sfx) do
+    [
+      %{
+        "id" => "lane#{sfx}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["lane#{sfx}_total"]
+      }
+    ]
+  end
+
+  defp lane_header_components(table, sfx) do
+    [
+      %{
+        "id" => "lane#{sfx}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["table_heading#{sfx}", "lane#{sfx}_total"]
+      },
+      %{
+        "id" => "table_heading#{sfx}",
+        "component" => "Text",
+        "text" => table.section.label,
+        "variant" => "h3"
+      }
+    ]
+  end
+
+  # The container is emitted once, with the template's first lane (on a
+  # swimlaned board, its first cell).
+  defp board_container_components(view, %{section: %{swimlane: %{}}} = table) do
+    case AshA2ui.Board.template_lanes(view.tables, table.section.template) do
+      [^table | _rest] = cells -> swimlane_board_components(view, table, cells)
+      _later_cell -> []
+    end
+  end
+
   defp board_container_components(view, table) do
     case AshA2ui.Board.template_lanes(view.tables, table.section.template) do
       [^table | _rest] = lanes ->
@@ -1505,6 +1534,127 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp board_id(table), do: "board_#{table.section.template}"
+
+  # A swimlaned board keeps the stage columns side by side and splits
+  # vertically into swimlane rows. `board_<template>_lanes` is a Column
+  # (inside the merged catalog's scroll frame): first
+  # `board_<template>_stages`, a Row of stage Columns (`stage_<lane>`, weight
+  # 1, each with a header Row of the stage heading and its
+  # `/_lane_total_<lane>` total), then one `swimlane_<swimlane>` Column per
+  # swimlane: a header Row (`swimlane_<swimlane>_heading` h3 and the
+  # `/_swimlane_total_<swimlane>` total) over `swimlane_<swimlane>_cells`, a
+  # Row of the swimlane's cell Columns (`lane_<cell>`) at weight 1, so each
+  # cell sits under its stage. The swimlane's tone is data
+  # (`/_swimlane_tone_<swimlane>`): the basic catalog has no colour props,
+  # and the merged catalog paints the row from it.
+  defp swimlane_board_components(view, table, cells) do
+    template = table.section.template
+    board = board_id(table)
+    {rows, columns} = AshA2ui.Board.grid(cells)
+
+    container = [
+      %{
+        "id" => board,
+        "component" => "Column",
+        "children" =>
+          ["#{board}_heading"] ++
+            create_button_ids(view, table, "_#{template}") ++ ["#{board}_lanes"]
+      },
+      %{
+        "id" => "#{board}_heading",
+        "component" => "Text",
+        "text" => humanize(template),
+        "variant" => "h2"
+      },
+      %{
+        "id" => "#{board}_lanes",
+        "component" => "Column",
+        "children" =>
+          ["#{board}_stages"] ++
+            Enum.map(rows, fn {swimlane, _cells} -> "swimlane_#{swimlane}" end)
+      },
+      %{
+        "id" => "#{board}_stages",
+        "component" => "Row",
+        "align" => "start",
+        "children" => Enum.map(columns, fn {lane, _cells} -> "stage_#{lane}" end)
+      }
+    ]
+
+    stages = Enum.flat_map(columns, fn {lane, [cell | _rest]} -> stage_components(lane, cell) end)
+
+    swimlanes =
+      Enum.flat_map(rows, fn {swimlane, [cell | _rest] = row_cells} ->
+        swimlane_components(view, swimlane, cell.section.swimlane, row_cells)
+      end)
+
+    container ++ stages ++ swimlanes ++ create_button_components(view, table, "_#{template}")
+  end
+
+  defp stage_components(lane, cell) do
+    [
+      %{
+        "id" => "stage_#{lane}",
+        "component" => "Column",
+        "weight" => 1,
+        "children" => ["stage_#{lane}_header"]
+      },
+      %{
+        "id" => "stage_#{lane}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["stage_#{lane}_heading", "stage_#{lane}_total"]
+      },
+      %{
+        "id" => "stage_#{lane}_heading",
+        "component" => "Text",
+        "text" => cell.section.label,
+        "variant" => "h3"
+      },
+      %{
+        "id" => "stage_#{lane}_total",
+        "component" => "Text",
+        "text" => %{"path" => AshA2ui.Board.stage_total_path(lane)},
+        "variant" => "caption"
+      }
+    ]
+  end
+
+  defp swimlane_components(view, name, swimlane, cells) do
+    id = "swimlane_#{name}"
+
+    [
+      %{
+        "id" => id,
+        "component" => "Column",
+        "children" => ["#{id}_header", "#{id}_cells"]
+      },
+      %{
+        "id" => "#{id}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["#{id}_heading", "#{id}_total"]
+      },
+      %{
+        "id" => "#{id}_heading",
+        "component" => "Text",
+        "text" => swimlane.label,
+        "variant" => "h3"
+      },
+      %{
+        "id" => "#{id}_total",
+        "component" => "Text",
+        "text" => %{"path" => AshA2ui.Board.swimlane_total_path(name)},
+        "variant" => "caption"
+      },
+      %{
+        "id" => "#{id}_cells",
+        "component" => "Row",
+        "align" => "start",
+        "children" => Enum.map(cells, &"lane#{table_suffix(view, &1)}")
+      }
+    ]
+  end
 
   defp lane_children(view, table, sfx, controls?) do
     ["lane#{sfx}_header"] ++
@@ -3980,15 +4130,35 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # Board lanes carry their total at the reserved /_lane_total_<lane> path
   # (see AshA2ui.Board); a no-op on surfaces without boards.
+  # A swimlaned board adds its swimlane-row and stage-column totals (sums of
+  # their cells') and each swimlane's tone at /_swimlane_tone_<swimlane>.
   defp put_lane_totals(value, view) do
-    view.tables
-    |> Enum.filter(&AshA2ui.Board.lane?/1)
-    |> Enum.reduce(value, fn table, acc ->
-      rows = rows_at(value, view, table)
-      state = table.query && get_in(value, ["query", to_string(table.name)])
+    lanes = Enum.filter(view.tables, &AshA2ui.Board.lane?/1)
 
-      Map.put(acc, "_lane_total_#{table.name}", AshA2ui.Board.total_text(length(rows), state))
-    end)
+    totals =
+      Map.new(lanes, fn table ->
+        rows = rows_at(value, view, table)
+        state = table.query && get_in(value, ["query", to_string(table.name)])
+        {table.name, AshA2ui.Board.total_text(length(rows), state)}
+      end)
+
+    lane_totals = Map.new(lanes, &{"_lane_total_#{&1.name}", Map.fetch!(totals, &1.name)})
+
+    swimlane_data =
+      for {path, text} <- AshA2ui.Board.aggregate_totals(lanes, totals),
+          into: %{},
+          do: {String.trim_leading(path, "/"), text}
+
+    tones =
+      for table <- lanes,
+          AshA2ui.Board.cell?(table),
+          swimlane = table.section.swimlane,
+          into: %{},
+          do:
+            {String.trim_leading(AshA2ui.Board.swimlane_tone_path(swimlane.name), "/"),
+             swimlane.tone}
+
+    value |> Map.merge(lane_totals) |> Map.merge(swimlane_data) |> Map.merge(tones)
   end
 
   # --- record serialization ---

@@ -132,10 +132,17 @@ defmodule AshA2ui.ContextRunner do
     end
   end
 
+  # A section's own filter, plus a swimlaned board cell's swimlane filter.
   defp section_scope(table) do
     case Map.get(table, :section) do
-      %{filter: {attribute, value}} -> [{attribute, value}]
-      _not_a_section -> []
+      %{filter: {attribute, value}, swimlane: %{filter: {swimlane_attribute, swimlane}}} ->
+        [{attribute, value}, {swimlane_attribute, swimlane}]
+
+      %{filter: {attribute, value}} ->
+        [{attribute, value}]
+
+      _not_a_section ->
+        []
     end
   end
 

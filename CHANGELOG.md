@@ -56,6 +56,27 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   source exports its callback. See the Live Diagrams topic, which includes
   an `AshBpmn.FlightView` adapter written as host code.
 
+- **Board swimlanes.** `swimlanes_by` in a board's source-less `sections`
+  block splits the board into rows by a second enumerated attribute: the
+  stage columns stay side by side under a header row, and every swimlane
+  is a row across them, headed by its label and total. `swimlane_values`
+  picks a subset and an order, `swimlane_labels` overrides headings and
+  `swimlane_tones` gives each swimlane a tone from the `badge_tones`
+  vocabulary. Each (swimlane, lane) cell is an expanded table,
+  `<key>_<lane>__<swimlane>`, scoped by both attributes (a client filter on
+  either cannot widen it), with its own pagination and total; swimlane and
+  stage totals are the sums of their cells'. `refreshes` on the template
+  key still covers every cell. The tone is data
+  (`/_swimlane_tone_<key>__<swimlane>`); the merged catalog paints each
+  row from the new `--a2ui-swimlane-<tone>-background` / `-color` tokens
+  (AA contrast in light and dark, defaults in `ash_a2ui_theme.css`), and
+  the admin catalog's basic board fallback gets the same rows. A board
+  without `swimlanes_by` is byte-identical to before. Verified at compile
+  time; `priv/js/probe/swimlanes_probe.mjs` is the browser check. On a
+  swimlaned board `limit` caps the cells (each one a page read and a
+  count on every render and refresh), and the verifier rejects a `limit`
+  below the cell count.
+
 - **`label` on the action entity.** `action :confirm_merge do label
   "Confirm match" end` names the action's row button and bulk toolbar
   button in both compositions, its admin `rowActions` entry, its prompt
@@ -124,6 +145,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `links`.
 
 ### Bug Fixes:
+
+- **Boards reject runtime names that would collide.** A board's lane (or
+  cell, swimlane or stage) runtime name that extends another at an
+  underscore (`:high` and `:high_total` both built `lane_board_high_total`),
+  or that equals another table's key (sharing its `/records/<name>`), is
+  now a compile error, as is an empty `values` or `swimlane_values` list,
+  which rendered no board at all. A board whose values did this compiled
+  before and now fails to compile.
 
 - **Following a basic-catalog link no longer throws "unsubscribe is not a
   function".** The merged catalog's status banner (`status_text`) called

@@ -19,6 +19,20 @@ defmodule AshA2ui.Board do
   key (which fans out to every lane). There is no drag-and-drop: the basic
   catalog has no pointer events.
 
+  ## Swimlanes
+
+  `swimlanes_by` (with optional `swimlane_values`, `swimlane_labels` and
+  `swimlane_tones`) splits the board into rows by a second enumerated
+  attribute. Each (swimlane, lane) pair is one expanded table, a **cell**
+  (`cell?/1`), swimlane-major, named `<template_key>_<lane>__<swimlane>`
+  (`cell_name/3`) and scoped by both filters (`section.filter` and
+  `section.swimlane.filter`). The encoder keeps the stage columns side by
+  side and stacks one row per swimlane (see the multi-section surfaces
+  topic). Each swimlane's tone is served at `/_swimlane_tone_<swimlane>`
+  (`swimlane_tone_path/1`); its total at `/_swimlane_total_<swimlane>` and
+  each stage's at `/_lane_total_<lane>` are sums of their cells' totals
+  (`aggregate_totals/2`).
+
   ## Lane totals
 
   Each lane's heading shows its total, served at the reserved root path
@@ -48,6 +62,9 @@ defmodule AshA2ui.Board do
   @typedoc "One synthesized lane record (the source-less section record)."
   @type lane :: %{value: atom | String.t(), label: String.t()}
 
+  @typedoc "One swimlane of a swimlaned board, with its tone."
+  @type swimlane :: %{value: atom | String.t(), label: String.t(), tone: String.t()}
+
   @doc """
   The enumerated values of `name` on `resource` (a resource module or its
   DSL state): an `Ash.Type.Enum`'s values, else a non-empty `one_of`
@@ -74,22 +91,59 @@ defmodule AshA2ui.Board do
   """
   @spec lanes(module, map) :: [lane]
   def lanes(resource, config) do
-    case AshA2ui.TypeMapper.choices(resource, config.scope_by) do
+    enumerate(resource, :scope_by, config.scope_by, Map.get(config, :values),
+      labels: Map.get(config, :labels, [])
+    )
+  end
+
+  @doc """
+  The swimlanes of a source-less sections config's resolved `swimlanes`
+  (`%{scope_by, values, labels, tones}`) over `resource`, top to bottom:
+  `%{value, label, tone}` per swimlane, enumerated like `lanes/2` (`values`
+  picks a subset and an order, `labels` overrides headings) with the tone
+  of `tones` (`"neutral"` when unlisted). `[]` for a board without
+  swimlanes (`nil`).
+
+  Raises `ArgumentError` when the swimlane attribute has no enumerable
+  values (the verifier rejects that at compile time where the resource is
+  resolvable).
+  """
+  @spec swimlanes(module, map | nil) :: [swimlane]
+  def swimlanes(_resource, nil), do: []
+
+  def swimlanes(resource, swimlanes) do
+    tones = Map.get(swimlanes, :tones, [])
+
+    resource
+    |> enumerate(:swimlanes_by, swimlanes.scope_by, Map.get(swimlanes, :values),
+      labels: Map.get(swimlanes, :labels, [])
+    )
+    |> Enum.map(&Map.put(&1, :tone, swimlane_tone(&1.value, tones)))
+  end
+
+  defp enumerate(resource, option, attribute, values, opts) do
+    case AshA2ui.TypeMapper.choices(resource, attribute) do
       [_ | _] = choices ->
         all = Enum.map(choices, &elem(&1, 0))
 
-        config
-        |> Map.get(:values)
+        values
         |> chosen_values(all)
         |> Enum.map(fn value ->
-          %{value: value, label: lane_label(value, Map.get(config, :labels, []), choices)}
+          %{value: value, label: lane_label(value, opts[:labels], choices)}
         end)
 
       [] ->
         raise ArgumentError,
-              "sections without a source need enumerable values: scope_by " <>
-                "#{inspect(config.scope_by)} of #{inspect(resource)} is neither an " <>
+              "sections without a source need enumerable values: #{option} " <>
+                "#{inspect(attribute)} of #{inspect(resource)} is neither an " <>
                 "Ash.Type.Enum nor constrained by one_of"
+    end
+  end
+
+  defp swimlane_tone(value, tones) do
+    case Enum.find(tones, fn {key, _tone} -> to_string(key) == to_string(value) end) do
+      {_key, tone} -> to_string(tone)
+      nil -> "neutral"
     end
   end
 
@@ -102,10 +156,108 @@ defmodule AshA2ui.Board do
     Enum.find(all, &(to_string(&1) == string))
   end
 
-  @doc "Whether an (expanded) resolved table is a board lane."
+  @doc """
+  Whether an (expanded) resolved table is a board lane — on a swimlaned
+  board, a cell (see `cell?/1`).
+  """
   @spec lane?(map) :: boolean
   def lane?(%{component: %{display: :board}, section: %{}}), do: true
   def lane?(_table), do: false
+
+  @doc "Whether an (expanded) resolved table is a cell of a swimlaned board."
+  @spec cell?(map) :: boolean
+  def cell?(%{component: %{display: :board}, section: %{swimlane: %{}}}), do: true
+  def cell?(_table), do: false
+
+  @doc """
+  The runtime name of a swimlane row: the template key and the sanitized
+  swimlane value joined by `__` (`swimlane_name(:board, :very_high) ==
+  "board__very_high"`). A cell's runtime name is its lane's runtime name
+  plus the same `__<swimlane>` suffix (`board_open__very_high`).
+  """
+  @spec swimlane_name(atom | String.t(), term) :: String.t()
+  def swimlane_name(template_key, value) do
+    "#{template_key}__#{AshA2ui.Sections.sanitize(value)}"
+  end
+
+  @doc "The runtime name of the cell of `lane` and `swimlane` on `template_key`'s board."
+  @spec cell_name(atom | String.t(), term, term) :: String.t()
+  def cell_name(template_key, lane, swimlane) do
+    "#{AshA2ui.Sections.section_name(template_key, lane)}__#{AshA2ui.Sections.sanitize(swimlane)}"
+  end
+
+  @doc "The reserved root data-model path of a swimlane row's tone."
+  @spec swimlane_tone_path(String.t()) :: String.t()
+  def swimlane_tone_path(swimlane_name), do: "/_swimlane_tone_#{swimlane_name}"
+
+  @doc "The reserved root data-model path of a swimlane row's total."
+  @spec swimlane_total_path(String.t()) :: String.t()
+  def swimlane_total_path(swimlane_name), do: "/_swimlane_total_#{swimlane_name}"
+
+  @doc """
+  The reserved root data-model path of a stage column's total on a
+  swimlaned board: `/_lane_total_<lane>`, with the lane's own runtime name
+  (the path a lane-only board's lane total has).
+  """
+  @spec stage_total_path(String.t()) :: String.t()
+  def stage_total_path(lane_name), do: "/_lane_total_#{lane_name}"
+
+  @doc """
+  The rows and columns of a swimlaned board's cells (each in board order):
+  `{[{swimlane_name, cells}], [{lane_name, cells}]}`. Empty for a board
+  without swimlanes.
+  """
+  @spec grid([map]) :: {[{String.t(), [map]}], [{String.t(), [map]}]}
+  def grid(cells) do
+    cells = Enum.filter(cells, &cell?/1)
+    {group_in_order(cells, & &1.section.swimlane.name), group_in_order(cells, & &1.section.lane)}
+  end
+
+  @doc """
+  The swimlane-row and stage-column totals of a swimlaned board, as
+  `{path, text}` pairs, from the cell totals in `cell_totals` (cell runtime
+  name => total text, see `total_text/2`): a row's (or column's) total is
+  the sum of its cells', suffixed `+` when any cell's is. Only rows and
+  columns whose every cell has a total in `cell_totals` are returned, so a
+  refresh covering some cells leaves the others' aggregates as they were.
+  """
+  @spec aggregate_totals([map], %{String.t() => String.t()}) :: [{String.t(), String.t()}]
+  def aggregate_totals(tables, cell_totals) do
+    {rows, columns} = grid(tables)
+
+    Enum.flat_map(rows, fn {name, cells} ->
+      aggregate(swimlane_total_path(name), cells, cell_totals)
+    end) ++
+      Enum.flat_map(columns, fn {name, cells} ->
+        aggregate(stage_total_path(name), cells, cell_totals)
+      end)
+  end
+
+  defp aggregate(path, cells, cell_totals) do
+    texts = Enum.map(cells, &Map.get(cell_totals, &1.name))
+
+    if Enum.all?(texts, &is_binary/1) do
+      sum =
+        texts |> Enum.map(&(&1 |> String.trim_trailing("+") |> String.to_integer())) |> Enum.sum()
+
+      more? = Enum.any?(texts, &String.ends_with?(&1, "+"))
+      [{path, if(more?, do: "#{sum}+", else: Integer.to_string(sum))}]
+    else
+      []
+    end
+  end
+
+  defp group_in_order(cells, key_fun) do
+    cells
+    |> Enum.reduce({[], %{}}, fn cell, {order, groups} ->
+      key = key_fun.(cell)
+      order = if Map.has_key?(groups, key), do: order, else: [key | order]
+      {order, Map.update(groups, key, [cell], &[cell | &1])}
+    end)
+    |> then(fn {order, groups} ->
+      order |> Enum.reverse() |> Enum.map(&{&1, Enum.reverse(Map.fetch!(groups, &1))})
+    end)
+  end
 
   @doc "The reserved root data-model path of a lane's total."
   @spec total_path(map) :: String.t()
@@ -145,6 +297,8 @@ defmodule AshA2ui.Board do
 
   # Headings: a `labels` override, else the shared choice label
   # (`AshA2ui.TypeMapper.choices/2`, the ChoicePicker's labels).
+  defp lane_label(value, nil, choices), do: lane_label(value, [], choices)
+
   defp lane_label(value, labels, choices) do
     case Enum.find(labels, fn {key, _label} -> to_string(key) == to_string(value) end) do
       {_key, label} -> to_string(label)

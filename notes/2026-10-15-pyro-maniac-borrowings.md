@@ -183,9 +183,39 @@ validated server-side exactly like a button.
 - PyroManiac's fractional-index ordering within a lane: a `priority` string
   with a Postgres rank function and a unique index. Our core depends only on
   `ash`.
-- WIP limits, and swimlanes on a second axis.
+- WIP limits, and swimlanes on a second axis (swimlanes reversed on
+  2026-10-17, see the amendment below).
 - PyroManiac's generated `move_action`. Our transitions are the resource's
   own actions, which keeps state-machine rules where they live.
+
+**Amendment, 2026-10-17: swimlanes are in (A2UI-105B).** The list above
+put "swimlanes on a second axis" out of scope. The clinic-demo owner has now
+asked for one: the triage board should stay a horizontal kanban of stages,
+split vertically by triage severity, each severity on its own coloured band.
+Why adding them now is sound:
+
+- *It needs no new machinery.* Lanes turned out to be ordinary expanded
+  tables with one more filter. A swimlane cell is the same table with a
+  second filter ANDed on, so expansion, per-cell reads and pagination, the
+  scope guarantee against client filters, and template-key refresh fan-out
+  are all reused. The runtime-name contract extends instead of changing:
+  `<key>_<lane>` becomes `<key>_<lane>__<swimlane>` (a sanitized value
+  never contains `__`; the verifier rejects the values with leading or
+  trailing punctuation that could still make two cells meet), and a board
+  without `swimlanes_by` encodes byte-for-byte as before (golden-tested).
+- *The alternative is worse.* Without it, a host stacks one board per
+  severity, which repeats the stage headers, does not align the stages, and
+  needs one refresh target per board.
+- *Colour stays out of the wire.* The basic catalog still has no colour
+  props, so the tone travels as data (`/_swimlane_tone_<key>__<swimlane>`)
+  in the `badge_tones` vocabulary, and the merged catalog paints it from
+  theme tokens with AA contrast. Stock basic renderers show the same rows
+  without colour, as they show badges without tones.
+
+WIP limits and rank ordering within a lane stay out, for the reasons above.
+The design is in the Boards section of
+`documentation/topics/multi-section-surfaces.md`; the criteria are in
+`.sdlc/acceptance/A2UI-105B.yaml`.
 
 ## 3. Wizard steps (A2UI-106)
 

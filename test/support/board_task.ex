@@ -5,7 +5,8 @@ defmodule AshA2ui.Test.BoardTask do
   attribute, moved by the `:claim` / `:complete` transitions) and
   `severity` an `Ash.Type.Enum` (`AshA2ui.Test.Severity`). `stage`'s
   `one_of` holds two values whose lane names collide (`:"in-progress"` and
-  `:in_progress`), for the verifier.
+  `:in_progress`), and `tier`'s values whose runtime names extend one
+  another (`:high`, `:high_total`), for the verifier.
   """
 
   use Ash.Resource,
@@ -37,6 +38,12 @@ defmodule AshA2ui.Test.BoardTask do
     attribute :stage, :atom,
       public?: true,
       constraints: [one_of: [:"in-progress", :in_progress, :done]]
+
+    # Values whose runtime names extend one another (board_high,
+    # board_high_total, board_high_cells): their component ids collide.
+    attribute :tier, :atom,
+      public?: true,
+      constraints: [one_of: [:high, :high_total, :high_cells, :low]]
   end
 
   actions do

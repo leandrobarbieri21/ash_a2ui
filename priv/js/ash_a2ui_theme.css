@@ -123,6 +123,26 @@
   --a2ui-badge-compliant-fill: #4fd07a;
   --a2ui-badge-noncompliant-fill: #ff5c64;
 
+  /* ---- Board swimlanes (merged-catalog swimlane rows) ---------------
+   * A swimlaned board paints each swimlane row from its tone (the
+   * badge_tones vocabulary): a band background and the ink of the
+   * headings and totals on it. 200-weight tints with 900-weight ink in
+   * light, 900 bands with 100 ink in dark; every pair is at least 6.9:1
+   * (WCAG AA asks 4.5:1). Cards on the band keep their own surface. */
+  --a2ui-swimlane-padding: 0.75rem;
+  --a2ui-swimlane-neutral-background: light-dark(#e2e8f0, #334155);
+  --a2ui-swimlane-neutral-color: light-dark(#0f172a, #f1f5f9);
+  --a2ui-swimlane-info-background: light-dark(#bfdbfe, #1e3a8a);
+  --a2ui-swimlane-info-color: light-dark(#1e3a8a, #dbeafe);
+  --a2ui-swimlane-success-background: light-dark(#bbf7d0, #14532d);
+  --a2ui-swimlane-success-color: light-dark(#14532d, #dcfce7);
+  --a2ui-swimlane-warning-background: light-dark(#fde68a, #713f12);
+  --a2ui-swimlane-warning-color: light-dark(#713f12, #fef3c7);
+  --a2ui-swimlane-danger-background: light-dark(#fecaca, #7f1d1d);
+  --a2ui-swimlane-danger-color: light-dark(#7f1d1d, #fee2e2);
+  --a2ui-swimlane-accent-background: light-dark(#ddd6fe, #4c1d95);
+  --a2ui-swimlane-accent-color: light-dark(#4c1d95, #ede9fe);
+
   /* ---- Search pickers (merged-catalog combobox & chips) ------------- */
   --a2ui-combobox-max-height: 18rem;
   --a2ui-combobox-z-index: 30;

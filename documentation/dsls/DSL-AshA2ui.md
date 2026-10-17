@@ -656,6 +656,11 @@ enum's label or the humanized value). Combined with `display :board` on
 the table this renders a board: one lane per value, side by side (see the
 multi-section surfaces topic).
 
+A board may split into **swimlanes** on a second enumerated attribute
+(`swimlanes_by`): the stage columns stay side by side and every
+swimlane is a row across them, one cell per (swimlane, lane), headed by
+its label on a background coloured by its tone (`swimlane_tones`).
+
 
 
 
@@ -678,6 +683,16 @@ end
 
 ```
 
+```
+sections do
+  scope_by :stage
+  swimlanes_by :severity
+  swimlane_values [:emergency, :urgent, :routine]
+  swimlane_tones emergency: :danger, urgent: :warning, routine: :success
+end
+
+```
+
 
 
 
@@ -689,11 +704,15 @@ end
 | [`source`](#a2ui-component-sections-source){: #a2ui-component-sections-source } | `module` |  | The Ash resource whose records enumerate the sections at render time. Optional: without it the sections are the enumerated values of `scope_by` (see `values` and `labels`). |
 | [`values`](#a2ui-component-sections-values){: #a2ui-component-sections-values } | `list(atom \| String.t)` |  | Source-less sections only: the enumerated values of `scope_by` that become sections, in this order (`values [:open, :claimed]`). Each must be one of the enumerated values. Defaults to all of them, in declaration order. |
 | [`labels`](#a2ui-component-sections-labels){: #a2ui-component-sections-labels } | `keyword` | `[]` | Source-less sections only: heading overrides per value (`labels open: "To do"`). Sections without an entry are headed by the enum's label, else the humanized value. |
+| [`swimlanes_by`](#a2ui-component-sections-swimlanes_by){: #a2ui-component-sections-swimlanes_by } | `atom` |  | Boards only (`display :board`, sections without a `source`): the public attribute or calculation of the table's resource that splits the board into swimlanes, rows across every lane. It needs enumerable values like a source-less `scope_by` (an `Ash.Type.Enum` or a `one_of` constraint) and must differ from `scope_by`. Each (swimlane, lane) cell is a table of its own, named `<component_key>_<lane>__<swimlane>`, whose reads AND `scope_by == lane` and `swimlanes_by == swimlane`. Records whose swimlane value is nil or not listed appear in no swimlane. |
+| [`swimlane_values`](#a2ui-component-sections-swimlane_values){: #a2ui-component-sections-swimlane_values } | `list(atom \| String.t)` |  | The enumerated values of `swimlanes_by` that become swimlanes, top to bottom (requires `swimlanes_by`). Defaults to all of them, in declaration order. |
+| [`swimlane_labels`](#a2ui-component-sections-swimlane_labels){: #a2ui-component-sections-swimlane_labels } | `keyword` | `[]` | Swimlane heading overrides per value (`swimlane_labels emergency: "Emergency"`; requires `swimlanes_by`). Swimlanes without an entry are headed by the enum's label, else the humanized value. |
+| [`swimlane_tones`](#a2ui-component-sections-swimlane_tones){: #a2ui-component-sections-swimlane_tones } | `keyword` | `[]` | The tone per swimlane value, which colours the swimlane's background (`swimlane_tones emergency: :danger, routine: :success`; requires `swimlanes_by`). Tones are the `badge_tones` vocabulary: `:neutral`, `:info`, `:success`, `:warning`, `:danger` and `:accent`; unlisted swimlanes are `:neutral`. Served at the reserved `/_swimlane_tone_<component_key>__<swimlane>` path; the AshA2ui merged catalog maps it onto the `--a2ui-swimlane-<tone>-*` tokens. |
 | [`label`](#a2ui-component-sections-label){: #a2ui-component-sections-label } | `atom` |  | The source attribute shown as each section's table heading (requires `source`). Defaults like an option label (first existing public attribute of `[:name, :title, :label, :username, :email]`, else the section value). |
 | [`value`](#a2ui-component-sections-value){: #a2ui-component-sections-value } | `atom` |  | The source attribute providing each section's scope value (matched against `scope_by`) and its runtime name (requires `source`). Defaults to the source's primary key (required explicitly when composite). |
 | [`read_action`](#a2ui-component-sections-read_action){: #a2ui-component-sections-read_action } | `atom` |  | The source read action enumerating the sections (requires `source`). Defaults to the primary read. |
 | [`sort`](#a2ui-component-sections-sort){: #a2ui-component-sections-sort } | `atom` |  | The source attribute sections are ordered by (ascending; requires `source`). Defaults to the resolved `label`. |
-| [`limit`](#a2ui-component-sections-limit){: #a2ui-component-sections-limit } | `pos_integer` | `50` | Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count. |
+| [`limit`](#a2ui-component-sections-limit){: #a2ui-component-sections-limit } | `pos_integer` | `50` | Maximum number of sections rendered (the source read's limit). Without a source it caps the lanes, not the cards per lane, and may not be below the lane count; on a swimlaned board it caps the cells (each one a page read and a count on every render and refresh) and may not be below the cell count. |
 
 
 
