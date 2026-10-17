@@ -9,6 +9,8 @@
  *       closes on success; Tab and Shift+Tab stay inside the dialog;
  *     - relationship and enum prompt fields render as pickers;
  *     - row actions with `visible_when` show only on the rows they apply to;
+ *     - a row action's busy state settles once on its outcome and then
+ *       releases its data-model subscriptions;
  *     - the read-only View panel has a control that closes it.
  *   boards (JobBoardUI, basic composition)
  *     - lanes share the board's width instead of sizing to their cards, on
@@ -331,6 +333,53 @@ async function main() {
         pickers.Reprioritize && pickers.Reprioritize.length >= 3,
         `priority options (${JSON.stringify(pickers.Reprioritize)})`,
       );
+    });
+
+    /* --- admin: a settled row action releases its subscriptions --------- */
+    await check("admin: a settled row action releases its outcome subscriptions", async () => {
+      const writeFeedback = (message) =>
+        page.evaluate((text) => {
+          window.__feed([
+            {
+              version: "v0.9",
+              updateDataModel: {surfaceId: "adoption_jobs", path: "/ui/feedback/message", value: text},
+            },
+          ]);
+        }, message);
+      const state = await page.evaluate(() => {
+        const baseline = window.__surface.dataModel.subscriptions.size;
+        window.__dispatched.length = 0;
+        window.__rowButtons("Open job").find((b) => b.textContent.trim() === "Lock").click();
+        const grid = window.__deepAll("*").find((el) => el._amBusyRowAction);
+        window.__settled = 0;
+        if (grid) {
+          const original = grid.onActionSettled.bind(grid);
+          grid.onActionSettled = () => {
+            window.__settled += 1;
+            original();
+          };
+        }
+        return {
+          baseline,
+          busy: window.__surface.dataModel.subscriptions.size,
+          grid: !!grid,
+          dispatched: window.__dispatched.map((d) => d.name),
+        };
+      });
+      truthy(state.grid, "the clicked grid is busy");
+      expect(state.dispatched, ["invoke"], "the row action dispatched");
+      expect(state.busy, state.baseline + 2, "busy subscribes to the two outcome paths");
+
+      await writeFeedback(`Locked ${Date.now()}`);
+      await page.waitForTimeout(100);
+      await writeFeedback(`Later feedback ${Date.now()}`);
+      await page.waitForTimeout(100);
+      const after = await page.evaluate(() => ({
+        size: window.__surface.dataModel.subscriptions.size,
+        settled: window.__settled,
+      }));
+      expect(after.settled, 1, "the action settles once, not on every later feedback write");
+      expect(after.size, state.baseline, "the outcome subscriptions are released");
     });
 
     /* --- admin: the View panel closes ------------------------------------ */

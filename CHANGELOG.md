@@ -79,6 +79,30 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **Following a basic-catalog link no longer throws "unsubscribe is not a
+  function".** The merged catalog's status banner (`status_text`) called
+  its data-model subscription as a function when it left the DOM (a link
+  navigation, a LiveView patch). `DataModel.subscribe` returns
+  `{value, unsubscribe()}` in @a2ui/web_core 0.10.x and 0.11.x; the banner
+  now calls `unsubscribe()`. The admin catalog's action-busy settle
+  subscriptions had the same mistake (swallowed by a `try`), so they were
+  never released and kept firing on every later feedback change; fixed
+  the same way.
+- **Basic-catalog reference links look like links.** The merged catalog
+  draws a `<value id>_link` borderless Button (`link_buttons: true`) in the
+  surrounding text's font (it used the browser's button font), in the ink
+  colour with a primary-coloured underline, with no padding, border or
+  shadow, and with a focus ring on keyboard focus. The text stays ink
+  because hosts often use primary as a fill colour, which can fall below
+  4.5:1 contrast as text. New tokens: `--a2ui-link-color`,
+  `--a2ui-link-hover-color`, `--a2ui-link-decoration`,
+  `--a2ui-link-hover-decoration`, `--a2ui-link-decoration-color`,
+  `--a2ui-link-decoration-thickness`,
+  `--a2ui-link-hover-decoration-thickness`, `--a2ui-link-underline-offset`,
+  `--a2ui-focus-ring-color`, `--a2ui-focus-ring-width`. The payload is
+  unchanged. Checked on @a2ui/lit 0.10.x (shadow DOM) and 0.11.0 (light
+  DOM) by `priv/js/probe/link_buttons_probe.mjs`, which also checks that
+  removing the surface after following a link logs no console error.
 - **Security: every read carries the surface's actor, tenant and
   `authorize?`.** A `:table` without a `query`, the option lists of
   relationship selects and a `sections` source were read with

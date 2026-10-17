@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<!--
+  Basic-catalog link-button probe page — the client half; drive with
+  priv/js/probe/link_buttons_probe.mjs. Replays recorded (synthetic) wire
+  payloads (priv/js/probe/record_link_buttons.exs): NotesUI under the basic
+  composition built with link_buttons: true.
+
+    ?catalog=ash     the AshA2ui merged catalog (default)
+    ?catalog=stock   the stock basic catalog only
+
+  Exposes __feedFixture(name) / __dispatched / __surface / __navigate()
+  (what a LiveView navigation does to the page: the surface element leaves
+  the DOM).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>link buttons probe</title>
+    <link rel="stylesheet" href="./catalog/ash_a2ui_theme.css" />
+    <style>
+      /* A page font no browser uses for buttons, so the probe can tell an
+       * inherited font from the user-agent button font. */
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "./nm/lit/index.js",
+          "lit/": "./nm/lit/",
+          "lit-html": "./nm/lit-html/lit-html.js",
+          "lit-html/": "./nm/lit-html/",
+          "@lit/reactive-element": "./nm/@lit/reactive-element/reactive-element.js",
+          "@lit/reactive-element/": "./nm/@lit/reactive-element/",
+          "@lit/context": "./nm/@lit/context/index.js",
+          "@lit/context/": "./nm/@lit/context/",
+          "lit-element": "./nm/lit-element/index.js",
+          "lit-element/": "./nm/lit-element/",
+          "@a2ui/web_core/": "./nm/@a2ui/web_core/src/",
+          "@a2ui/web_core/v0_9": "./nm/@a2ui/web_core/src/v0_9/index.js",
+          "@a2ui/web_core/v0_9/basic_catalog": "./nm/@a2ui/web_core/src/v0_9/basic_catalog/index.js",
+          "@a2ui/lit/": "./nm/@a2ui/lit/src/",
+          "@a2ui/lit/v0_9": "./nm/@a2ui/lit/src/v0_9/index.js",
+          "zod": "./nm/zod/index.js",
+          "zod/v3": "./nm/zod/v3/index.js",
+          "zod/v4": "./nm/zod/v4/index.js",
+          "zod/v4-mini": "./nm/zod/v4-mini/index.js",
+          "zod/mini": "./nm/zod/mini/index.js",
+          "zod/": "./nm/zod/",
+          "@preact/signals-core": "./nm/@preact/signals-core/dist/signals-core.mjs",
+          "signal-utils": "./nm/signal-utils/dist/index.ts.js",
+          "signal-utils/": "./nm/signal-utils/dist/",
+          "@lit-labs/signals": "./nm/@lit-labs/signals/index.js",
+          "zod-to-json-schema": "./nm/zod-to-json-schema/dist/esm/index.js",
+          "date-fns": "./nm/date-fns/index.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import {html, css, nothing} from "lit";
+      import "@a2ui/lit/v0_9";
+      import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
+      import {MessageProcessor, Catalog} from "@a2ui/web_core/v0_9";
+      import {ChoicePickerApi, ColumnApi} from "@a2ui/web_core/v0_9/basic_catalog";
+      import {createAshA2uiCatalog} from "./catalog/ash_a2ui_catalog.js";
+
+      const params = new URLSearchParams(location.search);
+      const stock = params.get("catalog") === "stock";
+
+      const catalog = stock
+        ? basicCatalog
+        : createAshA2uiCatalog({
+            Catalog,
+            basicCatalog,
+            ChoicePickerApi,
+            ColumnApi,
+            A2uiLitElement,
+            A2uiController,
+            lit: {html, css, nothing},
+          });
+
+      window.__boot = {stage: "imports-done"};
+      window.__dispatched = [];
+
+      const surfaceEl = document.createElement("a2ui-surface");
+      document.getElementById("host").appendChild(surfaceEl);
+
+      const processor = new MessageProcessor([catalog], (action) => {
+        window.__dispatched.push({name: action.name, context: action.context});
+      });
+      processor.onSurfaceCreated((surface) => {
+        window.__surface = surface;
+        surfaceEl.surface = surface;
+      });
+      window.__feedFixture = async (name) => {
+        const payload = await (await fetch(`./fixtures/${name}_payload.json`)).json();
+        processor.processMessages(payload.messages);
+      };
+      window.__navigate = () => surfaceEl.remove();
+
+      try {
+        await window.__feedFixture("link_buttons");
+        window.__boot.stage = "booted";
+      } catch (error) {
+        window.__boot.stage = "error";
+        window.__boot.error = String(error);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="host" style="max-width: 1100px"></div>
+  </body>
+</html>

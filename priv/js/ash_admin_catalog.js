@@ -760,9 +760,10 @@ function defineAdminElements(deps, {adminApis}) {
 
   function dropActionBusySubscriptions(component) {
     if (!component._amSettleUnsubscribes) return;
-    for (const unsubscribe of component._amSettleUnsubscribes) {
+    // DataModel.subscribe returns {value, unsubscribe()}, not a function.
+    for (const subscription of component._amSettleUnsubscribes) {
       try {
-        unsubscribe();
+        subscription.unsubscribe();
       } catch {
         // The data model may already be gone (surface torn down).
       }

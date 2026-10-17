@@ -85,7 +85,10 @@
  * registered, that override is skipped with a console warning and the
  * stock element renders.
  *
- * Verified against @a2ui/lit 0.10.1 / @a2ui/web_core 0.10.4:
+ * Verified against @a2ui/lit 0.10.1 / @a2ui/web_core 0.10.4 (the
+ * reference-link tier and the banner teardown also against @a2ui/lit +
+ * @a2ui/web_core 0.11.0, where the basic components render into light DOM
+ * and web_core's A2uiLitElement scopes `static styles` to the tag):
  * `new Catalog(id, components, functions, themeSchema)` takes
  * `{...ComponentApi, tagName}` entries; the renderer resolves
  * `createSurface.catalogId` by exact string match and renders each
@@ -369,6 +372,8 @@ function defineChoicePickerElement({A2uiLitElement, A2uiController, ChoicePicker
 //   `surface_title`     the surface's h1 → the display tier
 //   `row_action_*_button`, `*_prev_button`, `*_next_button`
 //                      → the quiet utility tier (sm, shadowless)
+//   `<value id>_link`   a borderless Button whose child is `<value id>`
+//                      (link_buttons: true) → the reference-link tier
 //
 // Tokens: everything reads `--a2ui-*` with the neobrutalism.dev literals
 // as fallbacks (2px black borders, 4px/4px/0 hard shadow, 5px radius,
@@ -607,8 +612,12 @@ function defineAnatomyElements({lit, basicCatalog}) {
       this.teardownBannerSubscriptions();
     }
 
+    // `DataModel.subscribe` returns a subscription object ({value,
+    // unsubscribe()}), not a function — the same in @a2ui/web_core 0.10.x
+    // and 0.11.x. Calling the object threw "unsubscribe is not a function"
+    // whenever the banner left the DOM (a link navigation, a LiveView patch).
     teardownBannerSubscriptions() {
-      for (const unsubscribe of this.__bannerUnsubscribes || []) unsubscribe();
+      for (const subscription of this.__bannerUnsubscribes || []) subscription.unsubscribe();
       this.__bannerUnsubscribes = null;
     }
 
@@ -771,6 +780,64 @@ function defineAnatomyElements({lit, basicCatalog}) {
           text-decoration: underline;
         }
 
+        /* Reference links ("<value id>_link" borderless Buttons wrapping a
+         * value Text, emitted with link_buttons: true; these rules follow
+         * the borderless ones so they win at equal specificity) read as links, not
+         * buttons: the surrounding text's font, an underline, no button
+         * box. The text keeps the ink colour and the primary colour marks
+         * the underline: hosts commonly use primary as a fill, and as text
+         * it can fall below 4.5:1 on a light surface. The Text child takes
+         * its colour from --_a2ui-text-color (upstream's button-to-text
+         * channel), so it is set here too. */
+        :host([data-a2ui-link]) {
+          margin: 0;
+          max-width: 100%;
+        }
+        .a2ui-button.nb-link {
+          display: inline-block;
+          vertical-align: baseline;
+          min-height: 0;
+          padding: 0;
+          margin: 0;
+          border: none;
+          border-radius: 2px;
+          box-shadow: none;
+          background: none;
+          font: inherit;
+          line-height: inherit;
+          letter-spacing: inherit;
+          text-align: inherit;
+          white-space: normal;
+          cursor: pointer;
+          color: var(--a2ui-link-color, var(--a2ui-color-on-surface, #141414));
+          --_a2ui-text-color: var(--a2ui-link-color, var(--a2ui-color-on-surface, #141414));
+          --_a2ui-text-margin: 0;
+          text-decoration-line: var(--a2ui-link-decoration, underline);
+          text-decoration-color: var(--a2ui-link-decoration-color, var(--a2ui-color-primary, currentColor));
+          text-decoration-thickness: var(--a2ui-link-decoration-thickness, 1px);
+          text-underline-offset: var(--a2ui-link-underline-offset, 2px);
+          transition: color 120ms ease, text-decoration-thickness 120ms ease;
+        }
+        .a2ui-button.nb-link:hover:not(:disabled),
+        .a2ui-button.nb-link:active:not(:disabled) {
+          transform: none;
+          box-shadow: none;
+          background: none;
+          color: var(--a2ui-link-hover-color, var(--a2ui-link-color, var(--a2ui-color-on-surface, #141414)));
+          --_a2ui-text-color: var(
+            --a2ui-link-hover-color,
+            var(--a2ui-link-color, var(--a2ui-color-on-surface, #141414))
+          );
+          text-decoration-line: var(--a2ui-link-hover-decoration, underline);
+          text-decoration-thickness: var(--a2ui-link-hover-decoration-thickness, 2px);
+        }
+        .a2ui-button.nb-link:focus-visible {
+          outline: var(--a2ui-focus-ring-width, 2px) solid
+            var(--a2ui-focus-ring-color, var(--a2ui-color-border, #141414));
+          outline-offset: 2px;
+        }
+
+
         /* The quiet utility tier: row actions and pagination — sm, white,
          * shadowless. Utility chrome beside the one loud primary; hover is
          * a tint, never the press (the press belongs to the buttons that
@@ -827,11 +894,14 @@ function defineAnatomyElements({lit, basicCatalog}) {
 
       const isDisabled = props.isValid === false;
       const variant = props.variant ?? "default";
+      const link = this.isReferenceLink(variant);
+      this.toggleAttribute("data-a2ui-link", link);
       const classes = {
         "a2ui-button": true,
         [variant]: true,
         ["a2ui-button-" + variant]: true,
         "nb-quiet": this.isQuietUtility(),
+        "nb-link": link,
       };
 
       return html`
@@ -846,6 +916,15 @@ function defineAnatomyElements({lit, basicCatalog}) {
           ${props.child ? html`${this.renderNode(props.child)}` : nothing}
         </button>
       `;
+    }
+
+    // A reference link: the encoder's `<value id>_link` borderless Button
+    // whose child is the value Text `<value id>`.
+    isReferenceLink(variant) {
+      if (variant !== "borderless") return false;
+      const id = componentIdOf(this);
+      const child = this.controller?.props?.child;
+      return id.endsWith("_link") && childRefId(child) === id.slice(0, -"_link".length);
     }
 
     // The utility tier, keyed on the encoder's frozen button ids: row
