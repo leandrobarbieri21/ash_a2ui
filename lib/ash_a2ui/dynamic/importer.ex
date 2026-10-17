@@ -194,18 +194,18 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_list("require_context", component.require_context)
       |> put_opt("select_context", component.select_context)
       |> put_opt("context", component.context)
-      |> put_calendar(component)
+      |> put_display(component)
       |> put_row_layout(component.row_layout)
       |> put_groups(component.groups)
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
 
-    {spec, component_rejections(component, path) ++ board_rejections(component, path)}
+    {spec, component_rejections(component, path)}
   end
 
-  # A calendar (`display :calendar`) carries its display and window
-  # options; `:list` is the default and is left out.
-  defp put_calendar(spec, %{display: :calendar} = component) do
+  # A board or calendar carries its display (`:list` is the default and is
+  # left out); a calendar also carries its window options.
+  defp put_display(spec, %{display: :calendar} = component) do
     spec
     |> Map.put("display", "calendar")
     |> put_opt("date_field", component.date_field)
@@ -213,40 +213,8 @@ defmodule AshA2ui.Dynamic.Importer do
     |> put_opt("granularity", component.granularity)
   end
 
-  defp put_calendar(spec, _component), do: spec
-
-  # Boards (source-less sections, `display :board`) have no spec
-  # vocabulary: the imported spec keeps a plain table and says so.
-  defp board_rejections(component, path) do
-    sections =
-      if match?(%{source: nil}, component.sections) do
-        [
-          Rejection.new(
-            "#{path}.sections",
-            "sections",
-            "declared without a source (enumerated lanes) — sections over an " <>
-              "attribute's values have no spec vocabulary"
-          )
-        ]
-      else
-        []
-      end
-
-    display =
-      if component.display == :board do
-        [
-          Rejection.new(
-            "#{path}.display",
-            "display",
-            "declared as :board on this component — boards have no spec vocabulary"
-          )
-        ]
-      else
-        []
-      end
-
-    sections ++ display
-  end
+  defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")
+  defp put_display(spec, _component), do: spec
 
   # Declared component features with no spec vocabulary: rejected with the
   # reason, never dropped.
@@ -343,7 +311,21 @@ defmodule AshA2ui.Dynamic.Importer do
   # of tables, so a per-section unrolling cannot round-trip). The source is
   # named by its allowlist name; defaults (limit) stay unspoken.
   defp put_sections(spec, nil), do: spec
-  defp put_sections(spec, %{source: nil}), do: spec
+
+  # Source-less sections (a board's enumerated lanes, optionally swimlaned).
+  defp put_sections(spec, %{source: nil} = sections) do
+    section =
+      %{"scope_by" => to_string(sections.scope_by)}
+      |> put_values("values", sections.values)
+      |> put_text_keyword("labels", sections.labels)
+      |> put_opt("swimlanes_by", sections.swimlanes_by)
+      |> put_values("swimlane_values", sections.swimlane_values)
+      |> put_text_keyword("swimlane_labels", sections.swimlane_labels)
+      |> put_keyword("swimlane_tones", sections.swimlane_tones, :name)
+      |> put_value("limit", if(sections.limit == 50, do: nil, else: sections.limit))
+
+    Map.put(spec, "sections", section)
+  end
 
   defp put_sections(spec, sections) do
     section =
@@ -352,7 +334,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("value", sections.value)
       |> put_opt("read_action", sections.read_action)
       |> put_opt("sort", sections.sort)
-      |> put_value("limit", if(sections.limit == 50, do: nil))
+      |> put_value("limit", if(sections.limit == 50, do: nil, else: sections.limit))
 
     Map.put(spec, "sections", section)
   end
@@ -538,6 +520,14 @@ defmodule AshA2ui.Dynamic.Importer do
   defp put_opt(spec, _key, nil), do: spec
   defp put_opt(spec, key, name) when is_atom(name), do: Map.put(spec, key, to_string(name))
   defp put_opt(spec, key, name) when is_binary(name), do: Map.put(spec, key, name)
+
+  defp put_values(spec, _key, nil), do: spec
+  defp put_values(spec, key, values), do: Map.put(spec, key, Enum.map(values, &to_string/1))
+
+  defp put_text_keyword(spec, _key, []), do: spec
+
+  defp put_text_keyword(spec, key, keyword),
+    do: Map.put(spec, key, Map.new(keyword, fn {k, v} -> {to_string(k), to_string(v)} end))
 
   defp put_value(spec, _key, nil), do: spec
   defp put_value(spec, key, value), do: Map.put(spec, key, value)

@@ -65,6 +65,12 @@ defmodule AshA2ui.Dynamic.Promoter do
     value: :name,
     read_action: :name,
     sort: :name,
+    values: :value_list,
+    labels: :string_keyword,
+    swimlanes_by: :name,
+    swimlane_values: :value_list,
+    swimlane_labels: :string_keyword,
+    swimlane_tones: :name_keyword,
     limit: :raw
   ]
 
@@ -236,9 +242,14 @@ defmodule AshA2ui.Dynamic.Promoter do
   defp sections_block(nil, _allowlist), do: nil
 
   defp sections_block(entry, allowlist) do
-    source = Map.fetch!(allowlist, Map.fetch!(entry, "source"))
+    source_line =
+      case Map.fetch(entry, "source") do
+        {:ok, name} -> ["source #{inspect(Map.fetch!(allowlist, name))}"]
+        # Source-less: a board's lanes are scope_by's values.
+        :error -> []
+      end
 
-    block("sections", ["source #{inspect(source)}" | option_lines(entry, @section_options)])
+    block("sections", source_line ++ option_lines(entry, @section_options))
   end
 
   defp query_block(entry) do
@@ -317,6 +328,12 @@ defmodule AshA2ui.Dynamic.Promoter do
 
   defp render(:raw, value), do: inspect(value)
 
+  # Enumerated values: identifier-shaped ones as atom literals (how the DSL
+  # declares them), anything else as a string; no atom is created here.
+  defp render(:value_list, values) do
+    "[#{Enum.map_join(values, ", ", &value_literal/1)}]"
+  end
+
   # A field's link: a relationship name, or the {"surface", "path"} object
   # back to the DSL's {surface_key, id_path} tuple (surface as a string).
   defp render(:link, name) when is_binary(name), do: render(:name, name)
@@ -380,4 +397,8 @@ defmodule AshA2ui.Dynamic.Promoter do
   end
 
   defp schema_locals(schema), do: Enum.map(Keyword.keys(schema), &{&1, 1})
+
+  defp value_literal(value) do
+    if value =~ ~r/^[a-z_][a-zA-Z0-9_]*[?!]?$/, do: ":#{value}", else: inspect(value)
+  end
 end

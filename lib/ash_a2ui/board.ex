@@ -157,6 +157,44 @@ defmodule AshA2ui.Board do
   end
 
   @doc """
+  The number of tables a source-less sections block expands to: its lanes
+  times its swimlanes (its lanes alone without `swimlanes_by`), counting
+  the chosen `values` / `swimlane_values` (all enumerated values when
+  unset). Every one is a page read plus a count on every render and
+  refresh. Shared by the compile-time cell limit
+  (`AshA2ui.Verifiers.VerifySections`) and the composed-surface cap
+  (`AshA2ui.Dynamic`). `:error` when either attribute has no enumerable
+  values.
+  """
+  @spec cell_count(module | map, map) :: {:ok, non_neg_integer} | :error
+  def cell_count(resource, sections) do
+    with {:ok, lanes} <- chosen_count(resource, sections.scope_by, sections.values),
+         {:ok, swimlanes} <- swimlane_count(resource, sections) do
+      {:ok, lanes * swimlanes}
+    end
+  end
+
+  defp swimlane_count(_resource, %{swimlanes_by: nil}), do: {:ok, 1}
+
+  defp swimlane_count(resource, sections),
+    do: chosen_count(resource, sections.swimlanes_by, sections.swimlane_values)
+
+  defp chosen_count(resource, attribute, values) do
+    case enumerated_values(resource, attribute) do
+      {:ok, all} ->
+        {:ok,
+         (values || all)
+         |> Enum.map(&match_value(&1, all))
+         |> Enum.reject(&is_nil/1)
+         |> Enum.uniq()
+         |> length()}
+
+      :error ->
+        :error
+    end
+  end
+
+  @doc """
   Whether an (expanded) resolved table is a board lane — on a swimlaned
   board, a cell (see `cell?/1`).
   """

@@ -140,14 +140,15 @@ defmodule AshA2ui.Dynamic.Parser do
   }
 
   # Closed vocabularies, string -> atom by lookup (never created from
-  # input). Boards are declared in the DSL only, so "board" is not offered.
-  @displays %{"list" => :list, "calendar" => :calendar}
+  # input).
+  @displays %{"list" => :list, "board" => :board, "calendar" => :calendar}
   @granularities Map.new(AshA2ui.Calendar.granularities(), &{Atom.to_string(&1), &1})
 
   @component_nested ~w(row_layout groups nested_forms sections)
 
   defp parse_component(entry, path, allowlist) when is_map(entry) do
     with :ok <- require_kind(entry, path),
+         :ok <- board_without_source(entry, path),
          {:ok, resource} <- component_resource(entry, path, allowlist),
          {:ok, opts} <-
            convert_options(
@@ -164,6 +165,21 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp parse_component(_entry, path, _allowlist),
     do: {:error, [Error.new(path, "each component must be a JSON object")]}
+
+  # A composed board's lanes are the enumerated values of `scope_by`:
+  # resource-sourced lanes are declared in the DSL only.
+  defp board_without_source(%{"display" => "board", "sections" => %{"source" => _}}, path) do
+    {:error,
+     [
+       Error.new(
+         "#{path}.sections.source",
+         ~s(a composed board's lanes are the values of scope_by — drop "source" ) <>
+           "(resource-sourced lanes are declared in the DSL only)"
+       )
+     ]}
+  end
+
+  defp board_without_source(_entry, _path), do: :ok
 
   # A related table's `resource` (a :table reading another resource, scoped
   # by a context): named like a context resource and resolved through the
@@ -343,6 +359,33 @@ defmodule AshA2ui.Dynamic.Parser do
   # offers. ("label" is handled like "resource" below: it names an attribute
   # here, while field/group labels are strings.)
   defp parse_sections(nil, _def, _path, _allowlist), do: {:ok, []}
+
+  @enumerated_section_keys %{
+    "scope_by" => :scope_by,
+    "values" => :values,
+    "labels" => :labels,
+    "limit" => :limit,
+    "swimlanes_by" => :swimlanes_by,
+    "swimlane_values" => :swimlane_values,
+    "swimlane_labels" => :swimlane_labels,
+    "swimlane_tones" => :swimlane_tones
+  }
+
+  # Without a "source", the sections are the enumerated values of
+  # `scope_by` (a board's lanes, optionally split by `swimlanes_by`). The
+  # shared verifiers check every value and key against the enumeration;
+  # AshA2ui.Dynamic additionally caps the cells of a composed board.
+  defp parse_sections(entry, sections_def, path, _allowlist)
+       when is_map(entry) and not is_map_key(entry, "source") do
+    section_path = "#{path}.sections"
+
+    with {:ok, opts} <- convert_options(entry, @enumerated_section_keys, [], section_path) do
+      case build_entity(:sections, sections_def, opts, [], section_path) do
+        {:ok, sections} -> {:ok, [sections]}
+        error -> error
+      end
+    end
+  end
 
   defp parse_sections(entry, sections_def, path, allowlist) when is_map(entry) do
     section_path = "#{path}.sections"
@@ -788,6 +831,15 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp convert_shaped(:raw, _option, value, _path), do: {:ok, value}
 
+  defp convert_shaped(:value_list, option, value, path),
+    do: convert_value_list(option, value, path)
+
+  defp convert_shaped(:label_keyword, option, value, path),
+    do: convert_value_keyword(option, value, path, &convert_label(option, &1, path))
+
+  defp convert_shaped(:value_tone_keyword, option, value, path),
+    do: convert_value_keyword(option, value, path, &convert_tone(&1, "#{path}.#{option}"))
+
   defp convert_shaped(keyword_shape, option, value, path),
     do: convert_keyword(option, value, path, keyword_value(keyword_shape, option, path))
 
@@ -817,7 +869,6 @@ defmodule AshA2ui.Dynamic.Parser do
               :badge,
               :depends_on,
               :default_preset,
-              :scope_by,
               :value,
               :sort,
               :links,
@@ -851,7 +902,14 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:default_sort), do: :default_sort
   defp option_shape(:display), do: {:enum, @displays}
   defp option_shape(:granularity), do: {:enum, @granularities}
-  defp option_shape(option) when option in [:date_field, :end_date_field], do: :existing_name
+
+  defp option_shape(option)
+       when option in [:date_field, :end_date_field, :scope_by, :swimlanes_by],
+       do: :existing_name
+
+  defp option_shape(option) when option in [:values, :swimlane_values], do: :value_list
+  defp option_shape(option) when option in [:labels, :swimlane_labels], do: :label_keyword
+  defp option_shape(:swimlane_tones), do: :value_tone_keyword
   defp option_shape(_option), do: :raw
 
   defp convert_enum(option, value, values, path) do
@@ -886,11 +944,17 @@ defmodule AshA2ui.Dynamic.Parser do
            Error.new(
              "#{path}.#{option}",
              "#{option} #{inspect(value)} is not an attribute of the resource — name one of " <>
-               "its date or datetime attributes"
+               existing_name_hint(option)
            )
          ]}
     end
   end
+
+  defp existing_name_hint(option) when option in [:date_field, :end_date_field],
+    do: "its date or datetime attributes"
+
+  defp existing_name_hint(_option),
+    do: "its enumerated attributes (an Ash.Type.Enum or a one_of constraint)"
 
   defp existing_atom(value) do
     {:ok, String.to_existing_atom(value)}
@@ -964,7 +1028,110 @@ defmodule AshA2ui.Dynamic.Parser do
      [Error.new("#{path}.#{option}", "#{option} must be a JSON object of key/value pairs")]}
   end
 
+  # Enumerated values (a board's `values` / `swimlane_values`) become the
+  # existing atom of the same name when there is one (atom enumerations, as
+  # the DSL declares them) and stay strings otherwise: the board matches
+  # them against the attribute's enumeration by string form, so no atom is
+  # created from them.
+  defp convert_value_list(option, values, path)
+       when is_list(values) and length(values) <= @max_list_entries do
+    if Enum.all?(values, &(is_binary(&1) and byte_size(&1) in 1..@max_name_bytes)) do
+      {:ok, Enum.map(values, &enumerated_value/1)}
+    else
+      value_list_error(option, path)
+    end
+  end
+
+  defp convert_value_list(option, _values, path), do: value_list_error(option, path)
+
+  defp enumerated_value(value) do
+    case existing_atom(value) do
+      {:ok, atom} -> atom
+      :error -> value
+    end
+  end
+
+  defp value_list_error(option, path) do
+    {:error,
+     [
+       Error.new(
+         "#{path}.#{option}",
+         "#{option} must be an array of at most #{@max_list_entries} value strings " <>
+           "(each at most #{@max_name_bytes} bytes)"
+       )
+     ]}
+  end
+
+  # Keyword options keyed by an enumerated value (`labels`, `swimlane_tones`,
+  # ...): the keys are looked up as existing atoms (an enumerated value that
+  # is an atom already exists), never created; the shared verifier then
+  # checks they are values of the attribute.
+  defp convert_value_keyword(option, object, path, convert_value)
+       when is_map(object) and map_size(object) <= @max_list_entries do
+    object
+    |> Enum.sort()
+    |> Enum.reduce_while({:ok, []}, fn {key, value}, {:ok, acc} ->
+      with {:ok, name} <- value_key(option, to_string(key), path),
+           {:ok, converted} <- convert_value.(value) do
+        {:cont, {:ok, acc ++ [{name, converted}]}}
+      else
+        {:error, errors} -> {:halt, {:error, errors}}
+      end
+    end)
+  end
+
+  defp convert_value_keyword(option, _object, path, _convert_value) do
+    {:error,
+     [
+       Error.new(
+         "#{path}.#{option}",
+         "#{option} must be a JSON object of at most #{@max_list_entries} value/text pairs"
+       )
+     ]}
+  end
+
+  defp value_key(option, key, path) do
+    case byte_size(key) <= @max_name_bytes && existing_atom(key) do
+      {:ok, atom} ->
+        {:ok, atom}
+
+      _unknown ->
+        {:error,
+         [
+           Error.new(
+             "#{path}.#{option}",
+             "#{option} key #{inspect(key)} is not one of the attribute's enumerated values"
+           )
+         ]}
+    end
+  end
+
+  @max_label_length 60
+  @label_regex ~r/^[\p{L}\p{N} .,:;'"!?()\/&+\-–]+$/u
+
+  # Lane and swimlane headings are plain text: letters, digits, spaces and
+  # light punctuation, at most 60 characters. No markup characters, so a
+  # composed heading can never be read as Markdown or HTML.
+  defp convert_label(option, value, path) do
+    if is_binary(value) and String.length(value) in 1..@max_label_length and
+         Regex.match?(@label_regex, value) do
+      {:ok, value}
+    else
+      {:error,
+       [
+         Error.new(
+           "#{path}.#{option}",
+           "#{option} values must be plain text of 1 to #{@max_label_length} characters " <>
+             "(letters, digits, spaces and . , : ; ' \" ! ? ( ) / & + - only), got: " <>
+             inspect(value)
+         )
+       ]}
+    end
+  end
+
   defp convert_tone(value, path) do
+    path = if String.ends_with?(path, "_tones"), do: path, else: "#{path}.badge_tones"
+
     case Map.fetch(@tones, value) do
       {:ok, tone} ->
         {:ok, tone}
@@ -973,7 +1140,7 @@ defmodule AshA2ui.Dynamic.Parser do
         {:error,
          [
            Error.new(
-             "#{path}.badge_tones",
+             path,
              "tone #{inspect(value)} is not supported — use one of: " <>
                Enum.join(Enum.sort(Map.keys(@tones)), ", ")
            )

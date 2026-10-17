@@ -131,7 +131,8 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
       {put.("end_date_field", "notes"), ~r/end_date_field :notes must be a public :date/},
       {put.("end_date_field", "starts_on"), ~r/end_date_field must differ from date_field/},
       {put.("granularity", "year"), ~r/granularity must be one of: day, month, week/},
-      {put.("display", "board"), ~r/display must be one of: calendar, list/},
+      {put.("display", "board"), ~r/a board needs a :table component with a sections block/},
+      {put.("display", "grid"), ~r/display must be one of: board, calendar, list/},
       {put.("display", "list"),
        ~r/(date_field|end_date_field|granularity) is only supported with display :calendar/},
       {put.("bulk_actions", ["confirm"]), ~r/unknown key "bulk_actions"/}
@@ -191,7 +192,7 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
   test "the spec schema offers the calendar vocabulary" do
     component = Dynamic.spec_schema(@allowlist)["properties"]["components"]["items"]
 
-    assert component["properties"]["display"]["enum"] == ["list", "calendar"]
+    assert component["properties"]["display"]["enum"] == ["list", "board", "calendar"]
     assert component["properties"]["granularity"]["enum"] == ["day", "week", "month"]
     assert Map.has_key?(component["properties"], "date_field")
     assert Map.has_key?(component["properties"], "end_date_field")

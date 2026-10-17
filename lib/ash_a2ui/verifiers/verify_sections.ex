@@ -277,7 +277,7 @@ defmodule AshA2ui.Verifiers.VerifySections do
         lanes = Enum.map(sections.values || all, &AshA2ui.Board.match_value(&1, all))
 
         with :ok <- verify_cell_names(lanes, swimlanes, key, module) do
-          verify_cell_limit(sections, lanes, swimlanes, key, module)
+          verify_cell_limit(sections, resource, lanes, swimlanes, key, module)
         end
 
       :error ->
@@ -288,8 +288,8 @@ defmodule AshA2ui.Verifiers.VerifySections do
   # On a swimlaned board `limit` caps the cells: every cell is a table with
   # its own page read and count, issued on every render and on every
   # refresh of the board, so the cell count is the board's read cost.
-  defp verify_cell_limit(sections, lanes, swimlanes, key, module) do
-    cells = length(lanes) * length(swimlanes)
+  defp verify_cell_limit(sections, resource, lanes, swimlanes, key, module) do
+    {:ok, cells} = AshA2ui.Board.cell_count(resource, sections)
 
     if sections.limit >= cells do
       :ok

@@ -1,0 +1,50 @@
+---
+# Acceptance criteria for A2UI-110 (Jira AST-176, board half): boards in
+# composed surfaces (the dynamic spec). Criterion ids are immutable. CI is
+# the only evidence producer. Rule: a composed spec never does what the DSL
+# can't — the board rules are the shared verifiers' (VerifySections,
+# VerifyLayouts, VerifyComponents, VerifyActions), and the composed cell cap
+# counts with the same AshA2ui.Board.cell_count/2 as the declared limit.
+item: A2UI-110
+
+criteria:
+  - id: A2UI-110/AC-1
+    given: a spec with a display "board" table, a row_layout and source-less
+      sections with swimlanes
+    when: it is resolved, built and sent a transition row action
+    then: >-
+      the payload validates with one cell per lane and swimlane and the
+      swimlane tones, and the transition moves the card between cells
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_dynamic_test.exs::a_composed_swimlaned_board_resolves_renders_and_moves_cards
+
+  - id: A2UI-110/AC-2
+    given: board specs with a source, unknown or non-enumerable attributes,
+      values outside the enumeration or empty, markup or over-long labels,
+      unknown label keys, unsupported tones, more than 12 cells, runtime
+      names that extend each other, no row_layout, bulk actions, unknown
+      row actions or refreshes outside the spec; and a 12-cell board over a
+      nil-mapping calculation
+    when: they are resolved
+    then: >-
+      each is rejected with a message naming the problem and no atom is
+      created from an unknown name; the 12-cell board is accepted and reads
+      the nil records into their own row
+    verify: unit
+    risk: high
+    test: >-
+      test/ash_a2ui/board/board_dynamic_test.exs::rejects_what_the_dsl_rejects_and_more_for_composed_boards
+
+  - id: A2UI-110/AC-3
+    given: a declared swimlaned board
+    when: it is imported to a spec, resolved, serialized and promoted
+    then: >-
+      the spec carries the board and swimlane options with no board
+      rejection, and the resolved, deserialized and promoted sections
+      configs equal the declared one
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/board/board_dynamic_test.exs::a_declared_swimlaned_board_exports_promotes_and_serializes_back

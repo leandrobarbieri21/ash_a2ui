@@ -118,14 +118,19 @@ defmodule AshA2ui.DynamicImporterTest do
       assert {:ok, %Dynamic.Surface{}} = Dynamic.resolve(spec, allowlist: allow)
     end
 
-    test "boards (source-less sections, display :board) are rejected, the table kept" do
+    test "boards (source-less sections, display :board) import as spec vocabulary" do
       {:ok, spec, rejections} = Importer.import(AshA2ui.Test.BoardTaskUI)
 
-      assert Enum.any?(rejections, &(&1.feature == "sections" and &1.path =~ "sections"))
-      assert Enum.any?(rejections, &(&1.feature == "display"))
+      refute Enum.any?(rejections, &(&1.feature in ["sections", "display"]))
 
       assert [board] = spec["components"]
-      refute Map.has_key?(board, "sections")
+      assert board["display"] == "board"
+
+      assert board["sections"] == %{
+               "scope_by" => "status",
+               "values" => ["open", "claimed", "completed"],
+               "labels" => %{"open" => "To do"}
+             }
 
       allow = Dynamic.allowlist([AshA2ui.Test.BoardTask])
       assert {:ok, %Dynamic.Surface{}} = Dynamic.resolve(spec, allowlist: allow)
