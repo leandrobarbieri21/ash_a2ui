@@ -157,7 +157,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.1.0";
+export const ADMIN_CATALOG_VERSION = "1.2.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -413,6 +413,13 @@ export function buildSchemas() {
           action: Str,
           context: RecordAny.optional(),
           destructive: Bool.optional(),
+          // 1.2: the row-relative per-row visibility of a visible_when
+          // action (`_visible_<action>`: a non-empty list = offered), and
+          // the prompt a prompt_fields action collects first —
+          // {content, title, confirmLabel, open}. Static, like the rest of
+          // the entry: the grid resolves them against the clicked row.
+          visiblePath: Str.optional(),
+          prompt: RecordAny.optional(),
         }),
       ).optional(),
       // 1.1: the row's primary action envelope (same flat shape as a
@@ -563,6 +570,21 @@ function rowActionEnvelope(entry) {
     return nested;
   }
   return null;
+}
+
+/**
+ * Whether a row action is offered on `row`: entries without a `visiblePath`
+ * always are; otherwise the row's value there must be a non-empty list (the
+ * server-computed `_visible_<action>` slot) or `true`. Hiding is a
+ * rendering concern only — the server re-checks every invoke.
+ */
+function rowActionVisible(action, row) {
+  const path = action?.visiblePath;
+  if (typeof path !== "string" || path === "") return true;
+  const value = getByPath(row, path);
+  if (value === undefined) return true;
+  if (Array.isArray(value)) return value.length > 0;
+  return value === true;
 }
 
 /**
@@ -938,6 +960,9 @@ function defineAdminElements(deps, {adminApis}) {
         // {row, label} — disabled + spinner from click to outcome write.
         this._amBusyRowAction = null;
         this._amSettleUnsubscribes = null;
+        // The open prompt dialog of a prompt_fields row action:
+        // {entry, rowIdentity, busy, error, restoreFocus, focused}.
+        this._amPrompt = null;
       }
 
       static styles = [
@@ -1036,11 +1061,68 @@ function defineAdminElements(deps, {adminApis}) {
           }
           .cell-actions {
             text-align: right;
-            white-space: nowrap;
           }
-          .cell-actions .am-btn + .am-btn,
-          .card-actions .am-btn + .am-btn {
-            margin-left: var(--am-space-2xs);
+          /* Row actions wrap inside their cell instead of pushing the
+           * table past its frame. */
+          .row-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: var(--am-space-2xs);
+          }
+          /* Prompt dialog (prompt_fields row actions). */
+          .prompt-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            display: grid;
+            place-items: center;
+            padding: var(--am-space-l);
+            background: rgb(15 23 42 / 0.45);
+          }
+          .prompt-dialog {
+            width: min(32rem, 100%);
+            max-height: calc(100vh - 2 * var(--am-space-l));
+            overflow: auto;
+            background: var(--am-surface);
+            color: var(--am-text);
+            border: 1px solid var(--am-border);
+            border-radius: var(--am-radius-l);
+            box-shadow: var(--am-shadow-3);
+            padding: var(--am-space-xl);
+          }
+          .prompt-focus-guard {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip-path: inset(50%);
+            outline: none;
+          }
+          .prompt-title {
+            margin: 0 0 var(--am-space-m);
+            font-size: var(--am-font-size-l);
+            font-weight: var(--am-font-weight-semibold);
+            line-height: var(--am-line-height-tight);
+          }
+          .prompt-title:focus {
+            outline: none;
+          }
+          .prompt-title:focus-visible {
+            outline: 2px solid var(--am-focus);
+            outline-offset: 2px;
+          }
+          .prompt-error {
+            margin: 0 0 var(--am-space-m);
+            color: var(--am-error);
+            font-size: var(--am-font-size-s);
+            font-weight: var(--am-font-weight-medium);
+          }
+          .prompt-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--am-space-s);
+            margin-top: var(--am-space-l);
           }
           .grid-cards {
             display: none;
@@ -1123,6 +1205,11 @@ function defineAdminElements(deps, {adminApis}) {
       updated(changedProperties) {
         super.updated(changedProperties);
         this.syncConfirmDialog();
+        if (this._amPrompt && !this._amPrompt.focused) {
+          // Prompt opened: move focus into the dialog.
+          this._amPrompt.focused = true;
+          this.renderRoot?.querySelector("[data-prompt-heading]")?.focus();
+        }
       }
 
       disconnectedCallback() {
@@ -1135,6 +1222,23 @@ function defineAdminElements(deps, {adminApis}) {
 
       onActionSettled() {
         this._amBusyRowAction = null;
+        const prompt = this._amPrompt;
+        if (!prompt || !prompt.busy) return;
+        // The outcome batch is processed synchronously; read it once the
+        // whole batch has landed (the /ui/response write of a v1.0 reply
+        // precedes its /ui/feedback mirror).
+        Promise.resolve().then(() => {
+          if (this._amPrompt !== prompt) return;
+          prompt.busy = false;
+          const dataModel = this.surface?.dataModel;
+          const kind = dataModel?.get("/ui/feedback/kind");
+          if (kind === "success") {
+            this.closePrompt();
+          } else {
+            prompt.error = str(dataModel?.get("/ui/feedback/message"));
+            this.requestUpdate();
+          }
+        });
       }
 
       get surface() {
@@ -1155,18 +1259,32 @@ function defineAdminElements(deps, {adminApis}) {
         }
       }
 
+      /** Ids of the grid children that are prompt contents (rendered only
+       * inside their prompt dialog). */
+      promptContentIds() {
+        const rowActions = this.controller?.props?.rowActions;
+        const ids = new Set();
+        for (const action of Array.isArray(rowActions) ? rowActions : []) {
+          if (typeof action?.prompt?.content === "string") ids.add(action.prompt.content);
+        }
+        return ids;
+      }
+
       partitionChildren() {
         const props = this.controller?.props;
+        const promptIds = this.promptContentIds();
         const empty = [];
         const pagination = [];
+        const prompts = [];
         const rest = [];
         for (const ref of childRefs(props?.children)) {
           const type = this.childType(ref);
-          if (type === "emptyState") empty.push(ref);
+          if (promptIds.has(ref.id)) prompts.push(ref);
+          else if (type === "emptyState") empty.push(ref);
           else if (type === "pagination") pagination.push(ref);
           else rest.push(ref);
         }
-        return {empty, pagination, rest};
+        return {empty, pagination, prompts, rest};
       }
 
       render() {
@@ -1177,7 +1295,7 @@ function defineAdminElements(deps, {adminApis}) {
         const rows = Array.isArray(props.rows) ? props.rows : [];
         const rowActions = Array.isArray(props.rowActions) ? props.rowActions : [];
         const label = str(props.label);
-        const {empty, pagination, rest} = this.partitionChildren();
+        const {empty, pagination, prompts, rest} = this.partitionChildren();
 
         return html`
           <div class="grid-root">
@@ -1201,6 +1319,7 @@ function defineAdminElements(deps, {adminApis}) {
                 </div>`
               : nothing}
             ${rest.map((ref) => html`${this.renderNode(ref)}`)}
+            ${this._amPrompt ? this.renderPrompt(prompts) : nothing}
           </div>
         `;
         // The ConfirmDialog is mounted imperatively in updated() — dynamic
@@ -1352,7 +1471,8 @@ function defineAdminElements(deps, {adminApis}) {
 
       renderRowActions(row, index, rowActions) {
         const rowIdentity = this.rowIdentity(row, index);
-        return rowActions.map((action) => {
+        const offered = rowActions.filter((action) => rowActionVisible(action, row));
+        return html`<div class="row-actions">${offered.map((action) => {
           const label = str(action?.label);
           const destructive = action?.destructive === true;
           const busy =
@@ -1371,7 +1491,139 @@ function defineAdminElements(deps, {adminApis}) {
               ${label}
             </button>
           `;
-        });
+        })}</div>`;
+      }
+
+      // --- prompt dialog (prompt_fields row actions) -----------------------
+
+      /** Opens the prompt of `action` for row `index`: the dialog shows the
+       * prompt's content child and the server pre-fills its values
+       * (`prompt`). Nothing is invoked until Confirm. */
+      openPrompt(action, index) {
+        const rows = this.controller?.props?.rows || [];
+        this._amPrompt = {
+          entry: action,
+          rowIdentity: this.rowIdentity(rows[index], index),
+          busy: false,
+          error: "",
+          restoreFocus: this.shadowRoot?.activeElement || document.activeElement,
+          focused: false,
+        };
+        const open = rowActionEnvelope(action.prompt.open);
+        if (open) this.dispatchRowAction(open, this.rowBasePath(index));
+        this.requestUpdate();
+      }
+
+      closePrompt() {
+        const prompt = this._amPrompt;
+        this._amPrompt = null;
+        this.requestUpdate();
+        if (prompt?.restoreFocus?.isConnected) prompt.restoreFocus.focus();
+      }
+
+      /** Confirm: the entry's own invoke envelope (its `values` bind the
+       * prompt state), resolved against the prompt's row — found again by
+       * identity, since a refresh may have moved it. */
+      confirmPrompt() {
+        const prompt = this._amPrompt;
+        if (!prompt || prompt.busy) return;
+        const rows = this.controller?.props?.rows || [];
+        const index = rows.findIndex(
+          (row, rowIndex) => this.rowIdentity(row, rowIndex) === prompt.rowIdentity,
+        );
+        if (index === -1) {
+          prompt.error = "This record is no longer listed.";
+          this.requestUpdate();
+          return;
+        }
+        const envelope = rowActionEnvelope(prompt.entry);
+        if (!envelope) return;
+        prompt.busy = true;
+        prompt.error = "";
+        this.markRowActionBusyByIdentity(prompt.entry, prompt.rowIdentity);
+        this.dispatchRowAction(envelope, this.rowBasePath(index));
+      }
+
+      onPromptKey(event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          this.closePrompt();
+          return;
+        }
+        if (event.key === "Tab") {
+          // Focus trap over the dialog's own buttons (the inputs live in
+          // nested shadow roots and take focus in between): Tab from the
+          // last button wraps to the heading, Shift+Tab from the heading to
+          // the last button. Shift+Tab from the first input lands on the
+          // start guard, which does the same (onPromptGuardFocus).
+          const last = this.lastPromptButton();
+          if (!last) return;
+          const active = this.shadowRoot?.activeElement;
+          const heading = this.renderRoot.querySelector("[data-prompt-heading]");
+          if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            heading?.focus();
+          } else if (event.shiftKey && active === heading) {
+            event.preventDefault();
+            last.focus();
+          }
+        }
+      }
+
+      lastPromptButton() {
+        const buttons = [...this.renderRoot.querySelectorAll(".prompt-dialog button")].filter(
+          (element) => !element.hasAttribute("disabled"),
+        );
+        return buttons[buttons.length - 1] ?? null;
+      }
+
+      onPromptGuardFocus() {
+        (this.lastPromptButton() ?? this.renderRoot.querySelector("[data-prompt-heading]"))?.focus();
+      }
+
+      renderPrompt(promptRefs) {
+        const prompt = this._amPrompt;
+        const spec = prompt.entry.prompt || {};
+        const ref = promptRefs.find((candidate) => candidate.id === spec.content);
+        const title = str(spec.title) || str(prompt.entry.label);
+        return html`
+          <div
+            class="prompt-overlay"
+            @keydown=${(event) => this.onPromptKey(event)}
+            @pointerdown=${(event) => {
+              if (event.target === event.currentTarget) this.closePrompt();
+            }}
+          >
+            <div class="prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="am-prompt-title">
+              <span
+                class="prompt-focus-guard"
+                tabindex="0"
+                data-prompt-focus-guard
+                @focus=${() => this.onPromptGuardFocus()}
+              ></span>
+              <h2 class="prompt-title" id="am-prompt-title" tabindex="-1" data-prompt-heading>
+                ${title}
+              </h2>
+              ${prompt.error
+                ? html`<p class="prompt-error" role="alert">${prompt.error}</p>`
+                : nothing}
+              ${ref ? html`${this.renderNode(ref)}` : nothing}
+              <div class="prompt-actions">
+                <button type="button" class="am-btn" @click=${() => this.closePrompt()}>Cancel</button>
+                <button
+                  type="button"
+                  class="am-btn am-btn-primary"
+                  ?disabled=${prompt.busy}
+                  aria-busy=${prompt.busy ? "true" : "false"}
+                  @click=${() => this.confirmPrompt()}
+                >
+                  ${prompt.busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
+                  ${str(spec.confirmLabel) || "Confirm"}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
       }
 
       /** Formats a cell: explicit column format wins; ISO-datetime-looking
@@ -1399,6 +1651,11 @@ function defineAdminElements(deps, {adminApis}) {
         if (!action) return;
         const envelope = rowActionEnvelope(action);
         if (!envelope) return;
+
+        if (action.prompt && typeof action.prompt.content === "string") {
+          this.openPrompt(action, index);
+          return;
+        }
 
         if (action.destructive === true) {
           // Destructive actions gate behind the ConfirmDialog; confirming
@@ -1984,11 +2241,18 @@ function defineAdminElements(deps, {adminApis}) {
         if (!mode) return nothing;
 
         const isView = mode === "view";
-        const refs = childRefs(props.children).filter((ref) => {
+        const children = childRefs(props.children);
+        // View mode: the field displays, then the action bar — whose
+        // primary is hidden there (empty label) but whose Cancel closes
+        // the panel, as the basic composition's footer does.
+        const refs = children.filter((ref) => {
           const type = this.childType(ref);
           if (type === "fieldDisplay") return isView;
           return !isView;
         });
+        const closeRefs = isView
+          ? children.filter((ref) => this.childType(ref) === "actionBar")
+          : [];
 
         const title = str(props.title);
         const headingText = title || MODE_HEADINGS[mode] || "";
@@ -2004,8 +2268,9 @@ function defineAdminElements(deps, {adminApis}) {
             </h2>
             ${isView
               ? html`<dl class="panel-fields">
-                  ${refs.map((ref) => html`${this.renderNode(ref)}`)}
-                </dl>`
+                    ${refs.map((ref) => html`${this.renderNode(ref)}`)}
+                  </dl>
+                  ${closeRefs.map((ref) => html`${this.renderNode(ref)}`)}`
               : html`<div class="panel-form">
                   ${refs.map((ref) => html`${this.renderNode(ref)}`)}
                 </div>`}

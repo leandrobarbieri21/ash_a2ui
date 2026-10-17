@@ -43,7 +43,7 @@ composer chooses among the same knobs a DSL author has, nothing more.
 The full vocabulary — components (`table` / `form` / `detail`), field
 overrides, queries with presets and range filters, `row_layout` cards (with
 `badge_text` and `badge_tones`), form `groups` and `nested_forms`,
-sectioned tables (`sections`), `action` metadata (`refreshes`,
+sectioned tables (`sections`), `action` metadata (`label`, `refreshes`,
 `prompt_fields`, `visible_when`, `via`), `contexts` with the tables'
 `select_context` / `context_filter` / `require_context`, related tables and
 reference links — mirrors the DSL entity for entity.

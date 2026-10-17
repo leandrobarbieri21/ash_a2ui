@@ -213,7 +213,8 @@ defmodule AshA2ui.ReportTest do
       message = envelope("report", %{"params" => %{}}, "broken_report")
 
       assert {:error, messages} = ActionHandler.handle(BrokenReportUI, message, authorize?: false)
-      assert value_at(messages, "/ui/feedback")["message"] =~ "Request failed"
+      # The action's own (field-less) message, as a sentence.
+      assert value_at(messages, "/ui/feedback")["message"] == "report exploded."
     end
 
     test "a surface without reports rejects the action" do

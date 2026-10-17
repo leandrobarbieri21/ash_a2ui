@@ -207,7 +207,11 @@ defmodule AshA2ui.ActionHandler do
     * on validation errors: `/errors/<field>` per failing field and an
       `/ui/feedback` error;
     * on `Ash.Error.Forbidden`: only an `/ui/feedback` "not authorized" error
-      (no field errors, to avoid leaking policy details).
+      (no field errors, to avoid leaking policy details);
+    * on any other error without a field: its message when it was written
+      for the user (a string, an Invalid-class error), else "The action
+      failed." with the error's text sent to `Logger.error/1` only (a raw
+      exception or data-layer error can carry row values).
 
   On v1.0 surfaces the outcome is additionally the structured `/ui/response`
   object and the `actionResponse` handshake (see `AshA2ui.Encoder.V1_0`);
@@ -220,7 +224,11 @@ defmodule AshA2ui.ActionHandler do
   import Ash.Expr
 
   require Ash.Query
+  require Logger
 
+  alias Ash.Error.Changes.InvalidAttribute
+  alias Ash.Error.Invalid
+  alias Ash.Error.Unknown.UnknownError
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshA2ui.Bulk
   alias AshA2ui.Conditions
@@ -233,6 +241,9 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.ResolvedView
 
   @version "v0.9.1"
+
+  # The field error a relationship prompt value the actor cannot read gets.
+  @unavailable "is not one of the available options"
 
   @doc """
   Handles an A2UI client `action` envelope for the surface declared on
@@ -422,7 +433,11 @@ defmodule AshA2ui.ActionHandler do
 
   defp dispatch("submit_form", context, env) do
     values = Map.get(context, "values") || %{}
-    env = Map.put(env, :submitted, values)
+
+    env =
+      env
+      |> Map.put(:submitted, values)
+      |> Map.put(:shown_fields, form_shown_fields(env.view))
 
     case Map.get(context, "recordId") do
       nil -> create(env, values)
@@ -580,18 +595,13 @@ defmodule AshA2ui.ActionHandler do
   defp dispatch("option_select", context, %{view: view, ash_opts: ash_opts}) do
     name = Map.get(context, "field")
     value = unwrap_picked(Map.get(context, "value"))
-
-    select =
-      is_binary(name) &&
-        Enum.find_value(view.selects, fn {field, select} ->
-          to_string(field) == name && {field, select}
-        end)
+    select = is_binary(name) && option_select_target(view, name, Map.get(context, "prompt"))
 
     cond do
       not is_binary(name) ->
         {:error, [status(view, ~s(Malformed option_select action: context is missing "field".))]}
 
-      select in [nil, false] or match?({_f, %{search_fields: []}}, select) ->
+      select in [nil, false] or match?({_target, _f, %{search_fields: []}}, select) ->
         {:error,
          [
            status(
@@ -604,8 +614,8 @@ defmodule AshA2ui.ActionHandler do
         {:error, [status(view, ~s(Malformed option_select action: context is missing "value".))]}
 
       true ->
-        {field, select_config} = select
-        selected_option_messages(view, field, select_config, value, ash_opts)
+        {target, field, select_config} = select
+        selected_option_messages(view, target, field, select_config, value, ash_opts)
     end
   end
 
@@ -843,18 +853,16 @@ defmodule AshA2ui.ActionHandler do
   # The option_select success path: re-fetch the picked record (policies
   # apply — spoofed / unauthorized ids never reach /form), then write the
   # value and its canonical label.
-  defp selected_option_messages(view, field, select_config, value, ash_opts) do
+  defp selected_option_messages(view, target, field, select_config, value, ash_opts) do
     case fetch_option(select_config, value, ash_opts) do
       {:ok, record} ->
         entry = AshA2ui.Info.option_entry(record, select_config)
+        {value_path, state_path} = option_select_paths(target, field)
 
         {:ok,
          [
-           update_data_model(view, "/form/#{field}", entry["value"]),
-           update_data_model(view, "/select/#{field}", %{
-             "search" => "",
-             "label" => entry["label"]
-           })
+           update_data_model(view, value_path, entry["value"]),
+           update_data_model(view, state_path, %{"search" => "", "label" => entry["label"]})
          ]}
 
       :not_found ->
@@ -864,6 +872,35 @@ defmodule AshA2ui.ActionHandler do
         {:error, error_messages(view, error)}
     end
   end
+
+  # The searchable select an option_select addresses: a form select by
+  # field name, or — with "prompt" — that action's searchable relationship
+  # prompt field. Returns {target, field, select config} or nil.
+  defp option_select_target(view, name, nil) do
+    Enum.find_value(view.selects, fn {field, select} ->
+      to_string(field) == name && {:form, field, select}
+    end)
+  end
+
+  defp option_select_target(view, name, prompt) when is_binary(prompt) do
+    Enum.find_value(view.prompts, fn {action, fields} ->
+      to_string(action) == prompt &&
+        Enum.find_value(fields, fn
+          %{widget: :select, name: field, select: select} ->
+            to_string(field) == name && {{:prompt, action}, field, select}
+
+          _other_widget ->
+            nil
+        end)
+    end)
+  end
+
+  defp option_select_target(_view, _name, _prompt), do: nil
+
+  defp option_select_paths(:form, field), do: {"/form/#{field}", "/select/#{field}"}
+
+  defp option_select_paths({:prompt, action}, field),
+    do: {"/prompt/values/#{action}/#{field}", "/prompt/select/#{action}/#{field}"}
 
   defp option_source(view, name) do
     view
@@ -1287,7 +1324,12 @@ defmodule AshA2ui.ActionHandler do
 
   defp invoke(action_name, record_id, values, %{view: view} = env) do
     setting = Map.get(view.actions, action_name)
-    env = env |> Map.put(:invoked, action_name) |> Map.put(:setting, setting)
+
+    env =
+      env
+      |> Map.put(:invoked, action_name)
+      |> Map.put(:setting, setting)
+      |> Map.put(:shown_fields, (setting && setting.prompt_fields) || [])
 
     case enforce_visibility(view, setting, record_id, env.ash_opts) do
       :ok ->
@@ -1296,12 +1338,18 @@ defmodule AshA2ui.ActionHandler do
             invoke_via(module, function, extra_args, record_id, env)
 
           _direct ->
-            params = prompt_params(view, setting, action_name, values)
-            dispatch_by_action_type(view, action_name, record_id, params, env)
+            invoke_direct(view, setting, action_name, record_id, values, env)
         end
 
       {:error, messages} ->
         {:error, messages}
+    end
+  end
+
+  defp invoke_direct(view, setting, action_name, record_id, values, env) do
+    with :ok <- check_prompt_options(view, setting, values, env.ash_opts) do
+      params = prompt_params(view, setting, action_name, values)
+      dispatch_by_action_type(view, action_name, record_id, params, env)
     end
   end
 
@@ -1310,7 +1358,7 @@ defmodule AshA2ui.ActionHandler do
   # results through generic_result.
   defp dispatch_by_action_type(view, action_name, record_id, params, %{ash_opts: ash_opts} = env) do
     fetch = fn -> fetch_record(view, record_id, ash_opts) end
-    completed = "Action #{inspect(to_string(action_name))} completed."
+    completed = completed_text(view, action_name)
 
     case run_direct(view, action_name, record_id, fetch, params, ash_opts) do
       {:write, result} ->
@@ -1408,11 +1456,11 @@ defmodule AshA2ui.ActionHandler do
     apply(module, function, [context | List.wrap(extra_args)])
   end
 
-  defp via_result(:ok, %{invoked: action_name} = env),
-    do: after_write(:ok, env, "Action #{inspect(to_string(action_name))} completed.")
+  defp via_result(:ok, %{view: view, invoked: action_name} = env),
+    do: after_write(:ok, env, completed_text(view, action_name))
 
-  defp via_result({:ok, _result}, %{invoked: action_name} = env),
-    do: after_write(:ok, env, "Action #{inspect(to_string(action_name))} completed.")
+  defp via_result({:ok, _result}, %{view: view, invoked: action_name} = env),
+    do: after_write(:ok, env, completed_text(view, action_name))
 
   defp via_result({:error, error}, env),
     do: after_write({:error, error}, env, "")
@@ -1428,6 +1476,16 @@ defmodule AshA2ui.ActionHandler do
            "result (expected :ok, {:ok, term}, or {:error, Ash.Error.t()}): " <> inspect(other)
        )
      ]}
+  end
+
+  # The success status of a single-row invoke: "<label>: done." when the
+  # action entity declares a `label` (the name its button shows, as the bulk
+  # status line uses), else the action's name as before.
+  defp completed_text(view, action_name) do
+    case Map.get(view.actions, action_name) do
+      %{label: label} when is_binary(label) -> label <> ": done."
+      _no_label -> "Action #{inspect(to_string(action_name))} completed."
+    end
   end
 
   # Handler-side visible_when enforcement (mandatory — rendering hides
@@ -1479,6 +1537,41 @@ defmodule AshA2ui.ActionHandler do
 
   defp prompt_params(_view, _setting, _action_name, _values), do: %{}
 
+  # Relationship prompt values are re-read as the actor before the write, as
+  # option_select re-reads a picked option: the picker offers only the
+  # options the actor can read, and a value it would not have offered (a
+  # spoofed or stale id) is refused as a field error on that prompt field.
+  defp check_prompt_options(view, %{name: action, prompt_fields: [_ | _] = fields}, values, opts)
+       when is_map(values) do
+    unavailable =
+      for %{name: name, select: %{} = select} <- Map.get(view.prompts, action, []),
+          Enum.any?(
+            prompt_option_values(values, name),
+            &(not match?({:ok, _record}, fetch_option(select, &1, opts)))
+          ),
+          do: InvalidAttribute.exception(field: name, message: @unavailable)
+
+    case unavailable do
+      [] ->
+        :ok
+
+      errors ->
+        {:error, error_messages(view, Invalid.exception(errors: errors), fields)}
+    end
+  end
+
+  defp check_prompt_options(_view, _setting, _values, _opts), do: :ok
+
+  # A prompt field's picked values: a ChoicePicker binds a list, a
+  # searchable select a single value; blanks are left to the action's own
+  # validation.
+  defp prompt_option_values(values, name) do
+    values
+    |> Map.get(Atom.to_string(name), Map.get(values, name))
+    |> List.wrap()
+    |> Enum.reject(&(&1 in [nil, ""]))
+  end
+
   defp destroy_record(record, action_name, params, ash_opts) do
     record
     |> Ash.Changeset.for_destroy(action_name, params, ash_opts)
@@ -1517,7 +1610,7 @@ defmodule AshA2ui.ActionHandler do
     case fetch_record(view, record_id, ash_opts, loads) do
       {:ok, record} ->
         if Conditions.visible?(view.resource, setting.visible_when, record) do
-          {:ok, prompt_prefill_messages(view, setting, record)}
+          {:ok, prompt_prefill_messages(view, setting, record, ash_opts)}
         else
           {:error,
            [
@@ -1533,7 +1626,7 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp prompt_prefill_messages(view, setting, record) do
+  defp prompt_prefill_messages(view, setting, record, ash_opts) do
     prefill =
       Map.new(setting.prompt_fields, fn field ->
         {Atom.to_string(field), prefill_value(view.resource, record, field)}
@@ -1542,8 +1635,41 @@ defmodule AshA2ui.ActionHandler do
     [
       update_data_model(view, "/prompt/values/#{setting.name}", prefill),
       update_data_model(view, "/errors", %{})
-    ]
+    ] ++ prompt_select_prefill(view, setting.name, prefill, ash_opts)
   end
+
+  # Searchable relationship prompt fields show the pre-filled value's label
+  # (read as the actor: a value the actor cannot read shows no label).
+  defp prompt_select_prefill(view, action, prefill, ash_opts) do
+    searchable =
+      for %{widget: :select, select: %{search_fields: [_ | _]} = select} = field <-
+            Map.get(view.prompts, action, []),
+          do: {field.name, select}
+
+    if searchable == [] do
+      []
+    else
+      state =
+        Map.new(searchable, fn {name, select} ->
+          {Atom.to_string(name),
+           %{
+             "search" => "",
+             "label" => prefill_label(select, prefill[Atom.to_string(name)], ash_opts)
+           }}
+        end)
+
+      [update_data_model(view, "/prompt/select/#{action}", state)]
+    end
+  end
+
+  defp prefill_label(select, value, ash_opts) when is_binary(value) and value != "" do
+    case fetch_option(select, value, ash_opts) do
+      {:ok, record} -> AshA2ui.Info.option_entry(record, select)["label"]
+      _not_found_or_error -> ""
+    end
+  end
+
+  defp prefill_label(_select, _value, _ash_opts), do: ""
 
   defp prefill_value(resource, record, field) do
     if ResourceInfo.attribute(resource, field) do
@@ -1574,8 +1700,8 @@ defmodule AshA2ui.ActionHandler do
     success(env, status_text, extra)
   end
 
-  defp generic_result({:error, error}, %{view: view}, _status_text) do
-    {:error, error_messages(view, error)}
+  defp generic_result({:error, error}, %{view: view} = env, _status_text) do
+    {:error, error_messages(view, error, shown_fields(env))}
   end
 
   defp generic_result(_ok_or_other, env, status_text) do
@@ -1710,7 +1836,14 @@ defmodule AshA2ui.ActionHandler do
   # (refreshes honoring `refreshes`, and typed feedback that is
   # "warning" on partial success); otherwise an error status and no refresh.
   defp bulk_messages(table, action_name, selected, result, %{view: view} = env) do
-    text = Bulk.status_text(action_name, selected, result)
+    text =
+      Bulk.status_text(
+        action_name,
+        selected,
+        result,
+        ResolvedView.action_label(view, action_name)
+      )
+
     result_write = update_data_model(view, Bulk.result_path(table), result)
 
     if result["ok"] == 0 do
@@ -2349,7 +2482,7 @@ defmodule AshA2ui.ActionHandler do
 
     messages =
       [update_data_model(view, "/errors", %{}) | field_messages] ++
-        [status(view, error_status(field_messages, nil), "VALIDATION_FAILED")]
+        [status(view, error_status(field_messages, []), "VALIDATION_FAILED")]
 
     {:error, messages ++ wizard_moves(view, Map.get(context, "recordId"), index)}
   end
@@ -2429,7 +2562,7 @@ defmodule AshA2ui.ActionHandler do
   defp after_write({:ok, _record}, env, status_text), do: success(env, status_text)
 
   defp after_write({:error, error}, %{view: view} = env, _status_text) do
-    messages = error_messages(view, error) ++ nested_error_mirrors(env, error)
+    messages = error_messages(view, error, shown_fields(env)) ++ nested_error_mirrors(env, error)
     {:error, messages ++ wizard_submit_failure(env, error)}
   end
 
@@ -2548,8 +2681,17 @@ defmodule AshA2ui.ActionHandler do
 
   # A successful prompt-backed invoke resets its /prompt/values/<action>
   # state so the next prompt starts clean.
-  defp prompt_clear(%{view: view, setting: %{prompt_fields: [_ | _], name: name}}),
-    do: [update_data_model(view, "/prompt/values/#{name}", %{})]
+  defp prompt_clear(%{view: view, setting: %{prompt_fields: [_ | _], name: name}}) do
+    selects =
+      if Enum.any?(
+           Map.get(view.prompts, name, []),
+           &match?(%{select: %{search_fields: [_ | _]}}, &1)
+         ),
+         do: [update_data_model(view, "/prompt/select/#{name}", %{})],
+         else: []
+
+    [update_data_model(view, "/prompt/values/#{name}", %{}) | selects]
+  end
 
   defp prompt_clear(_env), do: []
 
@@ -2795,19 +2937,77 @@ defmodule AshA2ui.ActionHandler do
 
   # --- error mapping ---------------------------------------------------------
 
-  defp error_messages(view, %Ash.Error.Forbidden{}) do
-    [status(view, "You are not authorized to perform this action.", "UNAUTHORIZED")]
+  # Maps an action's failure onto the reserved paths: field errors to
+  # `/errors/<field>` (always — the inputs bind them), and one readable
+  # sentence to the typed feedback:
+  #
+  #   * a Forbidden error class (also when the error only becomes one as a
+  #     class, e.g. a host function's Forbidden exception) → not authorized;
+  #   * errors without a field (an invalid change, a host function's
+  #     string refusal, an unknown error) → their messages;
+  #   * field errors on fields the action shows no input for (`shown`: the
+  #     invoked action's prompt fields, or the submitted form's fields) →
+  #     "<Label>: <message>", so they are not lost;
+  #   * only shown field errors → "Validation failed. Please review the
+  #     field errors."
+  defp error_messages(view, error, shown \\ :all) do
+    error = error_class(error)
+
+    if match?(%Ash.Error.Forbidden{}, error) do
+      [status(view, "You are not authorized to perform this action.", "UNAUTHORIZED")]
+    else
+      field_errors = field_errors(error)
+
+      field_messages =
+        for {segments, text} <- field_errors do
+          update_data_model(view, "/errors/" <> Enum.map_join(segments, "/", &to_string/1), text)
+        end
+
+      unshown =
+        for {[field | _rest] = segments, text} <- field_errors,
+            not shown_field?(shown, field),
+            do: "#{error_field_label(view, segments)}: #{text}"
+
+      code = if field_messages == [], do: "ACTION_FAILED", else: "VALIDATION_FAILED"
+
+      field_messages ++
+        [status(view, error_status(field_messages, general_messages(error) ++ unshown), code)]
+    end
   end
 
-  defp error_messages(view, error) do
-    field_messages =
-      for {segments, text} <- field_errors(error) do
-        update_data_model(view, "/errors/" <> Enum.map_join(segments, "/", &to_string/1), text)
-      end
+  defp error_class(error) do
+    Ash.Error.to_error_class(error)
+  rescue
+    _not_an_error -> error
+  end
 
-    code = if field_messages == [], do: "ACTION_FAILED", else: "VALIDATION_FAILED"
+  defp shown_field?(:all, _field), do: true
+  defp shown_field?(shown, field), do: Enum.any?(shown, &(to_string(&1) == to_string(field)))
 
-    field_messages ++ [status(view, error_status(field_messages, error), code)]
+  defp error_field_label(view, [field | _rest]) do
+    case Enum.find(view.fields, fn {name, _field} -> to_string(name) == to_string(field) end) do
+      {_name, %{label: label}} when is_binary(label) -> label
+      _undeclared -> field |> to_string() |> String.replace("_", " ") |> String.capitalize()
+    end
+  end
+
+  # The fields the failed action shows inputs for: an invoke records its
+  # prompt fields (none for a plain row action, see invoke/4), a
+  # submit_form its form's (form_shown_fields/1); anything else counts
+  # every field as shown.
+  defp shown_fields(env), do: Map.get(env, :shown_fields, :all)
+
+  # A form shows inputs for its declared fields (a stepped form's fields are
+  # its steps' — a failed submit moves to the step owning the error) and for
+  # its nested forms' arguments. A form without declared fields shows all.
+  defp form_shown_fields(view) do
+    case Enum.find(view.components, &(&1.name == :form)) do
+      %{fields: fields} when is_list(fields) ->
+        fields ++ Enum.map(view.nested_forms, fn {name, _nested} -> name end)
+
+      _no_declared_fields ->
+        :all
+    end
   end
 
   # Validation errors on create_inline rows are additionally mirrored INTO
@@ -2857,13 +3057,64 @@ defmodule AshA2ui.ActionHandler do
     end)
   end
 
-  defp error_status([], error) when is_exception(error),
-    do: "Request failed: " <> first_line(Exception.message(error))
+  defp error_status(_field_messages, [_ | _] = sentences),
+    do: sentences |> Enum.uniq() |> Enum.map_join(" ", &sentence/1)
 
-  defp error_status([], error), do: "Request failed: " <> inspect(error)
+  defp error_status([], []), do: "The action failed."
 
-  defp error_status(_field_messages, _error),
+  defp error_status(_field_messages, []),
     do: "Validation failed. Please review the field errors."
+
+  # Messages end in a full stop when they do not end in punctuation already,
+  # so several read as sentences side by side.
+  defp sentence(text) do
+    text = String.trim(text)
+    if text =~ ~r/[.!?:]$/u, do: text, else: text <> "."
+  end
+
+  # The messages of the error's field-less leaves (an error class's
+  # `errors`, or the error itself) that someone wrote for the user to read:
+  # a bare string, an UnknownError carrying one, and an Invalid-class leaf
+  # (its message text with `vars` interpolated). Any other leaf — a raw
+  # exception Splode wrapped as an UnknownError (its `error` is then the
+  # `Exception.format/2` text, "** (Module) ..."), a data-layer error, a
+  # Framework-class error, an arbitrary term — can carry row values or
+  # internals: it is logged server-side and reads as "The action failed."
+  defp general_messages(%{errors: errors}) when is_list(errors),
+    do: Enum.flat_map(errors, &general_messages/1)
+
+  defp general_messages(%{field: field}) when not is_nil(field), do: []
+  defp general_messages(%{fields: [_ | _]}), do: []
+  defp general_messages(message) when is_binary(message), do: [message]
+
+  defp general_messages(%UnknownError{error: message} = error)
+       when is_binary(message) do
+    if String.starts_with?(message, ["** (", "unknown error: "]),
+      do: concealed_message(error),
+      else: [message]
+  end
+
+  defp general_messages(%{class: :invalid} = error) when is_exception(error) do
+    case error_text(error) do
+      "" -> []
+      text -> [text]
+    end
+  end
+
+  defp general_messages(error), do: concealed_message(error)
+
+  defp concealed_message(error) do
+    Logger.error(fn ->
+      "AshA2ui.ActionHandler: an action failed with an error not shown to the user: " <>
+        concealed_detail(error)
+    end)
+
+    ["The action failed."]
+  end
+
+  defp concealed_detail(%UnknownError{error: message}), do: message
+  defp concealed_detail(error) when is_exception(error), do: Exception.message(error)
+  defp concealed_detail(error), do: inspect(error)
 
   # Walks the error-class `errors` list (as AshPhoenix.Form does) collecting
   # `%{field: f}` / `%{fields: [..]}` sub-errors, interpolating their `vars`
@@ -2921,10 +3172,6 @@ defmodule AshA2ui.ActionHandler do
 
   defp var_string(value) when is_binary(value), do: value
   defp var_string(value), do: inspect(value)
-
-  defp first_line(message) do
-    message |> String.split("\n", parts: 2) |> hd() |> String.trim()
-  end
 
   defp last_line(message) do
     message

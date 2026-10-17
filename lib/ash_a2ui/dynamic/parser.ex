@@ -502,6 +502,7 @@ defmodule AshA2ui.Dynamic.Parser do
 
   @action_keys %{
     "name" => :name,
+    "label" => :label,
     "refreshes" => :refreshes,
     "prompt_fields" => :prompt_fields,
     "prompt_title" => :prompt_title,

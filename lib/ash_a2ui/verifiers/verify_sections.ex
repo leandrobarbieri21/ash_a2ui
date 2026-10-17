@@ -4,8 +4,10 @@ defmodule AshA2ui.Verifiers.VerifySections do
   sound:
 
     * only `:table` components may declare a `sections` block,
-    * a sectioned table may not also declare `select_context` (per-row
-      context selection assumes a statically named table),
+    * a list-mode sectioned table may not also declare `select_context`
+      (a board may: each card carries the per-row select control, which
+      dispatches `context_select` with the card's id — nothing in it
+      depends on the runtime lane name),
     * `scope_by` is a public attribute of the surface's resource,
     * `label` / `value` / `sort`, when declared, are public attributes of the
       section `source`,
@@ -79,6 +81,7 @@ defmodule AshA2ui.Verifiers.VerifySections do
   end
 
   defp verify_no_select_context(%{select_context: nil}, _key, _module), do: :ok
+  defp verify_no_select_context(%{display: :board}, _key, _module), do: :ok
 
   defp verify_no_select_context(_component, key, module) do
     {:error,
@@ -87,7 +90,8 @@ defmodule AshA2ui.Verifiers.VerifySections do
        path: [:a2ui, :component, key, :sections],
        message:
          "table #{inspect(key)} cannot combine a sections block with select_context: " <>
-           "per-row context selection assumes a statically named table"
+           "per-row context selection on sectioned tables is supported on boards " <>
+           "(display :board) only"
      )}
   end
 

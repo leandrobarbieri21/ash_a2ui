@@ -73,15 +73,34 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   `row_action_<action>_button` — now dispatching event `prompt` with context
   `{"action": "<name>", "recordId": {"path": "id"}, "component": "<table>"}`
   so the server pre-fills `/prompt/values/<action>` — and whose `content` is
-  `row_action_<action>_prompt`, a `Column` of a title `Text`, one `TextField`
-  per prompt field (bound to the absolute `/prompt/values/<action>/<field>`
-  path; template-relative paths cannot reach the shared prompt state), a
-  per-field error `Text` (bound to `/errors/<field>`) and a confirm `Button`
+  `row_action_<action>_prompt`, a `Column` of a title `Text`, one input
+  per prompt field (`row_action_<action>_prompt_input_<field>`, bound to
+  the absolute `/prompt/values/<action>/<field>` path; template-relative
+  paths cannot reach the shared prompt state), a per-field error `Text`
+  (bound to `/errors/<field>`) and a confirm `Button`
   (`row_action_<action>_confirm_button`: event `invoke`, context carrying
   `"values": {"path": "/prompt/values/<action>"}` alongside the usual
   `"action"`/`"recordId"`/`"component"`). Modal open/close is client-side
   (the v0.9.1 protocol has no server-controlled open state); the server
   contract is only the `prompt` pre-fill and the `invoke` values.
+
+  Each prompt input is the widget a form field of the same type gets
+  (`AshA2ui.ResolvedView.t:prompt_field/0`): a `ChoicePicker` over a
+  relationship (`belongs_to`) field's loaded options or an enumerated
+  argument's choices, a `CheckBox`, a `DateTimeInput`, or a `TextField`. A
+  relationship field with `option_search` renders the searchable-select
+  composite instead (`row_action_<action>_prompt_select_<field>`): selected
+  label and search text at `/prompt/select/<action>/<field>`, results at
+  `/options/<field>`, each result dispatching `option_select` with
+  `"prompt": "<action>"` so the server writes the picked value to
+  `/prompt/values/<action>/<field>`. Values are cast and validated
+  server-side against the action, as for any prompt.
+
+  Under the admin catalog the same inputs sit in a `Column`
+  (`row_action<sfx>_<action>_prompt`, a child of the dataGrid) that the
+  action's `rowActions` entry names in its `prompt` (`content`, `title`,
+  `confirmLabel`, and the `open` pre-fill envelope); the grid renders it in
+  a dialog and dispatches the entry's `invoke` envelope on confirm.
 
   ## Conditional row actions (visible_when)
 
@@ -170,7 +189,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   pagination sentinels are described on `AshA2ui.Experience`.
 
   Surfaces with prompt-enabled row actions additionally carry `"prompt"` —
-  `%{"values" => %{"<action>" => %{"<field>" => ""}}}` — and rows of tables
+  `%{"values" => %{"<action>" => %{"<field>" => ""}}}`, plus `"select" =>
+  %{"<action>" => %{"<field>" => %{"search" => "", "label" => ""}}}` when a
+  prompt field is a searchable relationship select — and rows of tables
   with `visible_when` row actions gain the `"_actions"` /
   `"_visible_<action>"` keys (see the sections above).
 
@@ -366,6 +387,25 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
+  # Relationship prompt fields render their loaded option list inline (the
+  # v0.9.1 ChoicePicker takes literal options only), so the component pass
+  # carries each one's list on the prompt field.
+  defp put_prompt_options(view, options) do
+    prompts =
+      Map.new(view.prompts, fn {action, fields} ->
+        {action,
+         Enum.map(fields, fn
+           %{widget: :select, name: name} = field ->
+             Map.put(field, :options, Map.get(options, name, []))
+
+           field ->
+             field
+         end)}
+      end)
+
+    %{view | prompts: prompts}
+  end
+
   # --- select options ---
 
   # Options for relationship selects and pick_existing nested forms are
@@ -474,6 +514,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # leading noun ("records_list_<name>", "table_cell_<name>_<field>",
   # "query_<name>_apply_button", ...) — see the sfx/1-using call sites.
   defp components(view, options) do
+    view = put_prompt_options(view, options)
+
     if AshA2ui.Experience.admin?() do
       admin_components(view, options)
     else
@@ -674,6 +716,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp admin_data_grid_components(view, table, sfx) do
     pagination_children = if table.query, do: ["pagination#{sfx}"], else: []
+    {prompt_ids, prompt_components} = admin_prompt_contents(view, table, sfx)
 
     data_grid =
       %{
@@ -683,12 +726,30 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "rows" => %{"path" => table.records_path},
         "rowId" => "id",
         "label" => AshA2ui.Experience.collection_label(view, table),
-        "rowActions" => admin_row_actions(view, table),
-        "children" => ["empty_state#{sfx}" | pagination_children]
+        "rowActions" => admin_row_actions(view, table, sfx),
+        "children" => ["empty_state#{sfx}" | pagination_children] ++ prompt_ids
       }
       |> put_row_click(view, table)
 
-    [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)]
+    [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)] ++
+      prompt_components
+  end
+
+  # The prompt contents of the grid's prompt row actions: one Column of the
+  # prompt's inputs (the same widgets the basic Modal holds) per action,
+  # children of the grid that its renderer shows in the prompt dialog.
+  defp admin_prompt_contents(view, table, sfx) do
+    table.row_actions
+    |> Enum.filter(&Map.has_key?(view.prompts, &1))
+    |> Enum.map(fn action ->
+      base = "row_action#{sfx}_#{action}"
+      {children, components} = prompt_field_components(view, action, base)
+
+      {"#{base}_prompt",
+       [%{"id" => "#{base}_prompt", "component" => "Column", "children" => children} | components]}
+    end)
+    |> Enum.unzip()
+    |> then(fn {ids, components} -> {ids, List.flatten(components)} end)
   end
 
   # Whole-row click: the row's primary action — the master/detail select
@@ -786,7 +847,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # action declares prompt_fields) — destructive: true when the action is
   # a destroy, so the renderer confirms through ConfirmDialog and
   # dispatches the envelope unchanged.
-  defp admin_row_actions(view, table) do
+  defp admin_row_actions(view, table, sfx) do
     # View only when the surface has a record panel to open (formless
     # surfaces ship no dead affordance); Edit only with a declared update
     # action; neither on a related table — the same gates the basic
@@ -815,8 +876,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           |> put_contexts_binding(view)
           |> put_admin_prompt_values(setting)
 
-        %{"label" => humanize(action), "action" => "invoke", "context" => context}
+        %{
+          "label" => ResolvedView.action_label(view, action),
+          "action" => "invoke",
+          "context" => context
+        }
         |> maybe_destructive(view.resource, action)
+        |> put_visible_path(setting, action)
+        |> put_admin_prompt(view, table, action, setting, sfx)
       end)
 
     view_entries ++ select_context_entries(view, table) ++ edit_entries ++ declared_entries
@@ -865,6 +932,36 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp put_admin_prompt_values(context, _setting), do: context
+
+  # A visible_when action names the row-relative `_visible_<action>` key
+  # (non-empty on the rows it applies to) so the grid hides it per row, as
+  # the basic composition's visibility slot does.
+  defp put_visible_path(entry, %{visible_when: [_ | _]}, action),
+    do: Map.put(entry, "visiblePath", "_visible_#{action}")
+
+  defp put_visible_path(entry, _setting, _action), do: entry
+
+  # A prompt action's entry carries its prompt: the grid child holding the
+  # inputs, the dialog heading, and the `prompt` pre-fill envelope the grid
+  # dispatches on open (the basic trigger button's exact context). Confirm
+  # dispatches the entry itself — the invoke with the "values" binding.
+  defp put_admin_prompt(entry, view, table, action, %{prompt_fields: [_ | _]} = setting, sfx) do
+    Map.put(entry, "prompt", %{
+      "content" => "row_action#{sfx}_#{action}_prompt",
+      "title" => setting.prompt_title || ResolvedView.action_label(view, action),
+      "confirmLabel" => "Confirm",
+      "open" => %{
+        "action" => "prompt",
+        "context" => %{
+          "action" => to_string(action),
+          "recordId" => %{"path" => "id"},
+          "component" => to_string(table.name)
+        }
+      }
+    })
+  end
+
+  defp put_admin_prompt(entry, _view, _table, _action, _setting, _sfx), do: entry
 
   defp maybe_destructive(envelope, resource, action) do
     case ResourceInfo.action(resource, action) do
@@ -1238,9 +1335,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # bindings, like row-action invokes.
   defp bulk_toolbar_components(view, table, sfx) do
     if AshA2ui.Bulk.enabled?(table) do
-      AshA2ui.Bulk.toolbar_components(table, sfx, fn context ->
-        context |> put_query_binding(view) |> put_contexts_binding(view)
-      end)
+      AshA2ui.Bulk.toolbar_components(
+        table,
+        sfx,
+        fn context -> context |> put_query_binding(view) |> put_contexts_binding(view) end,
+        &ResolvedView.action_label(view, &1)
+      )
     else
       []
     end
@@ -1249,9 +1349,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # --- boards (display :board) ---
 
   # A board renders its template's lanes side by side: the container Column
-  # (`board_<template>`: an h2 heading, the create affordance, and a
-  # horizontal List of lane Columns — a List, not a Row, because the basic
-  # Row cannot wrap or scroll). Each lane Column (`lane<sfx>`) holds a
+  # (`board_<template>`: an h2 heading, the create affordance, and a Row of
+  # lane Columns). Every lane Column carries layout weight 1, so the lanes
+  # share the board's width equally instead of sizing to their cards (a
+  # horizontal List wraps each child in an inline-block that shrinks to its
+  # content). The AshA2ui merged catalog scrolls the lanes Row inside the
+  # board below a minimum lane width (see priv/js/ash_a2ui_catalog.js and
+  # `--a2ui-board-lane-min-width`). Each lane Column (`lane<sfx>`) holds a
   # header Row (the lane heading Text plus its total, bound to
   # `/_lane_total_<lane>`), the lane's query controls when its query
   # declares any, the card list, the empty state, the pagination and the
@@ -1270,6 +1374,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     lane = %{
       "id" => "lane#{sfx}",
       "component" => "Column",
+      "weight" => 1,
       "children" => lane_children(view, table, sfx, controls?)
     }
 
@@ -1333,8 +1438,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           },
           %{
             "id" => "#{board}_lanes",
-            "component" => "List",
-            "direction" => "horizontal",
+            "component" => "Row",
             "align" => "start",
             "children" => Enum.map(lanes, &"lane#{table_suffix(view, &1)}")
           }
@@ -2043,7 +2147,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     button =
       if prompt? do
-        prompt_trigger_button(table, action, base) ++
+        prompt_trigger_button(view, table, action, base) ++
           prompt_components(view, table, action, base, setting)
       else
         invoke_button(view, table, action, base)
@@ -2077,7 +2181,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_text",
         "component" => "Text",
-        "text" => humanize(action)
+        "text" => ResolvedView.action_label(view, action)
       }
     ]
   end
@@ -2085,7 +2189,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The Modal's trigger: opening is client-side (interacting with the
   # trigger), while the `prompt` event lets the server pre-fill
   # /prompt/values/<action> and clear stale /errors.
-  defp prompt_trigger_button(table, action, base) do
+  defp prompt_trigger_button(view, table, action, base) do
     [
       %{
         "id" => "#{base}_button",
@@ -2105,42 +2209,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_text",
         "component" => "Text",
-        "text" => humanize(action)
+        "text" => ResolvedView.action_label(view, action)
       }
     ]
   end
 
-  # The Modal and its content: a title, one TextField per prompt field bound
-  # to the absolute /prompt/values/<action>/<field> path (template-relative
+  # The Modal and its content: a title, one input per prompt field bound to
+  # the absolute /prompt/values/<action>/<field> path (template-relative
   # paths cannot reach the shared prompt state), a per-field error Text, and
   # the confirm Button whose invoke context carries the "values" binding.
   defp prompt_components(view, table, action, base, setting) do
-    title = setting.prompt_title || humanize(action)
-
-    field_children =
-      Enum.flat_map(setting.prompt_fields, fn field ->
-        ["#{base}_prompt_input_#{field}", "#{base}_prompt_error_#{field}"]
-      end)
-
-    inputs =
-      Enum.map(setting.prompt_fields, fn field ->
-        %{
-          "id" => "#{base}_prompt_input_#{field}",
-          "component" => "TextField",
-          "label" => prompt_label(view, field),
-          "value" => %{"path" => "/prompt/values/#{action}/#{field}"}
-        }
-      end)
-
-    errors =
-      Enum.map(setting.prompt_fields, fn field ->
-        %{
-          "id" => "#{base}_prompt_error_#{field}",
-          "component" => "Text",
-          "text" => %{"path" => "/errors/#{field}"},
-          "variant" => "caption"
-        }
-      end)
+    title = setting.prompt_title || ResolvedView.action_label(view, action)
+    {field_children, field_components} = prompt_field_components(view, action, base)
 
     [
       %{
@@ -2161,8 +2241,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "variant" => "h3"
       }
     ] ++
-      inputs ++
-      errors ++
+      field_components ++
       [
         %{
           "id" => "#{base}_confirm_button",
@@ -2188,11 +2267,115 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       ]
   end
 
-  defp prompt_label(view, field) do
-    case view.fields[field] do
-      %{label: label} when is_binary(label) -> label
-      _undeclared -> humanize(field)
+  # One prompt's inputs, shared by both compositions: per prompt field the
+  # widget a form field of that type gets (see ResolvedView.prompt_field)
+  # and its error Text. Returns {child ids, components}.
+  defp prompt_field_components(view, action, base) do
+    fields = Map.get(view.prompts, action, [])
+
+    children =
+      Enum.flat_map(fields, &[prompt_input_id(base, &1), "#{base}_prompt_error_#{&1.name}"])
+
+    components =
+      Enum.flat_map(fields, fn field ->
+        prompt_input(action, base, field) ++
+          [
+            %{
+              "id" => "#{base}_prompt_error_#{field.name}",
+              "component" => "Text",
+              "text" => %{"path" => "/errors/#{field.name}"},
+              "variant" => "caption"
+            }
+          ]
+      end)
+
+    {children, components}
+  end
+
+  defp prompt_input_id(base, field) do
+    if searchable_prompt_field?(field),
+      do: "#{base}_prompt_select_#{field.name}",
+      else: "#{base}_prompt_input_#{field.name}"
+  end
+
+  defp prompt_input(action, base, field) do
+    props = %{
+      "id" => "#{base}_prompt_input_#{field.name}",
+      "label" => field.label,
+      "value" => %{"path" => "/prompt/values/#{action}/#{field.name}"}
+    }
+
+    case field.widget do
+      :select ->
+        if searchable_prompt_field?(field) do
+          prompt_select_components(action, base, field)
+        else
+          [choice_picker(props, Map.get(field, :options, []))]
+        end
+
+      :choice_picker ->
+        options =
+          Enum.map(field.choices, fn {value, label} ->
+            %{"label" => label, "value" => to_string(value)}
+          end)
+
+        [choice_picker(props, options)]
+
+      :check_box ->
+        [Map.put(props, "component", "CheckBox")]
+
+      :date_time_input ->
+        [
+          props
+          |> Map.put("component", "DateTimeInput")
+          |> Map.put("enableDate", true)
+          |> Map.put("enableTime", not field.date_only?)
+        ]
+
+      _text_field ->
+        text_field = Map.put(props, "component", "TextField")
+        [if(field.numeric?, do: Map.put(text_field, "variant", "number"), else: text_field)]
     end
+  end
+
+  defp choice_picker(props, options) do
+    props
+    |> Map.put("component", "ChoicePicker")
+    |> Map.put("variant", "mutuallyExclusive")
+    |> Map.put("options", options)
+  end
+
+  # A searchable relationship prompt field: the searchable-select composite
+  # (label, selected label, search controls, result list) over prompt-scoped
+  # state — the selection writes /prompt/values/<action>/<field> server-side
+  # (option_select with "prompt"), never the form.
+  defp prompt_select_components(action, base, field) do
+    id = "#{base}_prompt_select_#{field.name}"
+    state = "/prompt/select/#{action}/#{field.name}"
+
+    [
+      %{
+        "id" => id,
+        "component" => "Column",
+        "children" => ["#{id}_label", "#{id}_selected", "#{id}_controls", "#{id}_options"]
+      },
+      %{"id" => "#{id}_label", "component" => "Text", "text" => field.label, "variant" => "h4"},
+      %{"id" => "#{id}_selected", "component" => "Text", "text" => %{"path" => "#{state}/label"}},
+      %{
+        "id" => "#{id}_controls",
+        "component" => "Row",
+        "children" => ["#{id}_search_input", "#{id}_search_button"]
+      }
+    ] ++
+      search_controls(id, to_string(field.name), "#{state}/search") ++
+      option_list(id, "/options/#{field.name}", %{
+        "name" => "option_select",
+        "context" => %{
+          "field" => to_string(field.name),
+          "value" => %{"path" => "value"},
+          "prompt" => to_string(action)
+        }
+      })
   end
 
   # Zero-or-one nested template: `_visible_<action>` on the row is either
@@ -2548,13 +2731,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The shared search input + button pair: the button's `option_search`
   # context carries the current search text via a data binding and the
   # select/picker name as "field".
-  defp search_controls(base, name) do
+  defp search_controls(base, name, search_path \\ nil) do
+    search_path = search_path || "/select/#{name}/search"
+
     [
       %{
         "id" => "#{base}_search_input",
         "component" => "TextField",
         "label" => "Search",
-        "value" => %{"path" => "/select/#{name}/search"}
+        "value" => %{"path" => search_path}
       },
       %{
         "id" => "#{base}_search_button",
@@ -2565,7 +2750,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             "name" => "option_search",
             "context" => %{
               "field" => name,
-              "search" => %{"path" => "/select/#{name}/search"}
+              "search" => %{"path" => search_path}
             }
           }
         }
@@ -3319,12 +3504,29 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         {to_string(name), Map.new(fields, &{to_string(&1), ""})}
       end
 
-    if prompt_values == %{} do
-      value
-    else
-      Map.put(value, "prompt", %{"values" => prompt_values})
+    prompt_selects =
+      for {name, fields} <- view.prompts,
+          searchable = Enum.filter(fields, &searchable_prompt_field?/1),
+          searchable != [],
+          into: %{} do
+        {to_string(name),
+         Map.new(searchable, &{to_string(&1.name), %{"search" => "", "label" => ""}})}
+      end
+
+    cond do
+      prompt_values == %{} ->
+        value
+
+      prompt_selects == %{} ->
+        Map.put(value, "prompt", %{"values" => prompt_values})
+
+      true ->
+        Map.put(value, "prompt", %{"values" => prompt_values, "select" => prompt_selects})
     end
   end
+
+  defp searchable_prompt_field?(%{widget: :select, select: %{search_fields: [_ | _]}}), do: true
+  defp searchable_prompt_field?(_field), do: false
 
   # The reserved /ui/wizard state (step 0) — only on surfaces whose form
   # declares steps (frozen shape unchanged everywhere else).

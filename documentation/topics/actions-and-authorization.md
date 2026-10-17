@@ -68,6 +68,19 @@ refresh plus typed `/ui/feedback`; on failure, validation errors mapped onto
 `/errors/<field>` paths and an `/ui/feedback` error (see
 [Data Model Conventions](data-model-conventions.md)).
 
+The error's message is a readable sentence, by Ash error class:
+
+| Failure | `/errors/<field>` | `/ui/feedback` message |
+|---|---|---|
+| `Ash.Error.Forbidden` (or an error that is one as a class) | nothing (no policy details leak) | "You are not authorized to perform this action." |
+| An error without a field someone wrote for the user (an Invalid-class error such as a change's `add_error`, a `via` function's string refusal) | nothing | the error's own message(s), as sentences |
+| Any other error (a raw exception such as `RuntimeError`, a data-layer error, a Framework-class error) | nothing | "The action failed." — its text can carry row values, so it only goes to `Logger.error/1` |
+| Field errors on fields the action shows an input for (a form's fields, an invoke's prompt fields) | each field's message | "Validation failed. Please review the field errors." |
+| Field errors on fields the action shows no input for (an invoke without that prompt field, a form without an input for that field) | each field's message | "<Label>: <message>" per field |
+
+Field-less messages and unshown field errors combine into one feedback
+message when both occur.
+
 ## The task panel
 
 Every surface with a `:form` component composes a **record task panel**: a
@@ -108,8 +121,9 @@ component :table do
 end
 
 action :decline do
+  label "Decline"                        # optional button text (row, bulk, prompt)
   prompt_fields [:notes]                 # must be args/accepts of :decline
-  prompt_title "Decline referral"        # optional; defaults to the humanized name
+  prompt_title "Decline referral"        # optional; defaults to the label
 end
 ```
 
@@ -122,12 +136,34 @@ basic-catalog `Modal` instead of a bare button:
   "table"}`); the server answers by pre-filling
   `/prompt/values/decline` (each field's current record value when it is a
   public attribute, `""` otherwise) and clearing `/errors`,
-- the Modal `content` is a Column with a title, one `TextField` per prompt
+- the Modal `content` is a Column with a title, one input per prompt
   field bound to `/prompt/values/decline/<field>`, a per-field error `Text`
   bound to `/errors/<field>`, and a **Confirm** button,
 - Confirm dispatches a regular `"invoke"` whose context carries
   `"values": {"path": "/prompt/values/decline"}` alongside
   `"action"`/`"recordId"`.
+
+Each prompt input is the widget a form field of that type gets: a
+`ChoicePicker` over a relationship field (a `belongs_to` source attribute,
+or a `field` entity's explicit `relationship`) with its options loaded as
+the actor, exactly like a form select's, at `/options/<field>`; a
+`ChoicePicker` over an enumerated argument or attribute (`Ash.Type.Enum` or
+`one_of`); a `CheckBox`, a `DateTimeInput`; else a `TextField`. A
+relationship field whose `field` entity declares `option_search` renders the
+searchable-select composite (`row_action_<action>_prompt_select_<field>`):
+search text and the picked label live at `/prompt/select/<action>/<field>`,
+results at `/options/<field>`, and each result dispatches `option_select`
+with `"prompt": "<action>"`, which re-reads the picked record as the actor and
+writes its value to `/prompt/values/<action>/<field>` (never `/form`). The
+`prompt` pre-fill writes the current value's label there too.
+
+Under the admin catalog the prompt is a dialog the dataGrid opens: the
+action's `rowActions` entry carries `prompt` (`content` — a grid child
+`Column` of the same inputs —, `title`, `confirmLabel` and the `open`
+pre-fill envelope). The grid dispatches `open` when the row button is
+clicked, shows the inputs, and dispatches the entry's own `invoke` envelope
+on Confirm; the dialog stays open showing the error when the outcome is an
+error, and closes on success.
 
 Handler-side, the `invoke` context's `"values"` map is **filtered to the
 declared `prompt_fields`** (nothing outside them ever reaches the
@@ -143,6 +179,24 @@ shut — the frozen contract is only the `prompt` pre-fill and the `invoke`
 `"values"` map. Prompt inputs bind **absolute** `/prompt/...` paths because
 the catalog's `Action.context` values cannot nest objects; the shared state
 is safe because only one Modal is open at a time.
+
+## Action labels (`label`)
+
+A row action's button reads as its humanized name ("Confirm merge"). Set
+`label` on its `action` entity for other text — no wrapper action needed:
+
+```elixir
+action :confirm_merge do
+  label "Confirm match"
+end
+```
+
+The label names the row button and the bulk toolbar button in both
+compositions, the admin `rowActions` entry, the prompt heading (unless
+`prompt_title` is set) and the bulk status line ("Confirm match: 3 of 3
+selected records done."). It is a plain string with no markup or
+interpolation, so translated text goes in as is. Like every DSL option it
+is fixed when the UI module compiles.
 
 ## Conditional row actions (`visible_when`)
 
@@ -174,7 +228,10 @@ Two halves, with different guarantees:
   action renders inside a `List` slot templated over that row-relative path
   — renderers that support nested templates show zero or one button per
   row. Renderers that don't can still consult `"_actions"`; either way the
-  handler enforcement above is the authority.
+  handler enforcement above is the authority. Under the admin catalog the
+  action's `rowActions` entry names the same path (`"visiblePath":
+  "_visible_<action>"`) and the dataGrid offers the action only on rows
+  where it is non-empty.
 
 Note `visible_when` is a UX affordance layered *inside* the `row_actions`
 allowlist — it narrows when an allowlisted action applies, and Ash policies

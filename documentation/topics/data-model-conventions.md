@@ -27,7 +27,8 @@ custom hooks, and tests can rely on them.
 | `/query` | The current search/filter/preset/sort/pagination state of a query-enabled table (multi-table surfaces: an object keyed by table component name) | Initial render; after every `query` action; alongside query-aware success refreshes |
 | `/query/<component_name>` | One table's query state on a **multi-table** surface | Same as `/query`, per table |
 | `/_lane_total_<lane>` | A board lane's total as a string (`"3"`, `"5+"`) — only on surfaces with `display :board` tables | Initial render; action refreshes and `query` actions on that lane. A `scope: :records` push leaves it untouched |
-| `/prompt/values/<action>` | The input values of a prompt-enabled row action's Modal (only on surfaces with `prompt_fields` actions) | Initial render (empty); pre-filled on `prompt`; cleared after a successful prompt `invoke` |
+| `/prompt/values/<action>` | The input values of a prompt-enabled row action's Modal (only on surfaces with `prompt_fields` actions) | Initial render (empty); pre-filled on `prompt`; a prompt `option_select` writes a searchable relationship field's value; cleared after a successful prompt `invoke` |
+| `/prompt/select/<action>/<field>` | A searchable relationship prompt field's state (`{"search", "label"}`) — only on surfaces with such a field | Initial render (empty); the picked label on `prompt` (pre-fill) and on a prompt `option_select`; cleared after a successful prompt `invoke` |
 | `/context/<name>` | One surface context's selection state (`{"search", "value", "label"}`) — only on surfaces with `context` entities | Initial render; every `context_select`/`context_clear` (the whole `/context` map is rewritten) |
 | `/options/<context>` | A picker context's option list (same `{"label","value"}` shape; shares the `/options` namespace) | Initial render; `context_search`; cascades that re-derive a dependent context's options |
 | `/detail/<context>` | The selected record of a context rendered by `:detail` components (`{}` while unselected) | Initial render; every selection change of that context |
@@ -194,8 +195,9 @@ Conventions:
   not a structured error object.
 - A subsequent successful submit **clears** the error paths (`/errors` is
   reset wholesale to `{}`).
-- Errors that can't be attributed to a field (e.g. a policy denial) go to
-  the `/ui/feedback` error instead.
+- Errors that can't be attributed to a field (e.g. a policy denial, an
+  invalid change without a field) go to the `/ui/feedback` error instead,
+  as their own message (a policy denial as "not authorized").
 - Errors on **nested-form rows** carry Ash's error path and land at
   `/errors/<argument>/<index>/<field>` — `<index>` is the row's position in
   the submitted array. The same text is additionally mirrored into the
@@ -230,8 +232,13 @@ success text on completion (submits, invokes, report runs, CSV exports),
 `"warning"` when a bulk run partly succeeded or a selection was capped, and
 `"error"` with
 an explanation on rejected/unknown actions, a "not authorized" text on policy
-denials (deliberately without detail), and a generic failure text when errors
-can't be attributed to a field. Task open/cancel and context
+denials (deliberately without detail), and the error's own message when it
+can't be attributed to a field (an invalid change, a `via` function's string
+refusal; any other error, such as a raw exception, reads "The action
+failed." and is only logged). Field errors on fields the action shows no
+input for are named in
+it as "<Label>: <message>" (see
+[Actions and Authorization](actions-and-authorization.md)). Task open/cancel and context
 select/clear clear it (`kind: null`, `message: ""`). Actions that only fetch
 data for the client (`query`, `option_search`, `context_search`) leave it
 untouched. The emitted surface binds its `status_text` Text to

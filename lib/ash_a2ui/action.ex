@@ -2,6 +2,8 @@ defmodule AshA2ui.Action do
   @moduledoc """
   Target struct for the `action` DSL entity: per-action metadata.
 
+  * `label` is the text of the action's buttons (row, bulk, prompt — both
+    compositions); `nil` (the default) uses the humanized action name.
   * `refreshes` names the table components (by component key — the unnamed
     table is `:table`) whose records are refreshed after the named Ash action
     succeeds. `nil` (the default) refreshes every table; `[]` refreshes none.
@@ -21,6 +23,7 @@ defmodule AshA2ui.Action do
 
   defstruct [
     :name,
+    :label,
     :refreshes,
     :prompt_title,
     :via,
@@ -31,6 +34,7 @@ defmodule AshA2ui.Action do
 
   @type t :: %__MODULE__{
           name: atom,
+          label: String.t() | nil,
           refreshes: [atom] | nil,
           prompt_fields: [atom],
           prompt_title: String.t() | nil,

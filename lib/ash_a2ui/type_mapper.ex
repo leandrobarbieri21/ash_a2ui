@@ -75,23 +75,31 @@ defmodule AshA2ui.TypeMapper do
   @spec choices(module | map, atom) :: [{atom | String.t(), String.t()}]
   def choices(resource, name) do
     case ResourceInfo.attribute(resource, name) || ResourceInfo.calculation(resource, name) do
-      %{type: type} = field ->
-        type = Ash.Type.get_type(type)
-
-        if enum_type?(type) do
-          Enum.map(type.values(), &{&1, enum_label(type, &1)})
-        else
-          field.constraints
-          |> one_of()
-          |> Enum.map(&{&1, humanize(&1)})
-        end
-
-      nil ->
-        []
+      %{type: type} = field -> type_choices(type, field.constraints)
+      nil -> []
     end
   end
 
-  defp one_of(constraints), do: Keyword.get(constraints, :one_of) || []
+  @doc """
+  The enumerated choices of an Ash type and its constraints (an action
+  argument's, say), labelled exactly like `choices/2`: an `Ash.Type.Enum`'s
+  values, else a `one_of` constraint's. `[]` when the type enumerates none.
+  """
+  @spec type_choices(module | atom, keyword) :: [{atom | String.t(), String.t()}]
+  def type_choices(type, constraints) do
+    type = Ash.Type.get_type(type)
+
+    if enum_type?(type) do
+      Enum.map(type.values(), &{&1, enum_label(type, &1)})
+    else
+      constraints
+      |> one_of()
+      |> Enum.map(&{&1, humanize(&1)})
+    end
+  end
+
+  defp one_of(constraints) when is_list(constraints), do: Keyword.get(constraints, :one_of) || []
+  defp one_of(_constraints), do: []
 
   # `Ash.Type.Enum.label/1` is nil unless the enum declared explicit labels.
   defp enum_label(type, value) do

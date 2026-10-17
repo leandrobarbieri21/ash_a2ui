@@ -964,6 +964,12 @@ function detectPicker(surface, id) {
   };
 }
 
+// A child reference's component id: static children are plain id strings,
+// template children `{id, basePath}` objects.
+function childRefId(child) {
+  return typeof child === "object" && child !== null ? child.id : String(child);
+}
+
 // Defines <ash-a2ui-column> once (idempotent across LiveView remounts and
 // hot reloads).
 function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
@@ -1004,13 +1010,30 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
      *
      * Shared input/surface/border/label tokens come from the same
      * `--a2ui-*` set as the rest of the catalog.
+     *
+     * Boards (`board_<template>`, whose `board_<template>_lanes` Row holds
+     * the weighted lane Columns) scroll their lanes horizontally inside
+     * the board instead of the page:
+     *
+     * - `--a2ui-board-lane-min-width`: the narrowest a lane gets before
+     *   the lanes scroll (default 18rem).
+     * - `--a2ui-board-lane-max-width`: the widest a lane gets (default
+     *   none — lanes share the board's width).
      */
     static styles = css`
       :host {
         display: flex;
         flex-direction: column;
         gap: var(--a2ui-column-gap, var(--a2ui-spacing-m));
+        min-width: 0;
       }
+      .board-lanes {
+        overflow-x: auto;
+        min-width: 0;
+        max-width: 100%;
+        padding-bottom: var(--a2ui-spacing-s, 0.5rem);
+      }
+
       .picker {
         display: flex;
         flex-direction: column;
@@ -1181,6 +1204,26 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
         this.style.justifyContent = JUSTIFY_MAP[props.justify ?? ""] ?? "flex-start";
         this.style.alignItems = ALIGN_MAP[props.align ?? ""] ?? "stretch";
       }
+      // Board lanes keep a minimum (and optional maximum) width, so a board
+      // with many lanes scrolls inside its frame instead of crushing them.
+      // Set on the lane itself: depending on the renderer version the lanes
+      // Row renders its children in light DOM or in its own shadow root.
+      if (this.boardLane()) {
+        this.style.minWidth = "var(--a2ui-board-lane-min-width, 18rem)";
+        this.style.maxWidth = "var(--a2ui-board-lane-max-width, none)";
+      } else {
+        this.style.removeProperty("min-width");
+        this.style.removeProperty("max-width");
+      }
+    }
+
+    // A board lane: the encoder's frozen `lane_<lane>` id with its
+    // `lane_<lane>_header` child, inside a board's lanes Row.
+    boardLane() {
+      const id = this.context?.componentModel?.id;
+      if (typeof id !== "string" || !/^lane_.+/.test(id)) return false;
+      const children = this.controller?.props?.children;
+      return Array.isArray(children) && children.some((child) => childRefId(child) === `${id}_header`);
     }
 
     disconnectedCallback() {
@@ -1243,7 +1286,27 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
       }
 
       const children = Array.isArray(props.children) ? props.children : [];
-      return html`${children.map((child) => html`${this.renderNode(child)}`)}`;
+      const lanesId = this.boardLanesId(children);
+      return html`${children.map((child) =>
+        lanesId !== null && childRefId(child) === lanesId
+          ? html`<div class="board-lanes" part="board-lanes">${this.renderNode(child)}</div>`
+          : html`${this.renderNode(child)}`,
+      )}`;
+    }
+
+    // A board container (the encoder's frozen `board_<template>` id with its
+    // `board_<template>_lanes` Row child): the lanes child renders inside a
+    // horizontal scroll frame. Anything else returns null (plain column).
+    boardLanesId(children) {
+      const id = this.context?.componentModel?.id;
+      if (typeof id !== "string" || !/^board_.+/.test(id)) return null;
+      const lanesId = `${id}_lanes`;
+      if (!children.some((child) => childRefId(child) === lanesId)) return null;
+      try {
+        return this.surface?.componentsModel?.get(lanesId)?.type === "Row" ? lanesId : null;
+      } catch {
+        return null;
+      }
     }
 
     // --- typeahead combobox ---

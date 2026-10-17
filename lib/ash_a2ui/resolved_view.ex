@@ -44,6 +44,13 @@ defmodule AshA2ui.ResolvedView do
       `row_actions`/`loads` are the union across tables
     * `bulk_actions` is the union of every table's `bulk_actions` (each
       table scope also carries its own list) — the `bulk_invoke` allowlist
+    * `prompts` maps every action declaring `prompt_fields` to its resolved
+      prompt inputs (see `t:prompt_field/0`): each field's label and the
+      widget a form field of that type gets — a relationship select over a
+      `belongs_to` (option-loading config in `prompt_selects`, keyed by
+      field name and loaded at `/options/<field>` like a form select), a
+      ChoicePicker over an enumerated argument or attribute, a CheckBox, a
+      DateTimeInput, or a TextField
 
   FROZEN CONTRACT — the struct fields and `resolve/2` signature are the
   interface every parallel track codes against; do not change outside an
@@ -76,7 +83,9 @@ defmodule AshA2ui.ResolvedView do
     contexts: %{},
     context_order: [],
     details: [],
-    reports: []
+    reports: [],
+    prompts: %{},
+    prompt_selects: %{}
   ]
 
   @typedoc """
@@ -195,6 +204,25 @@ defmodule AshA2ui.ResolvedView do
         }
 
   @typedoc """
+  One resolved prompt input of an action's `prompt_fields`: its `label`, the
+  `widget` (`:select` for a relationship select — config in `select`,
+  searchable when its `search_fields` are non-empty — `:choice_picker` with
+  `choices` as `{value, label}` pairs, `:check_box`, `:date_time_input`
+  with `date_only?`, or `:text_field` with `numeric?`). The value binds
+  `/prompt/values/<action>/<field>` and is cast server-side against the
+  action's argument or accepted attribute, as before.
+  """
+  @type prompt_field :: %{
+          name: atom,
+          label: String.t(),
+          widget: :select | :choice_picker | :check_box | :date_time_input | :text_field,
+          choices: [{atom | String.t(), String.t()}],
+          select: select | nil,
+          numeric?: boolean,
+          date_only?: boolean
+        }
+
+  @typedoc """
   A resolved `:report` component (aggregate/report queries): the generic Ash
   `action` it invokes, the `params` (argument names rendered as inputs, bound
   under `<path>/params`), the `fields` column allowlist (keys of the
@@ -235,7 +263,9 @@ defmodule AshA2ui.ResolvedView do
           contexts: %{atom => context},
           context_order: [atom],
           details: [detail],
-          reports: [report]
+          reports: [report],
+          prompts: %{atom => [prompt_field]},
+          prompt_selects: %{atom => select}
         }
 
   @option_label_fallbacks [:name, :title, :label, :username, :email]
@@ -295,6 +325,8 @@ defmodule AshA2ui.ResolvedView do
     create_action = component_action(form, :create_action, resource, :create)
     update_action = component_action(form, :update_action, resource, :update)
     contexts = resolve_contexts(resource_or_ui_module)
+    declared = Map.new(declared_fields, &{&1.name, &1})
+    prompt_selects = resolve_prompt_selects(resource, actions, declared)
 
     %__MODULE__{
       resource: resource,
@@ -320,8 +352,23 @@ defmodule AshA2ui.ResolvedView do
       contexts: Map.new(contexts, &{&1.name, &1}),
       context_order: Enum.map(contexts, & &1.name),
       details: resolve_details(components, contexts, fields),
-      reports: resolve_reports(resource, components)
+      reports: resolve_reports(resource, components),
+      prompts: resolve_prompts(resource, actions, declared, prompt_selects),
+      prompt_selects: prompt_selects
     }
+  end
+
+  @doc """
+  The button label of `action` on this surface: the `label` of its `action`
+  entity when declared, else the humanized action name. Used by row, bulk
+  and prompt buttons in both compositions.
+  """
+  @spec action_label(t(), atom) :: String.t()
+  def action_label(%__MODULE__{actions: actions}, action) do
+    case Map.get(actions, action) do
+      %{label: label} when is_binary(label) -> label
+      _no_label -> humanize(action)
+    end
   end
 
   @doc """
@@ -437,14 +484,18 @@ defmodule AshA2ui.ResolvedView do
   @doc """
   Every option list the surface loads (and the `"option_search"` action may
   refresh), keyed by the `/options/<name>` segment: relationship selects
-  (`kind: :select`) plus pick_existing nested forms (`kind: :nested_form`).
+  (`kind: :select` — form selects and relationship prompt fields, which
+  share a field's list) plus pick_existing nested forms (`kind:
+  :nested_form`).
   Each source carries the resolved `destination` / `option_label` /
   `option_value` / `option_sort` / `option_limit` / `search_fields` keys.
   """
   @spec option_sources(t()) :: %{atom => map}
   def option_sources(%__MODULE__{} = view) do
     selects =
-      Map.new(view.selects, fn {name, select} -> {name, Map.put(select, :kind, :select)} end)
+      view.prompt_selects
+      |> Map.merge(view.selects)
+      |> Map.new(fn {name, select} -> {name, Map.put(select, :kind, :select)} end)
 
     pickers =
       for {name, %{mode: :pick_existing} = nested} <- view.nested_forms, into: %{} do
@@ -901,6 +952,64 @@ defmodule AshA2ui.ResolvedView do
       option_limit: field.option_limit,
       search_fields: field.option_search
     }
+  end
+
+  # --- prompts ------------------------------------------------------------------
+
+  # A prompt field is a relationship select by the same rule as a form
+  # field: an explicit `relationship` on its `field` entity, or a name
+  # matching a `belongs_to` source_attribute.
+  defp resolve_prompt_selects(resource, actions, declared) do
+    for {_name, %{prompt_fields: [_ | _] = fields}} <- actions,
+        name <- fields,
+        field = declared[name] || %AshA2ui.Field{name: name},
+        relationship = select_relationship(resource, field),
+        not is_nil(relationship),
+        into: %{},
+        do: {name, resolve_select(field, relationship)}
+  end
+
+  defp resolve_prompts(resource, actions, declared, prompt_selects) do
+    for {name, %{prompt_fields: [_ | _] = fields}} <- actions, into: %{} do
+      ash_action = ResourceInfo.action(resource, name)
+
+      {name,
+       Enum.map(fields, &prompt_field(resource, ash_action, declared[&1], &1, prompt_selects))}
+    end
+  end
+
+  defp prompt_field(resource, ash_action, declared, name, prompt_selects) do
+    {type, constraints} = prompt_input_type(resource, ash_action, name)
+    select = prompt_selects[name]
+    choices = AshA2ui.TypeMapper.type_choices(type, constraints)
+
+    widget =
+      cond do
+        select -> :select
+        declared && declared.widget -> declared.widget
+        true -> AshA2ui.TypeMapper.widget_for(type, constraints)
+      end
+
+    %{
+      name: name,
+      label: (declared && declared.label) || humanize(name),
+      widget: widget,
+      choices: choices,
+      select: select,
+      numeric?: Ash.Type.get_type(type) in [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float],
+      date_only?: Ash.Type.get_type(type) == Ash.Type.Date
+    }
+  end
+
+  # The type behind a prompt field: the action argument of that name, else
+  # the accepted attribute (the verifier guarantees one of the two).
+  defp prompt_input_type(resource, ash_action, name) do
+    argument = ash_action && Enum.find(ash_action.arguments, &(&1.name == name))
+
+    case argument || ResourceInfo.attribute(resource, name) do
+      %{type: type, constraints: constraints} -> {type, constraints || []}
+      nil -> {Ash.Type.String, []}
+    end
   end
 
   # The option-label fallback chain: the first existing public attribute of

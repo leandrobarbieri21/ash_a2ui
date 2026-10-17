@@ -7,7 +7,8 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
     * `option_label` / `option_value` / `option_sort` must be public
       attributes of the relationship's destination — and require a
       relationship (explicit or inferred from a `belongs_to`
-      `source_attribute` match on a form field) in the first place,
+      `source_attribute` match on a form field or a row-action prompt
+      field) in the first place,
     * a relationship select whose destination has a composite primary key
       must set `option_value` explicitly,
     * `option_search` entries must be public **string-typed** attributes of
@@ -557,12 +558,22 @@ defmodule AshA2ui.Verifiers.VerifyRelationships do
 
   defp targets_of(targets, field), do: Map.get(targets, field.name, [targets.__default__])
 
+  # The fields a relationship select may be inferred for: form fields and
+  # row-action prompt fields (both render a select over a `belongs_to`).
   defp form_field_names(dsl_state) do
-    dsl_state
-    |> Verifier.get_entities([:a2ui])
-    |> Enum.filter(&(is_struct(&1, AshA2ui.Component) and &1.name == :form))
-    |> Enum.flat_map(&(&1.fields || []))
-    |> MapSet.new()
+    entities = Verifier.get_entities(dsl_state, [:a2ui])
+
+    form_fields =
+      entities
+      |> Enum.filter(&(is_struct(&1, AshA2ui.Component) and &1.name == :form))
+      |> Enum.flat_map(&(&1.fields || []))
+
+    prompt_fields =
+      entities
+      |> Enum.filter(&is_struct(&1, AshA2ui.Action))
+      |> Enum.flat_map(& &1.prompt_fields)
+
+    MapSet.new(form_fields ++ prompt_fields)
   end
 
   defp declared_fields(dsl_state) do

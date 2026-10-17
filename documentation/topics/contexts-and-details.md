@@ -148,7 +148,9 @@ themselves authorized); authorization stays in Ash policies.
   dispatching `context_select` for the named context with the row's id: the
   master/detail hook. The context's resource must be the table's resource.
   The label says what it does — the task panel's own "View" opens the record
-  in the panel; "Select" makes it the context's selection.
+  in the panel; "Select" makes it the context's selection. A board
+  (`display :board`) takes it too: every card gets the button
+  (`row_context_<lane>_button`); other sectioned tables do not.
 - A **related table** (`resource` on the `:table`, scoped through
   `context_filter`) is a read-only view of another resource: it renders no
   View/Edit controls and no create button, whatever the surface's form

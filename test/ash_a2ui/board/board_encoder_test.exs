@@ -1,7 +1,7 @@
 defmodule AshA2ui.Board.BoardEncoderTest do
   @moduledoc """
   Board rendering (A2UI-105): a `display :board` table emits its lanes side
-  by side — a horizontal `List` of lane `Column`s, each with its heading and
+  by side — a `Row` of lane `Column`s at equal weight, each with its heading and
   total, card list and pagination — on v0.9.1 and v1.0, schema-validated.
   `display :list` output is unchanged: list-mode sectioned surfaces match
   golden payloads captured from the pre-board base commit (08f8173).
@@ -107,11 +107,11 @@ defmodule AshA2ui.Board.BoardEncoderTest do
 
     assert components["board_board_heading"]["text"] == "Board"
 
-    # The lanes sit side by side: a horizontal List of lane Columns.
+    # The lanes sit side by side: a Row of lane Columns at equal weight
+    # (bounded shares of the board, not sized to their cards).
     assert components["board_board_lanes"] == %{
              "id" => "board_board_lanes",
-             "component" => "List",
-             "direction" => "horizontal",
+             "component" => "Row",
              "align" => "start",
              "children" => ["lane_board_open", "lane_board_claimed", "lane_board_completed"]
            }
@@ -122,6 +122,7 @@ defmodule AshA2ui.Board.BoardEncoderTest do
           {"board_completed", "Completed"}
         ] do
       assert components["lane_#{lane}"]["component"] == "Column"
+      assert components["lane_#{lane}"]["weight"] == 1
 
       # heading + total, query controls (the query declares a filter), card
       # list, empty state, pagination
@@ -165,7 +166,8 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     create = message["createSurface"]
     v1 = components_by_id(create["components"])
 
-    assert v1["board_board_lanes"]["direction"] == "horizontal"
+    assert v1["board_board_lanes"]["component"] == "Row"
+    assert v1["lane_board_open"]["weight"] == 1
     assert v1["board_board_lanes"]["children"] == ["lane_board_open", "lane_board_claimed"]
     # v1.0 headings are Markdown (the h1-h5 Text variants were dropped).
     assert v1["table_heading_board_open"]["text"] == "### Open"
