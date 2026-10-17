@@ -187,6 +187,13 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **A swimlaned board's cell-limit check cannot crash.** `VerifySections`
+  matched `{:ok, cells}` from `AshA2ui.Board.cell_count/2`. It now handles
+  `:error` (no enumerable values) with a diagnostic, so reordering the
+  checks cannot turn it into a `MatchError`. Composed specs are pinned by a
+  test: a sections `limit` below a board's lanes or cells is refused with
+  the DSL's own message, because the shared verifier runs on every spec.
+
 - **Boards reject runtime names that would collide.** A board's lane (or
   cell, swimlane or stage) runtime name that extends another at an
   underscore (`:high` and `:high_total` both built `lane_board_high_total`),
