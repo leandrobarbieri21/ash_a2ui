@@ -132,8 +132,17 @@ defmodule AshA2ui.Dynamic.Parser do
     "context_filter" => :context_filter,
     "require_context" => :require_context,
     "select_context" => :select_context,
-    "context" => :context
+    "context" => :context,
+    "display" => :display,
+    "date_field" => :date_field,
+    "end_date_field" => :end_date_field,
+    "granularity" => :granularity
   }
+
+  # Closed vocabularies, string -> atom by lookup (never created from
+  # input). Boards are declared in the DSL only, so "board" is not offered.
+  @displays %{"list" => :list, "calendar" => :calendar}
+  @granularities Map.new(AshA2ui.Calendar.granularities(), &{Atom.to_string(&1), &1})
 
   @component_nested ~w(row_layout groups nested_forms sections)
 
@@ -759,30 +768,28 @@ defmodule AshA2ui.Dynamic.Parser do
 
   # Option-shaped conversions, keyed by the DSL option name. Anything not
   # special-cased passes through for Spark's schema validation to type-check.
-  defp convert_option(option, value, path) do
-    case option_shape(option) do
-      :name ->
-        convert_name(option, value, path, true)
+  defp convert_option(option, value, path),
+    do: convert_shaped(option_shape(option), option, value, path)
 
-      :name_list ->
-        convert_name_list(option, value, path)
+  defp convert_shaped(:name, option, value, path), do: convert_name(option, value, path, true)
+  defp convert_shaped(:name_list, option, value, path), do: convert_name_list(option, value, path)
+  defp convert_shaped(:link, _option, value, path), do: convert_link(value, path)
 
-      :link ->
-        convert_link(value, path)
+  defp convert_shaped(:search_fields, _option, value, path),
+    do: convert_search_fields(value, path)
 
-      :search_fields ->
-        convert_search_fields(value, path)
+  defp convert_shaped(:default_sort, _option, value, path), do: convert_default_sort(value, path)
 
-      :default_sort ->
-        convert_default_sort(value, path)
+  defp convert_shaped({:enum, values}, option, value, path),
+    do: convert_enum(option, value, values, path)
 
-      :raw ->
-        {:ok, value}
+  defp convert_shaped(:existing_name, option, value, path),
+    do: convert_existing_name(option, value, path)
 
-      keyword_shape ->
-        convert_keyword(option, value, path, keyword_value(keyword_shape, option, path))
-    end
-  end
+  defp convert_shaped(:raw, _option, value, _path), do: {:ok, value}
+
+  defp convert_shaped(keyword_shape, option, value, path),
+    do: convert_keyword(option, value, path, keyword_value(keyword_shape, option, path))
 
   # The per-value conversion of a keyword-shaped (JSON object) option.
   defp keyword_value(:name_keyword, option, path), do: &convert_name(option, &1, path, true)
@@ -842,7 +849,54 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:link), do: :link
   defp option_shape(:search_fields), do: :search_fields
   defp option_shape(:default_sort), do: :default_sort
+  defp option_shape(:display), do: {:enum, @displays}
+  defp option_shape(:granularity), do: {:enum, @granularities}
+  defp option_shape(option) when option in [:date_field, :end_date_field], do: :existing_name
   defp option_shape(_option), do: :raw
+
+  defp convert_enum(option, value, values, path) do
+    case is_binary(value) && Map.fetch(values, value) do
+      {:ok, atom} ->
+        {:ok, atom}
+
+      _unknown ->
+        {:error,
+         [
+           Error.new(
+             "#{path}.#{option}",
+             "#{option} must be one of: #{values |> Map.keys() |> Enum.sort() |> Enum.join(", ")}"
+           )
+         ]}
+    end
+  end
+
+  # A calendar date field names an attribute of the resource, and every
+  # attribute name is already an atom: an existing-atom lookup only (an
+  # unknown name cannot be an attribute). The shared calendar rules then
+  # check the attribute's type.
+  defp convert_existing_name(option, value, path) do
+    with true <-
+           is_binary(value) and byte_size(value) <= @max_name_bytes and value =~ @name_regex,
+         {:ok, atom} <- existing_atom(value) do
+      {:ok, atom}
+    else
+      _unknown ->
+        {:error,
+         [
+           Error.new(
+             "#{path}.#{option}",
+             "#{option} #{inspect(value)} is not an attribute of the resource — name one of " <>
+               "its date or datetime attributes"
+           )
+         ]}
+    end
+  end
+
+  defp existing_atom(value) do
+    {:ok, String.to_existing_atom(value)}
+  rescue
+    ArgumentError -> :error
+  end
 
   defp convert_name(_option, value, _path)
        when is_binary(value) and byte_size(value) <= @max_name_bytes do

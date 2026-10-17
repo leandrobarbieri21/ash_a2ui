@@ -7,7 +7,8 @@ defmodule AshA2ui.Dynamic do
 
   A spec is *not* raw A2UI. It is a declarative mirror of the DSL vocabulary
   (components, fields, queries, presets, groups, row layouts, nested forms,
-  actions, contexts, related tables, reference links) that references
+  actions, contexts, related tables, reference links, calendar tables) that
+  references
   resources, attributes and actions **by name**; the server resolves,
   validates, and encodes everything. The spec composer never controls the
   wire payload, only the same knobs a DSL author has.
@@ -22,8 +23,8 @@ defmodule AshA2ui.Dynamic do
         ├─ field inference (AshA2ui.Transformers.InferFields)
         ├─ THE compile-time verifiers, run at runtime over a synthetic
         │    standalone-style DSL state (VerifyComponents/Layouts/Contexts/
-        │    Fields/Actions/Queries/Relationships/NestedForms — the same
-        │    modules, the same messages)
+        │    Fields/Actions/Queries/Calendar/Relationships/NestedForms — the
+        │    same modules, the same messages)
         └─ {:ok, %AshA2ui.Dynamic.Surface{}} | {:error, [%Dynamic.Error{}]}
 
   The returned surface then flows through the exact machinery declared
@@ -581,6 +582,32 @@ defmodule AshA2ui.Dynamic do
             "description",
             "The context a detail component renders (required on detail)."
           ),
+        "display" => %{
+          "type" => "string",
+          "enum" => ["list", "calendar"],
+          "description" =>
+            "Tables only: \"calendar\" shows the records on a month, week or day " <>
+              "grid placed by date_field; it needs date_field and a query (the query " <>
+              "reads only the visible window). Default \"list\"."
+        },
+        "date_field" =>
+          Map.put(
+            name,
+            "description",
+            "Calendar tables: the date or datetime attribute that places each record."
+          ),
+        "end_date_field" =>
+          Map.put(
+            name,
+            "description",
+            "Calendar tables (optional): a date or datetime attribute holding each " <>
+              "record's end; records overlapping the window are shown."
+          ),
+        "granularity" => %{
+          "type" => "string",
+          "enum" => Enum.map(AshA2ui.Calendar.granularities(), &Atom.to_string/1),
+          "description" => "Calendar tables: the visible window (default \"month\")."
+        },
         "row_layout" => %{
           "type" => "object",
           "description" => "Card-style table rows: a title header plus a labeled metadata grid.",

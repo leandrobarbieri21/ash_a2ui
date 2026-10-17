@@ -90,6 +90,7 @@ defmodule AshA2ui.Calendar do
   require Ash.Query
 
   alias Ash.Resource.Info, as: ResourceInfo
+  alias Spark.Dsl.Verifier
 
   @marks_limit 1_000
   @max_window_delta 1_200
@@ -163,6 +164,116 @@ defmodule AshA2ui.Calendar do
   end
 
   def resolve(_component, _resource), do: nil
+
+  @doc """
+  The calendar rules of one component, shared by the compile-time verifier
+  (`AshA2ui.Verifiers.VerifyCalendar`) and composed surfaces
+  (`AshA2ui.Dynamic`, which runs the same verifier over the spec):
+
+    * `display :calendar` only on `:table` components,
+    * a `date_field` and a `query`,
+    * `granularity` in `granularities/0`,
+    * no `sections` and no `bulk_actions`,
+    * `date_field` / `end_date_field` public `:date` or datetime attributes
+      of `resource` (skipped when `resource` is `nil`, i.e. not resolvable
+      yet), and not the same attribute,
+    * `date_field`, `end_date_field` and `granularity` only with
+      `display :calendar`.
+
+  Returns `:ok` or `{:error, option, message}`, `option` being the
+  offending component option.
+  """
+  @spec validate(AshA2ui.Component.t(), module | map | nil) :: :ok | {:error, atom, String.t()}
+  def validate(%{display: :calendar} = component, resource) do
+    with :ok <- validate_table(component),
+         :ok <- validate_required(component),
+         :ok <- validate_granularity(component),
+         :ok <- validate_compatible(component) do
+      validate_fields(component, resource)
+    end
+  end
+
+  def validate(component, _resource) do
+    case Enum.find([:date_field, :end_date_field, :granularity], &Map.get(component, &1)) do
+      nil -> :ok
+      option -> {:error, option, "#{option} is only supported with display :calendar"}
+    end
+  end
+
+  defp validate_table(%{name: :table}), do: :ok
+
+  defp validate_table(_component),
+    do: {:error, :display, "display :calendar is only supported on :table components"}
+
+  defp validate_required(%{date_field: nil}) do
+    {:error, :display,
+     "display :calendar needs a date_field: the date or datetime attribute that places " <>
+       "each record on the calendar"}
+  end
+
+  defp validate_required(%{query: nil}) do
+    {:error, :query,
+     "display :calendar needs a query: the visible window is read through the table's " <>
+       "query (its page size bounds the records shown per window)"}
+  end
+
+  defp validate_required(_component), do: :ok
+
+  defp validate_granularity(%{granularity: granularity}) do
+    if is_nil(granularity) or granularity in granularities(),
+      do: :ok,
+      else:
+        {:error, :granularity,
+         "granularity must be one of #{inspect(granularities())}, got: #{inspect(granularity)}"}
+  end
+
+  defp validate_compatible(%{sections: sections}) when not is_nil(sections),
+    do: {:error, :sections, "a display :calendar table cannot declare a sections block"}
+
+  defp validate_compatible(%{bulk_actions: [_ | _]}),
+    do: {:error, :bulk_actions, "a display :calendar table cannot declare bulk_actions"}
+
+  defp validate_compatible(_component), do: :ok
+
+  defp validate_fields(_component, nil), do: :ok
+
+  defp validate_fields(component, resource) do
+    with :ok <- validate_date_field(component, resource, :date_field),
+         :ok <- validate_date_field(component, resource, :end_date_field) do
+      if component.end_date_field == component.date_field,
+        do:
+          {:error, :end_date_field,
+           "end_date_field must differ from date_field (#{inspect(component.date_field)})"},
+        else: :ok
+    end
+  end
+
+  defp validate_date_field(component, resource, option) do
+    field = Map.get(component, option)
+
+    if is_nil(field) or field_kind(resource, field) do
+      :ok
+    else
+      {:error, option,
+       "#{option} #{inspect(field)} must be a public :date or datetime attribute " <>
+         "(:utc_datetime, :utc_datetime_usec, :datetime, :naive_datetime) of " <>
+         inspect(resource_name(resource)) <> date_fields_hint(resource)}
+    end
+  end
+
+  # Lists what is available, so an agent composing a spec can self-correct.
+  defp date_fields_hint(resource) do
+    case resource
+         |> ResourceInfo.public_attributes()
+         |> Enum.filter(&field_kind(resource, &1.name)) do
+      [] -> " — it has no date or datetime attributes"
+      fields -> " — its date and datetime attributes: #{inspect(Enum.map(fields, & &1.name))}"
+    end
+  end
+
+  defp resource_name(resource) when is_atom(resource), do: resource
+
+  defp resource_name(dsl_state), do: Verifier.get_persisted(dsl_state, :module)
 
   @doc "Whether a resolved table is a calendar."
   @spec calendar?(map) :: boolean

@@ -45,8 +45,8 @@ overrides, queries with presets and range filters, `row_layout` cards (with
 `badge_text` and `badge_tones`), form `groups` and `nested_forms`,
 sectioned tables (`sections`), `action` metadata (`label`, `refreshes`,
 `prompt_fields`, `visible_when`, `via`), `contexts` with the tables'
-`select_context` / `context_filter` / `require_context`, related tables and
-reference links — mirrors the DSL entity for entity.
+`select_context` / `context_filter` / `require_context`, related tables,
+reference links and calendar tables — mirrors the DSL entity for entity.
 
 A master/detail surface, as a spec: a pickerless context selected from the
 people table, and a related table over `Note` scoped by it, with a link
@@ -68,6 +68,35 @@ column:
   ]
 }
 ```
+
+A calendar, as a spec. `display: "calendar"` needs a `date_field` and a
+`query`. `end_date_field` and `granularity` (`"day"`, `"week"` or
+`"month"`) are optional:
+
+```json
+{
+  "resource": "Event",
+  "queries": [{"name": "schedule", "page_size": 50}],
+  "components": [
+    {"kind": "table", "name": "schedule", "fields": ["title", "starts_on"],
+     "display": "calendar", "date_field": "starts_on", "end_date_field": "ends_on",
+     "granularity": "week", "query": "schedule"}
+  ]
+}
+```
+
+The calendar rules are the DSL's (`AshA2ui.Calendar.validate/2`, run by
+`VerifyCalendar`):
+- the date fields must be public date or datetime attributes, and they must
+  differ;
+- the granularity must be from the closed set;
+- a query is required;
+- a calendar takes no `sections` and no bulk actions.
+
+The parser resolves a date field by existing-atom lookup only, so an
+unknown name is rejected without creating an atom. Rejections list the
+resource's date and datetime attributes. Boards (`"display": "board"`) are
+not spec vocabulary yet. See the Calendars topic.
 
 A related table's `resource` is an allowlisted name like a context's; its
 fields, query, `context_filter` keys, `source` paths and links resolve

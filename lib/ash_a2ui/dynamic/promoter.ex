@@ -31,7 +31,11 @@ defmodule AshA2ui.Dynamic.Promoter do
     context_filter: :name_keyword,
     require_context: :name_list,
     select_context: :name,
-    context: :name
+    context: :name,
+    display: :name,
+    date_field: :name,
+    end_date_field: :name,
+    granularity: :name
   ]
 
   @row_layout_options [

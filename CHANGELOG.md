@@ -10,6 +10,26 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Calendars in composed surfaces.** The dynamic spec carries
+  `"display": "calendar"` with `"date_field"`, `"end_date_field"` and
+  `"granularity"` (`day|week|month`) on a table, plus its required
+  `"query"`, so an agent can compose a calendar. The rules are shared with
+  the DSL: they moved into `AshA2ui.Calendar.validate/2`, which
+  `VerifyCalendar` calls and `AshA2ui.Dynamic` runs on every spec. A
+  composed spec is rejected for:
+  - a non-date or unknown date field (rejections list the resource's date
+    and datetime attributes);
+  - the same field twice;
+  - a granularity outside the set;
+  - a missing query;
+  - `sections` or bulk actions on a calendar.
+
+  Date fields are looked up as existing atoms only; `display` and
+  `granularity` come from closed vocabularies; `"board"` is not offered.
+  `spec_schema/1` describes the new keys. The importer exports declared
+  calendars instead of rejecting them, and calendar specs promote to DSL
+  source and serialize losslessly.
+
 - **Calendars: `display :calendar` on `:table`.** Declare a `date_field`
   (and optionally `end_date_field` and `granularity :day | :week |
   :month`) and the table's `query` reads only the visible window: the

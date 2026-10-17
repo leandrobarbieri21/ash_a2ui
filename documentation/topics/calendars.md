@@ -176,5 +176,8 @@ needs nothing beyond its existing `createAshAdminCatalog` setup.
   window holds more.
 - The marks read is capped at 1,000 records per window.
 - Days are UTC days. There is no per-actor time zone yet.
-- The dynamic surface spec has no calendar vocabulary. Importing a
-  calendar into a spec keeps a plain table and reports a rejection.
+- Composed surfaces (`AshA2ui.Dynamic`) carry calendars as
+  `"display": "calendar"` with `date_field`, `end_date_field` and
+  `granularity`. The same rules apply (`AshA2ui.Calendar.validate/2`), and
+  declared calendars import, promote and serialize losslessly. See the
+  Agent-Composed Surfaces topic.
