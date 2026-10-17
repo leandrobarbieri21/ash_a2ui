@@ -146,6 +146,66 @@ defmodule AshA2ui do
     ]
   }
 
+  @diagram %Spark.Dsl.Entity{
+    name: :diagram,
+    describe: """
+    A live diagram: a mermaid diagram whose nodes carry markers (a person, a
+    case, a job) that move as the host's state changes. The host's `source`
+    returns the mermaid source and the markers for each render, as the
+    actor; ash_a2ui has no knowledge of what the diagram shows. Markers live
+    at `/diagram/<name>/markers`, keyed by node id, so a data-model refresh
+    (for example a PubSub-driven one) moves them. The admin catalog renders
+    the diagram with mermaid, loaded only when the diagram appears; the
+    basic catalog renders a list of the nodes with their markers. See the
+    Live Diagrams topic.
+    """,
+    examples: [
+      """
+      diagram :flight do
+        label "Visits in flight"
+        source MyApp.FlightDiagram
+      end
+      """,
+      """
+      diagram :lineage do
+        source {MyApp.Lineage, :diagram, [:orders]}
+      end
+      """
+    ],
+    target: AshA2ui.Diagram,
+    args: [:name],
+    schema: [
+      name: [
+        type: :atom,
+        required: true,
+        doc: """
+        The name of the diagram: the `<name>` of its `/diagram/<name>`
+        data-model path. Unique across the surface's diagrams.
+        """
+      ],
+      label: [
+        type: :string,
+        doc: "The diagram's heading. Defaults to the humanized name."
+      ],
+      description: [
+        type: :string,
+        doc: "Optional help text rendered under the heading."
+      ],
+      source: [
+        type: {:or, [:atom, :mfa]},
+        required: true,
+        doc: """
+        The host callback returning the diagram for a render: a module
+        implementing `AshA2ui.Diagram.Source` (`diagram/1`), or
+        `{module, function, args}` called as
+        `apply(module, function, [context | args])`. It returns
+        `{:ok, %{source: mermaid, markers: markers}}` or `{:error, reason}`;
+        see `AshA2ui.Diagram` for the marker shape.
+        """
+      ]
+    ]
+  }
+
   @context %Spark.Dsl.Entity{
     name: :context,
     describe: """
@@ -1329,6 +1389,7 @@ defmodule AshA2ui do
     entities: [
       @context,
       @query,
+      @diagram,
       @component,
       @field,
       @action
@@ -1357,7 +1418,8 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyExport,
     AshA2ui.Verifiers.VerifyRelationships,
     AshA2ui.Verifiers.VerifyNestedForms,
-    AshA2ui.Verifiers.VerifyBulkActions
+    AshA2ui.Verifiers.VerifyBulkActions,
+    AshA2ui.Verifiers.VerifyDiagrams
   ]
 
   @moduledoc """

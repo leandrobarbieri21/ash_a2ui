@@ -32,6 +32,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   back. Compile-time checks cover the field types, the closed granularity
   set, the required `query`, and `sections`/`bulk_actions`, which a
   calendar does not take. See the Calendars topic.
+- **Live diagrams: the `diagram` entity.** A surface can declare
+  `diagram :flight do source MyApp.FlightDiagram end`, where the source
+  (an `AshA2ui.Diagram.Source` module or `{module, function, args}`)
+  returns a mermaid source and markers for each render, as the actor.
+  ash_a2ui has no knowledge of what the diagram shows. Markers (`node_id`,
+  `label`, `status` `active|executing|waiting|failed|done`, optional
+  `initials`, `tone`, `link`) live at `/diagram/<name>/markers`, keyed by
+  node id, with a `nodes` list for fallbacks. Marker links are resolved on
+  the server through the `AshA2ui.LinkResolver` and `:open_surface_url`;
+  the basic composition's marker link Buttons (`link_buttons: true`)
+  dispatch `"open_surface"` with the diagram name, accepted only for a
+  surface the diagram's markers link to for the actor. Every build and
+  full data-model refresh calls the source again, so a PubSub-driven
+  refresh moves the markers; `AshA2ui.Diagram.refresh_messages/2` builds
+  just the `/diagram/<name>` writes. The admin catalog (1.4.0, additive)
+  renders a `liveDiagram`, which draws the source with mermaid at
+  `securityLevel: "strict"`, places markers on their nodes and moves them
+  without redrawing. Mermaid loads only when a diagram appears, through
+  the new `loadMermaid` dependency and `priv/js/ash_a2ui_mermaid.js`,
+  bundled apart from app.js. The basic composition is a List of nodes
+  with their markers. `VerifyDiagrams` checks unique names and that the
+  source exports its callback. See the Live Diagrams topic, which includes
+  an `AshBpmn.FlightView` adapter written as host code.
 
 - **`label` on the action entity.** `action :confirm_merge do label
   "Confirm match" end` names the action's row button and bulk toolbar

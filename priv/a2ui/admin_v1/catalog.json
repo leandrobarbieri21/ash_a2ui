@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "x-changelog": {
+    "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
     "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
     "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
     "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
@@ -343,6 +344,31 @@
         "weight": {"type": "number"}
       },
       "required": ["component", "granularity", "window", "windowAction", "children"],
+      "unevaluatedProperties": false
+    },
+    "liveDiagram": {
+      "type": "object",
+      "description": "A live diagram (1.4): the mermaid source, drawn once with securityLevel strict, and markers placed on the nodes they name. Marker moves are data-model writes to the bound markers; the diagram itself does not re-render. A renderer that cannot draw mermaid renders the bound node list. A marker's link (server-resolved, never client input) opens through the openSurface function.",
+      "properties": {
+        "component": {"const": "liveDiagram"},
+        "label": {"type": "string", "description": "The diagram's heading."},
+        "description": {"type": "string", "description": "Optional help text under the heading."},
+        "source": {"type": "string", "description": "The mermaid diagram source (static)."},
+        "markers": {
+          "type": "object",
+          "description": "Binding to the markers keyed by node id ({\"path\": \"/diagram/<name>/markers\"}): {<nodeId>: [{id, nodeId, nodeLabel, label, initials, status: active|executing|waiting|failed|done, statusLabel, tone: neutral|info|success|warning|danger|accent, link?: {surface, recordId, label, href?}}]}."
+        },
+        "nodes": {
+          "type": "object",
+          "description": "Binding to the node list ({\"path\": \"/diagram/<name>/nodes\"}): [{id, label, count, markers}], the nodes that hold markers."
+        },
+        "error": {
+          "type": "object",
+          "description": "Binding to the unavailable message (\"\" when the diagram loaded)."
+        },
+        "weight": {"type": "number"}
+      },
+      "required": ["component", "source", "markers"],
       "unevaluatedProperties": false
     }
   },

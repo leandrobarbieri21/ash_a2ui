@@ -193,3 +193,24 @@
   --ash-admin-error-subtle: #ffd9db;
   --ash-admin-error-strong: #141414;
 }
+
+/* ---------------------------------------------------------------------------
+ * Live-diagram markers (the admin catalog's liveDiagram; see the Live
+ * Diagrams topic). One background/ink pair per tone — the row_layout
+ * badge_tones set — each at least 6.9:1 in light and dark. The admin
+ * catalog reads `--ash-admin-diagram-<tone>` first, then these.
+ * ------------------------------------------------------------------------- */
+:root {
+  --a2ui-marker-neutral-background: light-dark(#374151, #e5e7eb);
+  --a2ui-marker-neutral-color: light-dark(#ffffff, #111827);
+  --a2ui-marker-info-background: light-dark(#1e40af, #bfdbfe);
+  --a2ui-marker-info-color: light-dark(#ffffff, #172554);
+  --a2ui-marker-success-background: light-dark(#065f46, #a7f3d0);
+  --a2ui-marker-success-color: light-dark(#ffffff, #022c22);
+  --a2ui-marker-warning-background: light-dark(#7c2d12, #fed7aa);
+  --a2ui-marker-warning-color: light-dark(#ffffff, #431407);
+  --a2ui-marker-danger-background: light-dark(#991b1b, #fecaca);
+  --a2ui-marker-danger-color: light-dark(#ffffff, #450a0a);
+  --a2ui-marker-accent-background: light-dark(#5b21b6, #ddd6fe);
+  --a2ui-marker-accent-color: light-dark(#ffffff, #2e1065);
+}
