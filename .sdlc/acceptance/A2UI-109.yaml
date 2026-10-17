@@ -1,0 +1,49 @@
+---
+# Acceptance criteria for A2UI-109 (Jira AST-176, calendar half): calendars
+# in composed surfaces (the dynamic spec). Criterion ids are immutable. CI
+# is the only evidence producer. Rule: a composed spec never does what the
+# DSL can't — the calendar rules are AshA2ui.Calendar.validate/2, shared by
+# VerifyCalendar and AshA2ui.Dynamic.
+item: A2UI-109
+
+criteria:
+  - id: A2UI-109/AC-1
+    given: a spec with a table declaring display "calendar", date_field,
+      end_date_field, granularity and a query
+    when: it is resolved, built as an actor and sent a window query action
+    then: >-
+      the surface resolves with the calendar config, the payload validates
+      and reads only the actor's records in the window, and the window
+      action moves the window and re-reads as the actor
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_dynamic_test.exs::a_composed_calendar_resolves_renders_and_re_queries_as_the_actor
+
+  - id: A2UI-109/AC-2
+    given: specs with no query, no date_field, a non-date date_field or
+      end_date_field, an unknown field name, the same field twice, a
+      granularity outside the set, display "board", calendar options on a
+      list table, and bulk actions
+    when: they are resolved
+    then: >-
+      each is rejected with a message naming the problem (date-field
+      rejections list the resource's date and datetime attributes); unknown
+      field names are rejected without creating atoms
+    verify: unit
+    risk: high
+    test: >-
+      test/ash_a2ui/calendar/calendar_dynamic_test.exs::rejects_what_the_dsl_rejects
+
+  - id: A2UI-109/AC-3
+    given: a declared calendar surface
+    when: it is imported to a spec, resolved, serialized and deserialized,
+      and promoted to DSL source
+    then: >-
+      the spec carries the calendar options with no calendar rejection, it
+      resolves to the same calendar config, the serialized round trip is
+      lossless, and the promoted module compiles to the same config
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_dynamic_test.exs::a_declared_calendar_exports_promotes_and_serializes_back

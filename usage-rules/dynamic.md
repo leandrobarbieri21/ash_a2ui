@@ -34,8 +34,16 @@ end
   `require_context` on tables and `detail` components), related tables
   (`"resource": "<allowlisted name>"` on a table) and reference links on
   fields (`"link": "<relationship>"` or `{"surface": "<key>", "path":
-  ["<attr>"]}`, `"links"`, `"link_label"`). It has no vocabulary for
-  inline editing, file export, wizard steps, bulk actions or boards.
+  ["<attr>"]}`, `"links"`, `"link_label"`), and calendar tables
+  (`"display": "calendar"` with `"date_field"`, optional
+  `"end_date_field"` and `"granularity"` `day|week|month`, plus the
+  required `"query"`). It has no vocabulary for inline editing, file
+  export, wizard steps, bulk actions or boards.
+- A calendar's date fields must be date or datetime attributes of the
+  resource. The parser looks them up as existing atoms only, and the
+  rejection lists the resource's date and datetime attributes, so feed it
+  back to the composer. Size the query's `page_size` to a window's usual
+  record count.
 - Link surface keys stay strings (never atoms); names in specs become
   atoms only after the identifier-format and size checks, and resources
   only ever come from the allowlist.

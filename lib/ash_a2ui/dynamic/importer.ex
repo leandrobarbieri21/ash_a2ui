@@ -194,29 +194,26 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_list("require_context", component.require_context)
       |> put_opt("select_context", component.select_context)
       |> put_opt("context", component.context)
+      |> put_calendar(component)
       |> put_row_layout(component.row_layout)
       |> put_groups(component.groups)
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
 
-    {spec,
-     component_rejections(component, path) ++
-       board_rejections(component, path) ++ calendar_rejections(component, path)}
+    {spec, component_rejections(component, path) ++ board_rejections(component, path)}
   end
 
-  # Calendars (`display :calendar`) have no spec vocabulary either: the
-  # imported spec keeps a plain table and says so.
-  defp calendar_rejections(%{display: :calendar}, path) do
-    [
-      Rejection.new(
-        "#{path}.display",
-        "display",
-        "declared as :calendar on this component — calendars have no spec vocabulary"
-      )
-    ]
+  # A calendar (`display :calendar`) carries its display and window
+  # options; `:list` is the default and is left out.
+  defp put_calendar(spec, %{display: :calendar} = component) do
+    spec
+    |> Map.put("display", "calendar")
+    |> put_opt("date_field", component.date_field)
+    |> put_opt("end_date_field", component.end_date_field)
+    |> put_opt("granularity", component.granularity)
   end
 
-  defp calendar_rejections(_component, _path), do: []
+  defp put_calendar(spec, _component), do: spec
 
   # Boards (source-less sections, `display :board`) have no spec
   # vocabulary: the imported spec keeps a plain table and says so.

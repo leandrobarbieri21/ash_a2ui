@@ -1,7 +1,9 @@
 defmodule AshA2ui.Verifiers.VerifyCalendar do
   @moduledoc """
   Verifies at compile time that calendars (`display :calendar`, see
-  `AshA2ui.Calendar`) are sound:
+  `AshA2ui.Calendar`) are sound. The rules are `AshA2ui.Calendar.validate/2`,
+  shared with composed surfaces (`AshA2ui.Dynamic` runs this verifier over
+  every spec):
 
     * `display :calendar` appears only on `:table` components,
     * a calendar declares a `date_field` and a `query` (the window rides on
@@ -35,136 +37,11 @@ defmodule AshA2ui.Verifiers.VerifyCalendar do
     |> Verifier.get_entities([:a2ui])
     |> Enum.filter(&is_struct(&1, Component))
     |> Enum.reduce_while(:ok, fn component, :ok ->
-      case verify_component(component, dsl_state, module) do
+      case AshA2ui.Calendar.validate(component, table_resource(component, dsl_state)) do
         :ok -> {:cont, :ok}
-        {:error, error} -> {:halt, {:error, error}}
+        {:error, option, message} -> {:halt, error(component, module, option, message)}
       end
     end)
-  end
-
-  defp verify_component(%{display: :calendar} = component, dsl_state, module) do
-    with :ok <- verify_table(component, module),
-         :ok <- verify_required(component, module),
-         :ok <- verify_granularity(component, module),
-         :ok <- verify_compatible(component, module) do
-      verify_fields(component, table_resource(component, dsl_state), module)
-    end
-  end
-
-  defp verify_component(component, _dsl_state, module) do
-    case Enum.find([:date_field, :end_date_field, :granularity], &Map.get(component, &1)) do
-      nil ->
-        :ok
-
-      option ->
-        error(
-          component,
-          module,
-          option,
-          "#{option} is only supported with display :calendar"
-        )
-    end
-  end
-
-  defp verify_table(%{name: :table}, _module), do: :ok
-
-  defp verify_table(component, module) do
-    error(component, module, :display, "display :calendar is only supported on :table components")
-  end
-
-  defp verify_required(%{date_field: nil} = component, module) do
-    error(
-      component,
-      module,
-      :display,
-      "display :calendar needs a date_field: the date or datetime attribute that places " <>
-        "each record on the calendar"
-    )
-  end
-
-  defp verify_required(%{query: nil} = component, module) do
-    error(
-      component,
-      module,
-      :query,
-      "display :calendar needs a query: the visible window is read through the table's " <>
-        "query (its page size bounds the records shown per window)"
-    )
-  end
-
-  defp verify_required(_component, _module), do: :ok
-
-  defp verify_granularity(%{granularity: granularity} = component, module) do
-    if is_nil(granularity) or granularity in AshA2ui.Calendar.granularities() do
-      :ok
-    else
-      error(
-        component,
-        module,
-        :granularity,
-        "granularity must be one of #{inspect(AshA2ui.Calendar.granularities())}, got: " <>
-          inspect(granularity)
-      )
-    end
-  end
-
-  defp verify_compatible(%{sections: sections} = component, module) when not is_nil(sections) do
-    error(
-      component,
-      module,
-      :sections,
-      "a display :calendar table cannot declare a sections block"
-    )
-  end
-
-  defp verify_compatible(%{bulk_actions: [_ | _]} = component, module) do
-    error(
-      component,
-      module,
-      :bulk_actions,
-      "a display :calendar table cannot declare bulk_actions"
-    )
-  end
-
-  defp verify_compatible(_component, _module), do: :ok
-
-  defp verify_fields(_component, nil, _module), do: :ok
-
-  defp verify_fields(component, resource, module) do
-    with :ok <- verify_date_field(component, resource, :date_field, module),
-         :ok <- verify_date_field(component, resource, :end_date_field, module) do
-      if component.end_date_field == component.date_field do
-        error(
-          component,
-          module,
-          :end_date_field,
-          "end_date_field must differ from date_field (#{inspect(component.date_field)})"
-        )
-      else
-        :ok
-      end
-    end
-  end
-
-  defp verify_date_field(component, resource, option, module) do
-    case Map.get(component, option) do
-      nil ->
-        :ok
-
-      field ->
-        if AshA2ui.Calendar.field_kind(resource, field) do
-          :ok
-        else
-          error(
-            component,
-            module,
-            option,
-            "#{option} #{inspect(field)} must be a public :date or datetime attribute " <>
-              "(:utc_datetime, :utc_datetime_usec, :datetime, :naive_datetime) of " <>
-              inspect(resource_name(resource))
-          )
-        end
-    end
   end
 
   # The resource a table reads: a related table's `resource`, else the
@@ -184,9 +61,6 @@ defmodule AshA2ui.Verifiers.VerifyCalendar do
         if Code.ensure_loaded?(resource) and ResourceInfo.resource?(resource), do: resource
     end
   end
-
-  defp resource_name(resource) when is_atom(resource), do: resource
-  defp resource_name(dsl_state), do: Verifier.get_persisted(dsl_state, :module)
 
   defp error(component, module, option, message) do
     key = Component.key(component)
