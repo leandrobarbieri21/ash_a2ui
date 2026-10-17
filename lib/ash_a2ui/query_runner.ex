@@ -54,6 +54,15 @@ defmodule AshA2ui.QueryRunner do
   `""`) falls back to the query's `default_preset` (or no preset when none
   is declared); unknown names are rejected.
 
+  ## Calendar windows
+
+  On a `display :calendar` table the state also carries `"window"` (see
+  `AshA2ui.Calendar`): the read is narrowed to the visible window (or the
+  picked day), and the context may move the window (`"anchor"`,
+  `"windowDelta"`) or pick a day (`"date"`). Either change resets the page
+  to 1. Without a declared or requested sort, a calendar reads in
+  `date_field` order.
+
   ## Pagination mechanism
 
   Plain `Ash.Query.limit/2` + `Ash.Query.offset/2` with `limit = page_size + 1`
@@ -85,7 +94,8 @@ defmodule AshA2ui.QueryRunner do
           preset: atom | nil,
           sort: {atom, :asc | :desc} | nil,
           page: pos_integer,
-          page_size: pos_integer
+          page_size: pos_integer,
+          window: AshA2ui.Calendar.window() | nil
         }
 
   @doc """
@@ -121,7 +131,8 @@ defmodule AshA2ui.QueryRunner do
          {:ok, preset} <- parse_preset(query, state),
          {:ok, sort} <- parse_sort(query, state),
          {:ok, page} <- parse_page(state, context),
-         {:ok, page_size} <- parse_page_size(query, state) do
+         {:ok, page_size} <- parse_page_size(query, state),
+         {:ok, window, moved?} <- parse_window(view, state, context) do
       {:ok,
        %{
          search: search,
@@ -129,11 +140,25 @@ defmodule AshA2ui.QueryRunner do
          ranges: ranges,
          preset: preset,
          sort: sort,
-         page: page,
-         page_size: page_size
+         page: window_page(page, moved?, context),
+         page_size: page_size,
+         window: window
        }}
     end
   end
+
+  # Only calendar tables have a window (see AshA2ui.Calendar).
+  defp parse_window(view, state, context) do
+    case Map.get(view, :calendar) do
+      nil -> {:ok, nil, false}
+      config -> AshA2ui.Calendar.parse_window(config, state, context)
+    end
+  end
+
+  # Moving the window or picking a day starts over at page 1, unless the
+  # context names a page itself.
+  defp window_page(_page, true, context) when not is_map_key(context, "page"), do: 1
+  defp window_page(page, _moved?, _context), do: page
 
   @doc """
   The validated params equivalent to an empty client context: no search, no
@@ -141,8 +166,8 @@ defmodule AshA2ui.QueryRunner do
   the declared page size. Used for initial surface loads and refreshes
   without client query state.
   """
-  @spec default_params(AshA2ui.Query.t()) :: params
-  def default_params(query) do
+  @spec default_params(AshA2ui.Query.t() | ResolvedView.table() | ResolvedView.t()) :: params
+  def default_params(%AshA2ui.Query{} = query) do
     %{
       search: "",
       filters: [],
@@ -150,8 +175,20 @@ defmodule AshA2ui.QueryRunner do
       preset: query.default_preset,
       sort: nil,
       page: 1,
-      page_size: query.page_size
+      page_size: query.page_size,
+      window: nil
     }
+  end
+
+  # A table (or view) scope: a calendar table's defaults hold today's window.
+  def default_params(%{query: query} = table) do
+    window =
+      case Map.get(table, :calendar) do
+        nil -> nil
+        config -> AshA2ui.Calendar.default_window(config)
+      end
+
+    %{default_params(query) | window: window}
   end
 
   @doc """
@@ -173,7 +210,15 @@ defmodule AshA2ui.QueryRunner do
     }
     |> put_preset_state(query, params)
     |> put_ranges_state(query, params)
+    |> put_window_state(params)
   end
+
+  # The "window" key only exists on calendar tables (marks are filled in by
+  # run/4, which read them).
+  defp put_window_state(state, %{window: %{} = window}),
+    do: Map.put(state, "window", AshA2ui.Calendar.state(window, []))
+
+  defp put_window_state(state, _params), do: state
 
   # The "ranges" key only exists on queries that declare range_filters — the
   # state shape of range-less queries is unchanged. Every declared range is
@@ -224,7 +269,9 @@ defmodule AshA2ui.QueryRunner do
           {:ok, [Ash.Resource.record()], map} | {:error, term}
   def run(view, params, ash_opts, scope \\ []) do
     query = view.query
-    effective_sort = effective_sort(query, params)
+    calendar = Map.get(view, :calendar)
+    params = with_window(params, view)
+    effective_sort = read_sort(effective_sort(query, params), calendar)
 
     filtered =
       view
@@ -234,23 +281,66 @@ defmodule AshA2ui.QueryRunner do
       |> apply_ranges(params.ranges)
       |> apply_search(query, params.search)
 
+    windowed = apply_window(filtered, calendar, params)
+
     paged =
-      filtered
+      windowed
       |> Ash.Query.sort(effective_sort ++ tiebreaker(view.resource, effective_sort))
       |> Ash.Query.load(view.loads)
       |> Ash.Query.limit(params.page_size + 1)
       |> Ash.Query.offset((params.page - 1) * params.page_size)
 
-    case Ash.read(paged) do
-      {:ok, rows} ->
-        has_more = length(rows) > params.page_size
-        records = Enum.take(rows, params.page_size)
-        {:ok, records, state(query, params, total_count(filtered), has_more)}
+    with {:ok, rows} <- Ash.read(paged),
+         has_more = length(rows) > params.page_size,
+         records = Enum.take(rows, params.page_size),
+         {:ok, marks} <- window_marks(filtered, calendar, params, records, has_more) do
+      state =
+        query
+        |> state(params, total_count(windowed), has_more)
+        |> put_marks(marks)
 
-      {:error, error} ->
-        {:error, error}
+      {:ok, records, state}
     end
   end
+
+  # A calendar table always reads a window: params built without one (by a
+  # caller holding only the query) get today's.
+  defp with_window(params, view) do
+    case {Map.get(view, :calendar), Map.get(params, :window)} do
+      {nil, _window} -> Map.put(params, :window, nil)
+      {config, nil} -> Map.put(params, :window, AshA2ui.Calendar.default_window(config))
+      {_config, _window} -> params
+    end
+  end
+
+  # Without a declared or requested sort a calendar reads in date order.
+  defp read_sort([], %{date_field: date_field}), do: [{date_field, :asc}]
+  defp read_sort(sort, _calendar), do: sort
+
+  defp apply_window(query, nil, _params), do: query
+
+  defp apply_window(query, calendar, params),
+    do: AshA2ui.Calendar.filter(query, calendar, AshA2ui.Calendar.read_range(params.window))
+
+  # When the page holds the whole window (no picked day, first page, no
+  # further page) the marks come from its rows; otherwise from one more read
+  # of the window's dates through the same filters.
+  defp window_marks(_filtered, nil, _params, _records, _has_more), do: {:ok, nil}
+
+  defp window_marks(
+         _filtered,
+         calendar,
+         %{window: %{selected: nil}, page: 1} = params,
+         records,
+         false
+       ),
+       do: {:ok, AshA2ui.Calendar.marks(calendar, records, params.window)}
+
+  defp window_marks(filtered, calendar, params, _records, _has_more),
+    do: AshA2ui.Calendar.read_marks(filtered, calendar, params.window)
+
+  defp put_marks(state, nil), do: state
+  defp put_marks(state, marks), do: put_in(state, ["window", "marks"], marks)
 
   @doc """
   The read a table performs under the active preset of `params`, before

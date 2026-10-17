@@ -1,8 +1,9 @@
 # AshA2ui layout rules
 
-Rules for the `group`, `step` and `row_layout` layout entities and for boards
-(`display :board`). See the Layout, Wizard Steps and Multi-Section Surfaces
-topics for the full contracts.
+Rules for the `group`, `step` and `row_layout` layout entities, for boards
+(`display :board`) and for calendars (`display :calendar`). See the Layout,
+Wizard Steps, Multi-Section Surfaces and Calendars topics for the full
+contracts.
 
 ## Form groups
 
@@ -168,6 +169,46 @@ topics for the full contracts.
   List-mode sectioned tables still reject `select_context`.
 - `display :list` (the default) keeps the stacked rendering, so source-less
   sections work without a board too.
+
+## Calendars
+
+- A calendar is a queried `:table` shown as a month, week or day grid.
+  Declare `display :calendar`, a `date_field` and a `query`; add an
+  `end_date_field` for multi-day records and a `granularity` (`:month`
+  default, `:week`, `:day`):
+
+  ```elixir
+  component :table, :schedule do
+    fields [:title, :status, :starts_on, :ends_on]
+    display :calendar
+    date_field :starts_on
+    end_date_field :ends_on
+    granularity :month
+    query :schedule
+    row_actions [:confirm]
+  end
+  ```
+
+- `date_field`/`end_date_field` must be public `:date` or datetime
+  attributes of the table's resource; a calendar takes no `sections` and no
+  `bulk_actions` (compile-verified).
+- The window rides on the query: the read is the table's read (preset,
+  context scope, filters, search, actor) ANDed with the window, and the
+  state lives at `/query/<table>/window` (`anchor`, `from`, `to`,
+  `selected`, `label`, `scopeLabel`, `marks`). Don't add a `range_filters`
+  entry for the date field to fake a window.
+- Moving the window and picking a day are `"query"` actions with `anchor`
+  (an ISO date or `"today"`), `windowDelta` (an integer) or `date` (an ISO
+  date, `""` clears). The server derives the range; the client never sends
+  one. A picked day narrows the read; `marks` still cover the window.
+- Size the query's `page_size` to a window's usual record count: one page
+  is shown per window, with pagination when it holds more.
+- Days are UTC days. Rows carry `_calendar_start`, `_calendar_end` and
+  `_calendar_when`.
+- The basic composition is an agenda (window controls above the table's
+  list); the admin catalog (1.3) emits a `calendarView` wrapping the
+  table's `dataGrid`, so row actions, prompts and pagination work
+  unchanged.
 
 ## Avoid
 

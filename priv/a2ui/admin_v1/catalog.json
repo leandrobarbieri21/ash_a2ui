@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "x-changelog": {
+    "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
     "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
     "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
     "1.0.0": "The ten-component contract (notes/2026-09-07-admin-catalog-contract.md)."
@@ -312,6 +313,36 @@
         }
       },
       "required": ["component", "title", "body", "confirmLabel"],
+      "unevaluatedProperties": false
+    },
+    "calendarView": {
+      "type": "object",
+      "description": "Calendar over one display :calendar table (1.3). Shows the query window (a month or week grid, or one day) with the days that hold records marked and the picked day selected. Its child is the table's dataGrid, which lists the window's records, or the picked day's. Moving the window and picking a day dispatch windowAction with anchor (an ISO date inside the window the renderer now shows) or date (the picked ISO date, \"\" to clear) added to its context; the server re-reads and writes the window state back.",
+      "properties": {
+        "component": {"const": "calendarView"},
+        "label": {"type": "string", "description": "Accessible name of the calendar (the table's collection label)."},
+        "granularity": {"type": "string", "enum": ["day", "week", "month"], "description": "The window size declared on the table."},
+        "window": {
+          "type": "object",
+          "description": "Binding to the table's window state ({\"path\": \"/query/<table>/window\"}): {granularity, anchor, from, to, selected, label, scopeLabel, marks: [{date, count, label}]}."
+        },
+        "windowAction": {
+          "type": "object",
+          "description": "The query envelope {name: \"query\", context: {query: {path}, component, contexts?}} the calendar dispatches with anchor or date added.",
+          "properties": {
+            "name": {"const": "query"},
+            "context": {"type": "object"}
+          },
+          "required": ["name"]
+        },
+        "children": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "The id of the table's dataGrid."
+        },
+        "weight": {"type": "number"}
+      },
+      "required": ["component", "granularity", "window", "windowAction", "children"],
       "unevaluatedProperties": false
     }
   },

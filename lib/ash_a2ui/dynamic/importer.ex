@@ -199,8 +199,24 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
 
-    {spec, component_rejections(component, path) ++ board_rejections(component, path)}
+    {spec,
+     component_rejections(component, path) ++
+       board_rejections(component, path) ++ calendar_rejections(component, path)}
   end
+
+  # Calendars (`display :calendar`) have no spec vocabulary either: the
+  # imported spec keeps a plain table and says so.
+  defp calendar_rejections(%{display: :calendar}, path) do
+    [
+      Rejection.new(
+        "#{path}.display",
+        "display",
+        "declared as :calendar on this component — calendars have no spec vocabulary"
+      )
+    ]
+  end
+
+  defp calendar_rejections(_component, _path), do: []
 
   # Boards (source-less sections, `display :board`) have no spec
   # vocabulary: the imported spec keeps a plain table and says so.

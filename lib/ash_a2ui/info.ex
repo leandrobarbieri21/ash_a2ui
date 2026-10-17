@@ -338,7 +338,7 @@ defmodule AshA2ui.Info do
 
     case is_map(state) && AshA2ui.QueryRunner.parse(table, %{"query" => state}) do
       {:ok, params} -> params
-      _invalid_or_missing -> AshA2ui.QueryRunner.default_params(table.query)
+      _invalid_or_missing -> AshA2ui.QueryRunner.default_params(table)
     end
   end
 

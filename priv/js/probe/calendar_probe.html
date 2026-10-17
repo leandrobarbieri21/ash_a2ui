@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<!--
+  Calendar probe page — the client half; drive with
+  priv/js/probe/calendar_probe.mjs. Replays recorded (synthetic) wire
+  payloads (priv/js/probe/record_calendar.exs):
+
+    ?payload=calendar_admin   MonthUI under admin_v1: calendarView + dataGrid
+    ?payload=calendar_basic   MonthUI under the basic composition (agenda)
+    &catalog=stock            the stock basic catalog only (no AshA2ui
+                              overrides) — what any basic renderer shows
+
+  Exposes __feed(messages) / __feedFixture(name) / __dispatched /
+  __surface.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>calendar probe</title>
+    <link rel="stylesheet" href="./catalog/ash_a2ui_theme.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "./nm/lit/index.js",
+          "lit/": "./nm/lit/",
+          "lit-html": "./nm/lit-html/lit-html.js",
+          "lit-html/": "./nm/lit-html/",
+          "@lit/reactive-element": "./nm/@lit/reactive-element/reactive-element.js",
+          "@lit/reactive-element/": "./nm/@lit/reactive-element/",
+          "@lit/context": "./nm/@lit/context/index.js",
+          "@lit/context/": "./nm/@lit/context/",
+          "lit-element": "./nm/lit-element/index.js",
+          "lit-element/": "./nm/lit-element/",
+          "@a2ui/web_core/": "./nm/@a2ui/web_core/src/",
+          "@a2ui/web_core/v0_9": "./nm/@a2ui/web_core/src/v0_9/index.js",
+          "@a2ui/web_core/v0_9/basic_catalog": "./nm/@a2ui/web_core/src/v0_9/basic_catalog/index.js",
+          "@a2ui/lit/": "./nm/@a2ui/lit/src/",
+          "@a2ui/lit/v0_9": "./nm/@a2ui/lit/src/v0_9/index.js",
+          "zod": "./nm/zod/index.js",
+          "zod/v3": "./nm/zod/v3/index.js",
+          "zod/v4": "./nm/zod/v4/index.js",
+          "zod/v4-mini": "./nm/zod/v4-mini/index.js",
+          "zod/mini": "./nm/zod/mini/index.js",
+          "zod/": "./nm/zod/",
+          "@preact/signals-core": "./nm/@preact/signals-core/dist/signals-core.mjs",
+          "signal-utils": "./nm/signal-utils/dist/index.ts.js",
+          "signal-utils/": "./nm/signal-utils/dist/",
+          "@lit-labs/signals": "./nm/@lit-labs/signals/index.js",
+          "zod-to-json-schema": "./nm/zod-to-json-schema/dist/esm/index.js",
+          "date-fns": "./nm/date-fns/index.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import {html, css, nothing} from "lit";
+      import "@a2ui/lit/v0_9";
+      import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
+      import {MessageProcessor, Catalog} from "@a2ui/web_core/v0_9";
+      import {ChoicePickerApi, ColumnApi} from "@a2ui/web_core/v0_9/basic_catalog";
+      import {createAshA2uiCatalog} from "./catalog/ash_a2ui_catalog.js";
+      import {createAshAdminCatalog} from "./catalog/ash_admin_catalog.js";
+
+      const params = new URLSearchParams(location.search);
+      const lit = {html, css, nothing};
+      const stock = params.get("catalog") === "stock";
+
+      const ashCatalog = stock
+        ? basicCatalog
+        : createAshA2uiCatalog({
+            Catalog,
+            basicCatalog,
+            ChoicePickerApi,
+            ColumnApi,
+            A2uiLitElement,
+            A2uiController,
+            lit,
+          });
+      const adminCatalog = createAshAdminCatalog({
+        Catalog,
+        basicCatalog: ashCatalog,
+        A2uiLitElement,
+        A2uiController,
+        lit,
+      });
+
+      window.__boot = {stage: "imports-done"};
+      window.__dispatched = [];
+
+      const caseName = params.get("payload") || "calendar_admin";
+      const surfaceEl = document.createElement("a2ui-surface");
+      document.getElementById("host").appendChild(surfaceEl);
+
+      const processor = new MessageProcessor([ashCatalog, adminCatalog], (action) => {
+        window.__dispatched.push({name: action.name, context: action.context});
+      });
+      processor.onSurfaceCreated((surface) => {
+        window.__boot.surfaceCreated = true;
+        window.__surface = surface;
+        surfaceEl.surface = surface;
+      });
+      window.__feed = (messages) => processor.processMessages(messages);
+      window.__feedFixture = async (name) => {
+        const payload = await (await fetch(`./fixtures/${name}_payload.json`)).json();
+        processor.processMessages(payload.messages);
+      };
+
+      try {
+        await window.__feedFixture(caseName);
+        window.__boot.stage = "booted";
+      } catch (error) {
+        window.__boot.stage = "error";
+        window.__boot.error = String(error);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="host"></div>
+  </body>
+</html>

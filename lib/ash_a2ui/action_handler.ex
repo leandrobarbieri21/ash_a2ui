@@ -394,7 +394,7 @@ defmodule AshA2ui.ActionHandler do
 
     case QueryRunner.parse(table, %{"query" => state}) do
       {:ok, params} -> params
-      {:error, _reason} -> QueryRunner.default_params(table.query)
+      {:error, _reason} -> QueryRunner.default_params(table)
     end
   end
 
@@ -2261,7 +2261,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp read_export_table(table, scope, env) do
     params =
-      (env.refresh[table.name] || QueryRunner.default_params(table.query))
+      (env.refresh[table.name] || QueryRunner.default_params(table))
       |> Map.merge(%{page: 1, page_size: table.export.limit})
 
     case QueryRunner.run(table, params, env.ash_opts, scope) do
@@ -2432,7 +2432,7 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp read_edited_table(table, scope, env) do
-    params = env.refresh[table.name] || QueryRunner.default_params(table.query)
+    params = env.refresh[table.name] || QueryRunner.default_params(table)
 
     case QueryRunner.run(table, params, env.ash_opts, scope) do
       {:ok, records, _query_state} -> {:ok, records}
@@ -2729,7 +2729,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp empty_table_messages(view, table, params) do
     state =
-      QueryRunner.state(table.query, params || QueryRunner.default_params(table.query), 0, false)
+      QueryRunner.state(table.query, params || QueryRunner.default_params(table), 0, false)
 
     records_messages(view, table, []) ++ query_state_messages(view, table, state, [])
   end
@@ -2745,7 +2745,7 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp scoped_table_refresh(view, table, params, ash_opts, scope) do
-    params = params || QueryRunner.default_params(table.query)
+    params = params || QueryRunner.default_params(table)
 
     case QueryRunner.run(table, params, ash_opts, scope) do
       {:ok, records, query_state} ->

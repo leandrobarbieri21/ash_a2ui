@@ -1033,14 +1033,45 @@ defmodule AshA2ui do
         """
       ],
       display: [
-        type: {:one_of, [:list, :board]},
+        type: {:one_of, [:list, :board, :calendar]},
         default: :list,
         doc: """
-        How a sectioned `:table` lays out its sections: `:list` (default)
-        stacks them; `:board` renders them side by side as lanes, each with
-        its heading and total, card list and pagination. `:board` requires a
-        `sections` block and a `row_layout`. Cards move between lanes only
-        through row actions (transitions); there is no drag-and-drop.
+        How a `:table` lays out its records. `:list` (default) renders rows
+        (and stacks a sectioned table's sections). `:board` renders a
+        sectioned table's sections side by side as lanes, each with its
+        heading and total, card list and pagination; it requires a
+        `sections` block and a `row_layout`, and cards move between lanes
+        only through row actions (transitions). `:calendar` renders the
+        records on a month, week or day grid placed by `date_field` (and
+        `end_date_field`): the table's `query` reads only the visible window,
+        and changing the window or picking a day re-queries. It requires
+        `date_field` and a `query`. See the Calendars topic.
+        """
+      ],
+      date_field: [
+        type: :atom,
+        doc: """
+        `display :calendar` only: the public `:date` or datetime attribute of
+        the table's resource that places each record on the calendar (its
+        start). Required with `display :calendar`.
+        """
+      ],
+      end_date_field: [
+        type: :atom,
+        doc: """
+        `display :calendar` only: an optional public `:date` or datetime
+        attribute holding each record's end. A record then appears on every
+        day from `date_field` to `end_date_field`, and the window read
+        matches records that overlap the window. A `nil` end means the
+        record covers its start day only.
+        """
+      ],
+      granularity: [
+        type: {:one_of, [:day, :week, :month]},
+        doc: """
+        `display :calendar` only: the size of the visible window — `:month`
+        (default), `:week` (Monday to Sunday) or `:day`. Previous/Next move
+        the window by one unit.
         """
       ],
       query: [
@@ -1320,6 +1351,7 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyActions,
     AshA2ui.Verifiers.VerifyQueries,
     AshA2ui.Verifiers.VerifySections,
+    AshA2ui.Verifiers.VerifyCalendar,
     AshA2ui.Verifiers.VerifyEditable,
     AshA2ui.Verifiers.VerifyReports,
     AshA2ui.Verifiers.VerifyExport,

@@ -370,7 +370,8 @@ function defineChoicePickerElement({A2uiLitElement, A2uiController, ChoicePicker
 //   `status_text`       the feedback region → the tone-aware banner
 //   `table_heading*`    section/lane headings → h2 with the section chip
 //   `surface_title`     the surface's h1 → the display tier
-//   `row_action_*_button`, `*_prev_button`, `*_next_button`
+//   `row_action_*_button`, `*_prev_button`, `*_next_button`, and a
+//   calendar's `calendar*_today_button` / `_all_button` / `_day_button`
 //                      → the quiet utility tier (sm, shadowless)
 //   `<value id>_link`   a borderless Button whose child is `<value id>`
 //                      (link_buttons: true) → the reference-link tier
@@ -936,7 +937,8 @@ function defineAnatomyElements({lit, basicCatalog}) {
       return (
         /(^|_)row_action_.*_button$/.test(id) ||
         id.endsWith("_prev_button") ||
-        id.endsWith("_next_button")
+        id.endsWith("_next_button") ||
+        /^calendar(_.+)?_(today|all|day)_button$/.test(id)
       );
     }
   }

@@ -133,6 +133,10 @@ import {
   pageWindow,
 } from "./ash_admin_tokens.js";
 
+// The NB layer's calendar grid (`nb-calendar`), used by calendarView. The
+// file has no imports of its own and defines its elements only when asked.
+import {defineNbComponents} from "./nb_components.js";
+
 // Schema builders from web_core's OWN zod (3.x) — the instance the
 // GenericBinder introspects. Importing the module directly (rather than
 // receiving builders through `deps`) guarantees instance identity: the
@@ -157,7 +161,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.2.0";
+export const ADMIN_CATALOG_VERSION = "1.3.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -215,6 +219,7 @@ const TAGS = {
   actionBar: "ash-admin-action-bar",
   statusBanner: "ash-admin-status-banner",
   confirmDialog: "ash-admin-confirm-dialog",
+  calendarView: "ash-admin-calendar-view",
 };
 
 /** Basic input kinds this catalog replaces with a11y-hardened elements. */
@@ -504,6 +509,20 @@ export function buildSchemas() {
     statusBanner: EmptyObject.extend({
       kind: DynamicStringSchema.nullable().optional(),
       message: DynamicStringSchema.nullable().optional(),
+      accessibility: Any.optional(),
+      weight: Num.optional(),
+    }),
+
+    // 1.3: the calendar over a display :calendar table. `window` binds the
+    // table's /query/<table>/window state (an object, so DynamicValue);
+    // `windowAction` is the bare query event the calendar dispatches with
+    // `anchor` or `date` added (like pagination's page envelopes).
+    calendarView: EmptyObject.extend({
+      label: DynamicStringSchema.nullable().optional(),
+      granularity: Str.optional(),
+      window: DynamicValueSchema.optional(),
+      windowAction: bareEvent().optional(),
+      children: ChildListSchema.optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -860,6 +879,7 @@ function defineAdminElements(deps, {adminApis}) {
   defineActionBar();
   defineStatusBanner();
   defineConfirmDialog();
+  defineCalendarView();
   defineTextField();
   defineCheckBox();
   defineChoicePicker();
@@ -2815,6 +2835,403 @@ function defineAdminElements(deps, {adminApis}) {
     }
 
     customElements.define(tag, AshAdminStatusBanner);
+  }
+
+  // --- CalendarView: the window of a display :calendar table (1.3) ----------
+  //
+  // An `nb-calendar` grid (month, or one week for week and day calendars)
+  // beside the table's own dataGrid child, which lists the window's records
+  // or the picked day's. The server owns the data: moving the window or
+  // picking a day dispatches `windowAction` (a `query` envelope) with
+  // `anchor` / `date` added, and the window state it writes back
+  // (anchor, selected, marks) repaints the grid.
+  //
+  // Zero jank, "the server follows the DOM": the grid moves and highlights
+  // the moment the user acts, and the envelope carries the ABSOLUTE date the
+  // grid now shows, never a delta. While requests are in flight, window
+  // states from earlier requests do not move the grid back; the latest one
+  // (which matches what is on screen) lands silently. A typed-feedback
+  // write (an error) or a 10 s timeout clears the pending request.
+
+  function defineCalendarView() {
+    const tag = TAGS.calendarView;
+    if (customElements.get(tag)) return;
+    defineNbComponents();
+
+    const PENDING_TIMEOUT_MS = 10000;
+
+    const pad = (number) => String(number).padStart(2, "0");
+    const isoOf = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    const parseIso = (text) => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text || "");
+      if (!match) return null;
+      const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      date.setHours(12, 0, 0, 0);
+      return date;
+    };
+    const addDays = (date, days) => {
+      const next = new Date(date);
+      next.setDate(next.getDate() + days);
+      return next;
+    };
+    const mondayOf = (date) => addDays(date, -((date.getDay() + 6) % 7));
+
+    class AshAdminCalendarView extends A2uiLitElement {
+      static styles = [
+        shared,
+        buttons,
+        css`
+          :host {
+            display: block;
+          }
+          .cal-view {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            gap: var(--am-space-l);
+          }
+          .cal-pane {
+            flex: 0 1 22rem;
+            min-width: min(100%, 18rem);
+            display: flex;
+            flex-direction: column;
+            gap: var(--am-space-s);
+          }
+          .cal-tools {
+            display: flex;
+            align-items: center;
+            gap: var(--am-space-xs);
+            flex-wrap: wrap;
+          }
+          .cal-tools .cal-day {
+            font-weight: var(--am-font-weight-semibold);
+            margin-inline-end: auto;
+          }
+          .cal-list {
+            flex: 1 1 24rem;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--am-space-s);
+            transition: opacity 120ms ease;
+          }
+          .cal-list[aria-busy="true"] {
+            opacity: 0.6;
+          }
+          .cal-scope {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: var(--am-space-s);
+            flex-wrap: wrap;
+          }
+          .cal-scope-title {
+            margin: 0;
+            font-size: var(--am-font-size-l);
+            font-weight: var(--am-font-weight-semibold);
+          }
+          nb-calendar {
+            max-width: none;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .cal-list {
+              transition: none;
+            }
+          }
+        `,
+      ];
+
+      createController() {
+        return new A2uiController(this, adminApis.calendarView);
+      }
+
+      constructor() {
+        super();
+        this._pending = null;
+        this._pendingTimer = null;
+        this._feedbackSubscription = null;
+        this.onCalendarEvent = (event) => this.handleCalendarEvent(event);
+      }
+
+      disconnectedCallback() {
+        super.disconnectedCallback();
+        this.clearPending();
+      }
+
+      willUpdate(changedProperties) {
+        super.willUpdate(changedProperties);
+        applyWeight(this, this.controller?.props);
+      }
+
+      get granularity() {
+        const value = this.controller?.props?.granularity;
+        return value === "day" || value === "week" ? value : "month";
+      }
+
+      get windowState() {
+        const value = this.controller?.props?.window;
+        return value && typeof value === "object" ? value : {};
+      }
+
+      locale() {
+        return this.closest("[lang]")?.getAttribute("lang") || document.documentElement.lang || undefined;
+      }
+
+      render() {
+        const props = this.controller?.props;
+        if (!props) return nothing;
+
+        const label = str(props.label) || "Calendar";
+        const state = this.windowState;
+        const day = this.granularity === "day";
+        const selected = str(state.selected);
+
+        return html`
+          <section class="cal-view" aria-label=${label}>
+            <div class="cal-pane">
+              <div class="cal-tools">
+                ${day
+                  ? html`<span class="cal-day">${this.formatDay(str(state.anchor))}</span>`
+                  : nothing}
+                <button type="button" class="am-btn am-btn-quiet am-btn-sm" @click=${() => this.goToday()}>
+                  Today
+                </button>
+              </div>
+              <nb-calendar
+                part="calendar"
+                view=${this.granularity === "month" ? "month" : "week"}
+                @nb-select=${this.onCalendarEvent}
+                @nb-month-change=${this.onCalendarEvent}
+                @nb-week-change=${this.onCalendarEvent}
+              ></nb-calendar>
+            </div>
+            <div class="cal-list" aria-busy=${this._pending ? "true" : "false"}>
+              <div class="cal-scope">
+                <h3 class="cal-scope-title">${this.scopeTitle(state)}</h3>
+                ${!day && selected
+                  ? html`<button
+                      type="button"
+                      class="am-btn am-btn-quiet am-btn-sm"
+                      @click=${() => this.pickDay("")}
+                    >
+                      All days
+                    </button>`
+                  : nothing}
+              </div>
+              ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
+            </div>
+          </section>
+        `;
+      }
+
+      updated(changedProperties) {
+        super.updated?.(changedProperties);
+        this.syncCalendar();
+      }
+
+      calendarElement() {
+        return this.renderRoot?.querySelector("nb-calendar") || null;
+      }
+
+      // --- server → grid ---------------------------------------------------
+
+      /** Writes the server's window state onto the grid, unless a newer
+       * request of ours is still in flight (then only the marks move). */
+      syncCalendar() {
+        const element = this.calendarElement();
+        if (!element) return;
+        const state = this.windowState;
+        const items = Array.isArray(state.marks)
+          ? state.marks.map((mark) => `${str(mark.date)}*${Number(mark.count) || 1}`).join(" ")
+          : "";
+
+        const attrs = {items};
+        const serverKey = this.windowKey(str(state.anchor), str(state.selected));
+
+        if (this._pending && this._pending.key !== serverKey) {
+          this.writeAttributes(element, attrs);
+          return;
+        }
+        if (this._pending) this.clearPending();
+
+        attrs.month = str(state.anchor);
+        attrs.selected = this.granularity === "day" ? str(state.anchor) : str(state.selected);
+        this.writeAttributes(element, attrs);
+      }
+
+      /** Sets only the attributes that differ (each write repaints the
+       * grid), and keeps keyboard focus on the day that held it. */
+      writeAttributes(element, attrs) {
+        const focused = element.shadowRoot?.activeElement?.dataset?.date;
+        let changed = false;
+        for (const [name, value] of Object.entries(attrs)) {
+          const current = element.getAttribute(name);
+          if (value === "" || value === null || value === undefined) {
+            if (current !== null) {
+              element.removeAttribute(name);
+              changed = true;
+            }
+          } else if (current !== value) {
+            element.setAttribute(name, value);
+            changed = true;
+          }
+        }
+        if (changed && focused && typeof element.focusDateInMonth === "function") {
+          element.focusDateInMonth(parseIso(focused));
+        }
+      }
+
+      // --- grid → server ---------------------------------------------------
+
+      handleCalendarEvent(event) {
+        event.stopPropagation();
+        const detail = event.detail || {};
+        const state = this.windowState;
+
+        if (event.type === "nb-select") {
+          const date = str(detail.date);
+          if (this.granularity === "day") {
+            this.moveWindow(date, date);
+          } else {
+            this.pickDay(date === str(state.selected) ? "" : date);
+          }
+          return;
+        }
+
+        if (event.type === "nb-month-change") {
+          this.moveWindow(`${str(detail.month)}-01`, null);
+          return;
+        }
+
+        // nb-week-change: a week or day calendar moved a week. A day
+        // calendar keeps its weekday.
+        const monday = parseIso(str(detail.week));
+        if (!monday) return;
+        if (this.granularity === "day") {
+          const anchor = parseIso(str(state.anchor)) || monday;
+          const date = isoOf(addDays(monday, (anchor.getDay() + 6) % 7));
+          this.moveWindow(date, date);
+        } else {
+          this.moveWindow(isoOf(monday), null);
+        }
+      }
+
+      goToday() {
+        const today = isoOf(new Date());
+        this.moveWindow(today, this.granularity === "day" ? today : null);
+      }
+
+      /** Shows the window holding `anchor` now, then asks the server for it. */
+      moveWindow(anchor, dayPick) {
+        const element = this.calendarElement();
+        const state = this.windowState;
+        const selected = this.granularity === "day" ? anchor : this.keptSelection(anchor, str(state.selected));
+        if (element) this.writeAttributes(element, {month: anchor, selected});
+
+        if (this.granularity === "day" && dayPick) {
+          this.request({date: dayPick}, this.windowKey(anchor, ""));
+        } else {
+          this.request({anchor}, this.windowKey(anchor, selected));
+        }
+      }
+
+      /** Picks a day (or clears the pick with ""), then asks the server. */
+      pickDay(date) {
+        const element = this.calendarElement();
+        if (element) this.writeAttributes(element, {selected: date});
+        this.request({date}, this.windowKey(str(this.windowState.anchor), date));
+      }
+
+      /** The picked day survives a move only when it is inside the new window. */
+      keptSelection(anchor, selected) {
+        if (!selected) return "";
+        return this.windowKey(anchor, "") === this.windowKey(selected, "") ? selected : "";
+      }
+
+      /** A comparable key for "this window with this pick". */
+      windowKey(anchor, selected) {
+        const date = parseIso(anchor);
+        let key = anchor;
+        if (date && this.granularity === "month") key = anchor.slice(0, 7);
+        if (date && this.granularity === "week") key = isoOf(mondayOf(date));
+        return `${key}|${this.granularity === "day" ? "" : selected || ""}`;
+      }
+
+      request(extra, key) {
+        const props = this.controller?.props;
+        const context = this.context;
+        const surface = context?.dataContext?.surface;
+        const envelope = props?.windowAction;
+        if (!surface || !context.componentModel || !envelope || typeof envelope.name !== "string") return;
+
+        this.setPending(key, surface);
+        const resolved = resolveEventContext(
+          {event: {name: envelope.name, context: {...(envelope.context || {}), ...extra}}},
+          surface.dataModel,
+          "/",
+        );
+        surface.dispatchAction(resolved, context.componentModel.id);
+      }
+
+      setPending(key, surface) {
+        this.clearPending();
+        this._pending = {key};
+        this._pendingTimer = setTimeout(() => {
+          this.clearPending();
+          this.requestUpdate();
+        }, PENDING_TIMEOUT_MS);
+        if (surface.dataModel && typeof surface.dataModel.subscribe === "function") {
+          this._feedbackSubscription = surface.dataModel.subscribe("/ui/feedback/message", () => {
+            this.clearPending();
+            this.requestUpdate();
+          });
+        }
+        this.requestUpdate();
+      }
+
+      clearPending() {
+        this._pending = null;
+        if (this._pendingTimer) clearTimeout(this._pendingTimer);
+        this._pendingTimer = null;
+        if (this._feedbackSubscription) {
+          try {
+            this._feedbackSubscription.unsubscribe();
+          } catch {
+            // The data model may already be gone (surface torn down).
+          }
+        }
+        this._feedbackSubscription = null;
+      }
+
+      // --- labels ----------------------------------------------------------
+
+      scopeTitle(state) {
+        const selected = str(state.selected);
+        if (selected) return this.formatDay(selected);
+        const anchor = parseIso(str(state.anchor));
+        if (!anchor) return str(state.label);
+        const locale = this.locale();
+        if (this.granularity === "month") {
+          return new Intl.DateTimeFormat(locale, {month: "long", year: "numeric"}).format(anchor);
+        }
+        if (this.granularity === "week") {
+          const format = new Intl.DateTimeFormat(locale, {month: "short", day: "numeric", year: "numeric"});
+          const sunday = addDays(anchor, 6);
+          return typeof format.formatRange === "function"
+            ? format.formatRange(anchor, sunday)
+            : `${format.format(anchor)} – ${format.format(sunday)}`;
+        }
+        return this.formatDay(str(state.anchor));
+      }
+
+      formatDay(iso) {
+        const date = parseIso(iso);
+        if (!date) return iso;
+        return new Intl.DateTimeFormat(this.locale(), {dateStyle: "full"}).format(date);
+      }
+    }
+
+    customElements.define(tag, AshAdminCalendarView);
   }
 
   // --- ConfirmDialog: destructive confirmation -------------------------------

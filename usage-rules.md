@@ -24,8 +24,9 @@ Sub-rules (addressable as `ash_a2ui:<name>`):
 - `ash_a2ui:layout` — `group` form sections (labeled N-column grids),
   `step` wizard pages on forms (Back/Next with server-side per-step
   validation, optional review step), `row_layout` card-style table rows
-  (title + badge header, metadata grid), and `display :board` boards (lanes
-  over an attribute's values).
+  (title + badge header, metadata grid), `display :board` boards (lanes
+  over an attribute's values), and `display :calendar` calendars (a
+  month/week/day window over a queried table).
 - `ash_a2ui:contexts` — surface `context` entities (server-validated
   selections, dependent options, `context_filter`/`require_context`/
   `select_context`) and `:detail` components.
