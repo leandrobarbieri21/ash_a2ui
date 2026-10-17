@@ -538,6 +538,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         table_components(view, table, sfx) ++
           query_components(view, table, sfx) ++
           create_button_components(view, table, sfx) ++
+          calendar_components(view, table, sfx) ++
           table_export_components(view, table, sfx) ++
           table_descendants(view, table, sfx) ++
           empty_state_components(view, table, sfx)
@@ -677,13 +678,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     if admin_core_table?(table) do
       {query_control_components(view, table, sfx) ++
          create_button_components(view, table, sfx) ++
+         admin_calendar_components(view, table, sfx) ++
          admin_data_grid_components(view, table, sfx),
        ((table.query && ["query#{sfx}_controls"]) || []) ++
-         create_button_ids(view, table, sfx) ++ ["data_grid#{sfx}"]}
+         create_button_ids(view, table, sfx) ++ [admin_collection_id(table, sfx)]}
     else
       {table_components(view, table, sfx) ++
          query_components(view, table, sfx) ++
          create_button_components(view, table, sfx) ++
+         calendar_components(view, table, sfx) ++
          table_export_components(view, table, sfx) ++
          table_descendants(view, table, sfx) ++
          empty_state_components(view, table, sfx), component_root_children(view, table.component)}
@@ -1201,13 +1204,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     sfx = table_suffix(view, table)
 
     ["table_heading#{sfx}"] ++
-      ((table.query && ["query#{sfx}_controls"]) || []) ++
+      child_if(table.query, "query#{sfx}_controls") ++
       create_button_ids(view, table, sfx) ++
-      ((AshA2ui.Bulk.enabled?(table) && [AshA2ui.Bulk.toolbar_id(sfx)]) || []) ++
+      child_if(AshA2ui.Bulk.enabled?(table), AshA2ui.Bulk.toolbar_id(sfx)) ++
+      child_if(AshA2ui.Calendar.calendar?(table), "calendar#{sfx}") ++
       ["records_list#{sfx}"] ++
       empty_state_ids(view, table, sfx) ++
-      ((table.query && ["query#{sfx}_pagination"]) || []) ++
-      ((table.export && ["export#{sfx}_controls"]) || [])
+      child_if(table.query, "query#{sfx}_pagination") ++
+      child_if(table.export, "export#{sfx}_controls")
   end
 
   defp component_root_children(_view, %{name: :detail} = component),
@@ -1217,6 +1221,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     do: ["report_#{AshA2ui.Component.key(component)}"]
 
   defp component_root_children(_view, _form), do: []
+
+  # `[id]` when the feature is present (truthy), `[]` otherwise.
+  defp child_if(present, _id) when present in [nil, false], do: []
+  defp child_if(_present, id), do: [id]
 
   # The result panel displays map-returning generic action results: a Column
   # wrapping a Text bound to the reserved /ui/action_result_text path (see
@@ -1469,6 +1477,178 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       query.range_filters != []
   end
 
+  # --- calendars (display :calendar) ---
+
+  # A calendar is a queried table whose read covers the visible window (see
+  # AshA2ui.Calendar). The basic composition keeps the table's own list,
+  # rows, pagination and empty state, and adds the window controls above
+  # the list (`calendar<sfx>`, a Column):
+  #
+  #   * a nav Row: Previous / the window label / Next / Today, each a
+  #     `query` Button (`windowDelta` -1/+1, `anchor` "today");
+  #   * on month and week calendars, the days of the window that hold
+  #     records (a horizontal List over `/query/<table>/window/marks`), each
+  #     a `query` Button picking its day (`date`), then a Row with the
+  #     picked day (or the window) and an "All days" Button clearing it.
+  #
+  # Each row starts with its `_calendar_when` text. The list itself is the
+  # agenda: the window's records, or the picked day's.
+  defp calendar_components(view, table, sfx) do
+    if AshA2ui.Calendar.calendar?(table),
+      do: basic_calendar_components(view, table, sfx),
+      else: []
+  end
+
+  defp basic_calendar_components(view, table, sfx) do
+    base = "calendar#{sfx}"
+    window_path = "#{table.query_path}/window"
+    days? = table.calendar.granularity != :day
+
+    calendar = %{
+      "id" => base,
+      "component" => "Column",
+      "children" => ["#{base}_nav"] ++ ((days? && ["#{base}_days", "#{base}_scope"]) || [])
+    }
+
+    nav = [
+      %{
+        "id" => "#{base}_nav",
+        "component" => "Row",
+        "align" => "center",
+        "children" => [
+          "#{base}_prev_button",
+          "#{base}_label",
+          "#{base}_next_button",
+          "#{base}_today_button"
+        ]
+      },
+      %{
+        "id" => "#{base}_label",
+        "component" => "Text",
+        "text" => %{"path" => "#{window_path}/label"},
+        "variant" => "h3"
+      }
+    ]
+
+    buttons =
+      calendar_button("#{base}_prev", "Previous", table, %{"windowDelta" => -1}, view) ++
+        calendar_button("#{base}_next", "Next", table, %{"windowDelta" => 1}, view) ++
+        calendar_button("#{base}_today", "Today", table, %{"anchor" => "today"}, view)
+
+    days =
+      if days? do
+        [
+          %{
+            "id" => "#{base}_days",
+            "component" => "List",
+            "direction" => "horizontal",
+            "children" => %{
+              "componentId" => "#{base}_day_button",
+              "path" => "#{window_path}/marks"
+            }
+          },
+          %{
+            "id" => "#{base}_scope",
+            "component" => "Row",
+            "align" => "center",
+            "children" => ["#{base}_scope_label", "#{base}_all_button"]
+          },
+          %{
+            "id" => "#{base}_scope_label",
+            "component" => "Text",
+            "text" => %{"path" => "#{window_path}/scopeLabel"},
+            "variant" => "h4"
+          }
+        ] ++
+          day_button(base, table, view) ++
+          calendar_button("#{base}_all", "All days", table, %{"date" => ""}, view)
+      else
+        []
+      end
+
+    [calendar | nav] ++ buttons ++ days
+  end
+
+  # A day of the window, templated over its mark (`date`, `label`).
+  defp day_button(base, table, view) do
+    [
+      query_button("#{base}_day", table, %{"date" => %{"path" => "date"}}, view),
+      %{"id" => "#{base}_day_text", "component" => "Text", "text" => %{"path" => "label"}}
+    ]
+  end
+
+  defp calendar_button(id_prefix, label, table, context, view) do
+    [
+      query_button(id_prefix, table, context, view),
+      %{"id" => "#{id_prefix}_text", "component" => "Text", "text" => label}
+    ]
+  end
+
+  # Prepends the row's `_calendar_when` Text to the row (the card header
+  # under a row_layout, the content Row otherwise).
+  defp with_calendar_when(components, table, sfx) do
+    if AshA2ui.Calendar.calendar?(table) do
+      when_id = "record_row#{sfx}_when"
+
+      host_id =
+        if table.component.row_layout,
+          do: "record_row#{sfx}_header",
+          else: "record_row#{sfx}_content"
+
+      text = %{
+        "id" => when_id,
+        "component" => "Text",
+        "text" => %{"path" => "_calendar_when"},
+        "variant" => "caption"
+      }
+
+      Enum.map(components, fn
+        %{"id" => ^host_id, "children" => children} = host ->
+          %{host | "children" => [when_id | children]}
+
+        other ->
+          other
+      end) ++ [text]
+    else
+      components
+    end
+  end
+
+  # The admin collection of a core table: its dataGrid, or on a calendar
+  # the calendarView wrapping it.
+  defp admin_collection_id(table, sfx) do
+    if AshA2ui.Calendar.calendar?(table), do: "calendar#{sfx}", else: "data_grid#{sfx}"
+  end
+
+  # The admin calendar (catalog 1.3): a `calendarView` showing the window
+  # as a month or week grid with the days that hold records marked, and
+  # the table's own dataGrid (the window's records, or the picked day's)
+  # as its child. Moving the window and picking a day dispatch
+  # `windowAction` — the same `query` envelope the basic buttons send —
+  # with `anchor` / `date` added by the renderer.
+  defp admin_calendar_components(view, table, sfx) do
+    if AshA2ui.Calendar.calendar?(table) do
+      [
+        %{
+          "id" => "calendar#{sfx}",
+          "component" => "calendarView",
+          "label" => AshA2ui.Experience.collection_label(view, table),
+          "granularity" => to_string(table.calendar.granularity),
+          "window" => %{"path" => "#{table.query_path}/window"},
+          "windowAction" => %{
+            "name" => "query",
+            "context" =>
+              %{"query" => %{"path" => table.query_path}, "component" => to_string(table.name)}
+              |> put_contexts_binding(view)
+          },
+          "children" => ["data_grid#{sfx}"]
+        }
+      ]
+    else
+      []
+    end
+  end
+
   # --- query controls (search / filters / pagination) ---
 
   # The `"query"` action wire contract: every control sends
@@ -1704,8 +1884,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         layout -> card_row_components(view, table, layout, action_ids, sfx)
       end
 
-    # Bulk tables add the row CheckBox (no-op otherwise).
-    row_components = AshA2ui.Bulk.with_row_checkbox(row_components, table, sfx)
+    # Bulk tables add the row CheckBox, calendars the row's date text
+    # (no-ops otherwise).
+    row_components =
+      row_components
+      |> AshA2ui.Bulk.with_row_checkbox(table, sfx)
+      |> with_calendar_when(table, sfx)
 
     row_components ++
       List.flatten(action_components) ++ context_select_components ++ control_components
@@ -3489,7 +3673,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp default_state(table, records) do
     AshA2ui.QueryRunner.state(
       table.query,
-      AshA2ui.QueryRunner.default_params(table.query),
+      AshA2ui.QueryRunner.default_params(table),
       length(records),
       false
     )
@@ -3659,6 +3843,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.merge(AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record))
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     |> Map.merge(AshA2ui.Bulk.row_data(table))
+    |> Map.merge(AshA2ui.Calendar.row_data(table, record))
   end
 
   # `source` columns read through the loaded relationship path (nil-safe: a

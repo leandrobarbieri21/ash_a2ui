@@ -109,7 +109,7 @@ defmodule AshA2ui.Experience do
   `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.2.0"
+  def admin_catalog_version, do: "1.3.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item

@@ -144,6 +144,9 @@ defmodule AshA2ui.ResolvedView do
   section record before encoding/dispatch — each with a runtime string
   `name`, runtime-scoped paths, and a `section` key
   (`%{value:, label:, filter: {attribute, value}, template:}`) its reads AND on.
+
+  A `display :calendar` table carries its resolved calendar config under
+  `calendar` (`nil` on every other table); see `AshA2ui.Calendar`.
   """
   @type table :: %{
           name: atom | String.t(),
@@ -161,7 +164,8 @@ defmodule AshA2ui.ResolvedView do
           select_context: atom | nil,
           sections: map | nil,
           editable: map | nil,
-          export: map | nil
+          export: map | nil,
+          calendar: AshA2ui.Calendar.config() | nil
         }
 
   @typedoc """
@@ -670,7 +674,8 @@ defmodule AshA2ui.ResolvedView do
         select_context: component.select_context,
         sections: resolve_sections(component.sections, resource),
         editable: resolve_editable(resource, component.editable),
-        export: resolve_export(component, component.fields || public_attribute_names(resource))
+        export: resolve_export(component, component.fields || public_attribute_names(resource)),
+        calendar: AshA2ui.Calendar.resolve(component, resource)
       }
     end)
   end

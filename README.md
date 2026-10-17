@@ -464,7 +464,9 @@ emitted as an `entityPage` of `dataGrid` (with `emptyState` / `pagination`
 children and destructive-confirmed row actions), a `recordPanel`
 (`fieldDisplay` for view mode, `formSection` + `actionBar` for
 create/edit), and a `statusBanner` bound to `/ui/feedback` — declared in
-`priv/a2ui/admin_v1/catalog.json`. Advanced-feature subtrees (sections,
+`priv/a2ui/admin_v1/catalog.json`. A `display :calendar` table is a
+`calendarView` (catalog 1.3) wrapping its `dataGrid`; see the Calendars
+topic. Advanced-feature subtrees (sections,
 reports, export, editable, nested forms, bulk actions, wizard steps,
 boards) stay basic-composed, and query states carry plain boolean
 pagination props alongside the pagination sentinels. The default `:basic`

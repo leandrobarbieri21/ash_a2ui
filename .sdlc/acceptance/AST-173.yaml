@@ -1,0 +1,112 @@
+---
+# Acceptance criteria for AST-173 (calendars: `display :calendar` on
+# `:table`). Criterion ids are immutable. CI is the only evidence producer.
+# Design: the ash_a2ui session design agreed with Luke (a display mode on
+# :table; the window rides on the table's query; rendering in our admin
+# catalog, a basic agenda as the fallback). Contract: the Calendars topic
+# and AshA2ui.Calendar.
+item: AST-173
+
+criteria:
+  - id: AST-173/AC-1
+    given: a table declaring display :calendar with date_field,
+      end_date_field and granularity
+    when: the view is resolved
+    then: >-
+      the table scope carries the calendar config (fields, their kinds and
+      the granularity, :month by default), and tables without the display
+      carry none
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/calendar/calendar_dsl_test.exs::declares_a_calendar_table
+
+  - id: AST-173/AC-2
+    given: calendars with a missing date_field or query, a date_field or
+      end_date_field that is not a public date or datetime attribute, the
+      same field twice, a granularity outside day/week/month, calendar
+      options without display :calendar, display :calendar on a non-table,
+      sections or bulk_actions
+    when: the module compiles
+    then: each is rejected with a diagnostic naming the problem
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_dsl_test.exs::rejects_invalid_calendars
+
+  - id: AST-173/AC-3
+    given: a month calendar over date fields, a week calendar over a
+      datetime beside a list table, and a v1.0 day calendar
+    when: the surface is encoded under the basic catalog
+    then: >-
+      both wire versions validate against the vendored schemas; the read
+      holds only records in (or overlapping) the window, in date order;
+      /query/<table>/window carries the window, labels and the marks of
+      the whole window; rows carry _calendar_start/_calendar_end/
+      _calendar_when; the agenda composition adds the nav, day and scope
+      controls above the table's own list
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_encoder_test.exs::encodes_the_basic_agenda_for_both_versions
+
+  - id: AST-173/AC-4
+    given: the same month calendar under catalog :admin_v1
+    when: the surface is encoded
+    then: >-
+      the table is a calendarView bound to the window state with the query
+      windowAction, wrapping the table's dataGrid (row actions intact);
+      both validate against the admin catalog definition, which is 1.3.0
+      and additive
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_encoder_test.exs::encodes_the_admin_calendar_view
+
+  - id: AST-173/AC-5
+    given: events of two teams and a read scoped to the actor's team
+    when: query actions move the window (windowDelta, anchor) or pick and
+      clear a day, and a row action runs with the carried state
+    then: >-
+      every re-read (records, marks, totals) returns only the actor's
+      events; a picked day narrows the records but not the marks; moving
+      resets the page and drops a pick outside the new window; the row
+      action's refresh keeps the window and the pick
+    verify: integration
+    risk: high
+    test: >-
+      test/ash_a2ui/calendar/calendar_action_handler_test.exs::window_actions_re_query_as_the_actor
+
+  - id: AST-173/AC-6
+    given: query actions with a non-ISO anchor or date, a non-integer or
+      out-of-range windowDelta, or a carried non-ISO window anchor
+    when: the handler runs them
+    then: each is rejected with an error status and no read is written
+    verify: integration
+    risk: medium
+    test: >-
+      test/ash_a2ui/calendar/calendar_action_handler_test.exs::rejects_malformed_windows
+
+  - id: AST-173/AC-7
+    given: month, week and day windows and window requests
+    when: ranges, shifts and request precedence are computed
+    then: >-
+      months run first to last day, weeks Monday to Sunday, shifts cross
+      year ends, an absolute anchor wins over a delta, a day calendar's
+      pick moves its window, and a pick outside the window is dropped
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/calendar/calendar_window_test.exs::request_precedence
+
+  - id: AST-173/AC-8
+    given: the month calendar under the basic catalog
+    when: the surface is encoded
+    then: >-
+      every emitted component kind is a basic-catalog kind and the agenda
+      is the table's list over its records, so a stock basic renderer
+      shows it (the browser check is priv/js/probe/calendar_probe.mjs)
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/calendar/calendar_encoder_test.exs::the_fallback_is_basic_catalog_only

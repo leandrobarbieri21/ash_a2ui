@@ -17,6 +17,9 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
   # (notes/2026-09-07-admin-catalog-contract.md).
   @kinds ~w(entityPage dataGrid emptyState pagination recordPanel fieldDisplay formSection actionBar statusBanner confirmDialog)
 
+  # Kinds added after 1.0, each additive within the catalog id.
+  @additive_kinds ~w(calendarView)
+
   # The pinned property names per kind, straight from the contract.
   @pinned_props %{
     "entityPage" => ~w(title description children),
@@ -37,7 +40,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
              @admin_catalog_path |> File.read!() |> Jason.decode()
 
     assert catalog["catalogId"] == Experience.admin_catalog_id()
-    assert Map.keys(catalog["components"]) |> Enum.sort() == Enum.sort(@kinds)
+    assert Map.keys(catalog["components"]) |> Enum.sort() == Enum.sort(@kinds ++ @additive_kinds)
 
     Enum.each(@kinds, fn kind ->
       component = catalog["components"][kind]
@@ -84,6 +87,24 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert source =~ ~s(name: "openSurface")
   end
 
+  @tag ac: "AST-173/AC-4"
+  test "catalog 1.3 is additive: calendarView" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.3.0"
+    assert Experience.admin_catalog_version() == "1.3.0"
+    assert catalog["catalogId"] == Experience.admin_catalog_id()
+
+    calendar = catalog["components"]["calendarView"]
+    assert calendar["properties"]["component"]["const"] == "calendarView"
+
+    assert calendar["required"] ==
+             ["component", "granularity", "window", "windowAction", "children"]
+
+    assert calendar["properties"]["granularity"]["enum"] == ["day", "week", "month"]
+    assert Map.has_key?(catalog["x-changelog"], "1.3.0")
+  end
+
   @tag ac: "A2UI-101B/AC-12"
   test "renderer asset declares the component vocabulary" do
     assert File.exists?(@renderer_asset_path),
@@ -98,8 +119,9 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     # the admin catalog id the encoder emits on createSurface
     assert source =~ Experience.admin_catalog_id()
 
-    # all ten contract kinds registered under their ash-admin-* tags
-    Enum.each(@kinds, fn kind ->
+    # all ten contract kinds (and the additive ones) registered under their
+    # ash-admin-* tags
+    Enum.each(@kinds ++ @additive_kinds, fn kind ->
       assert Regex.match?(~r/#{kind}:\s*"ash-admin-/, source),
              "renderer asset does not register #{kind}"
     end)

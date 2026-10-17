@@ -98,6 +98,7 @@ defmodule AshA2ui.MixProject do
         "documentation/topics/multi-section-surfaces.md",
         "documentation/topics/reports-and-exports.md",
         "documentation/topics/bulk-actions.md",
+        "documentation/topics/calendars.md",
         "documentation/topics/contexts-and-details.md",
         "documentation/topics/agent-composed-surfaces.md",
         "documentation/topics/relationships.md",
@@ -130,6 +131,7 @@ defmodule AshA2ui.MixProject do
           AshA2ui.Action,
           AshA2ui.Sections,
           AshA2ui.Board,
+          AshA2ui.Calendar,
           AshA2ui.Editable,
           AshA2ui.Export
         ],

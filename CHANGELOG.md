@@ -10,6 +10,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Calendars: `display :calendar` on `:table`.** Declare a `date_field`
+  (and optionally `end_date_field` and `granularity :day | :week |
+  :month`) and the table's `query` reads only the visible window: the
+  table's read, preset, context scope, filters, search, actor and
+  pagination apply as for a list, with the window ANDed on (records
+  overlapping it when an end field is declared; UTC days). The window
+  state lives at `/query/<table>/window` (`anchor`, `from`, `to`,
+  `selected`, `label`, `scopeLabel`, and `marks`, the window's days that
+  hold records). Moving the window and picking a day are the standard
+  `"query"` action with `anchor`, `windowDelta` or `date` in the context;
+  the client sends dates only, and malformed ones are rejected before any
+  read. A picked day narrows the read; the marks still cover the window.
+  Rows carry `_calendar_start`, `_calendar_end` and `_calendar_when`. The
+  basic composition is an agenda: Previous/Next/Today, one Button per
+  marked day and "All days" above the table's own list. The admin catalog
+  (1.3.0, additive) emits a `calendarView` wrapping the table's
+  `dataGrid`, rendered with `nb-calendar`, which gains a week view
+  (`view="week"`, `nb-week-change`). The calendar moves at once and sends
+  the absolute date it shows; replies to earlier requests do not move it
+  back. Compile-time checks cover the field types, the closed granularity
+  set, the required `query`, and `sections`/`bulk_actions`, which a
+  calendar does not take. See the Calendars topic.
+
 - **`label` on the action entity.** `action :confirm_merge do label
   "Confirm match" end` names the action's row button and bulk toolbar
   button in both compositions, its admin `rowActions` entry, its prompt

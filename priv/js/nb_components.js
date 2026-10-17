@@ -32,8 +32,9 @@
  *   nb-column      column header metadata (label, align, width)
  *   nb-row         one row (grid over the shared column template)
  *   nb-cell        one cell (alignment follows its column)
- *   nb-calendar    month grid: today ring, has-items dot, selected lift,
- *                  full date-grid keyboard pattern; emits nb-select
+ *   nb-calendar    month (or week) grid: today ring, has-items dot,
+ *                  selected lift, full date-grid keyboard pattern; emits
+ *                  nb-select
  *   nb-scroller    stick-to-bottom message pane (MutationObserver), detaches
  *                  when scrolled up, "jump to latest" pill re-pins
  *   nb-pagination  windowed page chips, prev/next, aria-current="page"
@@ -1185,19 +1186,26 @@ class NbTable extends NbElement {
  * with items carry the tilted sticker dot, the selected day lifts on a
  * primary-colored shadow. Emits nb-select {date} and, when the month is
  * navigated, nb-month-change {month} — both composed for LiveView hooks.
+ *
+ * `view="week"` shows one Monday-to-Sunday row instead: the week holding
+ * the `month` attribute (read as a full YYYY-MM-DD date there), else the
+ * selected day, else today. Previous/Next and PageUp/PageDown move a week,
+ * arrows crossing the row move into the neighboring week, and every move
+ * emits nb-week-change {week} (the Monday, YYYY-MM-DD).
  * ------------------------------------------------------------------------- */
 
 class NbCalendar extends NbElement {
   static get observedAttributes() {
-    return ["month", "selected", "today", "items"];
+    return ["month", "selected", "today", "items", "view"];
   }
 
   constructor() {
     super();
-    // Internal navigation state: the rendered month and the focused day.
-    // Both re-derive from attributes when the host writes them, so the
-    // component is stateless from the host's point of view.
+    // Internal navigation state: the rendered month (or week) and the
+    // focused day. They re-derive from attributes when the host writes
+    // them, so the component is stateless from the host's point of view.
     this.__month = null;
+    this.__week = null;
     this.__focusDate = null;
   }
 
@@ -1212,8 +1220,35 @@ class NbCalendar extends NbElement {
 
   attributeChangedCallback() {
     this.__month = null;
+    this.__week = null;
     this.__focusDate = null;
     if (this.root) this.paint();
+  }
+
+  get weekView() {
+    return this.getAttribute("view") === "week";
+  }
+
+  monday(date) {
+    const monday = new Date(date);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    monday.setHours(12, 0, 0, 0);
+    return monday;
+  }
+
+  addDays(date, days) {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    next.setHours(12, 0, 0, 0);
+    return next;
+  }
+
+  /** Whether `date` is a day the grid currently shows as in range. */
+  inView(date, {month, week}) {
+    if (this.weekView) {
+      return date >= week && date < this.addDays(week, 7);
+    }
+    return date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
   }
 
   parseISO(text) {
@@ -1244,12 +1279,8 @@ class NbCalendar extends NbElement {
     const month = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     month.setHours(12, 0, 0, 0);
     const selected = this.getAttribute("selected") ? this.parseISO(this.getAttribute("selected")) : null;
-    const items = new Set(
-      (this.getAttribute("items") || "")
-        .split(/[\s,]+/)
-        .filter(Boolean)
-        .map((token) => token.split("*")[0]),
-    );
+    if (this.weekView) return this.weekState(today, selected);
+    const items = this.itemSet();
     const focus =
       this.__focusDate && this.__focusDate.getMonth() === month.getMonth()
         ? this.__focusDate
@@ -1261,7 +1292,34 @@ class NbCalendar extends NbElement {
     return {today, month, selected, items, focus};
   }
 
-  weeks(month) {
+  weekState(today, selected) {
+    const anchor = this.getAttribute("month") ? this.parseISO(this.getAttribute("month")) : null;
+    const week = this.__week || this.monday(anchor || selected || today);
+    const items = this.itemSet();
+    const within = (date) => date && date >= week && date < this.addDays(week, 7);
+    const focus = within(this.__focusDate)
+      ? this.__focusDate
+      : within(selected)
+        ? selected
+        : within(today)
+          ? today
+          : week;
+    const month = new Date(week.getFullYear(), week.getMonth(), 1);
+    month.setHours(12, 0, 0, 0);
+    return {today, month, week, selected, items, focus};
+  }
+
+  itemSet() {
+    return new Set(
+      (this.getAttribute("items") || "")
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map((token) => token.split("*")[0]),
+    );
+  }
+
+  weeks(month, week) {
+    if (this.weekView) return [Array.from({length: 7}, (_, index) => this.addDays(week, index))];
     // Monday-start grid; spillover days from neighbor months are rendered
     // muted and inert — navigation crosses months by recomputing instead.
     const start = new Date(month);
@@ -1282,21 +1340,24 @@ class NbCalendar extends NbElement {
   }
 
   paint() {
-    const {today, month, selected, items, focus} = this.state();
+    const view = this.state();
+    const {today, month, week, selected, items, focus} = view;
     const locale = this.getAttribute("lang") || undefined;
-    const title = new Intl.DateTimeFormat(locale, {month: "long", year: "numeric"}).format(month);
+    const title = this.weekView
+      ? this.weekTitle(week, locale)
+      : new Intl.DateTimeFormat(locale, {month: "long", year: "numeric"}).format(month);
     const weekdayFormatter = new Intl.DateTimeFormat(locale, {weekday: "short"});
     const weekdays = WEEKDAYS.map((_, index) => {
       const date = new Date(2024, 0, 1 + index); // 2024-01-01 was a Monday.
       return weekdayFormatter.format(date);
     });
-    const weeks = this.weeks(month);
+    const weeks = this.weeks(month, week);
     const cells = weeks
       .map((week) => {
         const row = week
           .map((date) => {
             const iso = this.dayISO(date);
-            const inMonth = date.getMonth() === month.getMonth();
+            const inMonth = this.inView(date, view);
             const isToday = this.dayISO(today) === iso;
             const isSelected = selected && this.dayISO(selected) === iso;
             const hasItems = items.has(iso);
@@ -1441,9 +1502,9 @@ class NbCalendar extends NbElement {
       `
       <div class="cal" part="cal">
         <div class="head">
-          <button type="button" class="nb-btn prev" aria-label="Previous month">‹</button>
+          <button type="button" class="nb-btn prev" aria-label="${this.weekView ? "Previous week" : "Previous month"}">‹</button>
           <h3 class="title" part="title" aria-live="polite">${escapeHtml(title)}</h3>
-          <button type="button" class="nb-btn next" aria-label="Next month">›</button>
+          <button type="button" class="nb-btn next" aria-label="${this.weekView ? "Next week" : "Next month"}">›</button>
         </div>
         <table class="grid" role="grid" aria-label="${escapeHtml(title)}">
           <thead aria-hidden="true">
@@ -1455,8 +1516,8 @@ class NbCalendar extends NbElement {
       `,
     );
 
-    this.root.querySelector(".prev").addEventListener("click", () => this.shiftMonth(-1));
-    this.root.querySelector(".next").addEventListener("click", () => this.shiftMonth(1));
+    this.root.querySelector(".prev").addEventListener("click", () => this.shift(-1));
+    this.root.querySelector(".next").addEventListener("click", () => this.shift(1));
     this.root.querySelectorAll("button.day").forEach((button) => {
       button.addEventListener("click", () => this.selectDay(button.dataset.date));
     });
@@ -1472,11 +1533,44 @@ class NbCalendar extends NbElement {
   }
 
   paintMonth(date) {
-    this.__month = new Date(date.getFullYear(), date.getMonth(), 1);
-    this.__month.setHours(12, 0, 0, 0);
+    if (this.weekView) {
+      this.__week = this.monday(date);
+    } else {
+      this.__month = new Date(date.getFullYear(), date.getMonth(), 1);
+      this.__month.setHours(12, 0, 0, 0);
+    }
     this.__focusDate = date;
     this.paint();
     this.focusDateInMonth(date);
+  }
+
+  weekTitle(week, locale) {
+    const sunday = this.addDays(week, 6);
+    const format = new Intl.DateTimeFormat(locale, {month: "short", day: "numeric", year: "numeric"});
+    return typeof format.formatRange === "function"
+      ? format.formatRange(week, sunday)
+      : `${format.format(week)} – ${format.format(sunday)}`;
+  }
+
+  /** Previous/Next: a month, or a week in the week view. */
+  shift(delta) {
+    if (this.weekView) this.shiftWeek(delta);
+    else this.shiftMonth(delta);
+  }
+
+  shiftWeek(delta) {
+    const {week, focus} = this.state();
+    this.__week = this.addDays(week, 7 * delta);
+    this.__focusDate = this.addDays(focus, 7 * delta);
+    this.paint();
+    this.focusDateInMonth(this.__focusDate);
+    this.emit("nb-week-change", {week: this.dayISO(this.__week)});
+  }
+
+  /** The navigation event for a move that left the shown range. */
+  emitRangeChange(date) {
+    if (this.weekView) this.emit("nb-week-change", {week: this.dayISO(this.monday(date))});
+    else this.emit("nb-month-change", {month: this.monthISO(date)});
   }
 
   shiftMonth(delta) {
@@ -1497,7 +1591,8 @@ class NbCalendar extends NbElement {
     this.emit("nb-select", {date: iso});
     const date = this.parseISO(iso);
     if (date) {
-      this.__month = new Date(date.getFullYear(), date.getMonth(), 1);
+      if (this.weekView) this.__week = this.monday(date);
+      else this.__month = new Date(date.getFullYear(), date.getMonth(), 1);
       this.__focusDate = date;
     }
     this.paint();
@@ -1519,13 +1614,13 @@ class NbCalendar extends NbElement {
       if (field === "month") next.setMonth(next.getMonth() + amount);
       else next.setDate(next.getDate() + amount);
       next.setHours(12, 0, 0, 0);
-      if (next.getMonth() === this.state().month.getMonth() && next.getFullYear() === this.state().month.getFullYear()) {
+      if (this.inView(next, this.state())) {
         this.__focusDate = next;
         this.paint();
         this.focusDateInMonth(next);
       } else {
         this.paintMonth(next);
-        this.emit("nb-month-change", {month: this.monthISO(next)});
+        this.emitRangeChange(next);
       }
     };
     switch (key) {
@@ -1558,10 +1653,12 @@ class NbCalendar extends NbElement {
         break;
       }
       case "PageUp":
-        step("month", -1);
+        if (this.weekView) step("day", -7);
+        else step("month", -1);
         break;
       case "PageDown":
-        step("month", 1);
+        if (this.weekView) step("day", 7);
+        else step("month", 1);
         break;
       case "Enter":
       case " ":
