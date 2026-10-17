@@ -46,7 +46,8 @@ overrides, queries with presets and range filters, `row_layout` cards (with
 sectioned tables (`sections`), `action` metadata (`label`, `refreshes`,
 `prompt_fields`, `visible_when`, `via`), `contexts` with the tables'
 `select_context` / `context_filter` / `require_context`, related tables,
-reference links and calendar tables — mirrors the DSL entity for entity.
+reference links, calendar tables and boards — mirrors the DSL entity for
+entity.
 
 A master/detail surface, as a spec: a pickerless context selected from the
 people table, and a related table over `Note` scoped by it, with a link
@@ -95,8 +96,63 @@ The calendar rules are the DSL's (`AshA2ui.Calendar.validate/2`, run by
 
 The parser resolves a date field by existing-atom lookup only, so an
 unknown name is rejected without creating an atom. Rejections list the
-resource's date and datetime attributes. Boards (`"display": "board"`) are
-not spec vocabulary yet. See the Calendars topic.
+resource's date and datetime attributes. See the Calendars topic.
+
+A board, as a spec. `display: "board"` needs a `row_layout` and
+`sections` without a `source`. The lanes are the values of `scope_by`,
+optionally split into rows by `swimlanes_by`:
+
+```json
+{
+  "resource": "Job",
+  "queries": [{"name": "lane_q", "page_size": 5}],
+  "components": [
+    {"kind": "table", "name": "board", "fields": ["title", "stage", "severity"],
+     "display": "board", "query": "lane_q", "row_actions": ["claim"],
+     "row_layout": {"title": "title", "badge": "severity"},
+     "sections": {"scope_by": "stage", "values": ["new", "claimed"],
+                  "labels": {"new": "To do"},
+                  "swimlanes_by": "severity", "swimlane_values": ["high", "low"],
+                  "swimlane_tones": {"high": "danger", "low": "success"}}}
+  ],
+  "actions": [{"name": "claim", "visible_when": {"stage": "new"}, "refreshes": ["board"]}]
+}
+```
+
+The board rules are the DSL's `VerifySections` / `VerifyLayouts` rules
+(see the Multi-Section Surfaces topic):
+- `scope_by` and `swimlanes_by` must be enumerated attributes or
+  calculations (an `Ash.Type.Enum` or `one_of`), and they must differ.
+- `values` and `swimlane_values` must come from the enumeration and must
+  not be empty.
+- `labels` and `tones` must be keyed by enumerated values.
+- No two lanes, swimlanes or cells may share a runtime name or extend one
+  another at an underscore.
+- A board needs a `row_layout`.
+
+Composed specs have stricter rules:
+- **No `source`.** Resource-sourced lanes are declared in the DSL only.
+- **Lookups, never atom creation.** `scope_by`, `swimlanes_by` and the
+  keys of `labels`, `swimlane_labels` and `swimlane_tones` are looked up
+  as existing atoms.
+- **Plain-text labels.** Labels are 1 to 60 characters of letters,
+  digits, spaces and light punctuation, with no markup characters.
+- **Closed tone set.** Tones are `neutral`, `info`, `success`, `warning`,
+  `danger` or `accent`.
+- **At most 12 cells.** A composed board may expand to at most 12 cells
+  (lanes × swimlanes, or lanes alone),
+  `AshA2ui.Dynamic.max_composed_cells/0`. The count comes from the same
+  `AshA2ui.Board.cell_count/2` as the declared `limit`, because every cell
+  is a page read and a count on every render and refresh.
+
+Row actions must be actions of the resource, and `refreshes` must name
+components in the same spec. Bulk actions remain outside the vocabulary.
+
+Board totals count only the listed swimlanes. A record whose swimlane
+attribute is `nil` belongs to no row, so it is in no total. To show those
+records, swimlane by a calculation that maps `nil` to a value of its own
+(for example `if is_nil(region), do: :none, else: region` with a
+`one_of` constraint that includes `:none`).
 
 A related table's `resource` is an allowlisted name like a context's; its
 fields, query, `context_filter` keys, `source` paths and links resolve

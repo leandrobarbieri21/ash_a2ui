@@ -10,6 +10,27 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Boards in composed surfaces.** The dynamic spec carries
+  `"display": "board"` with a `row_layout` and source-less `"sections"`
+  (`scope_by`, `values`, `labels`, `swimlanes_by`, `swimlane_values`,
+  `swimlane_labels`, `swimlane_tones`). The board rules are the shared
+  verifiers' (`VerifySections`, `VerifyLayouts`, `VerifyComponents`,
+  `VerifyActions`), so #25's runtime-name and empty-list rules apply to
+  composed boards. Composed boards also follow these rules:
+  - a board with a `source` is refused;
+  - attribute names and label/tone keys are existing-atom lookups;
+  - labels are plain text of 1 to 60 characters;
+  - tones come from the badge tone set;
+  - a board may expand to at most 12 cells
+    (`AshA2ui.Dynamic.max_composed_cells/0`), counted by the new
+    `AshA2ui.Board.cell_count/2`, which the declared `limit` check now uses
+    too.
+
+  Bulk actions stay outside the spec. The importer exports declared boards
+  (including swimlanes) instead of rejecting them, and board specs promote
+  and serialize back. The importer also exports a sourced sections block's
+  non-default `limit`, which it used to drop.
+
 - **Calendars in composed surfaces.** The dynamic spec carries
   `"display": "calendar"` with `"date_field"`, `"end_date_field"` and
   `"granularity"` (`day|week|month`) on a table, plus its required

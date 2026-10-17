@@ -95,8 +95,12 @@ defmodule AshA2ui.Dynamic do
   alias AshA2ui.Dynamic.Serializer
   alias AshA2ui.Dynamic.Surface
   alias AshA2ui.Transformers.InferFields
+  alias Spark.Dsl.Extension
 
   @resolve_opts [:allowlist, :surface_id, :spec_version, :via_allowlist]
+
+  # The cell cap of a composed board; see max_composed_cells/0.
+  @max_composed_cells 12
 
   @doc """
   Resolves and validates a surface `spec` (a JSON-decoded, string-keyed map)
@@ -147,7 +151,8 @@ defmodule AshA2ui.Dynamic do
            Keyword.get_lazy(opts, :surface_id, fn -> generate_surface_id(resource) end),
          {:ok, dsl_state} <-
            infer_fields(synthetic_dsl_state(resource, surface_id, spec_version, entities)),
-         :ok <- run_verifiers(dsl_state) do
+         :ok <- run_verifiers(dsl_state),
+         :ok <- validate_composed_sections(dsl_state, resource) do
       {:ok,
        %Surface{
          surface_id: surface_id,
@@ -584,11 +589,13 @@ defmodule AshA2ui.Dynamic do
           ),
         "display" => %{
           "type" => "string",
-          "enum" => ["list", "calendar"],
+          "enum" => ["list", "board", "calendar"],
           "description" =>
             "Tables only: \"calendar\" shows the records on a month, week or day " <>
               "grid placed by date_field; it needs date_field and a query (the query " <>
-              "reads only the visible window). Default \"list\"."
+              "reads only the visible window). \"board\" shows source-less sections " <>
+              "as lanes side by side (optionally split into swimlanes); it needs " <>
+              "sections without a source and a row_layout. Default \"list\"."
         },
         "date_field" =>
           Map.put(
@@ -703,9 +710,15 @@ defmodule AshA2ui.Dynamic do
           "type" => "object",
           "description" =>
             "Dynamic table sets (tables only): this table becomes a template expanded at " <>
-              "render time into one concrete table per record of the source resource, each " <>
-              "scoped by scope_by == the section's value and headed by its label. The source " <>
-              "must be allowlisted; the source read is authorized like any other.",
+              "render time into one concrete table per section, each scoped by scope_by == " <>
+              "the section's value. With a source, one section per record of the source " <>
+              "resource (allowlisted; its read is authorized). Without a source, one " <>
+              "section per enumerated value of scope_by (an Ash.Type.Enum or one_of " <>
+              "attribute) — a board's lanes, optionally split by swimlanes_by into rows. " <>
+              "A composed board may expand to at most #{@max_composed_cells} cells (lanes x " <>
+              "swimlanes). Board totals count only the listed swimlanes: records whose " <>
+              "swimlane attribute is nil appear in no row, so map nil to a value of its own " <>
+              "with a calculation and swimlane by that.",
           "properties" => %{
             "source" => %{
               "type" => "string",
@@ -740,9 +753,51 @@ defmodule AshA2ui.Dynamic do
                 "description",
                 "Source attribute the sections are ordered by (ascending)."
               ),
+            "values" => %{
+              "type" => "array",
+              "items" => %{"type" => "string", "maxLength" => 64},
+              "minItems" => 1,
+              "maxItems" => 64,
+              "description" =>
+                "Source-less only: the scope_by values that become lanes, in order " <>
+                  "(default: all of them)."
+            },
+            "labels" => %{
+              "type" => "object",
+              "additionalProperties" => %{"type" => "string", "maxLength" => 60},
+              "description" =>
+                "Source-less only: plain-text lane headings per value, e.g. " <>
+                  "{\"open\": \"To do\"} (no markup characters)."
+            },
+            "swimlanes_by" =>
+              Map.put(
+                name,
+                "description",
+                "Boards only: a second enumerated attribute splitting the board into rows."
+              ),
+            "swimlane_values" => %{
+              "type" => "array",
+              "items" => %{"type" => "string", "maxLength" => 64},
+              "minItems" => 1,
+              "maxItems" => 64,
+              "description" => "The swimlanes_by values that become rows, in order."
+            },
+            "swimlane_labels" => %{
+              "type" => "object",
+              "additionalProperties" => %{"type" => "string", "maxLength" => 60},
+              "description" => "Plain-text row headings per swimlane value."
+            },
+            "swimlane_tones" => %{
+              "type" => "object",
+              "additionalProperties" => %{
+                "type" => "string",
+                "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
+              },
+              "description" => "A tone per swimlane value (row background)."
+            },
             "limit" => %{"type" => "integer", "minimum" => 1, "maximum" => 500}
           },
-          "required" => ["source", "scope_by"],
+          "required" => ["scope_by"],
           "additionalProperties" => false
         }
       },
@@ -1092,6 +1147,61 @@ defmodule AshA2ui.Dynamic do
       errors -> {:error, errors}
     end
   end
+
+  @doc """
+  The most tables a composed (source-less) sections block may expand to:
+  #{@max_composed_cells} lanes × swimlanes. Every cell is a page read plus a
+  count on every render and refresh, so a composed spec gets a hard cap
+  even where a declared board may set a higher `limit`.
+  """
+  @spec max_composed_cells() :: pos_integer
+  def max_composed_cells, do: @max_composed_cells
+
+  # Composed surfaces on top of the shared verifiers (which have already
+  # passed): a source-less sections block expands to at most
+  # @max_composed_cells tables, counted by the same AshA2ui.Board.cell_count/2
+  # as the declared limit. (The parser has already refused a board with a
+  # `source`.)
+  defp validate_composed_sections(dsl_state, resource) do
+    dsl_state
+    |> Extension.get_entities([:a2ui])
+    |> Enum.filter(&is_struct(&1, AshA2ui.Component))
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {component, index} ->
+      composed_sections_errors(component, resource, "components[#{index}].sections")
+    end)
+    |> case do
+      [] -> :ok
+      errors -> {:error, errors}
+    end
+  end
+
+  defp composed_sections_errors(%{sections: nil}, _resource, _path), do: []
+
+  defp composed_sections_errors(
+         %{sections: %{source: nil} = sections} = component,
+         resource,
+         path
+       ) do
+    table_resource = component.resource || resource
+
+    case AshA2ui.Board.cell_count(table_resource, sections) do
+      {:ok, cells} when cells > @max_composed_cells ->
+        [
+          Error.new(
+            path,
+            "this board expands to #{cells} cells (lanes x swimlanes); a composed board may " <>
+              "have at most #{@max_composed_cells}, since every cell is a page read and a " <>
+              "count on every render — narrow values or swimlane_values"
+          )
+        ]
+
+      _within_cap_or_not_enumerable ->
+        []
+    end
+  end
+
+  defp composed_sections_errors(_component, _resource, _path), do: []
 
   defp error_text(error) when is_binary(error), do: error
   defp error_text(error) when is_exception(error), do: Exception.message(error)
