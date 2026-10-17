@@ -1,6 +1,6 @@
 defmodule AshA2ui.Calendar.CalendarDslTest do
   @moduledoc """
-  `display :calendar` on `:table` (AST-173): the DSL options, their
+  `display :calendar` on `:table` (A2UI-107): the DSL options, their
   resolution onto the table scope, and the compile-time rules. Verifier
   cases use the `capture_io(:stderr)` + regex pattern of the other verifier
   suites.
@@ -14,7 +14,7 @@ defmodule AshA2ui.Calendar.CalendarDslTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Calendar.{DayUI, MonthUI, WeekUI}
 
-  @tag ac: "AST-173/AC-1"
+  @tag ac: "A2UI-107/AC-1"
   test "declares a calendar table" do
     [month] = ResolvedView.resolve(MonthUI).tables
 
@@ -113,7 +113,7 @@ defmodule AshA2ui.Calendar.CalendarDslTest do
     """
   end
 
-  @tag ac: "AST-173/AC-2"
+  @tag ac: "A2UI-107/AC-2"
   test "rejects invalid calendars" do
     cases = [
       {calendar("display :calendar\nquery :q"), ~r/needs a date_field/},
@@ -159,7 +159,7 @@ defmodule AshA2ui.Calendar.CalendarDslTest do
     end
   end
 
-  @tag ac: "AST-173/AC-2"
+  @tag ac: "A2UI-107/AC-2"
   test "granularity is a closed set" do
     output =
       compile_ui(

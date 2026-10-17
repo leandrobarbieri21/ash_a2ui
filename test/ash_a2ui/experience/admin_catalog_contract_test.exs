@@ -87,7 +87,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert source =~ ~s(name: "openSurface")
   end
 
-  @tag ac: "AST-173/AC-4"
+  @tag ac: "A2UI-107/AC-4"
   test "catalog 1.3 is additive: calendarView" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 

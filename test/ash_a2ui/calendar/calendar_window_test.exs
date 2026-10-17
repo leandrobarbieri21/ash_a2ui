@@ -1,7 +1,7 @@
 defmodule AshA2ui.Calendar.CalendarWindowTest do
   @moduledoc """
   The window arithmetic and request precedence of `AshA2ui.Calendar`
-  (AST-173): month, week and day ranges, shifting across year ends, the
+  (A2UI-107): month, week and day ranges, shifting across year ends, the
   absolute anchor over the delta, and picks on day calendars.
   """
 
@@ -18,7 +18,7 @@ defmodule AshA2ui.Calendar.CalendarWindowTest do
       end_kind: nil
     }
 
-  @tag ac: "AST-173/AC-7"
+  @tag ac: "A2UI-107/AC-7"
   test "ranges and shifts" do
     assert Calendar.range(:month, ~D[2026-02-14]) == {~D[2026-02-01], ~D[2026-02-28]}
     # 2026-10-18 is a Sunday: its week starts on Monday the 12th.
@@ -33,7 +33,7 @@ defmodule AshA2ui.Calendar.CalendarWindowTest do
     assert Calendar.shift(:day, ~D[2026-12-31], 1) == ~D[2027-01-01]
   end
 
-  @tag ac: "AST-173/AC-7"
+  @tag ac: "A2UI-107/AC-7"
   test "request precedence" do
     state = %{"window" => %{"anchor" => "2026-10-01", "selected" => "2026-10-16"}}
 

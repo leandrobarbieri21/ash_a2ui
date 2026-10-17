@@ -1,6 +1,6 @@
 defmodule AshA2ui.Calendar.CalendarEncoderTest do
   @moduledoc """
-  Calendar payloads (AST-173): the basic agenda composition on v0.9.1 and
+  Calendar payloads (A2UI-107): the basic agenda composition on v0.9.1 and
   v1.0 (schema-validated, built from basic-catalog components only, so a
   stock renderer shows it), the window state and row keys, and the admin
   catalog's `calendarView` wrapping the table's `dataGrid`.
@@ -56,7 +56,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
 
   defp october, do: [query_state: %{"window" => %{"anchor" => "2026-10-20"}}]
 
-  @tag ac: "AST-173/AC-3"
+  @tag ac: "A2UI-107/AC-3"
   test "encodes the basic agenda for both versions" do
     seed_october()
 
@@ -190,7 +190,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     assert hd(data["records"])["_calendar_when"] == "2026-10-20 09:30 – 09:45"
   end
 
-  @tag ac: "AST-173/AC-3"
+  @tag ac: "A2UI-107/AC-3"
   test "a week calendar beside a list table" do
     event!(%{title: "Mon", starts_at: ~U[2026-10-12 00:00:00Z]})
     event!(%{title: "Sun late", starts_at: ~U[2026-10-18 23:59:59Z]})
@@ -219,7 +219,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     refute "record_row_all_when" in components["record_row_all_content"]["children"]
   end
 
-  @tag ac: "AST-173/AC-8"
+  @tag ac: "A2UI-107/AC-8"
   test "the fallback is basic catalog only" do
     seed_october()
 
@@ -245,7 +245,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
            }
   end
 
-  @tag ac: "AST-173/AC-4"
+  @tag ac: "A2UI-107/AC-4"
   test "encodes the admin calendar view" do
     seed_october()
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
@@ -308,7 +308,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     assert length(value["query"]["window"]["marks"]) == 5
   end
 
-  @tag ac: "AST-173/AC-4"
+  @tag ac: "A2UI-107/AC-4"
   test "an exported calendar keeps the basic agenda under the admin catalog" do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 

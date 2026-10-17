@@ -1,6 +1,6 @@
 defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
   @moduledoc """
-  Calendar behavior through `AshA2ui.ActionHandler` (AST-173): moving the
+  Calendar behavior through `AshA2ui.ActionHandler` (A2UI-107): moving the
   window and picking a day are `"query"` actions the server re-reads as the
   actor (reads, marks and refreshes alike), a picked day narrows the read,
   a row action's refresh keeps the window, and malformed window input is
@@ -79,7 +79,7 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
     messages
   end
 
-  @tag ac: "AST-173/AC-5"
+  @tag ac: "A2UI-107/AC-5"
   test "window actions re-query as the actor" do
     seed()
 
@@ -153,7 +153,7 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
     assert value_at(same, "/query")["page"] == 2
   end
 
-  @tag ac: "AST-173/AC-5"
+  @tag ac: "A2UI-107/AC-5"
   test "a row action's refresh keeps the window and the pick" do
     seed()
 
@@ -190,7 +190,7 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
     assert confirmed["_visible_confirm"] == []
   end
 
-  @tag ac: "AST-173/AC-6"
+  @tag ac: "A2UI-107/AC-6"
   test "rejects malformed windows" do
     seed()
 

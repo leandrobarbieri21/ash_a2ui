@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.Calendar.Domain do
   @moduledoc """
-  Domain for the calendar fixtures (`display :calendar`, AST-173). Kept
+  Domain for the calendar fixtures (`display :calendar`, A2UI-107). Kept
   apart from the frozen shared `AshA2ui.Test.Domain`.
   """
 
