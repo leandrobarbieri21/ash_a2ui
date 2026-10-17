@@ -1,0 +1,104 @@
+---
+# Acceptance criteria for A2UI-108 (Jira AST-172; live diagrams: the `diagram` entity).
+# Criterion ids are immutable. CI is the only evidence producer. Design: the
+# ash_a2ui session design agreed with Luke (a generic catalog component, no
+# BPMN knowledge in ash_a2ui; host source returning {source, markers};
+# server-resolved links; lazy-loaded mermaid). Contract: the Live Diagrams
+# topic and AshA2ui.Diagram.
+item: A2UI-108
+
+criteria:
+  - id: A2UI-108/AC-1
+    given: surfaces declaring diagram entities with a module source and an
+      {module, function, args} source
+    when: the view is resolved
+    then: the view lists the diagrams in declaration order with their label,
+      description and source; surfaces without diagrams list none
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/diagram/diagram_dsl_test.exs::declares_diagrams
+
+  - id: A2UI-108/AC-2
+    given: duplicate diagram names, a name that is not a lowercase
+      identifier, a module source without diagram/1, an MFA source whose
+      function is not exported at the right arity, or no source
+    when: the module compiles
+    then: each is rejected with a diagnostic naming the problem
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/diagram/diagram_dsl_test.exs::rejects_invalid_diagrams
+
+  - id: A2UI-108/AC-3
+    given: a diagram whose source returns markers on two nodes, on v0.9.1
+      and on v1.0 (with a second diagram whose source fails)
+    when: the surface is encoded under the basic catalog
+    then: >-
+      both payloads validate against the vendored schemas; /diagram/<name>
+      carries markers keyed by node id (status, status label, tone,
+      initials, server-resolved link with href) and the node list; a
+      failing source renders the unavailable message; the fallback List of
+      nodes with their markers sits after the contexts, before the tables
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/diagram/diagram_encoder_test.exs::encodes_the_basic_fallback_for_both_versions
+
+  - id: A2UI-108/AC-4
+    given: the same surface under catalog :admin_v1
+    when: the surface is encoded
+    then: >-
+      the diagram is a liveDiagram with the mermaid source as a static prop
+      and markers, nodes and error bound to /diagram/<name>; it validates
+      against the admin catalog definition, which is 1.3.0 and additive
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/diagram/diagram_encoder_test.exs::encodes_the_admin_live_diagram
+
+  - id: A2UI-108/AC-5
+    given: a token moved in the host's state, and actors of two teams
+    when: the data model is rebuilt (the PubSub refresh path) or
+      refresh_messages/2 is called
+    then: >-
+      the moved marker is on its new node with its new status, each actor
+      gets only their own markers, and v1.0 surfaces get v1.0 writes
+    verify: integration
+    risk: high
+    test: >-
+      test/ash_a2ui/diagram/diagram_encoder_test.exs::refreshes_move_markers_as_the_actor
+
+  - id: A2UI-108/AC-6
+    given: open_surface actions naming a diagram
+    when: the handler runs them
+    then: >-
+      a surface the diagram's markers link to for this actor is accepted;
+      any other surface, an unknown diagram, an actor without linked
+      markers, a vetoed link and a malformed surface are refused; an empty
+      surface is acknowledged
+    verify: integration
+    risk: high
+    test: >-
+      test/ash_a2ui/diagram/diagram_action_handler_test.exs::a_marker_opens_only_the_surfaces_its_diagram_links_to
+
+  - id: A2UI-108/AC-7
+    given: a link resolver that vetoes links for one team
+    when: markers are built for each team
+    then: the vetoed team's markers render without a link; the other keeps it
+    verify: unit
+    risk: medium
+    test: >-
+      test/ash_a2ui/diagram/diagram_encoder_test.exs::links_are_resolved_on_the_server_and_may_be_vetoed
+
+  - id: A2UI-108/AC-8
+    given: the diagram under the basic catalog with link_buttons
+    when: the surface is encoded
+    then: >-
+      every emitted component kind is a basic-catalog kind and a marker's
+      label is a link Button dispatching open_surface with the diagram name
+      (the browser check is priv/js/probe/diagram_probe.mjs)
+    verify: unit
+    risk: low
+    test: >-
+      test/ash_a2ui/diagram/diagram_encoder_test.exs::the_fallback_is_basic_catalog_only

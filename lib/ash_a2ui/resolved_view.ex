@@ -51,6 +51,8 @@ defmodule AshA2ui.ResolvedView do
       field name and loaded at `/options/<field>` like a form select), a
       ChoicePicker over an enumerated argument or attribute, a CheckBox, a
       DateTimeInput, or a TextField
+    * `diagrams` lists the surface's `diagram` entities in declaration
+      order (see `AshA2ui.Diagram`)
 
   FROZEN CONTRACT — the struct fields and `resolve/2` signature are the
   interface every parallel track codes against; do not change outside an
@@ -85,7 +87,8 @@ defmodule AshA2ui.ResolvedView do
     details: [],
     reports: [],
     prompts: %{},
-    prompt_selects: %{}
+    prompt_selects: %{},
+    diagrams: []
   ]
 
   @typedoc """
@@ -269,7 +272,8 @@ defmodule AshA2ui.ResolvedView do
           details: [detail],
           reports: [report],
           prompts: %{atom => [prompt_field]},
-          prompt_selects: %{atom => select}
+          prompt_selects: %{atom => select},
+          diagrams: [AshA2ui.Diagram.t()]
         }
 
   @option_label_fallbacks [:name, :title, :label, :username, :email]
@@ -358,7 +362,8 @@ defmodule AshA2ui.ResolvedView do
       details: resolve_details(components, contexts, fields),
       reports: resolve_reports(resource, components),
       prompts: resolve_prompts(resource, actions, declared, prompt_selects),
-      prompt_selects: prompt_selects
+      prompt_selects: prompt_selects,
+      diagrams: AshA2ui.Info.diagrams(resource_or_ui_module)
     }
   end
 

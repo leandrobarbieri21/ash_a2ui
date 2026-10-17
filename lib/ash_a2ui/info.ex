@@ -45,6 +45,16 @@ defmodule AshA2ui.Info do
   end
 
   @doc """
+  The `diagram` entities declared in the `a2ui` section, in order.
+  """
+  @spec diagrams(module | Spark.Dsl.t()) :: [AshA2ui.Diagram.t()]
+  def diagrams(resource_or_ui_module) do
+    resource_or_ui_module
+    |> Extension.get_entities([:a2ui])
+    |> Enum.filter(&is_struct(&1, AshA2ui.Diagram))
+  end
+
+  @doc """
   The `query` entities declared in the `a2ui` section.
   """
   @spec queries(module | Spark.Dsl.t()) :: [AshA2ui.Query.t()]
@@ -224,8 +234,17 @@ defmodule AshA2ui.Info do
       opts
       |> Keyword.put(:options, load_options!(resolved_view, selected, opts))
       |> put_context_values(resolved_view, selected)
+      |> put_diagram_values(resolved_view, selected)
 
     {records, opts}
+  end
+
+  # Each diagram's source is called once per build: the encoder takes the
+  # mermaid source for the component and the markers for /diagram/<name>.
+  defp put_diagram_values(opts, %{diagrams: []}, _selected), do: opts
+
+  defp put_diagram_values(opts, resolved_view, selected) do
+    Keyword.put(opts, :diagram_values, AshA2ui.Diagram.load_all(resolved_view, selected, opts))
   end
 
   defp put_context_values(opts, %{contexts: contexts}, _selected) when contexts == %{}, do: opts

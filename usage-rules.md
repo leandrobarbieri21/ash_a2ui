@@ -37,6 +37,9 @@ Sub-rules (addressable as `ash_a2ui:<name>`):
 - `ash_a2ui:reports` — `:report` components (aggregate/report queries over
   generic actions) and `export` blocks (CSV file export via the v1.0
   `downloadFile` callFunction).
+- `ash_a2ui:diagrams` — `diagram` entities: a host source returning a
+  mermaid diagram and markers, server-resolved marker links, lazy-loaded
+  mermaid in the admin catalog, and PubSub-driven marker moves.
 - `ash_a2ui:zero-jank` — the Zero Jank Manifesto translated to A2UI
   surfaces: instant feedback is client-side (optimistic data-model writes,
   typed feedback, in-flight action buttons, the bootstrap skeleton), what

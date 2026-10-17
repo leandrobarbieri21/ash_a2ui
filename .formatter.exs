@@ -24,6 +24,8 @@ spark_locals_without_parens = [
   depends_on: 1,
   depends_on_path: 1,
   description: 1,
+  diagram: 1,
+  diagram: 2,
   display: 1,
   editable: 0,
   editable: 1,

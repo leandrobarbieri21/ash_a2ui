@@ -48,6 +48,7 @@ for the resource named by `for_resource`).
  * [context](#a2ui-context)
  * [query](#a2ui-query)
    * preset
+ * [diagram](#a2ui-diagram)
  * [component](#a2ui-component)
    * nested_form
    * group
@@ -283,6 +284,64 @@ Target: `AshA2ui.Preset`
 ### Introspection
 
 Target: `AshA2ui.Query`
+
+### a2ui.diagram
+```elixir
+diagram name
+```
+
+
+A live diagram: a mermaid diagram whose nodes carry markers (a person, a
+case, a job) that move as the host's state changes. The host's `source`
+returns the mermaid source and the markers for each render, as the
+actor; ash_a2ui has no knowledge of what the diagram shows. Markers live
+at `/diagram/<name>/markers`, keyed by node id, so a data-model refresh
+(for example a PubSub-driven one) moves them. The admin catalog renders
+the diagram with mermaid, loaded only when the diagram appears; the
+basic catalog renders a list of the nodes with their markers. See the
+Live Diagrams topic.
+
+
+
+
+### Examples
+```
+diagram :flight do
+  label "Visits in flight"
+  source MyApp.FlightDiagram
+end
+
+```
+
+```
+diagram :lineage do
+  source {MyApp.Lineage, :diagram, [:orders]}
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#a2ui-diagram-name){: #a2ui-diagram-name .spark-required} | `atom` |  | The name of the diagram: the `<name>` of its `/diagram/<name>` data-model path. Unique across the surface's diagrams. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`source`](#a2ui-diagram-source){: #a2ui-diagram-source .spark-required} | `atom \| mfa` |  | The host callback returning the diagram for a render: a module implementing `AshA2ui.Diagram.Source` (`diagram/1`), or `{module, function, args}` called as `apply(module, function, [context \| args])`. It returns `{:ok, %{source: mermaid, markers: markers}}` or `{:error, reason}`; see `AshA2ui.Diagram` for the marker shape. |
+| [`label`](#a2ui-diagram-label){: #a2ui-diagram-label } | `String.t` |  | The diagram's heading. Defaults to the humanized name. |
+| [`description`](#a2ui-diagram-description){: #a2ui-diagram-description } | `String.t` |  | Optional help text rendered under the heading. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.Diagram`
 
 ### a2ui.component
 ```elixir

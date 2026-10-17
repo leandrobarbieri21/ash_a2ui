@@ -161,7 +161,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.3.0";
+export const ADMIN_CATALOG_VERSION = "1.4.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -220,6 +220,7 @@ const TAGS = {
   statusBanner: "ash-admin-status-banner",
   confirmDialog: "ash-admin-confirm-dialog",
   calendarView: "ash-admin-calendar-view",
+  liveDiagram: "ash-admin-live-diagram",
 };
 
 /** Basic input kinds this catalog replaces with a11y-hardened elements. */
@@ -239,7 +240,10 @@ void GRID_TABLE_MIN;
 /**
  * Builds the admin catalog. See the module docs for the `deps` contract:
  * `{Catalog, basicCatalog, A2uiLitElement, A2uiController, z,
- * lit: {html, css, nothing}}`.
+ * lit: {html, css, nothing}}`, plus the optional `loadMermaid` (a function
+ * returning a promise of the mermaid engine, called the first time a
+ * `liveDiagram` draws; see priv/js/ash_a2ui_mermaid.js) and
+ * `openSurface`.
  *
  * @returns {object} a `@a2ui/web_core` Catalog registered under the admin
  *   catalog id, extending `deps.basicCatalog`.
@@ -523,6 +527,20 @@ export function buildSchemas() {
       window: DynamicValueSchema.optional(),
       windowAction: bareEvent().optional(),
       children: ChildListSchema.optional(),
+      accessibility: Any.optional(),
+      weight: Num.optional(),
+    }),
+
+    // 1.4: a live diagram. `source` is the static mermaid text; `markers`
+    // (keyed by node id) and `nodes` (the fallback list) bind the
+    // /diagram/<name> state, `error` its unavailable message.
+    liveDiagram: EmptyObject.extend({
+      label: DynamicStringSchema.nullable().optional(),
+      description: DynamicStringSchema.nullable().optional(),
+      source: Str.optional(),
+      markers: DynamicValueSchema.optional(),
+      nodes: DynamicValueSchema.optional(),
+      error: DynamicStringSchema.nullable().optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -880,6 +898,7 @@ function defineAdminElements(deps, {adminApis}) {
   defineStatusBanner();
   defineConfirmDialog();
   defineCalendarView();
+  defineLiveDiagram();
   defineTextField();
   defineCheckBox();
   defineChoicePicker();
@@ -3232,6 +3251,484 @@ function defineAdminElements(deps, {adminApis}) {
     }
 
     customElements.define(tag, AshAdminCalendarView);
+  }
+
+  // --- LiveDiagram: a mermaid diagram with live markers (1.4) --------------
+  //
+  // Draws the static mermaid `source` once and places the bound markers
+  // (keyed by node id) on the nodes they name. Marker moves are plain
+  // data-model writes: the diagram never re-renders for them, only the
+  // marker layer does. Mermaid is loaded through `deps.loadMermaid` the
+  // first time a diagram is drawn (see priv/js/ash_a2ui_mermaid.js), and
+  // always renders with `securityLevel: "strict"`. Without a loader, or
+  // when mermaid fails, the bound node list renders instead (the basic
+  // composition's fallback).
+  //
+  // Status styling follows the BPMN viewer's marker vocabulary: waiting is
+  // dashed and hollow, executing pulses, active is solid, failed is the
+  // danger fill, done is muted. Tones color the fill and ink: the
+  // `--a2ui-marker-<tone>-background` / `-color` pairs of
+  // ash_a2ui_theme.css, overridable per tone as `--ash-admin-diagram-<tone>`
+  // and `--ash-admin-diagram-<tone>-ink`.
+
+  function defineLiveDiagram() {
+    const tag = TAGS.liveDiagram;
+    if (customElements.get(tag)) return;
+
+    let enginePromise = null;
+    let sequence = 0;
+
+    const strictConfig = (mermaid) => {
+      const current =
+        typeof mermaid.mermaidAPI?.getConfig === "function" ? mermaid.mermaidAPI.getConfig() : {};
+      if (current.securityLevel !== "strict" || current.startOnLoad !== false) {
+        mermaid.initialize({...current, startOnLoad: false, securityLevel: "strict"});
+      }
+    };
+
+    // The loader may resolve to ash_a2ui_mermaid.js's engine, to a raw
+    // `mermaid` module (default export or namespace), or to nothing (an
+    // IIFE entry that published window.AshA2uiMermaid).
+    const toEngine = (loaded) => {
+      const candidate = loaded?.default ?? loaded ?? globalThis.AshA2uiMermaid;
+      const mermaid = candidate?.mermaid ?? candidate;
+      if (!mermaid || typeof mermaid.render !== "function") return null;
+      return {
+        render: (id, source) => {
+          if (typeof mermaid.initialize === "function") strictConfig(mermaid);
+          return mermaid.render(id, source);
+        },
+      };
+    };
+
+    const loadEngine = () => {
+      if (!enginePromise) {
+        const loader = deps.loadMermaid;
+        enginePromise =
+          typeof loader === "function"
+            ? Promise.resolve()
+                .then(() => loader())
+                .then(toEngine)
+                .catch((error) => {
+                  console.error("liveDiagram: could not load mermaid", error);
+                  return null;
+                })
+            : Promise.resolve(toEngine(globalThis.AshA2uiMermaid));
+      }
+      return enginePromise;
+    };
+
+    // Mermaid (v10–12) wraps a node's id: "<render id>-flowchart-<node id>-<n>".
+    // Direct id/data-id matches come first for other renderers.
+    const findNode = (canvas, nodeId) => {
+      const escaped = String(nodeId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const pattern = new RegExp(`(^|-)${escaped}(-[0-9]+)?$`);
+      return (
+        canvas.querySelector(`[data-id="${CSS.escape(nodeId)}"]`) ||
+        canvas.querySelector(`g.node[id="${CSS.escape(nodeId)}"]`) ||
+        Array.from(canvas.querySelectorAll("g.node")).find((node) =>
+          pattern.test(node.getAttribute("id") || ""),
+        ) ||
+        null
+      );
+    };
+
+    const markerTitle = (marker) =>
+      `${str(marker.label)} — ${str(marker.nodeLabel) || str(marker.nodeId)} (${str(marker.statusLabel) || str(marker.status)})`;
+
+    class AshAdminLiveDiagram extends A2uiLitElement {
+      static styles = [
+        shared,
+        content,
+        css`
+          :host {
+            display: block;
+            --am-diagram-info: var(--ash-admin-diagram-info, var(--a2ui-marker-info-background, #1e40af));
+            --am-diagram-info-ink: var(--ash-admin-diagram-info-ink, var(--a2ui-marker-info-color, #ffffff));
+            --am-diagram-success: var(--ash-admin-diagram-success, var(--a2ui-marker-success-background, #065f46));
+            --am-diagram-success-ink: var(--ash-admin-diagram-success-ink, var(--a2ui-marker-success-color, #ffffff));
+            --am-diagram-warning: var(--ash-admin-diagram-warning, var(--a2ui-marker-warning-background, #7c2d12));
+            --am-diagram-warning-ink: var(--ash-admin-diagram-warning-ink, var(--a2ui-marker-warning-color, #ffffff));
+            --am-diagram-danger: var(--ash-admin-diagram-danger, var(--a2ui-marker-danger-background, #991b1b));
+            --am-diagram-danger-ink: var(--ash-admin-diagram-danger-ink, var(--a2ui-marker-danger-color, #ffffff));
+            --am-diagram-accent: var(--ash-admin-diagram-accent, var(--a2ui-marker-accent-background, #5b21b6));
+            --am-diagram-accent-ink: var(--ash-admin-diagram-accent-ink, var(--a2ui-marker-accent-color, #ffffff));
+            --am-diagram-neutral: var(--ash-admin-diagram-neutral, var(--a2ui-marker-neutral-background, #374151));
+            --am-diagram-neutral-ink: var(--ash-admin-diagram-neutral-ink, var(--a2ui-marker-neutral-color, #ffffff));
+          }
+          .diagram-head {
+            margin: 0 0 var(--am-space-s);
+          }
+          .diagram-title {
+            margin: 0;
+            font-size: var(--am-font-size-l);
+            font-weight: var(--am-font-weight-semibold);
+          }
+          .diagram-description {
+            margin: var(--am-space-2xs) 0 0;
+            color: var(--am-text-muted);
+          }
+          .diagram-frame {
+            position: relative;
+            border: var(--am-border-width) solid var(--am-border);
+            border-radius: var(--am-radius-m);
+            background: var(--ash-admin-diagram-background, var(--am-surface));
+            padding: var(--am-space-m);
+            overflow: auto;
+          }
+          .diagram-canvas svg {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+          }
+          .diagram-canvas:empty {
+            min-height: 6rem;
+          }
+          .diagram-markers {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+          }
+          .marker {
+            position: absolute;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            width: 2rem;
+            height: 2rem;
+            margin: -1rem 0 0 -1rem;
+            border: 2px solid var(--ash-admin-diagram-marker-border, var(--am-text));
+            border-radius: 999px;
+            background: var(--tone);
+            color: var(--ink);
+            font: inherit;
+            font-size: 0.6875rem;
+            font-weight: var(--am-font-weight-bold);
+            line-height: 1;
+            text-decoration: none;
+            box-shadow: var(--ash-admin-diagram-marker-shadow, 2px 2px 0 0 var(--am-text));
+            pointer-events: auto;
+            cursor: default;
+            transition:
+              left 250ms ease,
+              top 250ms ease,
+              transform 120ms ease;
+          }
+          a.marker,
+          button.marker {
+            cursor: pointer;
+            padding: 0;
+          }
+          a.marker:hover,
+          button.marker:hover {
+            transform: translate(-1px, -1px);
+          }
+          a.marker:focus-visible,
+          button.marker:focus-visible {
+            outline: 2px solid var(--am-focus);
+            outline-offset: 2px;
+          }
+          .marker[data-tone="info"] {
+            --tone: var(--am-diagram-info);
+            --ink: var(--am-diagram-info-ink);
+          }
+          .marker[data-tone="success"] {
+            --tone: var(--am-diagram-success);
+            --ink: var(--am-diagram-success-ink);
+          }
+          .marker[data-tone="warning"] {
+            --tone: var(--am-diagram-warning);
+            --ink: var(--am-diagram-warning-ink);
+          }
+          .marker[data-tone="danger"] {
+            --tone: var(--am-diagram-danger);
+            --ink: var(--am-diagram-danger-ink);
+          }
+          .marker[data-tone="accent"] {
+            --tone: var(--am-diagram-accent);
+            --ink: var(--am-diagram-accent-ink);
+          }
+          .marker[data-tone="neutral"] {
+            --tone: var(--am-diagram-neutral);
+            --ink: var(--am-diagram-neutral-ink);
+          }
+          .marker[data-status="waiting"] {
+            border-style: dashed;
+            border-color: var(--tone);
+            background: var(--am-surface);
+            color: var(--tone);
+            box-shadow: none;
+          }
+          .marker[data-status="executing"] {
+            animation: am-diagram-pulse 1.2s ease-in-out infinite;
+          }
+          .marker[data-status="failed"] {
+            border-width: 3px;
+          }
+          .marker[data-status="done"] {
+            opacity: 0.6;
+            box-shadow: none;
+          }
+          @keyframes am-diagram-pulse {
+            0%,
+            100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.55;
+            }
+          }
+          .diagram-status {
+            color: var(--am-text-muted);
+            font-size: var(--am-font-size-s);
+            margin: var(--am-space-xs) 0 0;
+          }
+          .node-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: var(--am-space-s);
+          }
+          .node-label {
+            font-weight: var(--am-font-weight-semibold);
+          }
+          .node-markers {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--am-space-xs);
+            margin-top: var(--am-space-2xs);
+          }
+          .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--am-space-xs);
+            font-size: var(--am-font-size-s);
+          }
+          .chip .marker {
+            position: static;
+            margin: 0;
+            width: 1.5rem;
+            height: 1.5rem;
+            font-size: 0.5625rem;
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .marker,
+            .marker[data-status="executing"] {
+              animation: none;
+              transition: none;
+            }
+          }
+        `,
+      ];
+
+      createController() {
+        return new A2uiController(this, adminApis.liveDiagram);
+      }
+
+      constructor() {
+        super();
+        this._drawn = null; // the source the canvas holds
+        this._drawing = null; // the source being drawn
+        this._failed = null; // the source mermaid could not draw (or no engine)
+        this._mode = "pending"; // pending | ready | fallback
+        this._positions = {};
+        this._resize = null;
+      }
+
+      disconnectedCallback() {
+        super.disconnectedCallback();
+        this._resize?.disconnect();
+        this._resize = null;
+      }
+
+      willUpdate(changedProperties) {
+        super.willUpdate(changedProperties);
+        applyWeight(this, this.controller?.props);
+      }
+
+      markerMap() {
+        const value = this.controller?.props?.markers;
+        return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+      }
+
+      render() {
+        const props = this.controller?.props;
+        if (!props) return nothing;
+
+        const label = str(props.label) || "Diagram";
+        const error = str(props.error);
+        const fallback = this._mode === "fallback" || !str(props.source);
+
+        return html`
+          <section aria-label=${label}>
+            <header class="diagram-head">
+              <h2 class="diagram-title">${label}</h2>
+              ${props.description
+                ? html`<p class="diagram-description">${str(props.description)}</p>`
+                : nothing}
+            </header>
+            ${error ? html`<p class="diagram-status" role="status">${error}</p>` : nothing}
+            ${fallback
+              ? this.renderNodeList(props)
+              : html`
+                  <div class="diagram-frame" part="frame">
+                    <div class="diagram-canvas" part="canvas"></div>
+                    <div class="diagram-markers">${this.renderMarkers()}</div>
+                  </div>
+                  ${this._mode === "pending"
+                    ? html`<p class="diagram-status" role="status">Loading diagram…</p>`
+                    : nothing}
+                `}
+          </section>
+        `;
+      }
+
+      renderMarkers() {
+        if (this._mode !== "ready") return nothing;
+        const rendered = [];
+        for (const [nodeId, markers] of Object.entries(this.markerMap())) {
+          const point = this._positions[nodeId];
+          if (!point || !Array.isArray(markers)) continue;
+          // Badges along the node's top edge, from its right corner
+          // leftwards, so the node's own label stays readable.
+          markers.forEach((marker, index) => {
+            const left = point.x - 4 - index * 28;
+            rendered.push(this.renderMarker(marker, `left: ${left}px; top: ${point.y}px`));
+          });
+        }
+        return rendered;
+      }
+
+      renderMarker(marker, style) {
+        const title = markerTitle(marker);
+        const tone = badgeTone(str(marker.tone));
+        const status = str(marker.status);
+        const link = marker.link && typeof marker.link === "object" ? marker.link : null;
+        const text = str(marker.initials) || "?";
+
+        if (link && str(link.surface)) {
+          const activate = (event) => this.openLink(event, link);
+          if (str(link.href)) {
+            return html`<a class="marker" data-tone=${tone} data-status=${status} style=${style}
+              href=${link.href} title=${title} aria-label=${title} @click=${activate}>${text}</a>`;
+          }
+          return html`<button type="button" class="marker" data-tone=${tone} data-status=${status}
+            style=${style} title=${title} aria-label=${title} @click=${activate}>${text}</button>`;
+        }
+        return html`<span class="marker" data-tone=${tone} data-status=${status} style=${style}
+          role="img" title=${title} aria-label=${title}>${text}</span>`;
+      }
+
+      openLink(event, link) {
+        if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        requestOpenSurface(deps, openSurfaceArgs(link), {
+          surfaceId: this.context?.dataContext?.surface?.id,
+          source: this,
+          href: link.href,
+        });
+      }
+
+      renderNodeList(props) {
+        const nodes = Array.isArray(props.nodes) ? props.nodes : [];
+        if (nodes.length === 0) return nothing;
+        return html`<ul class="node-list">
+          ${nodes.map(
+            (node) => html`<li>
+              <span class="node-label">${str(node.label) || str(node.id)}</span>
+              <div class="node-markers">
+                ${(Array.isArray(node.markers) ? node.markers : []).map(
+                  (marker) => html`<span class="chip">${this.renderMarker(marker, "")}
+                    <span>${str(marker.label)} (${str(marker.statusLabel) || str(marker.status)})</span></span>`,
+                )}
+              </div>
+            </li>`,
+          )}
+        </ul>`;
+      }
+
+      updated(changedProperties) {
+        super.updated?.(changedProperties);
+        const source = str(this.controller?.props?.source);
+        if (source && source !== this._drawn && source !== this._drawing && source !== this._failed) {
+          this.draw(source);
+        }
+        else if (this._mode === "ready") this.measure();
+      }
+
+      async draw(source) {
+        this._drawing = source;
+        if (this._mode !== "pending") {
+          this._mode = "pending";
+          this.requestUpdate();
+        }
+        const engine = await loadEngine();
+        if (this._drawing !== source) return;
+        if (!engine) {
+          this._drawing = null;
+          this._failed = source;
+          this._mode = "fallback";
+          this.requestUpdate();
+          return;
+        }
+        try {
+          const {svg} = await engine.render(`ash-a2ui-diagram-${++sequence}`, source);
+          if (this._drawing !== source) return;
+          await this.updateComplete;
+          const canvas = this.renderRoot.querySelector(".diagram-canvas");
+          if (!canvas) return;
+          canvas.innerHTML = svg;
+          this._drawn = source;
+          this._drawing = null;
+          this._mode = "ready";
+          this.observeResize(canvas);
+          this.measure();
+          this.requestUpdate();
+        } catch (error) {
+          console.error("liveDiagram: mermaid could not render the diagram", error);
+          this._drawing = null;
+          this._failed = source;
+          this._mode = "fallback";
+          this.requestUpdate();
+        }
+      }
+
+      observeResize(canvas) {
+        if (this._resize || typeof ResizeObserver !== "function") return;
+        this._resize = new ResizeObserver(() => this.measure());
+        this._resize.observe(canvas);
+      }
+
+      /** Node top-right corners relative to the frame, for every node
+       * holding markers. */
+      measure() {
+        const frame = this.renderRoot.querySelector(".diagram-frame");
+        const canvas = this.renderRoot.querySelector(".diagram-canvas");
+        if (!frame || !canvas) return;
+        const origin = frame.getBoundingClientRect();
+        const positions = {};
+        for (const nodeId of Object.keys(this.markerMap())) {
+          const node = findNode(canvas, nodeId);
+          if (!node) continue;
+          const box = node.getBoundingClientRect();
+          positions[nodeId] = {
+            x: Math.round(box.right - origin.left + frame.scrollLeft),
+            y: Math.round(box.top - origin.top + frame.scrollTop),
+          };
+        }
+        if (JSON.stringify(positions) !== JSON.stringify(this._positions)) {
+          this._positions = positions;
+          this.requestUpdate();
+        }
+      }
+    }
+
+    customElements.define(tag, AshAdminLiveDiagram);
   }
 
   // --- ConfirmDialog: destructive confirmation -------------------------------

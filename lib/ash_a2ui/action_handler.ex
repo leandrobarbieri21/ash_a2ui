@@ -151,6 +151,10 @@ defmodule AshA2ui.ActionHandler do
       not checked: the opened surface authorizes its own read. A missing
       or empty `"surface"` (a row without a link for that field) is
       acknowledged.
+      A context carrying `"diagram" => name` instead of `"field"` comes
+      from a diagram marker (see `AshA2ui.Diagram`): accepted when the
+      diagram's source, called again as the actor, returns a marker whose
+      server-resolved link opens `surface`.
       Returns no follow-up messages: the transport navigates —
       `AshA2ui.LiveRenderer` hands an accepted request to its
       `"a2ui:open_surface"` handling (the `:open_surface` callback, else
@@ -778,6 +782,10 @@ defmodule AshA2ui.ActionHandler do
   # (AshA2ui.LiveRenderer routes an accepted open_surface to its
   # "a2ui:open_surface" handling). A row without a link for the field binds
   # no surface: acknowledged, nothing to open.
+  defp open_surface(%{"diagram" => diagram} = context, env) when is_binary(diagram) do
+    open_diagram_surface(diagram, Map.get(context, "surface"), env)
+  end
+
   defp open_surface(context, %{view: view, ash_opts: ash_opts}) do
     field = Map.get(context, "field")
     surface = Map.get(context, "surface")
@@ -802,6 +810,27 @@ defmodule AshA2ui.ActionHandler do
         {:error,
          [status(view, "Field #{inspect(field)} does not link to #{inspect(surface)} here.")]}
     end
+  end
+
+  # A diagram marker's link (the basic composition's marker Buttons):
+  # accepted only when the diagram's source, called again as this actor,
+  # returns a marker whose server-resolved link opens `surface`. A marker
+  # without a link binds no surface: acknowledged, nothing to open.
+  defp open_diagram_surface(_diagram, surface, _env) when surface in [nil, ""], do: {:ok, []}
+
+  defp open_diagram_surface(diagram, surface, %{view: view} = env) when is_binary(surface) do
+    surfaces = AshA2ui.Diagram.link_surfaces(view, diagram, env.selected, env.ash_opts)
+
+    if surface in surfaces do
+      {:ok, []}
+    else
+      {:error,
+       [status(view, "Diagram #{inspect(diagram)} does not link to #{inspect(surface)} here.")]}
+    end
+  end
+
+  defp open_diagram_surface(_diagram, _surface, %{view: view}) do
+    {:error, [status(view, ~s(Malformed open_surface action: "surface" must be a string.))]}
   end
 
   # The surfaces `field` (a client string) opens on this view: every table

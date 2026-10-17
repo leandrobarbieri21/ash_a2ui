@@ -466,7 +466,9 @@ children and destructive-confirmed row actions), a `recordPanel`
 create/edit), and a `statusBanner` bound to `/ui/feedback` — declared in
 `priv/a2ui/admin_v1/catalog.json`. A `display :calendar` table is a
 `calendarView` (catalog 1.3) wrapping its `dataGrid`; see the Calendars
-topic. Advanced-feature subtrees (sections,
+topic. A `diagram` is a `liveDiagram` (catalog 1.4) that loads mermaid
+only when it appears; see the Live Diagrams topic. Advanced-feature
+subtrees (sections,
 reports, export, editable, nested forms, bulk actions, wizard steps,
 boards) stay basic-composed, and query states carry plain boolean
 pagination props alongside the pagination sentinels. The default `:basic`

@@ -241,6 +241,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           "components" =>
             resolved_view
             |> with_openable_links(opts)
+            |> with_diagram_sources(opts)
             |> components(select_options(resolved_view, opts))
         }
       },
@@ -292,7 +293,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
            |> put_bulk_state(resolved_view)
            |> put_experience_state(resolved_view)
            |> put_lane_totals(resolved_view)
-           |> put_wizard_state(resolved_view)}
+           |> put_wizard_state(resolved_view)
+           |> put_diagram_state(resolved_view, opts)}
       end
 
     %{
@@ -385,6 +387,44 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       nil ->
         MapSet.new()
     end
+  end
+
+  # The component pass needs each diagram's mermaid source (a static
+  # prop) and the link-button switch; AshA2ui.Info loaded the sources once
+  # under `:diagram_values` (direct encoder calls render an empty source).
+  defp with_diagram_sources(%{diagrams: []} = view, _opts), do: view
+
+  defp with_diagram_sources(view, opts) do
+    loaded = Keyword.get(opts, :diagram_values) || %{}
+    link_buttons? = Keyword.get(opts, :link_buttons, false) == true
+
+    diagrams =
+      Enum.map(view.diagrams, fn diagram ->
+        %{
+          diagram
+          | rendered_source: get_in(loaded, [diagram.name, :source]) || "",
+            link_buttons?: link_buttons?
+        }
+      end)
+
+    %{view | diagrams: diagrams}
+  end
+
+  # The reserved /diagram state: each diagram's markers and node list (see
+  # AshA2ui.Diagram). Omitted entirely on surfaces without diagrams (frozen
+  # shape unchanged).
+  defp put_diagram_state(value, %{diagrams: []}, _opts), do: value
+
+  defp put_diagram_state(value, view, opts) do
+    loaded = Keyword.get(opts, :diagram_values) || %{}
+
+    state =
+      Map.new(view.diagrams, fn diagram ->
+        {to_string(diagram.name),
+         get_in(loaded, [diagram.name, :state]) || AshA2ui.Diagram.empty_state()}
+      end)
+
+    Map.put(value, "diagram", state)
   end
 
   # Relationship prompt fields render their loaded option list inline (the
@@ -547,6 +587,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     detail_sections = Enum.flat_map(view.details, &detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
+    diagram_sections = Enum.flat_map(view.diagrams, &basic_diagram_components(view, &1))
 
     form_components = (form && form_components(view, form)) || []
 
@@ -566,6 +607,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       root
       | surface_title_components(view) ++
           context_sections ++
+          diagram_sections ++
           table_sections ++ detail_sections ++ report_sections ++ form_components
     ] ++
       form_descendants(view, form, options) ++ [status | action_result_components()]
@@ -620,6 +662,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
+    diagram_sections = Enum.map(view.diagrams, &admin_diagram_component/1)
 
     detail_children =
       Enum.flat_map(view.components, fn
@@ -641,12 +684,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         form_children ++
           ["status_banner"] ++
           context_children(view) ++
+          diagram_children(view) ++
           table_children ++ detail_children ++ ["action_result_panel"]
     }
 
     [
       root
       | context_sections ++
+          diagram_sections ++
           table_sections ++ detail_sections ++ report_sections ++ form_sections
     ] ++ [admin_status_banner() | action_result_components()]
   end
@@ -1179,7 +1224,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     title_child(view) ++
       form_child ++
-      ["status_text"] ++ context_children ++ component_children ++ ["action_result_panel"]
+      ["status_text"] ++
+      context_children ++
+      diagram_children(view) ++ component_children ++ ["action_result_panel"]
   end
 
   # The title child — present exactly when surface_title_components/1
@@ -1647,6 +1694,142 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     else
       []
     end
+  end
+
+  # --- live diagrams (see AshA2ui.Diagram) ---
+
+  # Diagrams sit after the context pickers, before the tables, in
+  # declaration order.
+  defp diagram_children(view), do: Enum.map(view.diagrams, &diagram_id/1)
+
+  defp diagram_id(diagram), do: "diagram_#{diagram.name}"
+
+  # The admin catalog's liveDiagram (catalog 1.4): the mermaid source as a
+  # static prop, the markers (keyed by node id) and the node list bound to
+  # /diagram/<name>. The renderer loads mermaid only when it appears.
+  defp admin_diagram_component(diagram) do
+    path = AshA2ui.Diagram.data_path(diagram.name)
+
+    %{
+      "id" => diagram_id(diagram),
+      "component" => "liveDiagram",
+      "label" => AshA2ui.Diagram.label(diagram),
+      "source" => diagram.rendered_source,
+      "markers" => %{"path" => "#{path}/markers"},
+      "nodes" => %{"path" => "#{path}/nodes"},
+      "error" => %{"path" => "#{path}/error"}
+    }
+    |> maybe_put("description", diagram.description)
+  end
+
+  # The basic composition (and any basic renderer's view of a diagram): a
+  # heading, the unavailable message, and a List of the nodes that hold
+  # markers, each a Card with the node label over a List of its markers
+  # (initials, label, status). With `link_buttons: true` a linked marker's
+  # label is a borderless Button dispatching "open_surface" with the
+  # diagram's name — the handler accepts only a surface the diagram's own
+  # markers link to for this actor.
+  defp basic_diagram_components(view, diagram) do
+    base = diagram_id(diagram)
+    path = AshA2ui.Diagram.data_path(diagram.name)
+    description = (diagram.description && ["#{base}_description"]) || []
+
+    [
+      %{
+        "id" => base,
+        "component" => "Column",
+        "children" => ["#{base}_heading"] ++ description ++ ["#{base}_error", "#{base}_nodes"]
+      },
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" => AshA2ui.Diagram.label(diagram),
+        "variant" => "h2"
+      },
+      %{"id" => "#{base}_error", "component" => "Text", "text" => %{"path" => "#{path}/error"}},
+      %{
+        "id" => "#{base}_nodes",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_node", "path" => "#{path}/nodes"}
+      },
+      %{"id" => "#{base}_node", "component" => "Card", "child" => "#{base}_node_body"},
+      %{
+        "id" => "#{base}_node_body",
+        "component" => "Column",
+        "children" => ["#{base}_node_label", "#{base}_node_markers"]
+      },
+      %{
+        "id" => "#{base}_node_label",
+        "component" => "Text",
+        "text" => %{"path" => "label"},
+        "variant" => "h4"
+      },
+      %{
+        "id" => "#{base}_node_markers",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_marker", "path" => "markers"}
+      }
+    ] ++ description_components(diagram, base) ++ marker_components(view, diagram, base)
+  end
+
+  defp description_components(%{description: nil}, _base), do: []
+
+  defp description_components(diagram, base) do
+    [%{"id" => "#{base}_description", "component" => "Text", "text" => diagram.description}]
+  end
+
+  defp marker_components(view, diagram, base) do
+    label_id = "#{base}_marker_label"
+    label_child = if diagram.link_buttons?, do: "#{label_id}_link", else: label_id
+
+    [
+      %{
+        "id" => "#{base}_marker",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["#{base}_marker_initials", label_child, "#{base}_marker_status"]
+      },
+      %{
+        "id" => "#{base}_marker_initials",
+        "component" => "Text",
+        "text" => %{"path" => "initials"},
+        "variant" => "caption"
+      },
+      %{"id" => label_id, "component" => "Text", "text" => %{"path" => "label"}},
+      %{
+        "id" => "#{base}_marker_status",
+        "component" => "Text",
+        "text" => %{"path" => "statusLabel"},
+        "variant" => "caption"
+      }
+    ] ++ marker_link_button(view, diagram, label_id)
+  end
+
+  defp marker_link_button(_view, %{link_buttons?: false}, _label_id), do: []
+
+  defp marker_link_button(view, diagram, label_id) do
+    [
+      %{
+        "id" => "#{label_id}_link",
+        "component" => "Button",
+        "variant" => "borderless",
+        "child" => label_id,
+        "action" => %{
+          "event" => %{
+            "name" => "open_surface",
+            "context" =>
+              put_contexts_binding(
+                %{
+                  "diagram" => to_string(diagram.name),
+                  "surface" => %{"path" => "link/surface"},
+                  "recordId" => %{"path" => "link/recordId"}
+                },
+                view
+              )
+          }
+        }
+      }
+    ]
   end
 
   # --- query controls (search / filters / pagination) ---

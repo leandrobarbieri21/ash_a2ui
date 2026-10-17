@@ -18,7 +18,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
   @kinds ~w(entityPage dataGrid emptyState pagination recordPanel fieldDisplay formSection actionBar statusBanner confirmDialog)
 
   # Kinds added after 1.0, each additive within the catalog id.
-  @additive_kinds ~w(calendarView)
+  @additive_kinds ~w(calendarView liveDiagram)
 
   # The pinned property names per kind, straight from the contract.
   @pinned_props %{
@@ -91,8 +91,6 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
   test "catalog 1.3 is additive: calendarView" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.3.0"
-    assert Experience.admin_catalog_version() == "1.3.0"
     assert catalog["catalogId"] == Experience.admin_catalog_id()
 
     calendar = catalog["components"]["calendarView"]
@@ -103,6 +101,20 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
 
     assert calendar["properties"]["granularity"]["enum"] == ["day", "week", "month"]
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
+  end
+
+  @tag ac: "A2UI-108/AC-4"
+  test "catalog 1.4 is additive: liveDiagram" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.4.0"
+    assert Experience.admin_catalog_version() == "1.4.0"
+    assert catalog["catalogId"] == Experience.admin_catalog_id()
+
+    diagram = catalog["components"]["liveDiagram"]
+    assert diagram["properties"]["component"]["const"] == "liveDiagram"
+    assert diagram["required"] == ["component", "source", "markers"]
+    assert Map.has_key?(catalog["x-changelog"], "1.4.0")
   end
 
   @tag ac: "A2UI-101B/AC-12"
