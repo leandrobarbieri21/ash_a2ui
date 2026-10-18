@@ -50,7 +50,10 @@ defmodule AshA2ui.ResolvedView do
       `belongs_to` (option-loading config in `prompt_selects`, keyed by
       field name and loaded at `/options/<field>` like a form select), a
       ChoicePicker over an enumerated argument or attribute, a CheckBox, a
-      DateTimeInput, or a TextField
+      DateTimeInput, or a TextField. A relationship field scoped by the
+      action's `prompt_options` carries the scope on its `select` (see
+      `t:select/0`) and is left out of `prompt_selects`: its options are
+      read per row, never surface-wide
     * `diagrams` lists the surface's `diagram` entities in declaration
       order (see `AshA2ui.Diagram`)
 
@@ -97,15 +100,21 @@ defmodule AshA2ui.ResolvedView do
   makes the select searchable: options refresh through the `"option_search"`
   action and selection round-trips through `"option_select"` instead of a
   static ChoicePicker.
+
+  A relationship prompt field scoped by its action's `prompt_options` also
+  carries `scope` (`%{read_action:, record_argument:}`): its options are
+  read per row through that destination read action, the row's primary key
+  passed as `record_argument` (see `AshA2ui.PromptOptions`).
   """
   @type select :: %{
-          relationship: atom,
-          destination: module,
-          option_label: atom,
-          option_value: atom,
-          option_sort: atom,
-          option_limit: pos_integer,
-          search_fields: [atom]
+          required(:relationship) => atom,
+          required(:destination) => module,
+          required(:option_label) => atom,
+          required(:option_value) => atom,
+          required(:option_sort) => atom,
+          required(:option_limit) => pos_integer,
+          required(:search_fields) => [atom],
+          optional(:scope) => %{read_action: atom, record_argument: atom}
         }
 
   @typedoc """
@@ -222,7 +231,10 @@ defmodule AshA2ui.ResolvedView do
   `choices` as `{value, label}` pairs, `:check_box`, `:date_time_input`
   with `date_only?`, or `:text_field` with `numeric?`). The value binds
   `/prompt/values/<action>/<field>` and is cast server-side against the
-  action's argument or accepted attribute, as before.
+  action's argument or accepted attribute, as before. A `:select` whose
+  `select` carries a `scope` (the action's `prompt_options`) lists the
+  options of the row the prompt is opened on, at
+  `/prompt/options/<action>/<field>`.
   """
   @type prompt_field :: %{
           name: atom,
@@ -988,9 +1000,13 @@ defmodule AshA2ui.ResolvedView do
   # A prompt field is a relationship select by the same rule as a form
   # field: an explicit `relationship` on its `field` entity, or a name
   # matching a `belongs_to` source_attribute.
+  # A field scoped by its action's `prompt_options` reads its options per
+  # row, so only the unscoped prompt fields get a surface-wide option list
+  # (`/options/<field>`).
   defp resolve_prompt_selects(resource, actions, declared) do
-    for {_name, %{prompt_fields: [_ | _] = fields}} <- actions,
+    for {_name, %{prompt_fields: [_ | _] = fields} = setting} <- actions,
         name <- fields,
+        is_nil(prompt_scope(setting, name)),
         field = declared[name] || %AshA2ui.Field{name: name},
         relationship = select_relationship(resource, field),
         not is_nil(relationship),
@@ -999,17 +1015,51 @@ defmodule AshA2ui.ResolvedView do
   end
 
   defp resolve_prompts(resource, actions, declared, prompt_selects) do
-    for {name, %{prompt_fields: [_ | _] = fields}} <- actions, into: %{} do
+    for {name, %{prompt_fields: [_ | _] = fields} = setting} <- actions, into: %{} do
       ash_action = ResourceInfo.action(resource, name)
 
       {name,
-       Enum.map(fields, &prompt_field(resource, ash_action, declared[&1], &1, prompt_selects))}
+       Enum.map(
+         fields,
+         &prompt_field(
+           resource,
+           ash_action,
+           declared[&1],
+           &1,
+           prompt_select(resource, setting, declared, &1, prompt_selects)
+         )
+       )}
     end
   end
 
-  defp prompt_field(resource, ash_action, declared, name, prompt_selects) do
+  # The select config of one prompt field: the shared surface-wide one, or
+  # — when the action scopes the field — its own, carrying the scope.
+  defp prompt_select(resource, setting, declared, name, prompt_selects) do
+    case prompt_scope(setting, name) do
+      nil ->
+        prompt_selects[name]
+
+      %AshA2ui.PromptOptions{read_action: read_action, record_argument: record_argument} ->
+        field = declared[name] || %AshA2ui.Field{name: name}
+
+        case select_relationship(resource, field) do
+          nil ->
+            nil
+
+          relationship ->
+            field
+            |> resolve_select(relationship)
+            |> Map.put(:scope, %{read_action: read_action, record_argument: record_argument})
+        end
+    end
+  end
+
+  defp prompt_scope(setting, name) do
+    Enum.find(Map.get(setting, :prompt_options) || [], &(&1.field == name))
+  end
+
+  defp prompt_field(resource, ash_action, declared, name, select) do
     {type, constraints} = prompt_input_type(resource, ash_action, name)
-    select = prompt_selects[name]
     choices = AshA2ui.TypeMapper.type_choices(type, constraints)
 
     widget =

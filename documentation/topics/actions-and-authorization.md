@@ -155,7 +155,10 @@ search text and the picked label live at `/prompt/select/<action>/<field>`,
 results at `/options/<field>`, and each result dispatches `option_select`
 with `"prompt": "<action>"`, which re-reads the picked record as the actor and
 writes its value to `/prompt/values/<action>/<field>` (never `/form`). The
-`prompt` pre-fill writes the current value's label there too.
+`prompt` pre-fill writes the current value's label there too. A current
+value the actor could not pick (unreadable, or outside a `prompt_options`
+scope) is pre-filled as `""`, so the field shows no selection and submits
+none.
 
 Under the admin catalog the prompt is a dialog the dataGrid opens: the
 action's `rowActions` entry carries `prompt` (`content` — a grid child
@@ -176,9 +179,73 @@ is ignored entirely — the pre-Wave-4 empty-params behavior is unchanged.
 Protocol notes: Modal open/close is client-side (the v0.9.1 basic catalog
 has no server-controlled open state), so the server cannot force the Modal
 shut — the frozen contract is only the `prompt` pre-fill and the `invoke`
-`"values"` map. Prompt inputs bind **absolute** `/prompt/...` paths because
-the catalog's `Action.context` values cannot nest objects; the shared state
+`"values"` map. The AshA2ui catalogs close it themselves: their Modal
+(`<ash-a2ui-modal>`, in `ash_a2ui_catalog.js` and — so boards and other
+basic-composed prompts behave alike there — in the admin catalog) watches
+the outcome of an `invoke` dispatched from inside it and closes on
+`/ui/feedback` kind `"success"`; an error keeps it open over the field
+errors. A stock basic renderer closes it through its × button only.
+
+Prompt inputs bind **absolute** `/prompt/...` paths because the catalog's `Action.context` values cannot nest objects; the shared state
 is safe because only one Modal is open at a time.
+
+### Per-row option scopes (`prompt_options`)
+
+A relationship prompt field lists every option the actor can read. When
+only some options apply to the row — a task delegated only to its
+candidates — scope the field on the `action` entity:
+
+```elixir
+action :delegate do
+  prompt_fields [:principal_id]
+
+  prompt_options :principal_id do
+    read_action :candidates_for_task   # a read action of the destination
+    record_argument :task_id           # receives the row's primary key
+  end
+end
+```
+
+```elixir
+# on the destination (Principal)
+read :candidates_for_task do
+  argument :task_id, :uuid, allow_nil?: false
+  filter expr(exists(candidacies, task_id == ^arg(:task_id)))
+end
+```
+
+The scope stays server-authoritative:
+
+- The options are read as the actor (the surface's actor, tenant and
+  `authorize?`) through `read_action`, with the row's primary key as
+  `record_argument`. The row itself is first re-read through the surface's
+  read action, with the action's `visible_when` enforced: a row the actor
+  cannot read (or that the action does not apply to) gets no options.
+- The client sends no filter — only the row's id, which the server
+  re-reads. The field renders as the option-list composite
+  (`row_action_<action>_prompt_select_<field>`) over
+  `/prompt/options/<action>/<field>`, which the `prompt` pre-fill writes for
+  the row (with the row's id at `/prompt/record/<action>`); its options are
+  never inlined in the component tree or loaded surface-wide at
+  `/options/<field>`. With `option_search` on the field, the composite also
+  gets search controls; `option_search` searches within the scope and
+  writes `/prompt/options/<action>/<field>`.
+- Each result dispatches `option_select` with `"prompt"` and
+  `"recordId": {"path": "/prompt/record/<action>"}`; the server re-reads the
+  row and the picked value through the scope before writing
+  `/prompt/values/<action>/<field>`. `invoke` re-reads every picked value
+  through the scope of the row it is invoked on, so a spoofed or stale
+  value outside it fails on `/errors/<field>` ("is not one of the available
+  options").
+- A success resets the prompt's options and row with its values.
+- Verified at compile time: the field is one of the action's
+  `prompt_fields` and a relationship select, `read_action` is a read action
+  of the relationship's destination, `record_argument` is one of its
+  arguments, and it requires no other argument without a default (the
+  scope read passes only `record_argument`).
+
+An unscoped prompt over the same field (another action) keeps its full
+list, and form selects are unaffected.
 
 ## Action labels (`label`)
 

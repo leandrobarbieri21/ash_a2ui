@@ -28,7 +28,9 @@ custom hooks, and tests can rely on them.
 | `/query/<component_name>` | One table's query state on a **multi-table** surface | Same as `/query`, per table |
 | `/_lane_total_<lane>` | A board lane's total as a string (`"3"`, `"5+"`) — only on surfaces with `display :board` tables | Initial render; action refreshes and `query` actions on that lane. A `scope: :records` push leaves it untouched |
 | `/prompt/values/<action>` | The input values of a prompt-enabled row action's Modal (only on surfaces with `prompt_fields` actions) | Initial render (empty); pre-filled on `prompt`; a prompt `option_select` writes a searchable relationship field's value; cleared after a successful prompt `invoke` |
-| `/prompt/select/<action>/<field>` | A searchable relationship prompt field's state (`{"search", "label"}`) — only on surfaces with such a field | Initial render (empty); the picked label on `prompt` (pre-fill) and on a prompt `option_select`; cleared after a successful prompt `invoke` |
+| `/prompt/select/<action>/<field>` | A searchable or per-row scoped (`prompt_options`) relationship prompt field's state (`{"search", "label"}`) — only on surfaces with such a field | Initial render (empty); the picked label on `prompt` (pre-fill) and on a prompt `option_select`; cleared after a successful prompt `invoke` |
+| `/prompt/options/<action>/<field>` | A scoped (`prompt_options`) relationship prompt field's options for the row the prompt is open on (`[{"label", "value"}]`) — only on surfaces with such a field | Initial render (`[]`); the row's options on `prompt`; a scoped `option_search`; reset to `[]` after a successful prompt `invoke` |
+| `/prompt/record/<action>` | The id of the row a scoped prompt is open on, carried back by its `option_select` / `option_search` (the server re-reads it) | Initial render (`""`); `prompt`; reset to `""` after a successful prompt `invoke` |
 | `/context/<name>` | One surface context's selection state (`{"search", "value", "label"}`) — only on surfaces with `context` entities | Initial render; every `context_select`/`context_clear` (the whole `/context` map is rewritten) |
 | `/options/<context>` | A picker context's option list (same `{"label","value"}` shape; shares the `/options` namespace) | Initial render; `context_search`; cascades that re-derive a dependent context's options |
 | `/detail/<context>` | The selected record of a context rendered by `:detail` components (`{}` while unselected) | Initial render; every selection change of that context |
@@ -428,6 +430,10 @@ shared across rows (only one Modal is open at a time). Conventions:
   `"values": {"path": "/prompt/values/<action>"}`; a success clears the
   action's values map back to `{}`, a validation failure writes
   `/errors/<field>` (rendered inside the Modal).
+- A relationship field scoped per row (`prompt_options`) adds
+  `/prompt/options/<action>/<field>` (the row's options, read as the actor
+  through the scope's read action) and `/prompt/record/<action>` (the row's
+  id), both written by `prompt` and reset with the values on success.
 
 ## `/context/<name>` and `/detail/<context>` — surface contexts
 

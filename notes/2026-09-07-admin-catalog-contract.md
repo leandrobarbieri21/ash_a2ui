@@ -256,3 +256,57 @@ View panel that could not be closed, and every row action on every row.
   past its frame (renderer-only).
 - Entry labels come from the action entity's `label` when declared (the
   humanized action name otherwise), as do the basic buttons'.
+
+
+## Addendum (2026-10-17): the settle contract, board prompts, per-row options
+
+Adopting the admin catalog in clinic-demo found three more issues. The
+catalog version and id are unchanged: no prop was added or changed.
+
+- **Settle on every outcome write.** A dispatching component (an
+  `actionBar` primary, a `dataGrid` row action) is busy from its click until
+  the data model next reports an outcome write to `/ui/feedback` or
+  `/ui/response`. The renderer subscribes to those **object** paths. The
+  data model gives an object path a fresh copy on every write at, above or
+  below it, so the subscription fires on every write, including one that
+  leaves the value unchanged. It used to subscribe to the primitive
+  `/ui/feedback/message`, which only fires when the message text changes.
+  `view_record` and `cancel_record_task` write the already-clear feedback,
+  so after View and Cancel on a page with no earlier message, the View
+  button kept its spinner until another action reported. The server
+  contract is unchanged: every AshA2ui action these components dispatch
+  writes `/ui/feedback` (and, on v1.0, `/ui/response`). A server ack was
+  not needed. Only path writes count: a write that replaces the whole
+  data model (`path: "/"`, from a LiveRenderer PubSub refresh or a
+  URL-state change) also fires those subscriptions, and resets
+  `/ui/feedback` to clear, but it is not the action's outcome. The
+  renderer skips it by the root object's identity (a path write changes
+  the model in place). Without that, a refresh queued ahead of the reply
+  re-enabled the button early. The shared helper is
+  `subscribeActionOutcomes` in `ash_a2ui_catalog.js`.
+- **Prompt Modals close on success.** Boards (and every basic-composed
+  prompt) render a prompt as the basic `Modal`, whose stock element closes
+  only through its × button. After a successful Confirm the server reset
+  `/prompt/values/<action>`, so the dialog stayed open over cleared fields.
+  The admin catalog, like the merged basic catalog
+  (`createAshA2uiCatalog`), now registers `<ash-a2ui-modal>` for `Modal`.
+  This is a subclass of the upstream element, defined once in
+  `ash_a2ui_catalog.js` (`promptModalComponent`). When a Button inside the
+  open dialog dispatches an `invoke`, the element waits for the next
+  `/ui/feedback` path write that carries a `kind` (a whole-model refresh
+  is skipped, as above). On `kind == "success"` it closes. On anything else
+  it stays open over the field errors and shows the `/ui/feedback` message
+  below the content: the basic prompt content binds only the per-field
+  `/errors/<field>` captions, and the status Text sits behind the dialog's
+  backdrop. This matches the `dataGrid` prompt dialog (1.2), which shows
+  the message as `prompt.error`. The emitted tree is still basic `Modal`.
+- **Per-row prompt options** (`prompt_options` on the `action` entity). A
+  scoped relationship prompt field renders as the option-list composite
+  (`row_action<sfx>_<action>_prompt_select_<field>`). Its `_options` List
+  is templated over `/prompt/options/<action>/<field>`, and its option
+  buttons dispatch `option_select` with `"prompt"` and `"recordId": {"path":
+  "/prompt/record/<action>"}`. The same Column sits inside the `dataGrid`
+  prompt content, so the admin dialog needs no change. The server writes
+  the row's options (read as the actor through the scope's read action)
+  and the row id on `prompt`, and re-reads both on `option_select`,
+  `option_search` and `invoke`.

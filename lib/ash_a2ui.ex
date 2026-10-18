@@ -1238,6 +1238,66 @@ defmodule AshA2ui do
     ]
   }
 
+  @prompt_options %Spark.Dsl.Entity{
+    name: :prompt_options,
+    describe: """
+    The per-row option scope of a relationship prompt field: the prompt
+    offers only the options `read_action` (a read action of the
+    relationship's destination) returns for the row it is opened on, its
+    `record_argument` receiving the row's primary key. Without it a
+    relationship prompt lists every option the actor can read.
+
+    Server-authoritative: the read runs as the actor, with the actor's
+    tenant, for a row the actor can read through the surface's read action
+    (and that passes the action's `visible_when`). The client never sends a
+    filter — only the row's id, which the server re-reads. The field renders
+    as an option list over `/prompt/options/<action>/<field>` (the `prompt`
+    pre-fill writes the row's options there; `option_search` refreshes them
+    when the field declares `option_search`), never as options inlined in
+    the component tree or loaded surface-wide, and every picked value is
+    re-read through the same scope by `option_select` and again by `invoke`
+    before the write — a value outside the row's scope is refused as a field
+    error.
+    """,
+    examples: [
+      """
+      action :delegate do
+        prompt_fields [:principal_id]
+
+        prompt_options :principal_id do
+          read_action :candidates_for_task
+          record_argument :task_id
+        end
+      end
+      """
+    ],
+    target: AshA2ui.PromptOptions,
+    args: [:field],
+    schema: [
+      field: [
+        type: :atom,
+        required: true,
+        doc:
+          "The prompt field this scope applies to: one of the action's `prompt_fields`, a relationship select."
+      ],
+      read_action: [
+        type: :atom,
+        required: true,
+        doc: """
+        A read action of the relationship's destination returning the options
+        for one row. Its preparations and policies run as the actor, so it can
+        read anything the row's candidates depend on.
+        """
+      ],
+      record_argument: [
+        type: :atom,
+        required: true,
+        doc:
+          "The argument of `read_action` that receives the row's primary key. The scope read passes no other input, so any other argument the read action requires needs a default."
+      ]
+    ]
+  }
+
   @action %Spark.Dsl.Entity{
     name: :action,
     describe: """
@@ -1259,6 +1319,17 @@ defmodule AshA2ui do
       end
       """,
       """
+      action :delegate do
+        prompt_fields [:principal_id]
+
+        # Only the task's candidates, read as the actor.
+        prompt_options :principal_id do
+          read_action :candidates_for_task
+          record_argument :task_id
+        end
+      end
+      """,
+      """
       action :confirm_merge do
         label "Confirm match"
       end
@@ -1273,6 +1344,7 @@ defmodule AshA2ui do
     ],
     target: AshA2ui.Action,
     args: [:name],
+    entities: [prompt_options: [@prompt_options]],
     schema: [
       name: [
         type: :atom,
@@ -1306,7 +1378,9 @@ defmodule AshA2ui do
         Arguments/accepts of the Ash action collected from the user in a
         per-row Modal prompt before the action is invoked (row actions only).
         Clicking the row button opens the Modal instead of invoking directly;
-        its confirm button sends `invoke` with a `"values"` map.
+        its confirm button sends `invoke` with a `"values"` map. A
+        relationship prompt field lists every option the actor can read
+        unless a `prompt_options` entity scopes it to the row.
         """
       ],
       prompt_title: [

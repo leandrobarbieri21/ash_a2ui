@@ -84,6 +84,17 @@ defmodule AshA2ui.ActionHandler do
       prompt field's current record value when it is a public attribute,
       `""` otherwise) and clearing `/errors`. No Ash write happens — the
       write is the subsequent `"invoke"` from the Modal's confirm button.
+      A relationship prompt field scoped by the action's `prompt_options`
+      also gets the row's options, read as the actor through the scope's
+      read action with the row's primary key as its `record_argument`, at
+      `/prompt/options/<action>/<field>`, and the row's id at
+      `/prompt/record/<action>`. That field's `"option_select"` and
+      `"option_search"` (context `"prompt" => action, "recordId" => id`)
+      re-read the row through the surface's read action (with the action's
+      `visible_when` enforced) and evaluate the same scope: a value outside
+      it is refused, and search results go to
+      `/prompt/options/<action>/<field>`. `"invoke"` re-reads every picked
+      value through the scope of the row it is invoked on before the write.
 
     * `"bulk_invoke"` / `"bulk_select"` — bulk actions over a row selection
       on tables declaring `bulk_actions` (see `AshA2ui.Bulk` and the Bulk
@@ -562,37 +573,16 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp dispatch("option_search", context, %{view: view, ash_opts: ash_opts}) do
+  defp dispatch("option_search", context, %{view: view} = env) do
     name = Map.get(context, "field")
     search = Map.get(context, "search") || ""
-    source = is_binary(name) && option_source(view, name)
 
-    cond do
-      not is_binary(name) ->
-        {:error, [status(view, ~s(Malformed option_search action: context is missing "field".))]}
+    case is_binary(name) && option_select_target(view, name, Map.get(context, "prompt")) do
+      {{:prompt, _action}, _field, %{scope: %{}}} = target ->
+        scoped_option_search(target, search, context, env)
 
-      match?({_name, %{search_fields: [_ | _]}}, source) == false ->
-        {:error,
-         [
-           status(
-             view,
-             "Field #{inspect(name)} is not a searchable select: it declares no option_search."
-           )
-         ]}
-
-      not is_binary(search) ->
-        {:error, [status(view, ~s(Malformed option_search action: "search" must be a string.))]}
-
-      true ->
-        {source_name, source_config} = source
-
-        case search_options(source_config, search, ash_opts) do
-          {:ok, options} ->
-            {:ok, [update_data_model(view, "/options/#{source_name}", options)]}
-
-          {:error, error} ->
-            {:error, error_messages(view, error)}
-        end
+      _form_or_unscoped ->
+        option_search(name, search, env)
     end
   end
 
@@ -605,7 +595,7 @@ defmodule AshA2ui.ActionHandler do
       not is_binary(name) ->
         {:error, [status(view, ~s(Malformed option_select action: context is missing "field".))]}
 
-      select in [nil, false] or match?({_target, _f, %{search_fields: []}}, select) ->
+      not option_selectable?(select) ->
         {:error,
          [
            status(
@@ -619,7 +609,10 @@ defmodule AshA2ui.ActionHandler do
 
       true ->
         {target, field, select_config} = select
-        selected_option_messages(view, target, field, select_config, value, ash_opts)
+
+        with {:ok, row} <- option_row(view, target, select_config, context, ash_opts) do
+          selected_option_messages(view, target, field, select_config, value, ash_opts, row)
+        end
     end
   end
 
@@ -882,8 +875,8 @@ defmodule AshA2ui.ActionHandler do
   # The option_select success path: re-fetch the picked record (policies
   # apply — spoofed / unauthorized ids never reach /form), then write the
   # value and its canonical label.
-  defp selected_option_messages(view, target, field, select_config, value, ash_opts) do
-    case fetch_option(select_config, value, ash_opts) do
+  defp selected_option_messages(view, target, field, select_config, value, ash_opts, row) do
+    case fetch_option(select_config, value, ash_opts, row) do
       {:ok, record} ->
         entry = AshA2ui.Info.option_entry(record, select_config)
         {value_path, state_path} = option_select_paths(target, field)
@@ -931,6 +924,90 @@ defmodule AshA2ui.ActionHandler do
   defp option_select_paths({:prompt, action}, field),
     do: {"/prompt/values/#{action}/#{field}", "/prompt/select/#{action}/#{field}"}
 
+  # option_select takes a searchable select, or a prompt field scoped per
+  # row (prompt_options) — whose option list is always picked through it.
+  defp option_selectable?({_target, _field, %{scope: %{}}}), do: true
+  defp option_selectable?({_target, _field, %{search_fields: [_ | _]}}), do: true
+  defp option_selectable?(_select), do: false
+
+  # The row a scoped prompt option read evaluates its scope for: the
+  # context's "recordId", re-read as the actor (visible_when enforced).
+  # Unscoped sources have none.
+  defp option_row(view, {:prompt, action}, %{scope: %{}}, context, ash_opts) do
+    prompt_row(view, Map.fetch!(view.actions, action), Map.get(context, "recordId"), ash_opts)
+  end
+
+  defp option_row(_view, _target, _select_config, _context, _ash_opts), do: {:ok, nil}
+
+  # A form select's (or an unscoped searchable prompt field's) search:
+  # results go to the shared /options/<field> list.
+  defp option_search(name, search, %{view: view, ash_opts: ash_opts}) do
+    source = is_binary(name) && option_source(view, name)
+
+    cond do
+      not is_binary(name) ->
+        {:error, [status(view, ~s(Malformed option_search action: context is missing "field".))]}
+
+      match?({_name, %{search_fields: [_ | _]}}, source) == false ->
+        {:error,
+         [
+           status(
+             view,
+             "Field #{inspect(name)} is not a searchable select: it declares no option_search."
+           )
+         ]}
+
+      not is_binary(search) ->
+        {:error, [status(view, ~s(Malformed option_search action: "search" must be a string.))]}
+
+      true ->
+        {source_name, source_config} = source
+
+        case search_options(source_config, search, ash_opts) do
+          {:ok, options} ->
+            {:ok, [update_data_model(view, "/options/#{source_name}", options)]}
+
+          {:error, error} ->
+            {:error, error_messages(view, error)}
+        end
+    end
+  end
+
+  # A scoped prompt field's search: within the row's scope, results to the
+  # prompt's own /prompt/options/<action>/<field>.
+  defp scoped_option_search({{:prompt, action}, field, select}, search, context, env) do
+    %{view: view, ash_opts: ash_opts} = env
+
+    cond do
+      select.search_fields == [] ->
+        {:error,
+         [
+           status(
+             view,
+             "Field #{inspect(to_string(field))} is not a searchable select: it declares no option_search."
+           )
+         ]}
+
+      not is_binary(search) ->
+        {:error, [status(view, ~s(Malformed option_search action: "search" must be a string.))]}
+
+      true ->
+        with {:ok, row} <- option_row(view, {:prompt, action}, select, context, ash_opts) do
+          scoped_search_messages(view, {action, field, select}, search, row, ash_opts)
+        end
+    end
+  end
+
+  defp scoped_search_messages(view, {action, field, select}, search, row, ash_opts) do
+    case search_options(select, search, ash_opts, row) do
+      {:ok, options} ->
+        {:ok, [update_data_model(view, "/prompt/options/#{action}/#{field}", options)]}
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
   defp option_source(view, name) do
     view
     |> ResolvedView.option_sources()
@@ -942,14 +1019,10 @@ defmodule AshA2ui.ActionHandler do
   # read with the surface's actor/tenant/authorize? opts, sorted by
   # option_sort and capped at option_limit. An empty search returns the
   # default first page (same as the initial load).
-  defp search_options(source, search, ash_opts) do
+  defp search_options(source, search, ash_opts, row \\ nil) do
     query =
-      source.destination
-      |> Ash.Query.for_read(
-        ResourceInfo.primary_action!(source.destination, :read).name,
-        %{},
-        destination_opts(source.destination, ash_opts)
-      )
+      source
+      |> option_query(ash_opts, row)
       |> apply_option_search(source.search_fields, search)
       |> Ash.Query.sort([{source.option_sort, :asc}])
       |> Ash.Query.limit(source.option_limit)
@@ -974,15 +1047,12 @@ defmodule AshA2ui.ActionHandler do
   end
 
   # Reads the destination record behind a picked option value (authorized —
-  # a value the actor cannot read cannot be selected).
-  defp fetch_option(source, value, ash_opts) do
+  # a value the actor cannot read cannot be selected; through the row's
+  # scope when the source is scoped — a value outside it cannot either).
+  defp fetch_option(source, value, ash_opts, row \\ nil) do
     query =
-      source.destination
-      |> Ash.Query.for_read(
-        ResourceInfo.primary_action!(source.destination, :read).name,
-        %{},
-        destination_opts(source.destination, ash_opts)
-      )
+      source
+      |> option_query(ash_opts, row)
       |> Ash.Query.filter(^ref(source.option_value) == ^value)
       |> Ash.Query.limit(1)
 
@@ -991,6 +1061,33 @@ defmodule AshA2ui.ActionHandler do
       {:ok, []} -> :not_found
       {:error, error} -> {:error, error}
     end
+  end
+
+  # The read every option list and option re-read goes through: the
+  # destination's primary read, or — for a prompt field scoped per row
+  # (prompt_options) — the scope's read action with the row's primary key
+  # as its record_argument. Both run with the surface's actor, tenant and
+  # authorize? opts; the client contributes no filter.
+  defp option_query(
+         %{scope: %{read_action: action, record_argument: argument}} = source,
+         ash_opts,
+         row
+       ) do
+    Ash.Query.for_read(
+      source.destination,
+      action,
+      %{argument => row_key(row)},
+      destination_opts(source.destination, ash_opts)
+    )
+  end
+
+  defp option_query(source, ash_opts, _row) do
+    Ash.Query.for_read(
+      source.destination,
+      ResourceInfo.primary_action!(source.destination, :read).name,
+      %{},
+      destination_opts(source.destination, ash_opts)
+    )
   end
 
   defp destination_opts(destination, ash_opts) do
@@ -1379,7 +1476,7 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp invoke_direct(view, setting, action_name, record_id, values, env) do
-    with :ok <- check_prompt_options(view, setting, values, env.ash_opts) do
+    with :ok <- check_prompt_options(view, setting, record_id, values, env.ash_opts) do
       params = prompt_params(view, setting, action_name, values)
       dispatch_by_action_type(view, action_name, record_id, params, env)
     end
@@ -1573,26 +1670,45 @@ defmodule AshA2ui.ActionHandler do
   # option_select re-reads a picked option: the picker offers only the
   # options the actor can read, and a value it would not have offered (a
   # spoofed or stale id) is refused as a field error on that prompt field.
-  defp check_prompt_options(view, %{name: action, prompt_fields: [_ | _] = fields}, values, opts)
+  # A field scoped per row (prompt_options) is re-read through the scope of
+  # the row being invoked on, so a value outside it is refused the same way.
+  defp check_prompt_options(
+         view,
+         %{name: action, prompt_fields: [_ | _] = fields} = setting,
+         record_id,
+         values,
+         opts
+       )
        when is_map(values) do
-    unavailable =
+    picked =
       for %{name: name, select: %{} = select} <- Map.get(view.prompts, action, []),
-          Enum.any?(
-            prompt_option_values(values, name),
-            &(not match?({:ok, _record}, fetch_option(select, &1, opts)))
-          ),
-          do: InvalidAttribute.exception(field: name, message: @unavailable)
+          (picks = prompt_option_values(values, name)) != [],
+          do: {name, select, picks}
 
-    case unavailable do
-      [] ->
-        :ok
+    with {:ok, row} <- scope_row_for(view, setting, record_id, picked, opts) do
+      unavailable =
+        for {name, select, picks} <- picked,
+            Enum.any?(picks, &(not match?({:ok, _record}, fetch_option(select, &1, opts, row)))),
+            do: InvalidAttribute.exception(field: name, message: @unavailable)
 
-      errors ->
-        {:error, error_messages(view, Invalid.exception(errors: errors), fields)}
+      case unavailable do
+        [] ->
+          :ok
+
+        errors ->
+          {:error, error_messages(view, Invalid.exception(errors: errors), fields)}
+      end
     end
   end
 
-  defp check_prompt_options(_view, _setting, _values, _opts), do: :ok
+  defp check_prompt_options(_view, _setting, _record_id, _values, _opts), do: :ok
+
+  # The invoked row, read once when a scoped field has a picked value.
+  defp scope_row_for(view, setting, record_id, picked, opts) do
+    if Enum.any?(picked, fn {_name, select, _picks} -> scoped_select?(select) end),
+      do: prompt_row(view, setting, record_id, opts),
+      else: {:ok, nil}
+  end
 
   # A prompt field's picked values: a ChoicePicker binds a list, a
   # searchable select a single value; blanks are left to the action's own
@@ -1637,12 +1753,25 @@ defmodule AshA2ui.ActionHandler do
   # resource, "" otherwise (arguments have no stored value). Clears /errors
   # so stale validation messages don't show inside a fresh prompt.
   defp prompt(view, setting, record_id, ash_opts) do
+    with {:ok, record} <- prompt_row(view, setting, record_id, ash_opts) do
+      prompt_prefill_messages(view, setting, record, ash_opts)
+    end
+  end
+
+  # The row a prompt (or a scoped prompt option read) is about: read
+  # through the surface's read action as the actor, with the action's
+  # visible_when conditions enforced — the same gate invoke applies.
+  defp prompt_row(view, _setting, record_id, _ash_opts) when record_id in [nil, ""] do
+    {:error, [status(view, ~s(Malformed prompt option action: context is missing "recordId".))]}
+  end
+
+  defp prompt_row(view, setting, record_id, ash_opts) do
     loads = Conditions.condition_loads(view.resource, setting.visible_when)
 
     case fetch_record(view, record_id, ash_opts, loads) do
       {:ok, record} ->
         if Conditions.visible?(view.resource, setting.visible_when, record) do
-          {:ok, prompt_prefill_messages(view, setting, record, ash_opts)}
+          {:ok, record}
         else
           {:error,
            [
@@ -1659,49 +1788,107 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp prompt_prefill_messages(view, setting, record, ash_opts) do
-    prefill =
+    stored =
       Map.new(setting.prompt_fields, fn field ->
         {Atom.to_string(field), prefill_value(view.resource, record, field)}
       end)
 
-    [
-      update_data_model(view, "/prompt/values/#{setting.name}", prefill),
-      update_data_model(view, "/errors", %{})
-    ] ++ prompt_select_prefill(view, setting.name, prefill, ash_opts)
+    {prefill, select_state} = prompt_select_prefill(view, setting.name, stored, record, ash_opts)
+
+    with {:ok, scoped} <- prompt_scope_prefill(view, setting.name, record, ash_opts) do
+      {:ok,
+       [
+         update_data_model(view, "/prompt/values/#{setting.name}", prefill),
+         update_data_model(view, "/errors", %{})
+       ] ++ select_state ++ scoped}
+    end
   end
 
-  # Searchable relationship prompt fields show the pre-filled value's label
-  # (read as the actor: a value the actor cannot read shows no label).
-  defp prompt_select_prefill(view, action, prefill, ash_opts) do
-    searchable =
-      for %{widget: :select, select: %{search_fields: [_ | _]} = select} = field <-
-            Map.get(view.prompts, action, []),
-          do: {field.name, select}
+  # Searchable and scoped relationship prompt fields show the pre-filled
+  # value's label, read as the actor (through the row's scope when scoped).
+  # A stored value the actor could not pick (unreadable, or outside the
+  # row's scope) is not pre-filled: the field shows no selection and
+  # submits none, rather than a blank selection invoke would refuse as
+  # unavailable. Returns {prefill, messages}.
+  defp prompt_select_prefill(view, action, prefill, record, ash_opts) do
+    composite =
+      for %{widget: :select, select: %{} = select} = field <- Map.get(view.prompts, action, []),
+          match?(%{search_fields: [_ | _]}, select) or scoped_select?(select),
+          do: {Atom.to_string(field.name), select}
 
-    if searchable == [] do
-      []
+    if composite == [] do
+      {prefill, []}
     else
-      state =
-        Map.new(searchable, fn {name, select} ->
-          {Atom.to_string(name),
-           %{
-             "search" => "",
-             "label" => prefill_label(select, prefill[Atom.to_string(name)], ash_opts)
-           }}
+      {prefill, state} =
+        Enum.reduce(composite, {prefill, %{}}, fn {name, select}, {prefill, state} ->
+          {value, label} = prefill_option(select, prefill[name], record, ash_opts)
+
+          {Map.put(prefill, name, value),
+           Map.put(state, name, %{"search" => "", "label" => label})}
         end)
 
-      [update_data_model(view, "/prompt/select/#{action}", state)]
+      {prefill, [update_data_model(view, "/prompt/select/#{action}", state)]}
     end
   end
 
-  defp prefill_label(select, value, ash_opts) when is_binary(value) and value != "" do
-    case fetch_option(select, value, ash_opts) do
-      {:ok, record} -> AshA2ui.Info.option_entry(record, select)["label"]
-      _not_found_or_error -> ""
+  # Scoped relationship prompt fields (prompt_options): the row's options,
+  # read as the actor through the scope, and the row the prompt is open on
+  # (which the field's option_select / option_search carry back).
+  defp prompt_scope_prefill(view, action, record, ash_opts) do
+    case scoped_prompt_selects(view, action) do
+      [] ->
+        {:ok, []}
+
+      scoped ->
+        with {:ok, options} <- scoped_option_lists(view, scoped, record, ash_opts) do
+          {:ok,
+           [
+             update_data_model(view, "/prompt/options/#{action}", options),
+             update_data_model(view, "/prompt/record/#{action}", row_id(record))
+           ]}
+        end
     end
   end
 
-  defp prefill_label(_select, _value, _ash_opts), do: ""
+  defp scoped_option_lists(view, scoped, record, ash_opts) do
+    Enum.reduce_while(scoped, {:ok, %{}}, fn {name, select}, {:ok, acc} ->
+      case search_options(select, "", ash_opts, record) do
+        {:ok, options} -> {:cont, {:ok, Map.put(acc, Atom.to_string(name), options)}}
+        {:error, error} -> {:halt, {:error, error_messages(view, error)}}
+      end
+    end)
+  end
+
+  defp scoped_prompt_selects(view, action) do
+    for %{widget: :select, select: %{scope: %{}} = select} = field <-
+          Map.get(view.prompts, action, []),
+        do: {field.name, select}
+  end
+
+  defp scoped_select?(%{scope: %{}}), do: true
+  defp scoped_select?(_select), do: false
+
+  # {value, label} of a pre-filled option: unchanged with its label when
+  # the actor can pick it, {"", ""} when the read finds nothing. A read
+  # that fails keeps the value, without a label.
+  defp prefill_option(select, value, record, ash_opts) when is_binary(value) and value != "" do
+    case fetch_option(select, value, ash_opts, record) do
+      {:ok, option} -> {value, AshA2ui.Info.option_entry(option, select)["label"]}
+      :not_found -> {"", ""}
+      {:error, _error} -> {value, ""}
+    end
+  end
+
+  defp prefill_option(_select, value, _record, _ash_opts), do: {value, ""}
+
+  # The row's primary key: what a scope's record_argument receives, and (as
+  # a string) the id written to /prompt/record/<action>.
+  defp row_key(record) do
+    [key | _rest] = ResourceInfo.primary_key(record.__struct__)
+    Map.get(record, key)
+  end
+
+  defp row_id(record), do: to_string(row_key(record))
 
   defp prefill_value(resource, record, field) do
     if ResourceInfo.attribute(resource, field) do
@@ -2714,18 +2901,37 @@ defmodule AshA2ui.ActionHandler do
   # A successful prompt-backed invoke resets its /prompt/values/<action>
   # state so the next prompt starts clean.
   defp prompt_clear(%{view: view, setting: %{prompt_fields: [_ | _], name: name}}) do
+    fields = Map.get(view.prompts, name, [])
+
     selects =
-      if Enum.any?(
-           Map.get(view.prompts, name, []),
-           &match?(%{select: %{search_fields: [_ | _]}}, &1)
-         ),
+      if Enum.any?(fields, &match?(%{select: %{search_fields: [_ | _]}}, &1)) or
+           Enum.any?(fields, &match?(%{select: %{scope: %{}}}, &1)),
          do: [update_data_model(view, "/prompt/select/#{name}", %{})],
          else: []
 
-    [update_data_model(view, "/prompt/values/#{name}", %{}) | selects]
+    [update_data_model(view, "/prompt/values/#{name}", %{}) | selects] ++ scope_clear(view, name)
   end
 
   defp prompt_clear(_env), do: []
+
+  # A scoped prompt's options and row reset with its values: the next
+  # prompt reads its own row's options.
+  defp scope_clear(view, action) do
+    case scoped_prompt_selects(view, action) do
+      [] ->
+        []
+
+      scoped ->
+        [
+          update_data_model(
+            view,
+            "/prompt/options/#{action}",
+            Map.new(scoped, fn {field, _select} -> {Atom.to_string(field), []} end)
+          ),
+          update_data_model(view, "/prompt/record/#{action}", "")
+        ]
+    end
+  end
 
   defp refresh_messages(%{view: view, ash_opts: ash_opts, refresh: refresh} = env) do
     view

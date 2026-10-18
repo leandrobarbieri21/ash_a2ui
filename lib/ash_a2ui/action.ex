@@ -12,6 +12,10 @@ defmodule AshA2ui.Action do
   * `visible_when` is a keyword list of per-record equality conditions
     (`nil` means `is_nil`, a list means membership) that gate whether the row
     action is offered — and, mandatorily, whether the handler accepts it.
+  * `prompt_options` holds the per-row option scopes of relationship
+    prompt fields (`AshA2ui.PromptOptions`): such a field offers only the
+    options a destination read action returns for the row the prompt is
+    opened on.
   * `via` delegates a row action to a host-provided function instead of
     running the mapped Ash action directly: the row button still emits the
     ordinary `invoke` event, but the handler calls
@@ -28,6 +32,7 @@ defmodule AshA2ui.Action do
     :prompt_title,
     :via,
     prompt_fields: [],
+    prompt_options: [],
     visible_when: [],
     __spark_metadata__: nil
   ]
@@ -37,6 +42,7 @@ defmodule AshA2ui.Action do
           label: String.t() | nil,
           refreshes: [atom] | nil,
           prompt_fields: [atom],
+          prompt_options: [AshA2ui.PromptOptions.t()],
           prompt_title: String.t() | nil,
           visible_when: [{atom, term}],
           via: {module, atom, [term]} | nil

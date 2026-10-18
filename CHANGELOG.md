@@ -10,6 +10,37 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Per-row prompt options (`prompt_options`).** A relationship prompt
+  listed every option the actor could read. For example, clinic-demo's
+  delegate prompt listed every principal, not only the task's candidates.
+  A `prompt_options :field` entity on an `action` now scopes the field to
+  the row. Its `read_action` (a read action of the relationship's
+  destination) runs as the actor, with the row's primary key as its
+  `record_argument`. The scope is server-authoritative:
+  - the client sends only the row's id, never a filter;
+  - the server re-reads the row through the surface's read action, with
+    `visible_when` enforced;
+  - the options reach the client only through the `prompt` pre-fill, at
+    `/prompt/options/<action>/<field>` (with the row at
+    `/prompt/record/<action>`). They are never inlined in the component
+    tree or loaded at `/options/<field>`;
+  - `option_select`, `option_search` (scoped to the row) and `invoke`
+    re-read every picked value through the scope. A value outside it fails
+    on `/errors/<field>`.
+
+  The field renders as the option-list composite, with search controls
+  when the field declares `option_search`, in both compositions. The
+  field, the read action and its argument are checked at compile time,
+  and the read action may require no other argument without a default
+  (the scope read passes only `record_argument`).
+
+- **A prompt pre-fills a relationship value only when it can be picked.**
+  A searchable or scoped prompt select pre-filled the row's stored value
+  even when the actor could not pick it (unreadable, or outside the row's
+  scope), with an empty label. Confirming without re-picking then failed
+  with "is not one of the available options" on a field that showed no
+  selection. Such a value is now pre-filled as `""`.
+
 - **Boards in composed surfaces.** The dynamic spec carries
   `"display": "board"` with a `row_layout` and source-less `"sections"`
   (`scope_by`, `values`, `labels`, `swimlanes_by`, `swimlane_values`,
@@ -186,6 +217,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `links`.
 
 ### Bug Fixes:
+
+- **View then Cancel no longer leaves the View button spinning (admin
+  catalog).** Row-action and action-bar buttons settled only when
+  `/ui/feedback/message` changed value. `view_record` and
+  `cancel_record_task` write the already-clear feedback, so a View button
+  stayed disabled with a spinner until another action reported. The
+  renderer now subscribes to the `/ui/feedback` and `/ui/response` objects,
+  so every outcome write settles the button, including one that leaves the
+  value unchanged. A write that replaces the whole data model (a PubSub
+  refresh, a URL-state change) is not an outcome and does not settle it.
+
+- **Prompt dialogs on boards close after a successful confirm.** Board
+  cards (and every basic-composed prompt) render their prompt as the basic
+  `Modal`, which closed only through its × button. After a successful
+  Complete or Delegate the dialog stayed open with its fields cleared. The
+  merged basic catalog and the admin catalog now register
+  `<ash-a2ui-modal>`, a subclass of the stock element. It closes when an
+  `invoke` dispatched from inside it reports `kind == "success"`. Otherwise
+  it stays open, showing the field errors and, below the content, the
+  outcome's `/ui/feedback` message (so a Forbidden or stale-row error is
+  visible inside the dialog), as the admin table dialog already did. A
+  whole-model refresh arriving before the outcome does not end the wait. A
+  stock basic renderer is unchanged.
 
 - **A swimlaned board's cell-limit check cannot crash.** `VerifySections`
   matched `{:ok, cells}` from `AshA2ui.Board.cell_count/2`. It now handles

@@ -21,7 +21,14 @@ defmodule AshA2ui.Verifiers.VerifyActions do
     * `via` (host-delegated dispatch) may only be declared on row or bulk
       actions,
       and is mutually exclusive with `prompt_fields` — the prompt collects
-      values cast against the direct Ash action, which `via` bypasses.
+      values cast against the direct Ash action, which `via` bypasses,
+    * every `prompt_options` scope names one of the action's
+      `prompt_fields` that is a relationship select (an explicit
+      `relationship` on its `field` entity, or a `belongs_to`
+      `source_attribute`), its `read_action` is a read action of the
+      relationship's destination, and its `record_argument` is an argument
+      of that action — at most one scope per field, on a resource with a
+      single-attribute primary key (the row's key is the argument's value).
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. Skipped when no resource can be resolved (standalone
@@ -147,24 +154,146 @@ defmodule AshA2ui.Verifiers.VerifyActions do
       |> MapSet.new()
       |> MapSet.union(row_action_names)
 
+    declared =
+      dsl_state
+      |> Verifier.get_entities([:a2ui])
+      |> Enum.filter(&is_struct(&1, AshA2ui.Field))
+      |> Map.new(&{&1.name, &1})
+
     dsl_state
     |> Verifier.get_entities([:a2ui])
     |> Enum.filter(&is_struct(&1, AshA2ui.Action))
     |> Enum.reduce_while(:ok, fn setting, :ok ->
-      case verify_action_setting(setting, {row_action_names, per_record_names}, target, module) do
+      case verify_action_setting(
+             setting,
+             {row_action_names, per_record_names},
+             {target, declared},
+             module
+           ) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
   end
 
-  defp verify_action_setting(setting, {row_action_names, per_record_names}, target, module) do
+  defp verify_action_setting(
+         setting,
+         {row_action_names, per_record_names},
+         {target, declared},
+         module
+       ) do
     with :ok <- verify_row_action_only(setting, :prompt_fields, row_action_names, module),
          :ok <- verify_row_action_only(setting, :visible_when, per_record_names, module),
          :ok <- verify_row_action_only(setting, :via, per_record_names, module),
          :ok <- verify_via_exclusivity(setting, module),
-         :ok <- verify_prompt_fields(setting, target, module) do
+         :ok <- verify_prompt_fields(setting, target, module),
+         :ok <- verify_prompt_options(setting, target, declared, module) do
       verify_visible_when(setting, target, module)
+    end
+  end
+
+  # prompt_options scopes a relationship prompt field's options per row
+  # through a destination read action that receives the row's primary key.
+  defp verify_prompt_options(%{prompt_options: scopes} = setting, target, declared, module)
+       when is_list(scopes) and scopes != [] do
+    Enum.reduce_while(scopes, :ok, fn scope, :ok ->
+      case verify_prompt_option(setting, scope, target, declared) do
+        :ok ->
+          {:cont, :ok}
+
+        {:error, message} ->
+          {:halt,
+           {:error,
+            DslError.exception(
+              module: module,
+              path: [:a2ui, :action, setting.name, :prompt_options, scope.field],
+              message: message
+            )}}
+      end
+    end)
+  end
+
+  defp verify_prompt_options(_setting, _target, _declared, _module), do: :ok
+
+  defp verify_prompt_option(setting, scope, target, declared) do
+    name = inspect(scope.field)
+
+    with :ok <-
+           check(scope.field in setting.prompt_fields, fn ->
+             "prompt_options #{name} is not one of the prompt_fields of action " <>
+               "#{inspect(setting.name)} (#{inspect(setting.prompt_fields)})"
+           end),
+         :ok <-
+           check(Enum.count(setting.prompt_options, &(&1.field == scope.field)) == 1, fn ->
+             "prompt_options #{name} is declared more than once on action #{inspect(setting.name)}"
+           end),
+         :ok <-
+           check(match?([_key], Info.primary_key(target)), fn ->
+             "prompt_options #{name}: #{inspect(target)} has a composite primary key; " <>
+               "record_argument receives a single key value"
+           end),
+         {:ok, destination} <- prompt_destination(target, declared, scope.field),
+         {:ok, read} <- scope_read_action(destination, scope.read_action),
+         :ok <-
+           check(Enum.any?(read.arguments, &(&1.name == scope.record_argument)), fn ->
+             "prompt_options #{name}: record_argument #{inspect(scope.record_argument)} is not an " <>
+               "argument of read action #{inspect(scope.read_action)} on #{inspect(destination)} " <>
+               "(arguments: #{inspect(Enum.map(read.arguments, & &1.name))})"
+           end) do
+      # The scope read receives record_argument and nothing else, so any
+      # other argument it requires would fail every prompt on the field.
+      required =
+        for %{allow_nil?: false, default: nil, name: arg} <- read.arguments,
+            arg != scope.record_argument,
+            do: arg
+
+      check(required == [], fn ->
+        "prompt_options #{name}: read action #{inspect(scope.read_action)} on " <>
+          "#{inspect(destination)} has other required arguments #{inspect(required)}; the " <>
+          "scope read passes only record_argument #{inspect(scope.record_argument)}, so give " <>
+          "them a default or allow_nil? true"
+      end)
+    end
+  end
+
+  defp check(true, _message), do: :ok
+  defp check(false, message), do: {:error, message.()}
+
+  # The destination of a prompt field's relationship select: the field
+  # entity's explicit `relationship`, else the belongs_to whose
+  # source_attribute it is (the rule ResolvedView applies).
+  defp prompt_destination(target, declared, field) do
+    relationship =
+      case declared[field] do
+        %{relationship: relationship} when not is_nil(relationship) ->
+          Info.relationship(target, relationship)
+
+        _inferred ->
+          target
+          |> Info.relationships()
+          |> Enum.find(&(&1.type == :belongs_to and &1.source_attribute == field))
+      end
+
+    case relationship do
+      %{destination: destination} ->
+        {:ok, destination}
+
+      nil ->
+        {:error,
+         "prompt_options #{inspect(field)} is not a relationship prompt field: name a " <>
+           "belongs_to source_attribute or give its field entity a `relationship`"}
+    end
+  end
+
+  defp scope_read_action(destination, name) do
+    case Info.action(destination, name) do
+      %{type: :read} = read ->
+        {:ok, read}
+
+      _missing_or_other_type ->
+        {:error,
+         "prompt_options read_action #{inspect(name)} is not a read action of " <>
+           inspect(destination)}
     end
   end
 

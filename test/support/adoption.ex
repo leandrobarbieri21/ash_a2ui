@@ -353,6 +353,44 @@ defmodule AshA2ui.Test.Adoption.QueuedJobsUI do
   end
 end
 
+defmodule AshA2ui.Test.Adoption.PromptBoardUI do
+  @moduledoc """
+  A board whose cards carry prompt row actions (clinic-demo's Complete and
+  Delegate): a text prompt (`:annotate`) and a relationship prompt
+  (`:assign`).
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Adoption.Job
+    surface_id "adoption_prompt_board"
+
+    component :table, :board do
+      fields [:title]
+      display :board
+      row_actions [:annotate, :assign]
+
+      row_layout do
+        title :title
+      end
+
+      sections do
+        scope_by :status
+        values [:open, :claimed, :done]
+      end
+    end
+
+    action :annotate do
+      prompt_fields [:note]
+    end
+
+    action :assign do
+      prompt_fields [:clerk_id]
+    end
+  end
+end
+
 defmodule AshA2ui.Test.Adoption.JobBoardUI do
   @moduledoc "A board: lanes over `status`, cards moved by `:claim`."
 

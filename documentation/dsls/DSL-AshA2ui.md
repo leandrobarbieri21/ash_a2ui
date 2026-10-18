@@ -59,6 +59,7 @@ for the resource named by `for_resource`).
    * export
  * [field](#a2ui-field)
  * [action](#a2ui-action)
+   * prompt_options
 
 
 ### Examples
@@ -883,6 +884,8 @@ prompts, per-row visibility conditions, and host-delegated dispatch
 (`via`).
 
 
+### Nested DSLs
+ * [prompt_options](#a2ui-action-prompt_options)
 
 
 ### Examples
@@ -898,6 +901,19 @@ end
 action :decline do
   prompt_fields [:notes]
   prompt_title "Decline referral"
+end
+
+```
+
+```
+action :delegate do
+  prompt_fields [:principal_id]
+
+  # Only the task's candidates, read as the actor.
+  prompt_options :principal_id do
+    read_action :candidates_for_task
+    record_argument :task_id
+  end
 end
 
 ```
@@ -931,11 +947,73 @@ end
 |------|------|---------|------|
 | [`label`](#a2ui-action-label){: #a2ui-action-label } | `String.t` |  | The text of this action's buttons — its row button, bulk toolbar button, admin `rowActions` entry and (unless `prompt_title` is set) its prompt heading — and the name in its bulk status line and its success status ("<label>: done."). A plain string, so a host can pass translated text. Defaults to the humanized action name. |
 | [`refreshes`](#a2ui-action-refreshes){: #a2ui-action-refreshes } | `list(atom)` |  | The table components refreshed after this action succeeds, by component name (`refreshes [:new_items]`; the unnamed table is `:table`). `[]` refreshes no table. Omitted (and for actions without an `action` entity) every table is refreshed (the default). |
-| [`prompt_fields`](#a2ui-action-prompt_fields){: #a2ui-action-prompt_fields } | `list(atom)` | `[]` | Arguments/accepts of the Ash action collected from the user in a per-row Modal prompt before the action is invoked (row actions only). Clicking the row button opens the Modal instead of invoking directly; its confirm button sends `invoke` with a `"values"` map. |
+| [`prompt_fields`](#a2ui-action-prompt_fields){: #a2ui-action-prompt_fields } | `list(atom)` | `[]` | Arguments/accepts of the Ash action collected from the user in a per-row Modal prompt before the action is invoked (row actions only). Clicking the row button opens the Modal instead of invoking directly; its confirm button sends `invoke` with a `"values"` map. A relationship prompt field lists every option the actor can read unless a `prompt_options` entity scopes it to the row. |
 | [`prompt_title`](#a2ui-action-prompt_title){: #a2ui-action-prompt_title } | `String.t` |  | Heading shown inside the prompt Modal. Defaults to the action's `label`, else the humanized action name. |
 | [`visible_when`](#a2ui-action-visible_when){: #a2ui-action-visible_when } | `keyword` | `[]` | Per-record conditions gating this row action, ANDed together (`visible_when status: :pending`). Keys are public attributes or public expression calculations; `nil` values mean `is_nil`, list values mean membership, anything else is equality. Enforced server-side on every invoke; rendering hides the button per row. A bulk action applies the same check to each selected record and counts the records that fail it as skipped. |
 | [`via`](#a2ui-action-via){: #a2ui-action-via } | `mfa` |  | Delegate this row action to a host-provided function instead of running the mapped Ash action directly (`via {MyApp.Tasks, :check_in, ["board"]}`). The framework knows nothing about the host's engine: at click time the handler fetches the row's record (with any `visible_when` condition calculations loaded, enforced as always) and calls     apply(module, function, [context \| extra_args]) where `context` is a map carrying the dispatch state:   * `:record` — the row's record, loaded as the surface loads it   * `:actor` — the actor the host passed to the handler (`nil` when none)   * `:tenant` — the tenant the host passed to the handler   * `:action` — the row-action name (atom)   * `:surface_id` — the surface's id   * `:selected` — the surface's context selections (see     `AshA2ui.ContextRunner.selected/2`; `%{}` without contexts) The MFA returns the same shape the direct path does — `:ok` \| `{:ok, term}` \| `{:error, Ash.Error.t()}` (any Ash error class or exception; mapped exactly like a direct invocation's failure: `Ash.Error.Forbidden` to a not-authorized status, validation errors to `/errors/<field>`) — and the result renders through the standard success/error channels unchanged: success refreshes the tables (honoring `refreshes`) and reports the action's status text; errors go to the typed `/ui/feedback` error. The client is unaware `via` exists: the emitted button is the ordinary `invoke` row action, addressed by the same action name. The named Ash action must still exist (it remains the row-action allowlist entry and the button's label source); `via` only reroutes the dispatch. Mutually exclusive with `prompt_fields` (the prompt exists to collect values cast against the direct Ash action). Row and bulk actions only; a bulk action calls the MFA once per selected record. |
 
+
+### a2ui.action.prompt_options
+```elixir
+prompt_options field
+```
+
+
+The per-row option scope of a relationship prompt field: the prompt
+offers only the options `read_action` (a read action of the
+relationship's destination) returns for the row it is opened on, its
+`record_argument` receiving the row's primary key. Without it a
+relationship prompt lists every option the actor can read.
+
+Server-authoritative: the read runs as the actor, with the actor's
+tenant, for a row the actor can read through the surface's read action
+(and that passes the action's `visible_when`). The client never sends a
+filter — only the row's id, which the server re-reads. The field renders
+as an option list over `/prompt/options/<action>/<field>` (the `prompt`
+pre-fill writes the row's options there; `option_search` refreshes them
+when the field declares `option_search`), never as options inlined in
+the component tree or loaded surface-wide, and every picked value is
+re-read through the same scope by `option_select` and again by `invoke`
+before the write — a value outside the row's scope is refused as a field
+error.
+
+
+
+
+### Examples
+```
+action :delegate do
+  prompt_fields [:principal_id]
+
+  prompt_options :principal_id do
+    read_action :candidates_for_task
+    record_argument :task_id
+  end
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`field`](#a2ui-action-prompt_options-field){: #a2ui-action-prompt_options-field .spark-required} | `atom` |  | The prompt field this scope applies to: one of the action's `prompt_fields`, a relationship select. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`read_action`](#a2ui-action-prompt_options-read_action){: #a2ui-action-prompt_options-read_action .spark-required} | `atom` |  | A read action of the relationship's destination returning the options for one row. Its preparations and policies run as the actor, so it can read anything the row's candidates depend on. |
+| [`record_argument`](#a2ui-action-prompt_options-record_argument){: #a2ui-action-prompt_options-record_argument .spark-required} | `atom` |  | The argument of `read_action` that receives the row's primary key. The scope read passes no other input, so any other argument the read action requires needs a default. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PromptOptions`
 
 
 

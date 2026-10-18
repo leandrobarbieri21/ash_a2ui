@@ -96,6 +96,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   `/prompt/values/<action>/<field>`. Values are cast and validated
   server-side against the action, as for any prompt.
 
+  A relationship field scoped per row by the action's `prompt_options`
+  renders the same composite without inlined options: its result `List`
+  templates over `/prompt/options/<action>/<field>` (the `prompt` pre-fill
+  writes the row's options there, read as the actor through the scope's
+  read action), the search controls appear only with `option_search`, and
+  its `option_select` (and `option_search`) context also carries
+  `"recordId": {"path": "/prompt/record/<action>"}` — the row the prompt
+  is open on, which the server re-reads before evaluating the scope.
+
+  The prompt Modal closes on its own after a successful confirm under the
+  AshA2ui catalogs (`priv/js/ash_a2ui_catalog.js` and the admin catalog
+  override the basic Modal); a stock basic renderer closes it through its
+  × button only.
+
   Under the admin catalog the same inputs sit in a `Column`
   (`row_action<sfx>_<action>_prompt`, a child of the dataGrid) that the
   action's `rowActions` entry names in its `prompt` (`content`, `title`,
@@ -191,7 +205,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   Surfaces with prompt-enabled row actions additionally carry `"prompt"` —
   `%{"values" => %{"<action>" => %{"<field>" => ""}}}`, plus `"select" =>
   %{"<action>" => %{"<field>" => %{"search" => "", "label" => ""}}}` when a
-  prompt field is a searchable relationship select — and rows of tables
+  prompt field is a searchable or per-row scoped relationship select, and
+  `"options" => %{"<action>" => %{"<field>" => []}}` with `"record" =>
+  %{"<action>" => ""}` when one is scoped (`prompt_options`) — and rows of tables
   with `visible_when` row actions gain the `"_actions"` /
   `"_visible_<action>"` keys (see the sections above).
 
@@ -2810,7 +2826,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp prompt_input_id(base, field) do
-    if searchable_prompt_field?(field),
+    if searchable_prompt_field?(field) or scoped_prompt_field?(field),
       do: "#{base}_prompt_select_#{field.name}",
       else: "#{base}_prompt_input_#{field.name}"
   end
@@ -2824,11 +2840,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     case field.widget do
       :select ->
-        if searchable_prompt_field?(field) do
-          prompt_select_components(action, base, field)
-        else
-          [choice_picker(props, Map.get(field, :options, []))]
-        end
+        prompt_select_input(action, base, field, props)
 
       :choice_picker ->
         options =
@@ -2852,6 +2864,17 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       _text_field ->
         text_field = Map.put(props, "component", "TextField")
         [if(field.numeric?, do: Map.put(text_field, "variant", "number"), else: text_field)]
+    end
+  end
+
+  # A relationship prompt field: the per-row option list when scoped, the
+  # searchable composite with option_search, else a ChoicePicker over the
+  # surface-wide options.
+  defp prompt_select_input(action, base, field, props) do
+    cond do
+      scoped_prompt_field?(field) -> scoped_prompt_select_components(action, base, field)
+      searchable_prompt_field?(field) -> prompt_select_components(action, base, field)
+      true -> [choice_picker(props, Map.get(field, :options, []))]
     end
   end
 
@@ -2894,6 +2917,67 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
       })
   end
+
+  # A relationship prompt field scoped per row (the action's
+  # `prompt_options`): the option-list composite over the prompt's own
+  # options, `/prompt/options/<action>/<field>`, which the `prompt` pre-fill
+  # writes for the row it opens on (a v0.9.1 ChoicePicker takes literal
+  # options only, and inlining them would list every row's options). Its
+  # option_select — and, when searchable, its option_search — carries the
+  # row the prompt is open on (`/prompt/record/<action>`, written by the
+  # pre-fill), which the server re-reads before evaluating the scope.
+  defp scoped_prompt_select_components(action, base, field) do
+    id = "#{base}_prompt_select_#{field.name}"
+    state = "/prompt/select/#{action}/#{field.name}"
+    record = %{"path" => "/prompt/record/#{action}"}
+    searchable? = searchable_prompt_field?(field)
+
+    controls =
+      if searchable? do
+        [
+          %{
+            "id" => "#{id}_controls",
+            "component" => "Row",
+            "children" => ["#{id}_search_input", "#{id}_search_button"]
+          }
+          | id
+            |> search_controls(to_string(field.name), "#{state}/search")
+            |> Enum.map(&scope_search_event(&1, "#{id}_search_button", action, record))
+        ]
+      else
+        []
+      end
+
+    children =
+      ["#{id}_label", "#{id}_selected"] ++
+        if(searchable?, do: ["#{id}_controls"], else: []) ++ ["#{id}_options"]
+
+    [
+      %{"id" => id, "component" => "Column", "children" => children},
+      %{"id" => "#{id}_label", "component" => "Text", "text" => field.label, "variant" => "h4"},
+      %{"id" => "#{id}_selected", "component" => "Text", "text" => %{"path" => "#{state}/label"}}
+    ] ++
+      controls ++
+      option_list(id, "/prompt/options/#{action}/#{field.name}", %{
+        "name" => "option_select",
+        "context" => %{
+          "field" => to_string(field.name),
+          "value" => %{"path" => "value"},
+          "prompt" => to_string(action),
+          "recordId" => record
+        }
+      })
+  end
+
+  defp scope_search_event(%{"id" => id} = component, id, action, record) do
+    update_in(component, ["action", "event", "context"], fn context ->
+      context
+      |> Map.put("prompt", to_string(action))
+      |> Map.put("recordId", record)
+    end)
+  end
+
+  defp scope_search_event(component, _search_button_id, _action, _record), do: component
 
   # Zero-or-one nested template: `_visible_<action>` on the row is either
   # [] or [%{"id" => id}], so the slot renders the action only when the
@@ -4023,27 +4107,42 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     prompt_selects =
       for {name, fields} <- view.prompts,
-          searchable = Enum.filter(fields, &searchable_prompt_field?/1),
-          searchable != [],
+          composite =
+            Enum.filter(fields, &(searchable_prompt_field?(&1) or scoped_prompt_field?(&1))),
+          composite != [],
           into: %{} do
         {to_string(name),
-         Map.new(searchable, &{to_string(&1.name), %{"search" => "", "label" => ""}})}
+         Map.new(composite, &{to_string(&1.name), %{"search" => "", "label" => ""}})}
       end
 
-    cond do
-      prompt_values == %{} ->
-        value
+    # Scoped prompt fields (prompt_options): the row's options and the row
+    # itself, both written by the `prompt` pre-fill; empty until a prompt
+    # opens.
+    prompt_options =
+      for {name, fields} <- view.prompts,
+          scoped = Enum.filter(fields, &scoped_prompt_field?/1),
+          scoped != [],
+          into: %{} do
+        {to_string(name), Map.new(scoped, &{to_string(&1.name), []})}
+      end
 
-      prompt_selects == %{} ->
-        Map.put(value, "prompt", %{"values" => prompt_values})
+    state =
+      %{"values" => prompt_values}
+      |> put_unless_empty("select", prompt_selects)
+      |> put_unless_empty("options", prompt_options)
+      |> put_unless_empty("record", Map.new(prompt_options, fn {name, _fields} -> {name, ""} end))
 
-      true ->
-        Map.put(value, "prompt", %{"values" => prompt_values, "select" => prompt_selects})
-    end
+    if prompt_values == %{}, do: value, else: Map.put(value, "prompt", state)
   end
+
+  defp put_unless_empty(map, _key, empty) when map_size(empty) == 0, do: map
+  defp put_unless_empty(map, key, value), do: Map.put(map, key, value)
 
   defp searchable_prompt_field?(%{widget: :select, select: %{search_fields: [_ | _]}}), do: true
   defp searchable_prompt_field?(_field), do: false
+
+  defp scoped_prompt_field?(%{widget: :select, select: %{scope: %{}}}), do: true
+  defp scoped_prompt_field?(_field), do: false
 
   # The reserved /ui/wizard state (step 0) — only on surfaces whose form
   # declares steps (frozen shape unchanged everywhere else).

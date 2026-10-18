@@ -68,10 +68,14 @@
  * Dispatching components acknowledge clicks at 0 RTT: the ActionBar primary
  * button and every DataGrid row-action button render disabled + spinner the
  * moment they dispatch, and settle when the surface's data model next
- * reports an outcome write (`/ui/feedback/message` or `/ui/response` — at
- * least one is written by every AshA2ui action these components dispatch:
+ * reports an outcome write (`/ui/feedback` or `/ui/response` — at least
+ * one is written by every AshA2ui action these components dispatch:
  * submits, invokes, task open/cancel, context select/clear and every
- * rejection, on both wire versions). No styling round
+ * rejection, on both wire versions). Any path write settles, including one
+ * that leaves the value as it was: View and Cancel write the already-clear
+ * feedback, and waiting for a changed message left the View button
+ * spinning (clinic-demo). A write replacing the whole data model (a PubSub
+ * refresh) is not an outcome and does not settle. No styling round
  * trip and no `phx-*-loading`: these components own their shadow DOM, and
  * host CSS cannot reach inside it.
  *
@@ -132,6 +136,16 @@ import {
   listItems,
   pageWindow,
 } from "./ash_admin_tokens.js";
+
+// The prompt-closing Modal override, shared with the merged basic catalog
+// (the board and basic-table prompts render the basic composition's Modal
+// here too), and the action-outcome subscription both catalogs settle on.
+// The file defines its element only when asked.
+import {
+  promptModalComponent,
+  subscribeActionOutcomes,
+  unsubscribeActionOutcomes,
+} from "./ash_a2ui_catalog.js";
 
 // The NB layer's calendar grid (`nb-calendar`), used by calendarView. The
 // file has no imports of its own and defines its elements only when asked.
@@ -294,12 +308,17 @@ export function createAshAdminCatalog(deps) {
 
   // The admin catalog extends the basic catalog: carry every basic component
   // (or the host's merged/overridden version of it), swapping the four input
-  // kinds for the a11y-hardened elements, then add the ten semantic kinds.
-  const components = [...basicCatalog.components.values()].map((component) =>
-    INPUT_OVERRIDE_KINDS.includes(component.name)
-      ? {...component, tagName: INPUT_OVERRIDE_TAGS[component.name]}
-      : component,
-  );
+  // kinds for the a11y-hardened elements and the Modal for the one closing
+  // a prompt on a success outcome (boards and basic-composed prompts — see
+  // "Prompt Modal" in ash_a2ui_catalog.js), then add the semantic kinds.
+  const modal = promptModalComponent(basicCatalog);
+  const components = [...basicCatalog.components.values()].map((component) => {
+    if (INPUT_OVERRIDE_KINDS.includes(component.name)) {
+      return {...component, tagName: INPUT_OVERRIDE_TAGS[component.name]};
+    }
+    if (component.name === "Modal" && modal) return modal;
+    return component;
+  });
 
   // The catalog's own client function: openSurface (reference-link
   // navigation — see OPEN_SURFACE_EVENT). Usable from any functionCall
@@ -774,9 +793,16 @@ function defineAdminElements(deps, {adminApis}) {
   // (submits, invokes, task open/cancel, context select/clear, and every
   // rejection) writes at least one of /ui/feedback (both wire versions) or
   // /ui/response (v1.0 wire), so subscribing to both settles on the first
-  // outcome. No styling round
+  // outcome. Both are subscribed as OBJECT paths through
+  // subscribeActionOutcomes (see "Action outcomes" in ash_a2ui_catalog.js),
+  // so the settle fires on every outcome path write, also one that leaves
+  // the value unchanged. view_record and cancel_record_task write the
+  // already-clear feedback; a primitive leaf like /ui/feedback/message
+  // only fires when its value changes, which left View spinning after
+  // View + Cancel. A whole-model refresh (a PubSub push or URL-state change
+  // writing "/") is not an outcome and does not settle. No styling round
   // trip, no phx-*-loading — these components own their shadow DOM.
-  const SETTLE_PATHS = ["/ui/feedback/message", "/ui/response"];
+  const SETTLE_PATHS = ["/ui/feedback", "/ui/response"];
 
   function markActionBusy(component) {
     if (component._amSettleUnsubscribes) return;
@@ -784,8 +810,8 @@ function defineAdminElements(deps, {adminApis}) {
     if (!surface || !surface.dataModel || typeof surface.dataModel.subscribe !== "function") {
       return;
     }
-    component._amSettleUnsubscribes = SETTLE_PATHS.map((path) =>
-      surface.dataModel.subscribe(path, () => settleActionBusy(component)),
+    component._amSettleUnsubscribes = subscribeActionOutcomes(surface.dataModel, SETTLE_PATHS, () =>
+      settleActionBusy(component),
     );
   }
 
@@ -797,14 +823,7 @@ function defineAdminElements(deps, {adminApis}) {
 
   function dropActionBusySubscriptions(component) {
     if (!component._amSettleUnsubscribes) return;
-    // DataModel.subscribe returns {value, unsubscribe()}, not a function.
-    for (const subscription of component._amSettleUnsubscribes) {
-      try {
-        subscription.unsubscribe();
-      } catch {
-        // The data model may already be gone (surface torn down).
-      }
-    }
+    unsubscribeActionOutcomes(component._amSettleUnsubscribes);
     component._amSettleUnsubscribes = null;
   }
 
