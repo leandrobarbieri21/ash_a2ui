@@ -197,7 +197,7 @@ defmodule AshA2ui.Test.Calendar.PresetUI do
 
       preset :booked do
         filter status: :booked
-        calendar_anchor(1)
+        calendar_anchor 1
       end
 
       preset :confirmed do
