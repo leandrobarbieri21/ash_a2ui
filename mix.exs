@@ -197,7 +197,10 @@ defmodule AshA2ui.MixProject do
       # declares (report.path: test/reports/junit/*.xml). Wired up in
       # test/test_helper.exs; uploaded as a CI artifact by
       # .github/workflows/elixir.yml.
-      {:junit_formatter, "~> 3.3", only: :test}
+      {:junit_formatter, "~> 3.3", only: :test},
+      # A time zone database for the calendar time zone tests
+      # (`config :ash_a2ui, :calendar_time_zone`); hosts bring their own.
+      {:tz, "~> 0.28", only: :test}
     ] ++ phoenix_deps()
   end
 

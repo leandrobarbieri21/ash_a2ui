@@ -367,6 +367,7 @@ defmodule AshA2ui.Dynamic.Importer do
         %{"name" => to_string(preset.name)}
         |> put_keyword("filter", preset.filter, :raw)
         |> put_opt("read_action", preset.read_action)
+        |> put_value("calendar_anchor", preset.calendar_anchor)
       end)
 
     Map.put(spec, "presets", entries)

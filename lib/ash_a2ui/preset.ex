@@ -14,18 +14,24 @@ defmodule AshA2ui.Preset do
       express (e.g. `not is_nil(...)`, ranges): the preset reads through the
       named read action (with its own `filter expr(...)`) instead of the
       table's `read_action`. Search/filters/sort still apply on top.
+
+  On a `display :calendar` table a preset may also set `calendar_anchor`:
+  switching to it moves the window to the one holding today plus that many
+  days (see `AshA2ui.Calendar`).
   """
 
   defstruct [
     :name,
     :filter,
     :read_action,
+    :calendar_anchor,
     __spark_metadata__: nil
   ]
 
   @type t :: %__MODULE__{
           name: atom,
           filter: [{atom, term}] | nil,
-          read_action: atom | nil
+          read_action: atom | nil,
+          calendar_anchor: integer | nil
         }
 end

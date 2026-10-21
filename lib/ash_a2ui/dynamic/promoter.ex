@@ -85,7 +85,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     max_page_size: :raw
   ]
 
-  @preset_options [filter: :raw_keyword, read_action: :name]
+  @preset_options [filter: :raw_keyword, read_action: :name, calendar_anchor: :raw]
 
   @field_options [
     label: :raw,

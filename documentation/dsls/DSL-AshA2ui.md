@@ -257,6 +257,14 @@ end
 
 ```
 
+```
+preset :tomorrow do
+  read_action :tomorrow
+  calendar_anchor 1
+end
+
+```
+
 
 
 ### Arguments
@@ -270,6 +278,7 @@ end
 |------|------|---------|------|
 | [`filter`](#a2ui-query-preset-filter){: #a2ui-query-preset-filter } | `keyword` |  | Keyword conditions ANDed onto the table's base query. Keys are public attributes or public expression calculations; `nil` values mean `is_nil`, list values mean membership, anything else is equality. |
 | [`read_action`](#a2ui-query-preset-read_action){: #a2ui-query-preset-read_action } | `atom` |  | A read action used instead of the table's `read_action` while this preset is selected — the escape hatch for predicates the keyword `filter` form can't express. Mutually exclusive with `filter`. |
+| [`calendar_anchor`](#a2ui-query-preset-calendar_anchor){: #a2ui-query-preset-calendar_anchor } | `integer` |  | On a `display :calendar` table: when the client switches to this preset, the window moves to the one holding today plus this many days (in the calendar time zone) and the picked day is cleared, so a preset such as "tomorrow" or "the next two weeks" shows its records wherever the user had navigated. `0` is today. Ignored on other tables. |
 
 
 

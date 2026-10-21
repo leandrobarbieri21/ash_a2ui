@@ -35,6 +35,10 @@ if Mix.env() == :test do
 
   config :logger, level: :warning
 
+  # The calendar time zone tests cut days in real zones (America/Toronto,
+  # America/Santiago); the calendar default stays Etc/UTC.
+  config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+
   # JUnit XML output for mix test — the evidence artifact .sdlc/verification.yaml
   # declares (report.path: test/reports/junit/*.xml). junit_formatter writes
   # the report at the end of every run, creating the directory if missing.

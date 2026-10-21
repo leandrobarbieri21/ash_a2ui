@@ -132,7 +132,7 @@ defmodule AshA2ui.QueryRunner do
          {:ok, sort} <- parse_sort(query, state),
          {:ok, page} <- parse_page(state, context),
          {:ok, page_size} <- parse_page_size(query, state),
-         {:ok, window, moved?} <- parse_window(view, state, context) do
+         {:ok, window, moved?} <- parse_window(view, state, context, preset) do
       {:ok,
        %{
          search: search,
@@ -147,13 +147,20 @@ defmodule AshA2ui.QueryRunner do
     end
   end
 
-  # Only calendar tables have a window (see AshA2ui.Calendar).
-  defp parse_window(view, state, context) do
+  # Only calendar tables have a window (see AshA2ui.Calendar). A preset
+  # with a calendar_anchor moves the window when the request switches to it.
+  defp parse_window(view, state, context, preset) do
     case Map.get(view, :calendar) do
-      nil -> {:ok, nil, false}
-      config -> AshA2ui.Calendar.parse_window(config, state, context)
+      nil ->
+        {:ok, nil, false}
+
+      config ->
+        AshA2ui.Calendar.parse_window(config, state, context, preset_entity(view.query, preset))
     end
   end
+
+  defp preset_entity(_query, nil), do: nil
+  defp preset_entity(query, name), do: Enum.find(query.presets, &(&1.name == name))
 
   # Moving the window or picking a day starts over at page 1, unless the
   # context names a page itself.
@@ -180,12 +187,20 @@ defmodule AshA2ui.QueryRunner do
     }
   end
 
-  # A table (or view) scope: a calendar table's defaults hold today's window.
+  # A table (or view) scope: a calendar table's defaults hold today's window
+  # (or the default preset's calendar_anchor day).
   def default_params(%{query: query} = table) do
     window =
       case Map.get(table, :calendar) do
-        nil -> nil
-        config -> AshA2ui.Calendar.default_window(config)
+        nil ->
+          nil
+
+        config ->
+          AshA2ui.Calendar.default_window(
+            config,
+            nil,
+            preset_entity(query, query.default_preset)
+          )
       end
 
     %{default_params(query) | window: window}
@@ -307,9 +322,15 @@ defmodule AshA2ui.QueryRunner do
   # caller holding only the query) get today's.
   defp with_window(params, view) do
     case {Map.get(view, :calendar), Map.get(params, :window)} do
-      {nil, _window} -> Map.put(params, :window, nil)
-      {config, nil} -> Map.put(params, :window, AshA2ui.Calendar.default_window(config))
-      {_config, _window} -> params
+      {nil, _window} ->
+        Map.put(params, :window, nil)
+
+      {config, nil} ->
+        preset = preset_entity(view.query, params.preset)
+        Map.put(params, :window, AshA2ui.Calendar.default_window(config, nil, preset))
+
+      {_config, _window} ->
+        params
     end
   end
 
