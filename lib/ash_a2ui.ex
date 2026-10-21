@@ -116,7 +116,7 @@ defmodule AshA2ui do
         loaded related record, so a target the actor cannot read is simply not
         linked), or `{surface_key, id_path}` for bare-id/polymorphic references
         (`link {:person, :subject_id}` — the id is read from `id_path`, a public
-        attribute or a relationship path ending in one). Rows carry the link at the
+        attribute or calculation, or a relationship path ending in one). Rows carry the link at the
         reserved `_links/<field>` key as `%{"surface", "recordId", "label"}` (plus
         `"href"` when `config :ash_a2ui, :open_surface_url` is set). The surface key
         of a relationship link comes from the configured `AshA2ui.LinkResolver`,

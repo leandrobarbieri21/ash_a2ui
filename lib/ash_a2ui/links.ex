@@ -74,8 +74,9 @@ defmodule AshA2ui.Links do
   end
 
   # [:attr] needs nothing; [:rel, :attr] loads :rel; a calculation/aggregate
-  # terminal loads the whole path.
-  defp path_loads(_resource, [_attribute]), do: []
+  # terminal loads the whole path (a lone one, [:calc], loads itself).
+  defp path_loads(resource, [terminal]),
+    do: if(loadable?(resource, terminal), do: [terminal], else: [])
 
   defp path_loads(resource, path) do
     {relationships, [terminal]} = Enum.split(path, -1)

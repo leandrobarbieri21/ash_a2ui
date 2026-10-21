@@ -84,8 +84,10 @@ defmodule AshA2ui.Test.Links.Note do
   @moduledoc """
   The linking resource: a `belongs_to :person` (single link, labelled by
   the `display_name` calculation read through `source`), a bare
-  `subject_id` uuid (an explicit `{surface, id_path}` link), and
-  `many_to_many :participants` (a multi-valued `links` column).
+  `subject_id` uuid (an explicit `{surface, id_path}` link), its
+  `subject_ref` calculation (a single-step id_path ending in a
+  calculation), and `many_to_many :participants` (a multi-valued `links`
+  column).
   """
 
   use Ash.Resource,
@@ -104,6 +106,10 @@ defmodule AshA2ui.Test.Links.Note do
       public?: true,
       default: :open,
       constraints: [one_of: [:open, :closed]]
+  end
+
+  calculations do
+    calculate :subject_ref, :uuid, expr(subject_id), public?: true
   end
 
   relationships do
@@ -193,6 +199,30 @@ defmodule AshA2ui.Test.Links.NotesUI do
     field :participant_links do
       label "Participants"
       links :participants
+    end
+  end
+end
+
+defmodule AshA2ui.Test.Links.SubjectRefNotesUI do
+  @moduledoc """
+  A virtual link field whose `{surface, id_path}` is a single calculation
+  (`link {:person, :subject_ref}`): the table must load `:subject_ref` for
+  the link to reach the row's `_links`.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Links.Note
+    surface_id "subject_ref_notes"
+
+    component :table do
+      fields [:title, :subject_label]
+    end
+
+    field :subject_label do
+      label "Subject"
+      link {:person, :subject_ref}
     end
   end
 end
