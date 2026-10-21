@@ -151,8 +151,10 @@ defmodule AshA2ui.Diagram do
   @doc """
   Calls every diagram's source for one render and returns
   `%{name => loaded}`. `selected` is the surface's context selection
-  (`AshA2ui.ContextRunner.selected/2`); `opts` carries `:actor` and
-  `:tenant`.
+  (`AshA2ui.ContextRunner.selected/2`); `opts` carries `:actor`,
+  `:tenant` and, on a time-travelled surface, `:as_of`, which the source
+  receives in its context (`nil` for now) so it can read at the same
+  instant.
   """
   @spec load_all(ResolvedView.t(), map, keyword) :: %{atom => loaded}
   def load_all(%ResolvedView{diagrams: diagrams} = view, selected, opts) do
@@ -167,6 +169,7 @@ defmodule AshA2ui.Diagram do
       surface_id: view.surface_id,
       actor: opts[:actor],
       tenant: opts[:tenant],
+      as_of: opts[:as_of],
       contexts: Map.new(view.context_order, &{&1, get_in(selected, [&1, :value])})
     }
 

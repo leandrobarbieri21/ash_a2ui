@@ -54,6 +54,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         the surface's context selections (see "Deep links" below). Requires
         the LiveView to be mounted at the router (it injects
         `handle_params/3`).
+      * `:time_travel` (optional, default `false`) — read the surface as of
+        the URL's `?as_of=` instant (see "Time travel" below). Requires the
+        LiveView to be mounted at the router (it injects `handle_params/3`).
       * `:open_surface` (optional) — a 2-arity function `(args, socket) ->
         {:noreply, socket}` handling reference-link navigation (the
         `"a2ui:open_surface"` event, `args = %{"surface" => _, "recordId" =>
@@ -118,6 +121,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     params kept), and browser back/forward re-applies the URL's selections —
     so a detail view is a shareable, back-button-friendly URL.
 
+    ## Time travel
+
+    With `time_travel: true` the surface reads as of the instant in the
+    URL's `?as_of=` parameter (`AshA2ui.AsOf.parse/1`; absent or
+    unparseable means now). Every read — tables, options, contexts, details
+    and the PubSub refreshes — runs at that instant
+    (`AshA2ui.Info.build_surface/2`'s `:as_of`), and a pinned surface is
+    view-only: its row and bulk actions are stripped and
+    `AshA2ui.ActionHandler` refuses writes. The instant is assigned as
+    `:ash_a2ui_as_of` (`nil` for now), so the host can render
+    `AshA2ui.TimeScrubber` above the surface. When `?as_of=` changes (a
+    scrubber patch, back/forward) the LiveView navigates to the new URL,
+    which rebuilds the surface: a pinned surface and a live one have
+    different controls, not only different data.
+
     ## Reference links
 
     The shipped JS hook pushes `"a2ui:open_surface"` when an admin-catalog
@@ -133,8 +151,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Introspection assigns
 
-    `mount/3` assigns `:ash_a2ui_ui`, `:ash_a2ui_actor` and
-    `:ash_a2ui_tenant` on the socket.
+    `mount/3` assigns `:ash_a2ui_ui`, `:ash_a2ui_actor`,
+    `:ash_a2ui_tenant` and `:ash_a2ui_as_of` (always `nil` without
+    `time_travel: true`) on the socket.
 
     ## Test seams (not public API)
 
@@ -201,7 +220,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
 
         unquote(
-          if Keyword.get(opts, :deep_link, false) do
+          if Keyword.get(opts, :deep_link, false) or Keyword.get(opts, :time_travel, false) do
             quote do
               @impl true
               def handle_params(params, uri, socket) do
@@ -241,6 +260,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         pubsub: normalize_pubsub(Keyword.get(opts, :pubsub)),
         refresh_debounce_ms: Keyword.get(opts, :refresh_debounce_ms, @default_debounce_ms),
         deep_link: Keyword.get(opts, :deep_link, false),
+        time_travel: Keyword.get(opts, :time_travel, false),
         open_surface: Keyword.get(opts, :open_surface),
         open_surface_url: Keyword.get(opts, :open_surface_url),
         surface_fn: Keyword.get(opts, :surface_fn, &AshA2ui.Info.build_surface/2),
@@ -254,12 +274,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       actor = config.actor_fn.(socket)
       tenant = config.tenant_fn.(socket)
       url_state = url_state(params)
+      as_of = url_as_of(config, params)
 
       socket =
         assign(socket,
           ash_a2ui_ui: config.ui,
           ash_a2ui_actor: actor,
           ash_a2ui_tenant: tenant,
+          ash_a2ui_as_of: as_of,
           ash_a2ui_refresh_scheduled?: false,
           ash_a2ui_query_state: nil,
           ash_a2ui_context_state: nil,
@@ -277,7 +299,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           # hydrate the surface when the task lands. URL-carried state is
           # validated inside the task (authorized context reads).
           start_async(socket, :ash_a2ui_surface, fn ->
-            opts = [actor: actor, tenant: tenant]
+            opts = [actor: actor, tenant: tenant] ++ AshA2ui.AsOf.read_opt(as_of)
 
             config.surface_fn.(
               config.ui,
@@ -301,6 +323,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp url_state(_not_mounted_at_router), do: %{ctx: %{}, query: nil}
+
+    # time_travel: the URL's ?as_of= instant, nil (now) otherwise.
+    defp url_as_of(%{time_travel: true}, params), do: AshA2ui.AsOf.from_params(params)
+    defp url_as_of(_config, _params), do: nil
 
     defp string_map(map) when is_map(map) do
       for {key, value} <- map, is_binary(key) and is_binary(value) and value != "", into: %{} do
@@ -368,6 +394,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         first? or not connected?(socket) ->
           {:noreply, assign(socket, :ash_a2ui_url_ctx, ctx)}
 
+        # A new instant rebuilds the surface: pinned and live surfaces carry
+        # different controls, so a data-model refresh is not enough.
+        url_as_of(config, params) != socket.assigns[:ash_a2ui_as_of] ->
+          {:noreply, push_navigate(socket, to: request_path(uri))}
+
+        not config.deep_link ->
+          {:noreply, socket}
+
         ctx == socket.assigns[:ash_a2ui_url_ctx] ->
           {:noreply, socket}
 
@@ -426,6 +460,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp with_query(path, _args), do: path
+
+    defp request_path(uri) do
+      case URI.parse(uri) do
+        %URI{path: path, query: nil} -> path || "/"
+        %URI{path: path, query: query} -> (path || "/") <> "?" <> query
+      end
+    end
 
     @doc false
     def surface_container(assigns) do
@@ -647,7 +688,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp call_opts(socket) do
-      [actor: socket.assigns.ash_a2ui_actor, tenant: socket.assigns.ash_a2ui_tenant]
+      [actor: socket.assigns.ash_a2ui_actor, tenant: socket.assigns.ash_a2ui_tenant] ++
+        AshA2ui.AsOf.read_opt(socket.assigns[:ash_a2ui_as_of])
     end
 
     defp refresh_opts(socket) do

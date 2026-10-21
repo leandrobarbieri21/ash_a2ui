@@ -10,6 +10,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Time travel (AST-175).** A surface can be read as of an instant over
+  Ash temporal resources:
+  - `AshA2ui.Info.build_surface/2`, `build_data_model/2` and
+    `AshA2ui.ActionHandler.handle/3` take `:as_of`. Every table, option
+    list, context, detail and section read runs at that instant, and a
+    diagram source receives it as `context.as_of`.
+  - A surface pinned to an instant is view-only. Its row actions, bulk
+    actions and action metadata are stripped (`AshA2ui.Info.view_only/1`),
+    and the action handler refuses writes with `READ_ONLY_AS_OF`.
+  - `AshA2ui.AsOf` is the `?as_of=` grammar: `parse/1`, `to_param/1`,
+    `from_params/1`, `put_param/2` and `read_opt/1`.
+  - `AshA2ui.LiveRenderer` takes `time_travel: true`: it reads `?as_of=`,
+    assigns `:ash_a2ui_as_of`, and rebuilds the surface when the instant
+    changes.
+  - `AshA2ui.TimeScrubber.scrubber/1` is a timeline control: a range input
+    over a span, marks that are links to their exact instants (dragging
+    snaps to them), "Return to now", and a status readout. Positions are
+    resolved server-side with `AshA2ui.TimeScrubber.instant/4`.
+
+  Extracted from clinic-demo's board and revenue time travel, which
+  threaded `as_of` through a copy of the surface builder.
+  See the `ash_a2ui:time-travel` usage rules.
+
 - **Per-row prompt options (`prompt_options`).** A relationship prompt
   listed every option the actor could read. For example, clinic-demo's
   delegate prompt listed every principal, not only the task's candidates.

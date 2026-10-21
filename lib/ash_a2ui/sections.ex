@@ -294,11 +294,15 @@ defmodule AshA2ui.Sections do
     # The opts go to `for_read/4` so the source action's preparations see
     # the actor and tenant (they run when the query is built).
     config.source
-    |> Ash.Query.for_read(config.read_action, %{},
-      domain: domain,
-      actor: opts[:actor],
-      tenant: opts[:tenant],
-      authorize?: Keyword.get(opts, :authorize?, true)
+    |> Ash.Query.for_read(
+      config.read_action,
+      %{},
+      [
+        domain: domain,
+        actor: opts[:actor],
+        tenant: opts[:tenant],
+        authorize?: Keyword.get(opts, :authorize?, true)
+      ] ++ AshA2ui.AsOf.read_opt(opts)
     )
     |> Ash.Query.sort([{config.sort, :asc}])
     |> Ash.Query.limit(config.limit)
