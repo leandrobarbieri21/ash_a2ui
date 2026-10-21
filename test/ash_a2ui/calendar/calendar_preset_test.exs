@@ -175,6 +175,18 @@ defmodule AshA2ui.Calendar.CalendarPresetTest do
     presets = resolved.query.presets
     assert Enum.map(presets, &{&1.name, &1.calendar_anchor}) == [booked: 1, confirmed: nil]
 
+    # Promoted to DSL source, the anchor survives.
+    assert {:ok, source} =
+             Dynamic.to_dsl_source(spec,
+               module: AshA2ui.Calendar.PromotedPresetUI,
+               allowlist: allowlist
+             )
+
+    assert source =~ "calendar_anchor 1"
+    [{module, _binary}] = Code.compile_string(source)
+    [promoted] = ResolvedView.resolve(module).tables
+    assert Enum.map(promoted.query.presets, & &1.calendar_anchor) == [1, nil]
+
     schema = Dynamic.spec_schema(allowlist)
     preset = schema["properties"]["queries"]["items"]["properties"]["presets"]["items"]
     assert preset["properties"]["calendar_anchor"]["type"] == "integer"
