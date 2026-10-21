@@ -211,6 +211,7 @@ defmodule AshA2ui.Dynamic.Importer do
     |> put_opt("date_field", component.date_field)
     |> put_opt("end_date_field", component.end_date_field)
     |> put_opt("granularity", component.granularity)
+    |> put_values("granularities", component.granularities)
   end
 
   defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")

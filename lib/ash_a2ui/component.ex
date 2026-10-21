@@ -26,6 +26,7 @@ defmodule AshA2ui.Component do
     :date_field,
     :end_date_field,
     :granularity,
+    :granularities,
     context_filter: [],
     require_context: [],
     row_actions: [],
@@ -64,6 +65,7 @@ defmodule AshA2ui.Component do
           date_field: atom | nil,
           end_date_field: atom | nil,
           granularity: :day | :week | :month | nil,
+          granularities: [:day | :week | :month] | nil,
           nested_forms: [AshA2ui.NestedForm.t()],
           groups: [AshA2ui.Group.t()],
           steps: [AshA2ui.Step.t()]

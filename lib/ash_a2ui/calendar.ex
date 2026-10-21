@@ -132,13 +132,18 @@ defmodule AshA2ui.Calendar do
   @typedoc "The kind of a calendar date field: how it is bounded and read."
   @type kind :: :date | :datetime | :naive
 
-  @typedoc "A resolved calendar config (the table's `:calendar` key)."
+  @typedoc """
+  A resolved calendar config (the table's `:calendar` key). `granularity`
+  is the one the calendar opens on; `granularities` the ones the client may
+  switch to (at least `granularity`).
+  """
   @type config :: %{
-          date_field: atom,
-          end_date_field: atom | nil,
-          granularity: :day | :week | :month,
-          start_kind: kind,
-          end_kind: kind | nil
+          required(:date_field) => atom,
+          required(:end_date_field) => atom | nil,
+          required(:granularity) => :day | :week | :month,
+          optional(:granularities) => [:day | :week | :month],
+          required(:start_kind) => kind,
+          required(:end_kind) => kind | nil
         }
 
   @typedoc """
@@ -187,10 +192,14 @@ defmodule AshA2ui.Calendar do
   @spec resolve(AshA2ui.Component.t(), module) :: config | nil
   def resolve(%{display: :calendar, date_field: date_field} = component, resource)
       when not is_nil(date_field) do
+    granularities = Map.get(component, :granularities)
+    granularity = component.granularity || List.first(granularities || []) || :month
+
     %{
       date_field: date_field,
       end_date_field: component.end_date_field,
-      granularity: component.granularity || :month,
+      granularity: granularity,
+      granularities: granularities || [granularity],
       start_kind: field_kind(resource, date_field) || :date,
       end_kind:
         component.end_date_field && (field_kind(resource, component.end_date_field) || :date)
@@ -228,7 +237,10 @@ defmodule AshA2ui.Calendar do
   end
 
   def validate(component, _resource) do
-    case Enum.find([:date_field, :end_date_field, :granularity], &Map.get(component, &1)) do
+    case Enum.find(
+           [:date_field, :end_date_field, :granularity, :granularities],
+           &Map.get(component, &1)
+         ) do
       nil -> :ok
       option -> {:error, option, "#{option} is only supported with display :calendar"}
     end
@@ -253,12 +265,30 @@ defmodule AshA2ui.Calendar do
 
   defp validate_required(_component), do: :ok
 
-  defp validate_granularity(%{granularity: granularity}) do
-    if is_nil(granularity) or granularity in granularities(),
-      do: :ok,
-      else:
+  defp validate_granularity(%{granularity: granularity} = component) do
+    switchable = Map.get(component, :granularities)
+
+    cond do
+      not (is_nil(granularity) or granularity in granularities()) ->
         {:error, :granularity,
          "granularity must be one of #{inspect(granularities())}, got: #{inspect(granularity)}"}
+
+      is_nil(switchable) ->
+        :ok
+
+      switchable == [] or not Enum.all?(switchable, &(&1 in granularities())) ->
+        {:error, :granularities,
+         "granularities must be a non-empty list of #{inspect(granularities())}, got: " <>
+           inspect(switchable)}
+
+      granularity && granularity not in switchable ->
+        {:error, :granularities,
+         "granularities must include the granularity the calendar opens on " <>
+           "(#{inspect(granularity)}), got: #{inspect(switchable)}"}
+
+      true ->
+        :ok
+    end
   end
 
   defp validate_compatible(%{sections: sections}) when not is_nil(sections),
@@ -415,19 +445,23 @@ defmodule AshA2ui.Calendar do
           {:ok, window, boolean} | {:error, String.t()}
   def parse_window(config, state, context, preset \\ nil) do
     carried = window_state_map(state)
-    granularity = config.granularity
 
-    with {:ok, carried_anchor} <- carried_date(carried, "anchor"),
+    with {:ok, carried_granularity} <- carried_granularity(config, carried),
+         {:ok, granularity} <- requested_granularity(config, context, carried_granularity),
+         {:ok, carried_anchor} <- carried_date(carried, "anchor"),
          {:ok, carried_selected} <- carried_date(carried, "selected"),
          {:ok, followed} <- followed_anchor(carried, preset),
          {:ok, moved} <- requested_anchor(context, granularity, followed || carried_anchor),
          {:ok, picked} <- requested_date(context) do
-      carried_window = build_window(granularity, carried_anchor || today(), carried_selected)
+      carried_window =
+        build_window(carried_granularity, carried_anchor || today(), carried_selected)
 
       base =
-        if followed,
-          do: build_window(granularity, followed, nil),
-          else: carried_window
+        cond do
+          followed -> build_window(granularity, followed, nil)
+          granularity != carried_granularity -> switched_window(granularity, carried_window)
+          true -> carried_window
+        end
 
       window =
         granularity
@@ -435,10 +469,73 @@ defmodule AshA2ui.Calendar do
         |> Map.put(:preset, preset_name(preset))
 
       changed? =
-        window.anchor != carried_window.anchor or window.selected != carried_selected
+        window.anchor != carried_window.anchor or window.selected != carried_selected or
+          window.granularity != carried_granularity
 
       {:ok, window, changed?}
     end
+  end
+
+  @doc "The window sizes the client may switch between: `[granularity]` without a switch."
+  @spec switchable(config) :: [:day | :week | :month]
+  def switchable(config), do: Map.get(config, :granularities) || [config.granularity]
+
+  # The carried window's size: one the calendar offers, else the one it
+  # opens on (a state written before a switch existed carries none).
+  defp carried_granularity(config, carried) do
+    case Map.get(carried, "granularity") do
+      empty when empty in [nil, ""] ->
+        {:ok, config.granularity}
+
+      value when is_binary(value) ->
+        {:ok, Enum.find(switchable(config), config.granularity, &(Atom.to_string(&1) == value))}
+
+      _other ->
+        {:error, ~s(Malformed query action: window "granularity" must be a string.)}
+    end
+  end
+
+  defp requested_granularity(config, context, carried) do
+    case Map.get(context, "granularity") do
+      nil ->
+        {:ok, carried}
+
+      value when is_binary(value) ->
+        case Enum.find(switchable(config), &(Atom.to_string(&1) == value)) do
+          nil ->
+            {:error,
+             "Malformed query action: granularity #{inspect(value)} is not one of " <>
+               "#{inspect(Enum.map(switchable(config), &Atom.to_string/1))}."}
+
+          granularity ->
+            {:ok, granularity}
+        end
+
+      _other ->
+        {:error, ~s(Malformed query action: "granularity" must be a string.)}
+    end
+  end
+
+  # Switching size keeps the user's place: the new window holds the picked
+  # day, else today when the old window held it, else the old window's first
+  # day. The pick survives when it is inside the new window.
+  defp switched_window(granularity, carried) do
+    today = today()
+
+    focus =
+      cond do
+        carried.selected ->
+          carried.selected
+
+        Date.compare(today, carried.from) != :lt and Date.compare(today, carried.to) != :gt ->
+          today
+
+        true ->
+          carried.anchor
+      end
+
+    selected = if granularity == :day, do: nil, else: carried.selected
+    build_window(granularity, focus, selected)
   end
 
   # The day the window moves to when the request switches to a preset with a

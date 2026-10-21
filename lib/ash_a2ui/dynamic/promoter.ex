@@ -35,7 +35,8 @@ defmodule AshA2ui.Dynamic.Promoter do
     display: :name,
     date_field: :name,
     end_date_field: :name,
-    granularity: :name
+    granularity: :name,
+    granularities: :name_list
   ]
 
   @row_layout_options [

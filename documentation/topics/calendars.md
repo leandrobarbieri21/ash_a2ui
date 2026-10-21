@@ -43,9 +43,11 @@ The rules, checked at compile time:
   resource of type `:date`, `:utc_datetime`, `:utc_datetime_usec`,
   `:datetime` or `:naive_datetime`. They must differ.
 - `granularity` is `:day`, `:week` or `:month`.
+- `granularities`, when given, is a non-empty list of those that includes
+  `granularity` (which defaults to its first entry).
 - A calendar declares no `sections` and no `bulk_actions`.
-- `date_field`, `end_date_field` and `granularity` are only accepted with
-  `display :calendar`.
+- `date_field`, `end_date_field`, `granularity` and `granularities` are
+  only accepted with `display :calendar`.
 
 ## The window
 
@@ -116,6 +118,29 @@ Both are the ordinary `"query"` action. Next to the usual
 
 A row action's refresh carries the query state like any other refresh, so
 the window and the picked day survive it.
+
+## Switching between month, week and day
+
+`granularities` lets the user change the window's size:
+
+```elixir
+component :table, :schedule do
+  display :calendar
+  date_field :starts_at
+  granularities [:month, :week]   # opens on the month
+  query :schedule
+end
+```
+
+The client sends `"granularity": "week"` in a `"query"` action's context.
+The server accepts only a size in `granularities`; anything else is
+rejected before a read. The new window keeps the user's place: it holds the
+picked day, else today when the old window held it, else the old window's
+first day. The picked day survives when it is inside the new window (a day
+window has none). The window state's `granularity` is the size shown, and
+later requests keep it. The basic composition adds one Button per size to
+the navigation Row; the admin `calendarView` carries `granularities` and
+draws a switch (admin catalog 1.5).
 
 Each row of a calendar table carries three reserved keys:
 `_calendar_start` and `_calendar_end` (ISO dates; the end is never before

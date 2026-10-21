@@ -136,7 +136,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "display" => :display,
     "date_field" => :date_field,
     "end_date_field" => :end_date_field,
-    "granularity" => :granularity
+    "granularity" => :granularity,
+    "granularities" => :granularities
   }
 
   # Closed vocabularies, string -> atom by lookup (never created from
@@ -831,6 +832,18 @@ defmodule AshA2ui.Dynamic.Parser do
   defp convert_shaped({:enum, values}, option, value, path),
     do: convert_enum(option, value, values, path)
 
+  defp convert_shaped({:enum_list, values}, option, list, path) when is_list(list) do
+    Enum.reduce_while(list, {:ok, []}, fn value, {:ok, acc} ->
+      case convert_enum(option, value, values, path) do
+        {:ok, atom} -> {:cont, {:ok, acc ++ [atom]}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp convert_shaped({:enum_list, _values}, option, _value, path),
+    do: {:error, [Error.new("#{path}.#{option}", "#{option} must be an array")]}
+
   defp convert_shaped(:existing_name, option, value, path),
     do: convert_existing_name(option, value, path)
 
@@ -907,6 +920,7 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:default_sort), do: :default_sort
   defp option_shape(:display), do: {:enum, @displays}
   defp option_shape(:granularity), do: {:enum, @granularities}
+  defp option_shape(:granularities), do: {:enum_list, @granularities}
 
   defp option_shape(option)
        when option in [:date_field, :end_date_field, :scope_by, :swimlanes_by],

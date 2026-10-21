@@ -175,7 +175,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.4.0";
+export const ADMIN_CATALOG_VERSION = "1.5.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -543,6 +543,7 @@ export function buildSchemas() {
     calendarView: EmptyObject.extend({
       label: DynamicStringSchema.nullable().optional(),
       granularity: Str.optional(),
+      granularities: Any.optional(),
       window: DynamicValueSchema.optional(),
       windowAction: bareEvent().optional(),
       children: ChildListSchema.optional(),
@@ -2941,6 +2942,15 @@ function defineAdminElements(deps, {adminApis}) {
             gap: var(--am-space-xs);
             flex-wrap: wrap;
           }
+          .cal-sizes {
+            display: inline-flex;
+            gap: var(--am-space-2xs, 2px);
+          }
+          .cal-sizes .am-btn[aria-pressed="true"] {
+            font-weight: var(--am-font-weight-semibold);
+            text-decoration: underline;
+            text-underline-offset: 0.25em;
+          }
           .cal-tools .cal-day {
             font-weight: var(--am-font-weight-semibold);
             margin-inline-end: auto;
@@ -3001,9 +3011,21 @@ function defineAdminElements(deps, {adminApis}) {
         applyWeight(this, this.controller?.props);
       }
 
+      // The window's own size (it can be switched), else the declared one.
       get granularity() {
-        const value = this.controller?.props?.granularity;
+        const value = str(this.windowState.granularity) || this.controller?.props?.granularity;
         return value === "day" || value === "week" ? value : "month";
+      }
+
+      get granularities() {
+        const value = this.controller?.props?.granularities;
+        return Array.isArray(value)
+          ? value.filter((size) => size === "day" || size === "week" || size === "month")
+          : [];
+      }
+
+      sizeLabel(size) {
+        return size === "day" ? "Day" : size === "week" ? "Week" : "Month";
       }
 
       get windowState() {
@@ -3034,6 +3056,20 @@ function defineAdminElements(deps, {adminApis}) {
                 <button type="button" class="am-btn am-btn-quiet am-btn-sm" @click=${() => this.goToday()}>
                   Today
                 </button>
+                ${this.granularities.length > 1
+                  ? html`<span class="cal-sizes" role="group" aria-label="Calendar view">
+                      ${this.granularities.map(
+                        (size) => html`<button
+                          type="button"
+                          class="am-btn am-btn-quiet am-btn-sm"
+                          aria-pressed=${size === this.granularity ? "true" : "false"}
+                          @click=${() => this.switchSize(size)}
+                        >
+                          ${this.sizeLabel(size)}
+                        </button>`,
+                      )}
+                    </span>`
+                  : nothing}
               </div>
               <nb-calendar
                 part="calendar"
@@ -3154,6 +3190,15 @@ function defineAdminElements(deps, {adminApis}) {
         }
       }
 
+      /** Asks the server for another window size. The server decides the
+       * window it then shows (it keeps the picked day, or today), so no
+       * pending key: its reply repaints the grid. */
+      switchSize(size) {
+        if (size === this.granularity) return;
+        this.clearPending();
+        this.request({granularity: size}, null);
+      }
+
       goToday() {
         const today = isoOf(new Date());
         this.moveWindow(today, this.granularity === "day" ? today : null);
@@ -3202,7 +3247,9 @@ function defineAdminElements(deps, {adminApis}) {
         const envelope = props?.windowAction;
         if (!surface || !context.componentModel || !envelope || typeof envelope.name !== "string") return;
 
-        this.setPending(key, surface);
+        // A null key (a size switch) waits for no particular window.
+        if (key === null) this.clearPending();
+        else this.setPending(key, surface);
         const resolved = resolveEventContext(
           {event: {name: envelope.name, context: {...(envelope.context || {}), ...extra}}},
           surface.dataModel,
