@@ -252,6 +252,10 @@ contracts.
   switching to one moves the window there and clears the picked day;
   staying on it leaves the window where the user takes it. The preset's
   read still ANDs with the window.
+- To let the user switch between a month and a week (or a day), declare
+  `granularities [:month, :week]`; `granularity` is the one it opens on
+  (default: the first). Don't declare two calendar tables over the same
+  read to get two views.
 - Rows carry `_calendar_start`, `_calendar_end` and `_calendar_when`.
 - The basic composition is an agenda (window controls above the table's
   list); the admin catalog (1.3) emits a `calendarView` wrapping the

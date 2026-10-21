@@ -8,7 +8,7 @@
 # depend on the day they are recorded.
 
 alias AshA2ui.ActionHandler
-alias AshA2ui.Test.Calendar.{Event, MonthUI}
+alias AshA2ui.Test.Calendar.{Event, MonthUI, SwitchUI}
 
 actor = %{team: "red"}
 
@@ -58,6 +58,37 @@ for catalog <- [:admin_v1, :basic] do
   write.("#{prefix}_november_payload.json", reply.(%{"anchor" => "2026-11-01"}))
   write.("#{prefix}_december_payload.json", reply.(%{"anchor" => "2026-12-01"}))
 end
+
+# The month/week/day switch (SwitchUI), under the admin catalog: the October
+# month, then the reply to "Week" with the 16th picked.
+Application.put_env(:ash_a2ui, :catalog, :admin_v1)
+
+switch_envelope = fn context ->
+  %{
+    "version" => "v0.9.1",
+    "action" => %{
+      "name" => "query",
+      "surfaceId" => "calendar_switch",
+      "sourceComponentId" => "calendar",
+      "timestamp" => "2026-10-16T00:00:00Z",
+      "context" => Map.merge(%{"component" => "schedule", "query" => october}, context)
+    }
+  }
+end
+
+write.("calendar_switch_payload.json", AshA2ui.Info.build_surface(SwitchUI, actor: actor, query_state: october))
+
+{_tag, week} =
+  ActionHandler.handle(
+    SwitchUI,
+    switch_envelope.(%{
+      "query" => put_in(october, ["window", "selected"], "2026-10-16"),
+      "granularity" => "week"
+    }),
+    actor: actor
+  )
+
+write.("calendar_switch_week_payload.json", week)
 
 Application.delete_env(:ash_a2ui, :catalog)
 IO.puts("calendar fixtures written to #{out}")

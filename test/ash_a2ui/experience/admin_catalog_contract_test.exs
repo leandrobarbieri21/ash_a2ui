@@ -103,12 +103,21 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.5 is additive: calendarView granularities" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.5.0"
+    assert Experience.admin_catalog_version() == "1.5.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.5.0")
+
+    sizes = catalog["components"]["calendarView"]["properties"]["granularities"]
+    assert sizes["items"]["enum"] == ["day", "week", "month"]
+  end
+
   @tag ac: "A2UI-108/AC-4"
   test "catalog 1.4 is additive: liveDiagram" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.4.0"
-    assert Experience.admin_catalog_version() == "1.4.0"
     assert catalog["catalogId"] == Experience.admin_catalog_id()
 
     diagram = catalog["components"]["liveDiagram"]

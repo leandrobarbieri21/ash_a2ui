@@ -1728,12 +1728,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "id" => "#{base}_nav",
         "component" => "Row",
         "align" => "center",
-        "children" => [
-          "#{base}_prev_button",
-          "#{base}_label",
-          "#{base}_next_button",
-          "#{base}_today_button"
-        ]
+        "children" =>
+          [
+            "#{base}_prev_button",
+            "#{base}_label",
+            "#{base}_next_button",
+            "#{base}_today_button"
+          ] ++ granularity_button_ids(base, table)
       },
       %{
         "id" => "#{base}_label",
@@ -1743,10 +1744,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       }
     ]
 
+    sizes = granularity_buttons(base, table, view)
+
     buttons =
       calendar_button("#{base}_prev", "Previous", table, %{"windowDelta" => -1}, view) ++
         calendar_button("#{base}_next", "Next", table, %{"windowDelta" => 1}, view) ++
-        calendar_button("#{base}_today", "Today", table, %{"anchor" => "today"}, view)
+        calendar_button("#{base}_today", "Today", table, %{"anchor" => "today"}, view) ++
+        sizes
 
     days =
       if days? do
@@ -1781,6 +1785,37 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     [calendar | nav] ++ buttons ++ days
   end
+
+  # One Button per window size the calendar may switch to (none without a
+  # switch).
+  defp granularity_button_ids(base, table) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] -> []
+      sizes -> Enum.map(sizes, &"#{base}_#{&1}_button")
+    end
+  end
+
+  defp granularity_buttons(base, table, view) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] ->
+        []
+
+      sizes ->
+        Enum.flat_map(sizes, fn size ->
+          calendar_button(
+            "#{base}_#{size}",
+            granularity_label(size),
+            table,
+            %{"granularity" => to_string(size)},
+            view
+          )
+        end)
+    end
+  end
+
+  defp granularity_label(:month), do: "Month"
+  defp granularity_label(:week), do: "Week"
+  defp granularity_label(:day), do: "Day"
 
   # A day of the window, templated over its mark (`date`, `label`).
   defp day_button(base, table, view) do
@@ -1856,9 +1891,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           },
           "children" => ["data_grid#{sfx}"]
         }
+        |> put_granularities(table)
       ]
     else
       []
+    end
+  end
+
+  # Only a calendar that can switch size carries `granularities` (1.5).
+  defp put_granularities(component, table) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] -> component
+      sizes -> Map.put(component, "granularities", Enum.map(sizes, &Atom.to_string/1))
     end
   end
 

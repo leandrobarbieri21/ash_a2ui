@@ -615,6 +615,16 @@ defmodule AshA2ui.Dynamic do
           "enum" => Enum.map(AshA2ui.Calendar.granularities(), &Atom.to_string/1),
           "description" => "Calendar tables: the visible window (default \"month\")."
         },
+        "granularities" => %{
+          "type" => "array",
+          "items" => %{
+            "type" => "string",
+            "enum" => Enum.map(AshA2ui.Calendar.granularities(), &Atom.to_string/1)
+          },
+          "description" =>
+            "Calendar tables: the window sizes the user may switch between " <>
+              "(default: only granularity)."
+        },
         "row_layout" => %{
           "type" => "object",
           "description" => "Card-style table rows: a title header plus a labeled metadata grid.",

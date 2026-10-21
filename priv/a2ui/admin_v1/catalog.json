@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "x-changelog": {
+    "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
     "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
     "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
     "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
@@ -322,7 +323,12 @@
       "properties": {
         "component": {"const": "calendarView"},
         "label": {"type": "string", "description": "Accessible name of the calendar (the table's collection label)."},
-        "granularity": {"type": "string", "enum": ["day", "week", "month"], "description": "The window size declared on the table."},
+        "granularity": {"type": "string", "enum": ["day", "week", "month"], "description": "The window size declared on the table (the one it opens on). The window state's own granularity, when present, is the one shown."},
+        "granularities": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["day", "week", "month"]},
+          "description": "Optional (1.5): the window sizes the user may switch between. With more than one the renderer offers a switch that dispatches windowAction with granularity (one of these) added."
+        },
         "window": {
           "type": "object",
           "description": "Binding to the table's window state ({\"path\": \"/query/<table>/window\"}): {granularity, anchor, from, to, selected, label, scopeLabel, marks: [{date, count, label}]}."

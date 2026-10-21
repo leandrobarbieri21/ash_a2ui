@@ -11,6 +11,10 @@
  *       stale reply of the first does not move the grid back;
  *     - Today dispatches today's date as the anchor;
  *     - nothing logs an error.
+ *   admin catalog, a switchable calendar (SwitchUI: month, week, day)
+ *     - the Month/Week/Day switch shows with Month pressed;
+ *     - Week dispatches `query` with granularity "week";
+ *     - the reply paints a one-week grid and lists that week's rows.
  *   basic composition (stock basic catalog and the AshA2ui merged one)
  *     - the agenda renders: window label, one Button per marked day, the
  *       rows with their date text; a day Button dispatches `query` with
@@ -174,7 +178,9 @@ async function main() {
       }));
       expect(state.title, "October 2026", "calendar title");
       expect(state.marked, ["2026-10-03", "2026-10-16", "2026-10-17", "2026-10-18"], "marked days");
-      expect(state.rows, ["Kickoff", "Boiler service", "Offsite"], "the grid holds the window rows");
+      // Same-day rows tie-break on the (random) primary key.
+      expect(state.rows[0], "Kickoff", "date order");
+      expect([...state.rows].sort(), ["Boiler service", "Kickoff", "Offsite"], "the grid holds the window rows");
     });
 
     await check("admin: picking a day highlights it at once and dispatches its date", async () => {
@@ -258,6 +264,61 @@ async function main() {
     });
     await shot.screenshot({path: join(probeDir, "screenshots", "calendar_admin.png"), fullPage: true});
     await shot.close();
+
+    /* --- admin: the month/week/day switch -------------------------------- */
+    const switcher = await openCase(browser, base, "payload=calendar_switch");
+    const sizes = () =>
+      switcher.evaluate(() => {
+        const view = window.__deepAll("ash-admin-calendar-view")[0];
+        return [...view.shadowRoot.querySelectorAll(".cal-sizes button")].map((b) => ({
+          label: b.textContent.trim(),
+          pressed: b.getAttribute("aria-pressed"),
+        }));
+      });
+
+    await check("admin switch: Month, Week and Day show, Month pressed", async () => {
+      expect(
+        await sizes(),
+        [
+          {label: "Month", pressed: "true"},
+          {label: "Week", pressed: "false"},
+          {label: "Day", pressed: "false"},
+        ],
+        "the switch",
+      );
+      expect(await switcher.evaluate(() => window.__cal().getAttribute("view")), "month", "grid view");
+    });
+
+    await check("admin switch: Week dispatches the granularity", async () => {
+      await switcher.evaluate(() => {
+        window.__dispatched.length = 0;
+        const view = window.__deepAll("ash-admin-calendar-view")[0];
+        [...view.shadowRoot.querySelectorAll(".cal-sizes button")]
+          .find((b) => b.textContent.trim() === "Week")
+          .click();
+      });
+      const sent = await lastDispatch(switcher);
+      expect(sent?.name, "query", "action");
+      expect(sent?.context?.granularity, "week", "granularity");
+    });
+
+    await check("admin switch: the reply paints the week and its rows", async () => {
+      await feed(switcher, "calendar_switch_week");
+      const state = await switcher.evaluate(() => ({
+        view: window.__cal().getAttribute("view"),
+        rows: window.__gridTitles().sort(),
+      }));
+      expect(state.view, "week", "grid view");
+      expect(state.rows, ["Boiler service", "Offsite"], "the picked day's rows");
+      expect((await sizes()).find((size) => size.pressed === "true")?.label, "Week", "Week pressed");
+    });
+
+    await check("admin switch: no console errors", async () => {
+      expect(switcher.__errors, [], "errors");
+    });
+
+    await switcher.screenshot({path: join(probeDir, "screenshots", "calendar_switch_week.png"), fullPage: true});
+    await switcher.close();
 
     /* --- basic composition --------------------------------------------- */
     for (const catalog of ["stock", "merged"]) {

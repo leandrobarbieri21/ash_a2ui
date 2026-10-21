@@ -24,6 +24,7 @@ defmodule AshA2ui.Calendar.CalendarDslTest do
              date_field: :starts_on,
              end_date_field: :ends_on,
              granularity: :month,
+             granularities: [:month],
              start_kind: :date,
              end_kind: :date
            }
@@ -34,6 +35,7 @@ defmodule AshA2ui.Calendar.CalendarDslTest do
              date_field: :starts_at,
              end_date_field: nil,
              granularity: :week,
+             granularities: [:week],
              start_kind: :datetime,
              end_kind: nil
            }

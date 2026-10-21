@@ -1205,7 +1205,18 @@ defmodule AshA2ui do
         doc: """
         `display :calendar` only: the size of the visible window — `:month`
         (default), `:week` (Monday to Sunday) or `:day`. Previous/Next move
-        the window by one unit.
+        the window by one unit. With `granularities`, this is the one the
+        calendar opens on (default: the first of them).
+        """
+      ],
+      granularities: [
+        type: {:list, {:one_of, [:day, :week, :month]}},
+        doc: """
+        `display :calendar` only: the window sizes the user may switch
+        between (e.g. `[:month, :week]`). The renderer offers a switch, and
+        the client names the one it wants (`"granularity"` in a `"query"`
+        action); any other is rejected. Defaults to `[granularity]`: no
+        switch.
         """
       ],
       query: [

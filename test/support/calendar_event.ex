@@ -214,3 +214,29 @@ defmodule AshA2ui.Test.Calendar.PresetUI do
     end
   end
 end
+
+defmodule AshA2ui.Test.Calendar.SwitchUI do
+  @moduledoc """
+  A calendar over `starts_on` the user may switch between month, week and
+  day (`granularities`), opening on the month.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Calendar.Event
+    surface_id "calendar_switch"
+
+    query :schedule do
+      page_size 10
+    end
+
+    component :table, :schedule do
+      fields [:title, :starts_on]
+      display :calendar
+      date_field :starts_on
+      granularities [:month, :week, :day]
+      query :schedule
+    end
+  end
+end
