@@ -161,6 +161,21 @@ defmodule AshA2ui.LinksTest do
       assert row["participant_links"] |> String.split(", ") |> Enum.sort() == ["Ada", "Bob"]
     end
 
+    test "a single-step id_path ending in a calculation loads it and links", %{bob: bob} do
+      [table] = ResolvedView.resolve(AshA2ui.Test.Links.SubjectRefNotesUI).tables
+      assert :subject_ref in table.loads
+
+      row = AshA2ui.Test.Links.SubjectRefNotesUI |> AshA2ui.Info.build_surface() |> row("Kickoff")
+
+      assert row["subject_label"] == bob.id
+
+      assert row["_links"]["subject_label"] == %{
+               "surface" => "person",
+               "recordId" => bob.id,
+               "label" => bob.id
+             }
+    end
+
     test "a link to a record the actor cannot read is pruned (and the cell is blank)" do
       row = NotesUI |> AshA2ui.Info.build_surface() |> row("Secret")
 

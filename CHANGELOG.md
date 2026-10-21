@@ -218,6 +218,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **A `{surface, id_path}` link whose path is a single calculation now
+  links.** `link {:record, :subject_ref}`, with `:subject_ref` a
+  calculation (or aggregate) of the resource, was never loaded: a
+  one-step path was assumed to be an attribute. The id read as nil and
+  the field was silently missing from the row's `"_links"`. A one-step
+  path now loads its terminal when it is a calculation or aggregate.
+  Attribute paths still load nothing.
+
 - **View then Cancel no longer leaves the View button spinning (admin
   catalog).** Row-action and action-bar buttons settled only when
   `/ui/feedback/message` changed value. `view_record` and
