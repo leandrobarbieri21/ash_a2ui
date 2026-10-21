@@ -2,6 +2,7 @@ defmodule AshA2ui.TimeTravelTest do
   # async: false — the temporal fixture is a shared (non-private) ETS table.
   use ExUnit.Case, async: false
 
+  alias Ash.DataLayer.Ets
   alias AshA2ui.{ActionHandler, AsOf, Info}
   alias AshA2ui.Test.SchemaHelper
   alias AshA2ui.Test.TimeTravel.{Plan, PlanUI}
@@ -11,7 +12,7 @@ defmodule AshA2ui.TimeTravelTest do
   # A destroy only ends a version's period; history stays. Dropping the
   # table gives each test an empty history.
   setup do
-    Ash.DataLayer.Ets.stop(Plan)
+    Ets.stop(Plan)
     :ok
   end
 
