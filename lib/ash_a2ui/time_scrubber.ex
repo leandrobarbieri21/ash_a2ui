@@ -62,8 +62,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     @tones %{
       primary: "var(--a2ui-color-primary, #2563eb)",
-      secondary: "var(--a2ui-color-secondary, #7c3aed)",
-      danger: "var(--a2ui-color-danger, #dc2626)",
+      secondary: "var(--a2ui-marker-accent-background, #7c3aed)",
+      danger: "var(--a2ui-marker-danger-background, #dc2626)",
       neutral: "var(--a2ui-color-border, #111827)"
     }
 
@@ -171,8 +171,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         data-as-of={@as_of && AshA2ui.AsOf.to_param(@as_of)}
         style={"display:flex;flex-direction:column;gap:0.75rem;padding:0.75rem 1rem;
                 border:2px solid var(--a2ui-color-border, currentColor);
-                border-radius:var(--a2ui-radius, 0.5rem);
-                background:#{if @as_of, do: "var(--a2ui-color-warning-surface, #fef9c3)", else: "var(--a2ui-color-surface, #fff)"};
+                border-radius:var(--a2ui-border-radius, 0.5rem);
+                background:var(--a2ui-color-surface, #fff);
                 color:var(--a2ui-color-on-surface, inherit);
                 box-shadow:4px 4px 0 var(--a2ui-color-border, currentColor);
                 font-family:var(--a2ui-font-family, inherit);"}
@@ -181,9 +181,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           <span
             id={"#{@id}-status"}
             role="status"
-            style="display:inline-flex;align-items:center;gap:0.375rem;padding:0.125rem 0.5rem;
-                   border:2px solid var(--a2ui-color-border, currentColor);border-radius:9999px;
-                   font:700 var(--a2ui-font-size-xs, 0.75rem) var(--a2ui-font-family, inherit);"
+            style={"display:inline-flex;align-items:center;gap:0.375rem;padding:0.125rem 0.5rem;
+                    border:2px solid var(--a2ui-color-border, currentColor);border-radius:9999px;
+                    #{status_fill(@as_of)}
+                    font:700 var(--a2ui-font-size-xs, 0.75rem) var(--a2ui-font-family, inherit);"}
           >
             {@readout}
           </span>
@@ -192,18 +193,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             id={"#{@id}-now"}
             patch={@path.(nil)}
             style="padding:0.25rem 0.625rem;border:2px solid var(--a2ui-color-border, currentColor);
-                   border-radius:var(--a2ui-radius, 0.5rem);
+                   border-radius:var(--a2ui-border-radius, 0.5rem);
                    background:var(--a2ui-color-primary, #2563eb);color:var(--a2ui-color-on-primary, #fff);
                    box-shadow:2px 2px 0 var(--a2ui-color-border, currentColor);
-                   font:700 var(--a2ui-font-size-sm, 0.875rem) var(--a2ui-font-family, inherit);
+                   font:700 var(--a2ui-font-size-s, 0.875rem) var(--a2ui-font-family, inherit);
                    text-decoration:none;"
           >
             Return to now
           </.link>
         </div>
 
-        <form id={"#{@id}-form"} phx-change={@event} onsubmit="return false;" style="margin:0;">
-          <label for={"#{@id}-input"} style="display:block;font:700 var(--a2ui-font-size-sm, 0.875rem) var(--a2ui-font-family, inherit);margin-bottom:0.25rem;">
+        <form id={"#{@id}-form"} phx-change={@event} style="margin:0;">
+          <label for={"#{@id}-input"} style="display:block;font:700 var(--a2ui-font-size-s, 0.875rem) var(--a2ui-font-family, inherit);margin-bottom:0.25rem;">
             Move through time
           </label>
           <input
@@ -251,8 +252,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               title={Map.get(mark, :description)}
               style={"display:inline-flex;align-items:center;gap:0.375rem;padding:0.125rem 0.5rem;
                       border:2px solid var(--a2ui-color-border, currentColor);
-                      border-radius:var(--a2ui-radius, 0.5rem);text-decoration:none;color:inherit;
-                      background:#{if current?(mark.at, @as_of), do: "var(--a2ui-color-secondary-surface, #e0e7ff)", else: "var(--a2ui-color-surface, #fff)"};
+                      border-radius:var(--a2ui-border-radius, 0.5rem);text-decoration:none;color:inherit;
+                      background:#{if current?(mark.at, @as_of), do: "var(--a2ui-color-secondary, #e0e7ff)", else: "var(--a2ui-color-surface, #fff)"};
                       font-size:var(--a2ui-font-size-xs, 0.75rem);"}
             >
               <span aria-hidden="true" style={"width:0.5rem;height:0.5rem;transform:rotate(45deg);background:#{tone(mark)};"}></span>
@@ -264,6 +265,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </section>
       """
     end
+
+    # The status chip: the warning marker pair while pinned (the page is
+    # not showing the present), the success pair when live.
+    defp status_fill(nil),
+      do:
+        "background:var(--a2ui-marker-success-background, #065f46);" <>
+          "color:var(--a2ui-marker-success-color, #fff);"
+
+    defp status_fill(_pinned),
+      do:
+        "background:var(--a2ui-marker-warning-background, #7c2d12);" <>
+          "color:var(--a2ui-marker-warning-color, #fff);"
 
     defp readout(nil, _format), do: "Live: now"
     defp readout(at, format), do: "As of #{format.(at)}"
