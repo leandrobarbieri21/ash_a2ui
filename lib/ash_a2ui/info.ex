@@ -126,6 +126,15 @@ defmodule AshA2ui.Info do
       `createSurface` payload's `surfaceProperties` (e.g.
       `%{"agentDisplayName" => "Support Agent"}`). Ignored on v0.9.1
       surfaces (the v0.9 `theme` block was never emitted).
+    * `:as_of` — a `DateTime` to read every table, option list, context
+      and detail at (Ash temporal resources' `as_of`; see `AshA2ui.AsOf`).
+      Temporal resources return the version valid at that instant; other
+      resources only anchor `now()` to it. A surface built with `:as_of` is
+      **view-only**: its row actions, bulk actions and action metadata are
+      stripped before encoding (`view_only/1`), so a view of the past
+      carries no control that would act on the present, and
+      `AshA2ui.ActionHandler` refuses writes under `:as_of` as well. `nil`
+      reads now.
     * `:link_buttons` — basic catalog only: `true` renders each to-one
       reference link (`link :relationship` / `link {surface, id_path}`)
       as a borderless `Button` dispatching the `"open_surface"` action
@@ -142,6 +151,7 @@ defmodule AshA2ui.Info do
       resource_or_ui_module
       |> ResolvedView.resolve(opts)
       |> AshA2ui.Sections.expand!(opts)
+      |> view_only_when_pinned(opts)
 
     {records, opts} = load_and_put_state!(resolved_view, opts)
 
@@ -161,6 +171,7 @@ defmodule AshA2ui.Info do
       resource_or_ui_module
       |> ResolvedView.resolve(opts)
       |> AshA2ui.Sections.expand!(opts)
+      |> view_only_when_pinned(opts)
 
     {records, opts} = load_and_put_state!(resolved_view, opts)
 
@@ -186,7 +197,7 @@ defmodule AshA2ui.Info do
     view =
       ResolvedView.resolve(
         resource_or_ui_module,
-        Keyword.take(opts, [:actor, :tenant, :domain, :authorize?])
+        Keyword.take(opts, [:actor, :tenant, :domain, :authorize?, :as_of])
       )
 
     if view.contexts == %{} do
@@ -212,6 +223,27 @@ defmodule AshA2ui.Info do
       {:ok, change} -> change.selected
       _not_found_or_error -> selected
     end
+  end
+
+  @doc """
+  Strips a resolved view's operating affordances: row actions (on the view
+  and on every table), bulk actions, action metadata and refresh targets.
+  What remains reads and navigates (search, sort, pages, contexts, links)
+  but cannot act.
+
+  `build_surface/2` and `build_data_model/2` apply it whenever `:as_of`
+  pins an instant: an action clicked on a historical row would run against
+  the live record, changing the present while the reader looks at the past.
+  """
+  @spec view_only(ResolvedView.t()) :: ResolvedView.t()
+  def view_only(%ResolvedView{} = view) do
+    tables = Enum.map(view.tables, &Map.merge(&1, %{row_actions: [], bulk_actions: []}))
+
+    %{view | tables: tables, row_actions: [], bulk_actions: [], actions: %{}, refreshes: %{}}
+  end
+
+  defp view_only_when_pinned(view, opts) do
+    if AshA2ui.AsOf.pinned?(opts), do: view_only(view), else: view
   end
 
   @doc """
@@ -466,7 +498,7 @@ defmodule AshA2ui.Info do
       actor: opts[:actor],
       tenant: opts[:tenant],
       authorize?: Keyword.get(opts, :authorize?, true)
-    ]
+    ] ++ AshA2ui.AsOf.read_opt(opts)
   end
 
   defp option_string(%Date{} = date), do: Date.to_iso8601(date)
@@ -494,6 +526,6 @@ defmodule AshA2ui.Info do
       actor: opts[:actor],
       tenant: opts[:tenant],
       authorize?: Keyword.get(opts, :authorize?, true)
-    ]
+    ] ++ AshA2ui.AsOf.read_opt(opts)
   end
 end

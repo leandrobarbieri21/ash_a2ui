@@ -304,7 +304,8 @@ defmodule AshA2ui.ResolvedView do
     :context_state,
     :surface_properties,
     :spec_version,
-    :link_buttons
+    :link_buttons,
+    :as_of
   ]
 
   @doc """
@@ -314,8 +315,8 @@ defmodule AshA2ui.ResolvedView do
 
   ## Options
 
-    * `:actor` / `:tenant` / `:authorize?` / `:domain` / `:query_state` —
-      reserved for data loading (see `AshA2ui.Info.build_surface/2`);
+    * `:actor` / `:tenant` / `:authorize?` / `:domain` / `:query_state` /
+      `:as_of` — reserved for data loading (see `AshA2ui.Info.build_surface/2`);
       validated and passed through, not consumed by normalization itself.
     * `:surface_properties` / `:link_buttons` — encoder options (see
       `AshA2ui.Info.build_surface/2`); passed through.

@@ -260,6 +260,14 @@ defmodule AshA2ui.ActionHandler do
   # The field error a relationship prompt value the actor cannot read gets.
   @unavailable "is not one of the available options"
 
+  # Actions that write, or open a form that would. On a surface pinned to an
+  # instant (`:as_of`) every one is refused.
+  @writes ~w(submit_form invoke bulk_invoke prompt edit_cell nested_add nested_remove
+             start_create start_edit wizard_next wizard_back)
+
+  @pinned_refusal "This view shows an earlier moment, so nothing on it can be changed. " <>
+                    "Return to now to make changes."
+
   @doc """
   Handles an A2UI client `action` envelope for the surface declared on
   `resource_or_ui_module` (an `Ash.Resource` using the `AshA2ui` extension,
@@ -276,6 +284,11 @@ defmodule AshA2ui.ActionHandler do
       read).
     * `:tenant` — the tenant for the Ash action invocation.
     * `:authorize?` — whether to authorize the Ash calls. Defaults to `true`.
+    * `:as_of` — the instant the surface is pinned to (see
+      `AshA2ui.Info.build_surface/2`). Reads (query, contexts, options,
+      reports, exports) run at that instant; every action that writes, or
+      opens a form that would, is refused with feedback, because the write
+      would land on the present while the reader looks at the past.
   """
   @spec handle(module | Spark.Dsl.t(), action_message :: map, opts :: keyword) ::
           {:ok, [map]} | {:error, [map]}
@@ -284,6 +297,22 @@ defmodule AshA2ui.ActionHandler do
     ash_opts = ash_opts(view, opts)
 
     case parse(action_message) do
+      {:ok, name, _context, action_id} when name in @writes ->
+        if AshA2ui.AsOf.pinned?(opts) do
+          {:error, [status(view, @pinned_refusal, "READ_ONLY_AS_OF")]}
+          |> put_feedback(view)
+          |> attach_action_response(view, action_id)
+        else
+          handle_parsed(view, ash_opts, parse(action_message))
+        end
+
+      parsed ->
+        handle_parsed(view, ash_opts, parsed)
+    end
+  end
+
+  defp handle_parsed(view, ash_opts, parsed) do
+    case parsed do
       {:ok, name, context, action_id} ->
         case AshA2ui.Sections.expand(view, ash_opts) do
           {:ok, view} ->
@@ -441,7 +470,7 @@ defmodule AshA2ui.ActionHandler do
       actor: opts[:actor],
       tenant: opts[:tenant],
       authorize?: Keyword.get(opts, :authorize?, true)
-    ]
+    ] ++ AshA2ui.AsOf.read_opt(opts)
   end
 
   # --- dispatch --------------------------------------------------------------
