@@ -178,3 +178,39 @@ defmodule AshA2ui.Test.Calendar.DayUI do
     end
   end
 end
+
+defmodule AshA2ui.Test.Calendar.PresetUI do
+  @moduledoc """
+  A month calendar over `starts_on` whose presets are quick ranges:
+  `:booked` moves the window to the month holding tomorrow when the client
+  switches to it (`calendar_anchor 1`), `:confirmed` is a plain filter.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.Calendar.Event
+    surface_id "calendar_presets"
+
+    query :schedule do
+      page_size 10
+
+      preset :booked do
+        filter status: :booked
+        calendar_anchor(1)
+      end
+
+      preset :confirmed do
+        filter status: :confirmed
+      end
+    end
+
+    component :table, :schedule do
+      fields [:title, :status, :starts_on]
+      display :calendar
+      date_field :starts_on
+      granularity :month
+      query :schedule
+    end
+  end
+end

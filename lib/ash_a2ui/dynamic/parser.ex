@@ -471,7 +471,12 @@ defmodule AshA2ui.Dynamic.Parser do
   defp parse_query(_entry, path),
     do: {:error, [Error.new(path, "each query must be a JSON object")]}
 
-  @preset_keys %{"name" => :name, "filter" => :filter, "read_action" => :read_action}
+  @preset_keys %{
+    "name" => :name,
+    "filter" => :filter,
+    "read_action" => :read_action,
+    "calendar_anchor" => :calendar_anchor
+  }
 
   defp parse_presets(nil, _def, _path), do: {:ok, []}
 

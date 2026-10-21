@@ -354,6 +354,12 @@ defmodule AshA2ui do
       preset :deleted do
         read_action :deleted
       end
+      """,
+      """
+      preset :tomorrow do
+        read_action :tomorrow
+        calendar_anchor 1
+      end
       """
     ],
     target: AshA2ui.Preset,
@@ -378,6 +384,17 @@ defmodule AshA2ui do
         A read action used instead of the table's `read_action` while this
         preset is selected — the escape hatch for predicates the keyword
         `filter` form can't express. Mutually exclusive with `filter`.
+        """
+      ],
+      calendar_anchor: [
+        type: :integer,
+        doc: """
+        On a `display :calendar` table: when the client switches to this
+        preset, the window moves to the one holding today plus this many
+        days (in the calendar time zone) and the picked day is cleared, so a
+        preset such as "tomorrow" or "the next two weeks" shows its records
+        wherever the user had navigated. `0` is today. Ignored on other
+        tables.
         """
       ]
     ]

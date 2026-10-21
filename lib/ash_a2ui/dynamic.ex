@@ -855,7 +855,15 @@ defmodule AshA2ui.Dynamic do
                   "Attribute -> value conditions ANDed together (null means is-nil, " <>
                     "an array means membership)."
               },
-              "read_action" => name
+              "read_action" => name,
+              "calendar_anchor" => %{
+                "type" => "integer",
+                "minimum" => -366,
+                "maximum" => 366,
+                "description" =>
+                  "Calendar tables only: switching to this preset moves the window to " <>
+                    "today plus this many days and clears the picked day."
+              }
             },
             "required" => ["name"],
             "additionalProperties" => false
