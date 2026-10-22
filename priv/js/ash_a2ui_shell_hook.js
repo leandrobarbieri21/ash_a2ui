@@ -25,6 +25,8 @@ function keyLabel(event, ctrl) {
 
 export const AshA2uiShell = {
   mounted() {
+    this.pending = null
+    this.submitPending = false
     this.onKey = (event) => this.handleKey(event)
     this.onOpen = (event) => {
       const mode = (event.detail && event.detail.mode) || "palette"
@@ -53,8 +55,11 @@ export const AshA2uiShell = {
     if (this.isOpen()) {
       const input = this.input()
       if (input && document.activeElement !== input) input.focus()
+      if (input && this.pending !== null) this.flushPending(input)
       const active = this.el.querySelector('[data-shell-item][aria-selected="true"]')
       if (active && active.scrollIntoView) active.scrollIntoView({block: "nearest"})
+    } else if (this.pending !== null) {
+      // Still opening: the closed render that came first is not the answer.
     } else if (this.returnFocus) {
       const target = this.returnFocus
       this.returnFocus = null
@@ -79,8 +84,47 @@ export const AshA2uiShell = {
   },
 
   openShell(mode) {
-    if (!this.isOpen()) this.returnFocus = document.activeElement
+    if (!this.isOpen()) {
+      this.returnFocus = document.activeElement
+      // Whatever is typed before the input is on the page goes into it.
+      this.pending = ""
+      this.submitPending = false
+      // A shell that never opens (a lost connection) stops holding keys.
+      setTimeout(() => {
+        if (!this.input()) this.pending = null
+      }, 3000)
+    }
     this.pushEventTo(this.el, "shell:open", {mode})
+  },
+
+  flushPending(input) {
+    const text = this.pending
+    const submit = this.submitPending
+    this.pending = null
+    this.submitPending = false
+    if (text) {
+      input.value = input.value + text
+      input.setSelectionRange(input.value.length, input.value.length)
+      input.dispatchEvent(new Event("input", {bubbles: true}))
+    }
+    if (submit && input.form) input.form.requestSubmit()
+  },
+
+  // Keys pressed between the open key and the input appearing: printable
+  // characters, backspace and enter are kept for the input.
+  bufferKey(event) {
+    if (event.ctrlKey || event.metaKey || event.altKey) return false
+    if (event.key === "Enter") {
+      this.submitPending = true
+    } else if (event.key === "Backspace") {
+      this.pending = this.pending.slice(0, -1)
+    } else if (event.key && event.key.length === 1) {
+      this.pending += event.key
+    } else {
+      return false
+    }
+    event.preventDefault()
+    return true
   },
 
   handleKey(event) {
@@ -94,6 +138,10 @@ export const AshA2uiShell = {
       event.stopPropagation()
       this.openShell(mode)
       return
+    }
+
+    if (this.pending !== null && !this.input()) {
+      if (this.bufferKey(event)) return
     }
 
     if (!this.isOpen()) return
