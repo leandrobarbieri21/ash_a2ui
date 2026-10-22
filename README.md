@@ -94,8 +94,8 @@ AshA2ui ships LLM usage rules (`usage-rules.md` plus the
 `usage-rules/actions.md`, `usage-rules/ag-ui.md`, `usage-rules/contexts.md`,
 `usage-rules/dynamic.md`, `usage-rules/layout.md`,
 `usage-rules/liveview.md`, `usage-rules/queries.md`,
-`usage-rules/relationships.md`, `usage-rules/reports.md`, and
-`usage-rules/zero-jank.md` sub-rules)
+`usage-rules/relationships.md`, `usage-rules/reports.md`,
+`usage-rules/shell.md`, and `usage-rules/zero-jank.md` sub-rules)
 compatible with
 [`usage_rules`](https://hexdocs.pm/usage_rules). To sync them into your
 project's AGENTS.md, add `{:usage_rules, "~> 1.1", only: [:dev]}` and

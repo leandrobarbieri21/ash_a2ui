@@ -10,6 +10,23 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **The shell (AST-174).** A command palette (`ctrl+p`), a surface
+  launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
+  host:
+  - `AshA2ui.Shell` is the pure half: the key table (`keys/0`), the slash
+    grammar (`route/2`: a plain line is a prompt, `/open`, `/home`, a
+    command's name, a surface named directly), surface lookup by id, title
+    or unique prefix (`find_surface/2`), and the rows a mode lists
+    (`items/3`).
+  - The host supplies its lists in the ACP wire shapes
+    (`AvailableCommand`, `SurfaceEntry`) and what an invocation does,
+    through `AshA2ui.Shell.Host`.
+  - `AshA2ui.Shell.Component` draws it in a page; mount it in the layout.
+    `priv/js/ash_a2ui_shell_hook.js` (`AshA2uiShell`) turns the keys into
+    the component's events. `AshA2ui.Shell.Component.open/1` opens it from
+    a button.
+  - New usage rule: `ash_a2ui:shell`.
+
 - **Time travel (AST-175).** A surface can be read as of an instant over
   Ash temporal resources:
   - `AshA2ui.Info.build_surface/2`, `build_data_model/2` and
