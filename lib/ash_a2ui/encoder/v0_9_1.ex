@@ -2076,9 +2076,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "child" => "query#{sfx}_controls_body"
     }
 
+    # `align: "end"` bottom-aligns the controls, so inputs with a label above
+    # them and the Apply button without one sit on one baseline.
     controls = %{
       "id" => "query#{sfx}_controls_body",
       "component" => "Row",
+      "align" => "end",
       "children" =>
         Enum.map(search ++ presets ++ filters ++ ranges, & &1["id"]) ++
           ["query#{sfx}_apply_button"]

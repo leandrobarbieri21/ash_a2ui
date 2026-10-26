@@ -258,6 +258,11 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **A table's query controls sit on one baseline.** The controls row
+  (`query_controls_body`, or `query_<table>_controls_body`) is sent with
+  `align: "end"`, so labelled inputs and the label-less Apply button line up
+  at the bottom instead of the top. The board and wizard goldens gain only
+  that property.
 - **A date-only value shows its own day west of Greenwich.** The admin
   catalog's `formatDisplayValue` built `"2026-12-31"` at UTC midnight and
   formatted it in local time, so it read Dec 30 in Toronto, Vancouver or

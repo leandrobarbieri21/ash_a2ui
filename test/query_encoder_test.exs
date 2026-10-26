@@ -50,7 +50,8 @@ defmodule AshA2ui.QueryEncoderTest do
       assert %{"component" => "Card", "child" => "query_controls_body"} =
                components["query_controls"]
 
-      assert %{"component" => "Row", "children" => children} = components["query_controls_body"]
+      assert %{"component" => "Row", "align" => "end", "children" => children} =
+               components["query_controls_body"]
 
       assert children == [
                "query_search_input",
