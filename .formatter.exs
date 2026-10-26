@@ -67,6 +67,7 @@ spark_locals_without_parens = [
   picker: 1,
   preset: 1,
   preset: 2,
+  preset_picker: 1,
   prompt_fields: 1,
   prompt_options: 1,
   prompt_options: 2,

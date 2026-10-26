@@ -10,6 +10,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`preset_picker false` on a query.** For a page that selects the preset
+  itself (tabs linking to `?q[preset]=...`): the query controls leave the
+  "View" picker out, and the presets still apply. Defaults to `true`; the
+  output is unchanged without it. Dynamic specs carry it as
+  `"preset_picker": false`.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:
