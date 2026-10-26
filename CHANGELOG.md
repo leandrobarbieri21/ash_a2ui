@@ -258,6 +258,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **A table's query controls sit on one baseline.** The controls row
+  (`query_controls_body`, or `query_<table>_controls_body`) is sent with
+  `align: "end"`, so labelled inputs and the label-less Apply button line up
+  at the bottom instead of the top. The board and wizard goldens gain only
+  that property.
+
 - **A `{surface, id_path}` link whose path is a single calculation now
   links.** `link {:record, :subject_ref}`, with `:subject_ref` a
   calculation (or aggregate) of the resource, was never loaded: a
