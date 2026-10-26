@@ -10,6 +10,15 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`header: false` leaves a surface's own heading out.** For a host page
+  that already renders the `<h1>` (a second one is a duplicate and an
+  outline error). `AshA2ui.Info.build_surface/2` and `AshA2ui.LiveRenderer`
+  (`use AshA2ui.LiveRenderer, header: false`) take it. Basic catalog: the
+  `surface_title` Text is not emitted. Admin catalog **1.6.0** (additive):
+  `entityPage` gains an optional `headerVisible` boolean, and the renderer
+  skips the page header (title and description) when it is `false`. The
+  default output is unchanged.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:

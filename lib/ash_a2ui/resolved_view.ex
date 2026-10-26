@@ -305,7 +305,8 @@ defmodule AshA2ui.ResolvedView do
     :surface_properties,
     :spec_version,
     :link_buttons,
-    :as_of
+    :as_of,
+    :header
   ]
 
   @doc """

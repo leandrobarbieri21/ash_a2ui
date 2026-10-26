@@ -259,10 +259,36 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             |> with_openable_links(opts)
             |> with_diagram_sources(opts)
             |> components(select_options(resolved_view, opts))
+            |> without_header(opts)
         }
       },
       encode_data_model(resolved_view, records, opts)
     ]
+  end
+
+  # `header: false`: the page around the surface already owns its heading
+  # (a host layout with its own <h1>), so the surface leaves its own out
+  # instead of rendering a second one. Basic: the `surface_title` Text and
+  # its root child go. Admin: the entityPage keeps its title (still the
+  # page's name for the payload) and carries `headerVisible: false`, so the
+  # renderer skips its header (title and description). Default: unchanged.
+  defp without_header(components, opts) do
+    if Keyword.get(opts, :header, true) == false do
+      components
+      |> Enum.reject(&(&1["id"] == "surface_title"))
+      |> Enum.map(fn
+        %{"component" => "entityPage"} = page ->
+          Map.put(page, "headerVisible", false)
+
+        %{"id" => "root", "children" => children} = root when is_list(children) ->
+          %{root | "children" => List.delete(children, "surface_title")}
+
+        component ->
+          component
+      end)
+    else
+      components
+    end
   end
 
   # The admin catalog (`catalog: :admin_v1`) surfaces declare their own

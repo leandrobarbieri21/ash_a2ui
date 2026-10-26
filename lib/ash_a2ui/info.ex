@@ -144,6 +144,12 @@ defmodule AshA2ui.Info do
       `:open_surface` callback or an `:open_surface_url` template.
       Admin-catalog link columns and FieldDisplays render their links
       regardless; only its basic-component fallbacks follow this option.
+    * `:header` — `false` leaves the surface's own heading out, for a host
+      page that already renders one (a second `<h1>` is a duplicate and an
+      outline error). Basic catalog: the `surface_title` Text is not
+      emitted. Admin catalog: the `entityPage` carries
+      `headerVisible: false` (catalog 1.6) and the renderer skips its
+      header. Defaults to `true` (the output is unchanged).
   """
   @spec build_surface(module | Spark.Dsl.t(), keyword) :: [map]
   def build_surface(resource_or_ui_module, opts \\ []) do
