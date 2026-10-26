@@ -103,11 +103,21 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.6 is additive: entityPage headerVisible" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.6.0"
+    assert Experience.admin_catalog_version() == "1.6.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.6.0")
+
+    page = catalog["components"]["entityPage"]
+    assert page["properties"]["headerVisible"]["type"] == "boolean"
+    assert page["required"] == ["component", "title", "children"]
+  end
+
   test "catalog 1.5 is additive: calendarView granularities" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.5.0"
-    assert Experience.admin_catalog_version() == "1.5.0"
     assert Map.has_key?(catalog["x-changelog"], "1.5.0")
 
     sizes = catalog["components"]["calendarView"]["properties"]["granularities"]

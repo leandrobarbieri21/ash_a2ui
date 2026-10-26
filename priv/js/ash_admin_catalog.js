@@ -175,7 +175,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.5.0";
+export const ADMIN_CATALOG_VERSION = "1.6.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -401,6 +401,8 @@ export function buildSchemas() {
       title: DynamicStringSchema,
       description: DynamicStringSchema.nullable().optional(),
       children: ChildListSchema.optional(),
+      // 1.6: false when the host page already owns the heading.
+      headerVisible: Bool.optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -987,12 +989,14 @@ function defineAdminElements(deps, {adminApis}) {
         if (!props) return nothing;
 
         return html`
-          <header class="page-header">
-            <h1 class="page-title">${str(props.title)}</h1>
-            ${props.description
-              ? html`<p class="page-description">${str(props.description)}</p>`
-              : nothing}
-          </header>
+          ${props.headerVisible === false
+            ? nothing
+            : html`<header class="page-header">
+                <h1 class="page-title">${str(props.title)}</h1>
+                ${props.description
+                  ? html`<p class="page-description">${str(props.description)}</p>`
+                  : nothing}
+              </header>`}
           <div class="page-body">
             ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
           </div>
