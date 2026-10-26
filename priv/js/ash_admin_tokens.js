@@ -534,15 +534,16 @@ export function formatDisplayValue(value, format) {
     case "datetime": {
       const text = String(value);
       const hasTime = text.includes("T") && /[:0-9]/.test(text.split("T")[1] || "");
-      // Date-only strings must not travel through the UTC-to-local
-      // conversion (a plain Date would shift the calendar day in negative
-      // offsets); datetime strings keep normal parsing.
+      // A date-only string is a calendar day, not an instant: build it at
+      // local midnight, the zone the formatter shows. UTC midnight (what
+      // `new Date("2026-12-31")` or `Date.UTC` gives) is the evening before
+      // anywhere west of Greenwich. Datetime strings keep normal parsing.
       if (!hasTime) {
         const dateOnly = /^(?:\d{4}-\d{2}-\d{2})$/.exec(text.trim());
         if (dateOnly) {
-          const [year, month, day] = text.split("-").map(Number);
+          const [year, month, day] = text.trim().split("-").map(Number);
           const {dateFormatter: d} = dateFormatters();
-          return d.format(new Date(Date.UTC(year, month - 1, day)));
+          return d.format(new Date(year, month - 1, day));
         }
       }
       const parsed = new Date(text);
