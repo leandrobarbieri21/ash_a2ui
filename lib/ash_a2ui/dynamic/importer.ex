@@ -352,6 +352,7 @@ defmodule AshA2ui.Dynamic.Importer do
         |> put_list("range_filters", query.range_filters)
         |> put_default_sort(query.default_sort)
         |> put_opt("default_preset", query.default_preset)
+        |> put_value("preset_picker", if(query.preset_picker == false, do: false))
         |> put_value("page_size", query.page_size)
         |> put_value("max_page_size", query.max_page_size)
         |> put_presets(query.presets)

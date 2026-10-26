@@ -221,6 +221,7 @@ end
 | [`range_filters`](#a2ui-query-range_filters){: #a2ui-query-range_filters } | `list(atom)` | `[]` | Public attributes (or expression-backed public calculations) of orderable types (date/datetime/numeric) the client may range-filter on through `/query/ranges/<field>` (`{"from", "to"}`, each optional). Anything else is rejected. |
 | [`filters`](#a2ui-query-filters){: #a2ui-query-filters } | `list(atom)` | `[]` | Public attributes or public expression calculations the client may equality-filter on. Anything else is rejected. |
 | [`default_preset`](#a2ui-query-default_preset){: #a2ui-query-default_preset } | `atom` |  | The preset applied when the client selects none. Must name a declared preset. |
+| [`preset_picker`](#a2ui-query-preset_picker){: #a2ui-query-preset_picker } | `boolean` | `true` | Whether the query controls include the preset picker. Set `false` when the page around the surface selects the preset itself (tabs that link to `?q[preset]=...`): the presets still apply, only the picker is not emitted. |
 | [`default_sort`](#a2ui-query-default_sort){: #a2ui-query-default_sort } | `list({atom, :asc \| :desc})` | `[]` | The sort applied when the client requests none, e.g. `default_sort inserted_at: :desc`. |
 | [`page_size`](#a2ui-query-page_size){: #a2ui-query-page_size } | `pos_integer` | `25` | The page size used when the client requests none. |
 | [`max_page_size`](#a2ui-query-max_page_size){: #a2ui-query-max_page_size } | `pos_integer` | `100` | The hard upper bound client-requested page sizes are clamped to. |
