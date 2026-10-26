@@ -258,6 +258,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **A date-only value shows its own day west of Greenwich.** The admin
+  catalog's `formatDisplayValue` built `"2026-12-31"` at UTC midnight and
+  formatted it in local time, so it read Dec 30 in Toronto, Vancouver or
+  Honolulu. It is now built at local midnight. `priv/js/probe/dates_probe.mjs`
+  checks it across six time zones.
+
 - **A `{surface, id_path}` link whose path is a single calculation now
   links.** `link {:record, :subject_ref}`, with `:subject_ref` a
   calculation (or aggregate) of the resource, was never loaded: a
