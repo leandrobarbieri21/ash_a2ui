@@ -261,8 +261,10 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 - **A table's query controls sit on one baseline.** The controls row
   (`query_controls_body`, or `query_<table>_controls_body`) is sent with
   `align: "end"`, so labelled inputs and the label-less Apply button line up
-  at the bottom instead of the top. The board and wizard goldens gain only
-  that property.
+  at the bottom instead of the top, and the merged catalog's Row
+  (`<ash-a2ui-row>`) lets that row wrap, so a filter bar with several pickers
+  or longer labels stays inside a narrow screen. The board and wizard goldens
+  gain only the `align` property.
 
 - **A `{surface, id_path}` link whose path is a single calculation now
   links.** `link {:record, :subject_ref}`, with `:subject_ref` a

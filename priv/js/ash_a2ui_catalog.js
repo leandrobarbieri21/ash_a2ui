@@ -47,6 +47,9 @@
  *   - **Text** → `<ash-a2ui-text>` and **Button** → `<ash-a2ui-button>`:
  *     the CLIN-10 neobrutalist anatomy overrides — see the
  *     "Neobrutalist anatomy overrides" section below the imports.
+ *   - **Row** → `<ash-a2ui-row>`: renders as upstream, except that a
+ *     table's query controls Row wraps (the basic Row has no wrap
+ *     property).
  *   - **Modal** → `<ash-a2ui-modal>`: the stock Modal closes only through
  *     its × button, so a row-action prompt stayed open (its fields
  *     cleared) after a successful Confirm. The override closes the dialog
@@ -108,6 +111,7 @@ const CHOICEPICKER_TAG = "ash-a2ui-choicepicker";
 const COLUMN_TAG = "ash-a2ui-column";
 const TEXT_TAG = "ash-a2ui-text";
 const BUTTON_TAG = "ash-a2ui-button";
+const ROW_TAG = "ash-a2ui-row";
 const MODAL_TAG = "ash-a2ui-modal";
 
 /**
@@ -147,6 +151,7 @@ export function createAshA2uiCatalog(deps) {
   for (const [type, tag] of [
     ["Text", TEXT_TAG],
     ["Button", BUTTON_TAG],
+    ["Row", ROW_TAG],
   ]) {
     const api = basicCatalog.components.get(type);
     if (api && customElements.get(tag)) overrides.set(type, {...api, tagName: tag});
@@ -971,6 +976,34 @@ function defineAnatomyElements({lit, basicCatalog}) {
 
   if (!customElements.get(TEXT_TAG)) customElements.define(TEXT_TAG, AshA2uiTextElement);
   if (!customElements.get(BUTTON_TAG)) customElements.define(BUTTON_TAG, AshA2uiButtonElement);
+
+  defineRowElement(basicCatalog);
+}
+
+// A table's query controls Row (`query_controls_body`, or
+// `query_<table>_controls_body` on a multi-table surface) wraps: the basic
+// catalog's Row has no wrap property, and a filter bar with several pickers
+// (or longer translated labels) must not run off a narrow screen. Every
+// other Row renders as upstream.
+const QUERY_CONTROLS_ROW = /^query_(?:.+_)?controls_body$/;
+
+function defineRowElement(basicCatalog) {
+  if (customElements.get(ROW_TAG)) return;
+  const A2uiBasicRowElement = upstreamElementClass(basicCatalog, "Row");
+  if (!A2uiBasicRowElement) return;
+
+  class AshA2uiRowElement extends A2uiBasicRowElement {
+    updated(changedProperties) {
+      super.updated(changedProperties);
+      if (QUERY_CONTROLS_ROW.test(componentIdOf(this))) {
+        this.style.flexWrap = "wrap";
+      } else {
+        this.style.removeProperty("flex-wrap");
+      }
+    }
+  }
+
+  customElements.define(ROW_TAG, AshA2uiRowElement);
 }
 
 // --- Action outcomes ------------------------------------------------------------
