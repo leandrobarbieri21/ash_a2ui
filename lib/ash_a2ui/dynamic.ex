@@ -832,6 +832,13 @@ defmodule AshA2ui.Dynamic do
         "sortable" => Map.put(name_list, "description", "Attributes the client may sort by."),
         "filters" =>
           Map.put(name_list, "description", "Attributes the client may equality-filter on."),
+        "hidden_filters" =>
+          Map.put(
+            name_list,
+            "description",
+            "Entries of filters that get no picker: the page sets them itself, and " <>
+              "they still apply."
+          ),
         "range_filters" =>
           Map.put(
             name_list,

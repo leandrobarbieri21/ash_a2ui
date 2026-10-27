@@ -80,6 +80,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     sortable: :name_list,
     range_filters: :name_list,
     filters: :name_list,
+    hidden_filters: :name_list,
     default_preset: :name,
     preset_picker: :raw,
     default_sort: :default_sort,
