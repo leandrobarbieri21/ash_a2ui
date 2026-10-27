@@ -21,6 +21,7 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
       public expression calculations with castable values, and `read_action`
       must name a `:read` action of the resource,
     * `default_preset` must name a declared preset,
+    * `hidden_filters` must name entries of `filters`,
     * `page_size` must not exceed `max_page_size`,
     * query names must be unique, and
     * a component's `query` option must reference a declared query.
@@ -120,6 +121,7 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
   defp verify_query(query, ctx) do
     with :ok <- verify_allowlists(query, ctx),
          :ok <- verify_search_fields(query, ctx),
+         :ok <- verify_hidden_filters(query, ctx.module),
          :ok <- verify_presets(query, ctx) do
       verify_page_sizes(query, ctx.module)
     end
@@ -368,6 +370,23 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
           "#{detail}. Every step but the last must be a public relationship, and the " <>
           "last a public string attribute of the final destination."
     )
+  end
+
+  defp verify_hidden_filters(query, module) do
+    case query.hidden_filters -- query.filters do
+      [] ->
+        :ok
+
+      unknown ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :query, query.name, :hidden_filters],
+           message:
+             "query #{inspect(query.name)} hidden_filters #{inspect(unknown)} " <>
+               "are not in its filters (declared: #{inspect(query.filters)})"
+         )}
+    end
   end
 
   # --- presets ----------------------------------------------------------------

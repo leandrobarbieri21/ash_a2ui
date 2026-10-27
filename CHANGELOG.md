@@ -10,6 +10,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`hidden_filters` on a query.** For a filter the page sets itself
+  (links to `?q[filters][<name>]=...`): the query controls draw no picker
+  for it, and it still applies. Each entry must be in `filters`. The
+  output is unchanged without it. Dynamic specs carry it as
+  `"hidden_filters": [...]`.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:

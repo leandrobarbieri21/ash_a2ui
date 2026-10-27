@@ -46,6 +46,7 @@ spark_locals_without_parens = [
   group: 1,
   group: 2,
   hidden: 1,
+  hidden_filters: 1,
   label: 1,
   labels: 1,
   limit: 1,

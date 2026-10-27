@@ -617,6 +617,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           list_text("search", query.search_fields),
           list_text("sortable", query.sortable),
           list_text("filters", query.filters),
+          list_text("hidden filters", query.hidden_filters),
           list_text("range filters", query.range_filters),
           opt_text("default preset", query.default_preset),
           opt_text("page size", query.page_size)

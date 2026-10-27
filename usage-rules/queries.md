@@ -49,6 +49,10 @@ end
   calculations have no data-layer expression and are rejected everywhere;
   aggregates are sort-only). All verified at compile
   time — fix the declaration, do not work around the verifier.
+- **`hidden_filters` drops a filter's picker, not the filter.** List there
+  the `filters` entries the page sets itself (links to
+  `?q[filters][<name>]=...`): they still apply, the controls just draw no
+  picker for them. Each must also be in `filters`.
 - **`range_filters` is the only client-driven bound mechanism.** Each
   declared field (public attributes only) gets `/query/ranges/<field>/from`
   and `/to` string bindings, cast to the attribute's type and ANDed as

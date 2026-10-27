@@ -467,6 +467,16 @@ defmodule AshA2ui do
         equality-filter on. Anything else is rejected.
         """
       ],
+      hidden_filters: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Filters (each one also in `filters`) that get no picker in the query
+        controls. Use it when the page around the surface sets the filter
+        itself (links to `?q[filters][<name>]=...`): the filter still
+        applies, only its picker is not emitted.
+        """
+      ],
       default_preset: [
         type: :atom,
         doc: "The preset applied when the client selects none. Must name a declared preset."
