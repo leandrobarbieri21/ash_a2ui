@@ -10,6 +10,12 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Rows carry the value of a labelled choice.** A field with declared
+  choices (`one_of` atoms, `Ash.Type.Enum`) still shows its label in the
+  row, and the row now also has the value at the reserved
+  `_values/<field>` key, so a client that keys its own words by value can
+  read it. Rows without such fields are unchanged.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:

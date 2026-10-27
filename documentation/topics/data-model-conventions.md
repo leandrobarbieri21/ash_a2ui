@@ -56,11 +56,24 @@ LiveView transport's PubSub subscription — is one message:
     "surfaceId": "tickets",
     "path": "/records",
     "value": [
-      { "id": "…", "subject": "Printer on fire", "status": "open" }
+      {
+        "id": "…",
+        "subject": "Printer on fire",
+        "status": "Open",
+        "_values": { "status": "open" }
+      }
     ]
   }
 }
 ```
+
+A field with declared choices (an atom with a `one_of` constraint, or an
+`Ash.Type.Enum`) reaches the row as its label, the same words its form picker
+shows: `Ash.Type.Enum.label/1` when the enum declares one, the humanized value
+otherwise. The row also carries the value itself at the reserved
+`_values/<field>` key, for a client that keys its own words by value (a
+translated label, a detail line per state). Only fields whose value was
+rewritten appear there; a row without any has no `_values` key.
 
 Because `updateDataModel` replaces the value at `path`, refreshes are
 whole-region: the list is replaced, not diffed. On multi-table surfaces the

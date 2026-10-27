@@ -78,6 +78,26 @@ defmodule AshA2ui.EnumTypeTest do
              EnumRecord |> Ash.read!(action: :read, authorize?: false) |> Enum.take(1)
   end
 
+  test "rows show an enum's label and carry its value at _values" do
+    Ash.create!(EnumRecord, %{name: "both", severity: :very_high, stage: :in_progress},
+      authorize?: false
+    )
+
+    Ash.create!(EnumRecord, %{name: "neither"}, authorize?: false)
+
+    [_create, _components, data] = AshA2ui.Info.build_surface(EnumRecord, authorize?: false)
+    records = Map.new(data["updateDataModel"]["value"]["records"], &{&1["name"], &1})
+
+    # a declared label (`Stage`) and a humanized one (`Severity`)
+    assert %{"severity" => "Very high", "stage" => "In Progress"} = records["both"]
+
+    assert records["both"]["_values"] == %{"severity" => "very_high", "stage" => "in_progress"}
+
+    # nothing was rewritten, so the row has no _values key
+    assert %{"severity" => nil, "stage" => nil} = records["neither"]
+    refute Map.has_key?(records["neither"], "_values")
+  end
+
   test "an enum filter value is validated and applied" do
     Ash.create!(EnumRecord, %{name: "low one", severity: :low}, authorize?: false)
     Ash.create!(EnumRecord, %{name: "high one", severity: :very_high}, authorize?: false)
@@ -100,6 +120,7 @@ defmodule AshA2ui.EnumTypeTest do
     # table rows read enum values as their labels, on refreshes as on the
     # initial render
     assert record["severity"] == "Very high"
+    assert record["_values"] == %{"severity" => "very_high"}
 
     bogus = put_in(envelope, ["action", "context", "query", "filters", "severity"], "bogus")
     assert {:error, error_messages} = AshA2ui.ActionHandler.handle(EnumRecord, bogus, actor: nil)
