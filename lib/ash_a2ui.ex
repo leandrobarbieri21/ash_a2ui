@@ -985,6 +985,69 @@ defmodule AshA2ui do
     ]
   }
 
+  @primary_action %Spark.Dsl.Entity{
+    name: :primary_action,
+    describe: """
+    Draws a `:table`'s primary row action (the row click: the
+    `select_context` selection, else View) as one button per row in a final
+    column, with a label and a variant chosen per row. For a list whose last
+    column reads "Review", "Approve" or "View" depending on the record, all
+    opening it. The button dispatches exactly what the row click does.
+
+    Rows carry the button's label at the reserved `_primary_label` key and
+    its variant at `_primary_variant`. Without `primary_action` nothing
+    changes.
+    """,
+    examples: [
+      """
+      primary_action do
+        label_from :next_step
+        labels review: "Review", approve: "Approve", view: "View"
+        variants review: :primary, approve: :default, view: :borderless
+      end
+      """
+    ],
+    target: AshA2ui.PrimaryAction,
+    schema: [
+      label_from: [
+        type: :atom,
+        doc: """
+        A public attribute, calculation or aggregate of the table's resource
+        whose value picks the row's `labels` and `variants` entries. It is
+        loaded for the table; it need not be one of the table's fields.
+        """
+      ],
+      labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The button's label per `label_from` value (atom values, or string
+        values by name), e.g. `labels review: "Review", view: "View"`.
+        """
+      ],
+      variants: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The button's variant per `label_from` value, matched like `labels`:
+        `:default`, `:primary` or `:borderless` (the A2UI Button variants).
+        """
+      ],
+      label: [
+        type: :string,
+        doc: """
+        The label for rows whose value has no `labels` entry (and for every
+        row without `label_from`). Defaults to the row click's own label.
+        """
+      ],
+      variant: [
+        type: {:in, [:default, :primary, :borderless]},
+        default: :default,
+        doc: "The variant for rows whose value has no `variants` entry."
+      ]
+    ]
+  }
+
   @export %Spark.Dsl.Entity{
     name: :export,
     describe: """
@@ -1077,9 +1140,10 @@ defmodule AshA2ui do
       row_layout: [@row_layout],
       sections: [@table_sections],
       editable: [@editable],
-      export: [@export]
+      export: [@export],
+      primary_action: [@primary_action]
     ],
-    singleton_entity_keys: [:row_layout, :sections, :editable, :export],
+    singleton_entity_keys: [:row_layout, :sections, :editable, :export, :primary_action],
     schema: [
       name: [
         type: {:one_of, [:table, :form, :detail, :report]},
@@ -1565,6 +1629,7 @@ defmodule AshA2ui do
   @verifiers [
     AshA2ui.Verifiers.VerifyComponents,
     AshA2ui.Verifiers.VerifyLayouts,
+    AshA2ui.Verifiers.VerifyPrimaryAction,
     AshA2ui.Verifiers.VerifySteps,
     AshA2ui.Verifiers.VerifyContexts,
     AshA2ui.Verifiers.VerifyFields,

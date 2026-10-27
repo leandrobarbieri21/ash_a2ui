@@ -199,6 +199,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_groups(component.groups)
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
+      |> put_primary_action(component.primary_action)
 
     {spec, component_rejections(component, path)}
   end
@@ -270,6 +271,22 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_value("columns", layout.columns)
 
     Map.put(spec, "row_layout", row_layout)
+  end
+
+  defp put_primary_action(spec, nil), do: spec
+
+  # `variant` is left out at its default, so specs without one stay as they
+  # were written.
+  defp put_primary_action(spec, action) do
+    primary_action =
+      %{}
+      |> put_opt("label_from", action.label_from)
+      |> put_keyword("labels", action.labels, :raw)
+      |> put_keyword("variants", action.variants, :name)
+      |> put_value("label", action.label)
+      |> put_value("variant", if(action.variant != :default, do: to_string(action.variant)))
+
+    Map.put(spec, "primary_action", primary_action)
   end
 
   defp put_groups(spec, []), do: spec

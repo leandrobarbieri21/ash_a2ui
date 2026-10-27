@@ -57,6 +57,7 @@ for the resource named by `for_resource`).
    * sections
    * editable
    * export
+   * primary_action
  * [field](#a2ui-field)
  * [action](#a2ui-action)
    * prompt_options
@@ -377,6 +378,7 @@ distinguishing name via the optional second argument, e.g.
  * [sections](#a2ui-component-sections)
  * [editable](#a2ui-component-editable)
  * [export](#a2ui-component-export)
+ * [primary_action](#a2ui-component-primary_action)
 
 
 ### Examples
@@ -820,6 +822,53 @@ end
 ### Introspection
 
 Target: `AshA2ui.Export`
+
+### a2ui.component.primary_action
+
+
+Draws a `:table`'s primary row action (the row click: the
+`select_context` selection, else View) as one button per row in a final
+column, with a label and a variant chosen per row. For a list whose last
+column reads "Review", "Approve" or "View" depending on the record, all
+opening it. The button dispatches exactly what the row click does.
+
+Rows carry the button's label at the reserved `_primary_label` key and
+its variant at `_primary_variant`. Without `primary_action` nothing
+changes.
+
+
+
+
+### Examples
+```
+primary_action do
+  label_from :next_step
+  labels review: "Review", approve: "Approve", view: "View"
+  variants review: :primary, approve: :default, view: :borderless
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label_from`](#a2ui-component-primary_action-label_from){: #a2ui-component-primary_action-label_from } | `atom` |  | A public attribute, calculation or aggregate of the table's resource whose value picks the row's `labels` and `variants` entries. It is loaded for the table; it need not be one of the table's fields. |
+| [`labels`](#a2ui-component-primary_action-labels){: #a2ui-component-primary_action-labels } | `keyword` | `[]` | The button's label per `label_from` value (atom values, or string values by name), e.g. `labels review: "Review", view: "View"`. |
+| [`variants`](#a2ui-component-primary_action-variants){: #a2ui-component-primary_action-variants } | `keyword` | `[]` | The button's variant per `label_from` value, matched like `labels`: `:default`, `:primary` or `:borderless` (the A2UI Button variants). |
+| [`label`](#a2ui-component-primary_action-label){: #a2ui-component-primary_action-label } | `String.t` |  | The label for rows whose value has no `labels` entry (and for every row without `label_from`). Defaults to the row click's own label. |
+| [`variant`](#a2ui-component-primary_action-variant){: #a2ui-component-primary_action-variant } | `:default \| :primary \| :borderless` | `:default` | The variant for rows whose value has no `variants` entry. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PrimaryAction`
 
 
 

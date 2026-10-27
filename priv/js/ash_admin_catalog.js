@@ -175,7 +175,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.5.0";
+export const ADMIN_CATALOG_VERSION = "1.10.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -456,6 +456,12 @@ export function buildSchemas() {
         label: DynamicStringSchema,
         action: Str,
         context: RecordAny.optional(),
+        // 1.10: the row click drawn as one button per row (`inline`), its
+        // label and Button variant read from the row (`_primary_label`,
+        // `_primary_variant`). Static, like the rest of the envelope.
+        labelPath: Str.optional(),
+        variantPath: Str.optional(),
+        inline: Bool.optional(),
       }).optional(),
       children: ChildListSchema.optional(),
       accessibility: Any.optional(),
@@ -617,6 +623,17 @@ function fieldErrors(props, selfError) {
  * shape the admin encoder emits (`{label, action: <name>, context}`); a
  * legacy nested `{label, action: {event: ...}}` is tolerated defensively.
  */
+/**
+ * The button class of a primary action variant (the A2UI Button variants):
+ * primary is the filled call to action, borderless reads as a link,
+ * default (and anything unknown) is the outlined button.
+ */
+function primaryVariantClass(variant) {
+  if (variant === "primary") return "am-btn-primary";
+  if (variant === "borderless") return "am-btn-quiet";
+  return "";
+}
+
 function rowActionEnvelope(entry) {
   if (!entry || typeof entry !== "object") return null;
   if (typeof entry.action === "string") {
@@ -1122,6 +1139,10 @@ function defineAdminElements(deps, {adminApis}) {
           .cell-actions {
             text-align: right;
           }
+          .cell-primary {
+            text-align: right;
+            white-space: nowrap;
+          }
           /* Row actions wrap inside their cell instead of pushing the
            * table past its frame. */
           .row-actions {
@@ -1389,6 +1410,7 @@ function defineAdminElements(deps, {adminApis}) {
 
       renderTable(columns, rows, rowActions, label) {
         const hasActions = rowActions.length > 0;
+        const primary = this.inlinePrimary();
         return html`
           <div class="grid-frame" part="frame">
             <table class="grid-table" aria-label=${label || "Records"}>
@@ -1398,6 +1420,9 @@ function defineAdminElements(deps, {adminApis}) {
                     (column) =>
                       html`<th scope="col" class=${alignClass(column)}>${str(column.label)}</th>`,
                   )}
+                  ${primary
+                    ? html`<th scope="col"><span class="sr-only">${str(primary.label)}</span></th>`
+                    : nothing}
                   ${hasActions
                     ? html`<th scope="col"><span class="sr-only">Actions</span></th>`
                     : nothing}
@@ -1430,6 +1455,9 @@ function defineAdminElements(deps, {adminApis}) {
                 ? html`<th scope="row" class=${alignClass(column)}>${cell}</th>`
                 : html`<td class=${alignClass(column)}>${cell}</td>`;
             })}
+            ${this.inlinePrimary()
+              ? html`<td class="cell-primary">${this.renderPrimaryAction(row, index)}</td>`
+              : nothing}
             ${hasActions
               ? html`<td class="cell-actions">${this.renderRowActions(row, index, rowActions)}</td>`
               : nothing}
@@ -1463,8 +1491,11 @@ function defineAdminElements(deps, {adminApis}) {
                 `,
               )}
             </dl>
-            ${hasActions
-              ? html`<div class="card-actions">${this.renderRowActions(row, index, rowActions)}</div>`
+            ${hasActions || this.inlinePrimary()
+              ? html`<div class="card-actions">
+                  ${this.inlinePrimary() ? this.renderPrimaryAction(row, index) : nothing}
+                  ${hasActions ? this.renderRowActions(row, index, rowActions) : nothing}
+                </div>`
               : nothing}
           </li>
         `;
@@ -1501,6 +1532,53 @@ function defineAdminElements(deps, {adminApis}) {
         return column.mono === true && value !== "—"
           ? html`<span class="am-mono">${value}</span>`
           : value;
+      }
+
+      /** The row click when it is also drawn as a button per row (1.10
+       * `inline`), else null. */
+      inlinePrimary() {
+        const rowClick = this.controller?.props?.rowClick;
+        return rowClick && rowClick.inline === true && typeof rowClick.action === "string"
+          ? rowClick
+          : null;
+      }
+
+      /** The row's primary action button: the row click's envelope, its
+       * label and variant from the row (labelPath / variantPath), the row
+       * click's own label and the default variant when absent. A click
+       * here never reaches the row's own click handler (it is a button). */
+      renderPrimaryAction(row, index) {
+        const rowClick = this.inlinePrimary();
+        const rowLabel =
+          typeof rowClick.labelPath === "string" ? getByPath(row, rowClick.labelPath) : null;
+        const label = str(
+          rowLabel === null || rowLabel === undefined || rowLabel === "" ? rowClick.label : rowLabel,
+        );
+        const variant =
+          typeof rowClick.variantPath === "string"
+            ? primaryVariantClass(getByPath(row, rowClick.variantPath))
+            : primaryVariantClass(null);
+        const action = {...rowClick, label};
+        const busy =
+          this._amBusyRowAction !== null &&
+          this._amBusyRowAction.row === this.rowIdentity(row, index) &&
+          this._amBusyRowAction.label === label;
+        return html`
+          <button
+            type="button"
+            class="am-btn am-btn-sm ${variant}"
+            data-primary-action
+            ?disabled=${busy}
+            aria-busy=${busy ? "true" : "false"}
+            @click=${(event) => {
+              event.stopPropagation();
+              this.onRowAction(action, index);
+            }}
+          >
+            ${busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
+            ${label}
+          </button>
+        `;
       }
 
       rowClickable() {

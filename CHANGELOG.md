@@ -10,6 +10,15 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`primary_action` on a table.** The row click (the `select_context`
+  selection, else View) drawn as one button per row in a final column,
+  its label and Button variant picked per row by a field's value (e.g. a
+  `next_step` calculation: "Review" as primary, "View" as borderless). The
+  admin catalog goes to 1.10.0: `rowClick` gains optional `labelPath`,
+  `variantPath` and `inline`; rows carry `_primary_label` and
+  `_primary_variant`. Tables without it are unchanged. Dynamic specs carry
+  it as `"primary_action"`.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:

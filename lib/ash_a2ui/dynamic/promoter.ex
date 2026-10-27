@@ -48,6 +48,14 @@ defmodule AshA2ui.Dynamic.Promoter do
     columns: :raw
   ]
 
+  @primary_action_options [
+    label_from: :name,
+    labels: :string_keyword,
+    variants: :name_keyword,
+    label: :raw,
+    variant: :name
+  ]
+
   @group_options [label: :raw, columns: :raw, fields: :name_list]
 
   @nested_form_options [
@@ -201,7 +209,8 @@ defmodule AshA2ui.Dynamic.Promoter do
         entry |> Map.get("row_layout") |> row_layout_block(),
         entry |> Map.get("groups", []) |> Enum.map(&group_block/1),
         entry |> Map.get("nested_forms", []) |> Enum.map(&nested_form_block/1),
-        entry |> Map.get("sections") |> sections_block(allowlist)
+        entry |> Map.get("sections") |> sections_block(allowlist),
+        entry |> Map.get("primary_action") |> primary_action_block()
       ]
       |> List.flatten()
       |> Enum.filter(& &1)
@@ -225,6 +234,12 @@ defmodule AshA2ui.Dynamic.Promoter do
 
   defp row_layout_block(entry) do
     block("row_layout", option_lines(entry, @row_layout_options))
+  end
+
+  defp primary_action_block(nil), do: nil
+
+  defp primary_action_block(entry) do
+    block("primary_action", option_lines(entry, @primary_action_options))
   end
 
   defp group_block(entry) do

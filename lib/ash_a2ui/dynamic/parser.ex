@@ -143,9 +143,10 @@ defmodule AshA2ui.Dynamic.Parser do
   # Closed vocabularies, string -> atom by lookup (never created from
   # input).
   @displays %{"list" => :list, "board" => :board, "calendar" => :calendar}
+  @button_variants Map.new(AshA2ui.PrimaryAction.variants(), &{Atom.to_string(&1), &1})
   @granularities Map.new(AshA2ui.Calendar.granularities(), &{Atom.to_string(&1), &1})
 
-  @component_nested ~w(row_layout groups nested_forms sections)
+  @component_nested ~w(row_layout groups nested_forms sections primary_action)
 
   defp parse_component(entry, path, allowlist) when is_map(entry) do
     with :ok <- require_kind(entry, path),
@@ -234,6 +235,7 @@ defmodule AshA2ui.Dynamic.Parser do
     [group_def] = component_def.entities[:groups]
     [nested_form_def] = component_def.entities[:nested_forms]
     [sections_def] = component_def.entities[:sections]
+    [primary_action_def] = component_def.entities[:primary_action]
 
     with {:ok, row_layout} <-
            parse_row_layout(Map.get(entry, "row_layout"), row_layout_def, path),
@@ -241,16 +243,41 @@ defmodule AshA2ui.Dynamic.Parser do
          {:ok, nested_forms} <-
            parse_nested_forms(Map.get(entry, "nested_forms"), nested_form_def, path),
          {:ok, sections} <-
-           parse_sections(Map.get(entry, "sections"), sections_def, path, allowlist) do
+           parse_sections(Map.get(entry, "sections"), sections_def, path, allowlist),
+         {:ok, primary_action} <-
+           parse_primary_action(Map.get(entry, "primary_action"), primary_action_def, path) do
       {:ok,
        [
          row_layout: row_layout,
          groups: groups,
          nested_forms: nested_forms,
-         sections: sections
+         sections: sections,
+         primary_action: primary_action
        ]}
     end
   end
+
+  @primary_action_keys %{
+    "label_from" => :label_from,
+    "labels" => :labels,
+    "variants" => :variants,
+    "label" => :label,
+    "variant" => :variant
+  }
+
+  defp parse_primary_action(nil, _def, _path), do: {:ok, []}
+
+  defp parse_primary_action(entry, primary_action_def, path) when is_map(entry) do
+    path = "#{path}.primary_action"
+
+    with {:ok, opts} <- convert_options(entry, @primary_action_keys, [], path),
+         {:ok, action} <- build_entity(:primary_action, primary_action_def, opts, [], path) do
+      {:ok, [action]}
+    end
+  end
+
+  defp parse_primary_action(_entry, _def, path),
+    do: {:error, [Error.new("#{path}.primary_action", "primary_action must be a JSON object")]}
 
   @row_layout_keys %{
     "title" => :title,
@@ -858,6 +885,15 @@ defmodule AshA2ui.Dynamic.Parser do
   defp convert_shaped(:value_tone_keyword, option, value, path),
     do: convert_value_keyword(option, value, path, &convert_tone(&1, "#{path}.#{option}"))
 
+  defp convert_shaped(:variant_keyword, option, value, path),
+    do:
+      convert_value_keyword(
+        option,
+        value,
+        path,
+        &convert_enum(option, &1, @button_variants, path)
+      )
+
   defp convert_shaped(keyword_shape, option, value, path),
     do: convert_keyword(option, value, path, keyword_value(keyword_shape, option, path))
 
@@ -887,6 +923,7 @@ defmodule AshA2ui.Dynamic.Parser do
               :badge,
               :depends_on,
               :default_preset,
+              :label_from,
               :value,
               :sort,
               :links,
@@ -928,6 +965,8 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp option_shape(option) when option in [:values, :swimlane_values], do: :value_list
   defp option_shape(option) when option in [:labels, :swimlane_labels], do: :label_keyword
+  defp option_shape(:variants), do: :variant_keyword
+  defp option_shape(:variant), do: {:enum, @button_variants}
   defp option_shape(:swimlane_tones), do: :value_tone_keyword
   defp option_shape(_option), do: :raw
 

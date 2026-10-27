@@ -625,6 +625,40 @@ defmodule AshA2ui.Dynamic do
             "Calendar tables: the window sizes the user may switch between " <>
               "(default: only granularity)."
         },
+        "primary_action" => %{
+          "type" => "object",
+          "description" =>
+            "Tables: the row click drawn as one button per row, its label and variant " <>
+              "picked by a field's value.",
+          "properties" => %{
+            "label_from" =>
+              Map.put(name, "description", "Field whose value picks the row's label and variant."),
+            "labels" => %{
+              "type" => "object",
+              "additionalProperties" => %{"type" => "string", "maxLength" => 60},
+              "description" => "Button label per label_from value, e.g. {\"review\": \"Review\"}."
+            },
+            "variants" => %{
+              "type" => "object",
+              "additionalProperties" => %{
+                "type" => "string",
+                "enum" => Enum.map(AshA2ui.PrimaryAction.variants(), &Atom.to_string/1)
+              },
+              "description" =>
+                "Button variant per label_from value, e.g. {\"review\": \"primary\"}."
+            },
+            "label" => %{
+              "type" => "string",
+              "description" => "Label for values without one (default: the row click's)."
+            },
+            "variant" => %{
+              "type" => "string",
+              "enum" => Enum.map(AshA2ui.PrimaryAction.variants(), &Atom.to_string/1),
+              "description" => "Variant for values without one. Default \"default\"."
+            }
+          },
+          "additionalProperties" => false
+        },
         "row_layout" => %{
           "type" => "object",
           "description" => "Card-style table rows: a title header plus a labeled metadata grid.",
