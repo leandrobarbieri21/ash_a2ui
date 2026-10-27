@@ -1579,7 +1579,7 @@ function defineAdminElements(deps, {adminApis}) {
                   <div class="card-field">
                     <dt>${str(column.label)}</dt>
                     <dd>${this.renderCell(row, column)}</dd>
-                  </div>
+                  </dl>
                 `,
               )}
             </dl>
@@ -2674,32 +2674,32 @@ function defineAdminElements(deps, {adminApis}) {
 
         if (links.length > 0) {
           return html`
-            <div class="field">
+            <dl class="field">
               <dt class="field-label">${str(props.label)}</dt>
               <dd class="field-value">${renderLinks(this, links)}</dd>
-            </div>
+            </dl>
           `;
         }
 
         if (isBoolean) {
           const value = formatDisplayValue(props.value, props.format);
           return html`
-            <div class="field">
+            <dl class="field">
               <dt class="field-label">${str(props.label)}</dt>
               <dd
                 class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
               >
                 ${value}
               </dd>
-            </div>
+            </dl>
           `;
         }
 
         return html`
-          <div class="field">
+          <dl class="field">
             <dt class="field-label">${str(props.label)}</dt>
             <dd class="field-value">${renderValue(props.value, props.format)}</dd>
-          </div>
+          </dl>
         `;
       }
     }
