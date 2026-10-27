@@ -21,6 +21,8 @@ defmodule AshA2ui.Column do
     icon_tones: [],
     icon_labels: [],
     detail_text: [],
+    detail_icon_names: [],
+    detail_icon_tones: [],
     __spark_metadata__: nil
   ]
 
@@ -34,10 +36,12 @@ defmodule AshA2ui.Column do
           more: atom | nil,
           detail: atom | nil,
           detail_date: atom | nil,
-          detail_text: keyword(String.t())
+          detail_text: keyword(String.t()),
+          detail_icon_names: keyword(atom),
+          detail_icon_tones: keyword(atom)
         }
 
-  @icons ~w(check x user_check user_x alert clock info)a
+  @icons ~w(check x user_check user_x alert clock info refresh extend)a
 
   @doc """
   The icon vocabulary `icon_names` values are drawn from. Generic names;
@@ -72,8 +76,11 @@ defmodule AshA2ui.Column do
   (the `icon_tones` entry, `"neutral"` when unmatched) and
   `"_icon_label_<column>"` (the `icon_labels` entry, else the humanized
   value); a column with a `detail` adds `"_detail_<column>"` (the
-  `detail_text` entry, with any `{date}` left for the renderer to fill).
-  A nil or unmatched value serializes as `""`: no icon, no detail line.
+  `detail_text` entry, with any `{date}` left for the renderer to fill)
+  and, when it declares `detail_icon_names`, `"_detail_icon_<column>"` and
+  `"_detail_icon_tone_<column>"` (the icon and tone for the line, picked
+  by the same value). A nil or unmatched value serializes as `""`: no
+  icon, no detail line.
 
   Shared by the encoder and `AshA2ui.ActionHandler` (through
   `serialize_row`) so initial renders and refreshes serialize rows
@@ -109,8 +116,21 @@ defmodule AshA2ui.Column do
   defp detail_data(%{detail: nil}, _record), do: []
 
   defp detail_data(column, record) do
-    text = lookup(column.detail_text, Map.get(record, column.detail))
-    [{"_detail_#{column.name}", text || ""}]
+    value = Map.get(record, column.detail)
+    text = lookup(column.detail_text, value)
+    [{"_detail_#{column.name}", text || ""} | detail_icon_data(column, value)]
+  end
+
+  defp detail_icon_data(%{detail_icon_names: []}, _value), do: []
+
+  defp detail_icon_data(column, value) do
+    name = lookup(column.detail_icon_names, value)
+
+    [
+      {"_detail_icon_#{column.name}", (name && to_string(name)) || ""},
+      {"_detail_icon_tone_#{column.name}",
+       to_string(lookup(column.detail_icon_tones, value) || :neutral)}
+    ]
   end
 
   # Keyword keys are atoms; values arrive as atoms (enums, booleans) or as

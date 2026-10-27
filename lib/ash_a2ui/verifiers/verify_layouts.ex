@@ -298,12 +298,14 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
                "without an icon field"
          )}
 
-      is_nil(column.detail) and (column.detail_text != [] or not is_nil(column.detail_date)) ->
+      is_nil(column.detail) and
+          (column.detail_text != [] or not is_nil(column.detail_date) or
+             column.detail_icon_names != [] or column.detail_icon_tones != []) ->
         {:error,
          error(module, path,
            message:
-             "column #{inspect(column.name)} declares detail_text or detail_date without a " <>
-               "detail field"
+             "column #{inspect(column.name)} declares detail_text, detail_date or detail icons " <>
+               "without a detail field"
          )}
 
       true ->
@@ -318,7 +320,11 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       {:icon_tones, column.icon_tones, &(&1 in AshA2ui.RowLayout.tones()),
        "one of #{inspect(AshA2ui.RowLayout.tones())}"},
       {:icon_labels, column.icon_labels, &is_binary/1, "a string"},
-      {:detail_text, column.detail_text, &is_binary/1, "a string"}
+      {:detail_text, column.detail_text, &is_binary/1, "a string"},
+      {:detail_icon_names, column.detail_icon_names, &(&1 in AshA2ui.Column.icons()),
+       "one of #{inspect(AshA2ui.Column.icons())}"},
+      {:detail_icon_tones, column.detail_icon_tones, &(&1 in AshA2ui.RowLayout.tones()),
+       "one of #{inspect(AshA2ui.RowLayout.tones())}"}
     ]
     |> Enum.find_value(:ok, &invalid_mapping(&1, path, module))
   end

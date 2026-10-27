@@ -714,6 +714,22 @@ defmodule AshA2ui.Dynamic do
                 "additionalProperties" => %{"type" => "string"},
                 "description" =>
                   "Detail text per detail value, e.g. {\"overdue\": \"Overdue since {date}\"}."
+              },
+              "detail_icon_names" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.Column.icons(), &Atom.to_string/1)
+                },
+                "description" => "Icon before the detail line per detail value."
+              },
+              "detail_icon_tones" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
+                },
+                "description" => "Tone of that icon per detail value."
               }
             },
             "required" => ["name"],

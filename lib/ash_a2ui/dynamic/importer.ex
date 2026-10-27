@@ -288,6 +288,8 @@ defmodule AshA2ui.Dynamic.Importer do
         |> put_opt("detail", column.detail)
         |> put_opt("detail_date", column.detail_date)
         |> put_keyword("detail_text", column.detail_text, :raw)
+        |> put_keyword("detail_icon_names", column.detail_icon_names, :name)
+        |> put_keyword("detail_icon_tones", column.detail_icon_tones, :name)
       end)
 
     Map.put(spec, "columns", entries)

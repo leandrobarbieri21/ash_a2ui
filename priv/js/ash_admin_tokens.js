@@ -413,6 +413,11 @@ export function createAdminStyles(css) {
       font-size: var(--am-font-size-xs);
       color: var(--am-text-muted);
     }
+    .am-cell-detail {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--am-space-2xs);
+    }
     .am-mono {
       font-family: var(--am-font-mono);
       font-size: 0.92em;
@@ -451,6 +456,8 @@ export const CELL_ICONS = {
   alert: ["M10 3.5l7 12.5H3l7-12.5z", "M10 8.5v3", "M10 14v.01"],
   clock: ["M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M10 6.5V10l2.5 1.5"],
   info: ["M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M10 9v5", "M10 6.5v.01"],
+  refresh: ["M15.5 3.5v4h-4", "M4.5 16.5v-4h4", "M15.2 7.5A5.75 5.75 0 0 0 4.5 8.5", "M4.8 12.5a5.75 5.75 0 0 0 10.7-1"],
+  extend: ["M3 10h10", "M10 6.5l3.5 3.5-3.5 3.5", "M17 4.5v11"],
 };
 
 /** The cell icon for a row's `_icon_<column>` value, or null for none. */

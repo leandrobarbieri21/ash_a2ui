@@ -29,6 +29,8 @@ spark_locals_without_parens = [
   description: 1,
   detail: 1,
   detail_date: 1,
+  detail_icon_names: 1,
+  detail_icon_tones: 1,
   detail_text: 1,
   diagram: 1,
   diagram: 2,
