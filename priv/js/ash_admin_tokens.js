@@ -375,7 +375,7 @@ export function createAdminStyles(css) {
       background: var(--ash-admin-badge-accent-background, var(--am-primary));
       color: var(--ash-admin-badge-accent-text, var(--am-on-primary));
     }
-    /* 1.9 column cells: a second line, a leading icon, a "+N more" tag
+    /* 1.8 column cells: a second line, a leading icon, a "+N more" tag
      * and a detail line, all tokens. */
     .am-cell {
       display: inline-flex;
@@ -436,7 +436,7 @@ export function createAdminStyles(css) {
 export const BADGE_TONES = ["neutral", "info", "success", "warning", "danger", "accent"];
 
 /**
- * The data grid's cell icons (catalog 1.9 column `icon`): each generic name
+ * The data grid's cell icons (catalog 1.8 column `icon`): each generic name
  * as stroke paths on a 20px grid. A renderer with its own icon set maps the
  * same names onto it.
  */
