@@ -1579,7 +1579,7 @@ function defineAdminElements(deps, {adminApis}) {
                   <div class="card-field">
                     <dt>${str(column.label)}</dt>
                     <dd>${this.renderCell(row, column)}</dd>
-                  </dl>
+                  </div>
                 `,
               )}
             </dl>
