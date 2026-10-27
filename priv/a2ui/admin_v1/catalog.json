@@ -6,7 +6,7 @@
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
   "version": "1.9.0",
   "x-changelog": {
-    "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope. Without these the row click is unchanged. The catalogId is unchanged.",
+    "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope; the rowActions entry the row click mirrors is then left out. Without these the row click and rowActions are unchanged. The catalogId is unchanged.",
     "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
     "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
     "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
@@ -141,7 +141,7 @@
             },
             "inline": {
               "type": "boolean",
-              "description": "Optional (1.9): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. Whole-row activation is unchanged."
+              "description": "Optional (1.9): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. The rowActions entry the row click mirrors is then left out of rowActions. Whole-row activation is unchanged."
             }
           },
           "required": ["label", "action", "context"],
