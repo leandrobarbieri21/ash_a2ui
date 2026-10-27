@@ -11,6 +11,13 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       that are strings, `badge_text` only alongside a `badge`, and
       `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` (also only
       alongside a `badge`),
+    * `column` entities appear only on `:table` components, with unique
+      names that are table fields, `subtitle`/`icon`/`more`/`detail`/
+      `detail_date` referencing table fields that are not columns of their
+      own, the icon options only alongside an `icon` and the detail options
+      only alongside a `detail`, `icon_names` drawn from
+      `AshA2ui.Column.icons/0`, `icon_tones` from `AshA2ui.RowLayout.tones/0`,
+      and `icon_labels`/`detail_text` values that are strings,
     * `display :board` appears only on `:table` components that declare a
       `sections` block and a `row_layout` (lanes render cards).
 
@@ -64,6 +71,15 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
                   "`row_layout` entities are only supported on :table components"
             )}}
 
+        component.name != :table and component.columns != [] ->
+          {:halt,
+           {:error,
+            error(module, [:a2ui, :component, component.name],
+              message:
+                "component #{inspect(component.name)} declares a column: " <>
+                  "`column` entities are only supported on :table components"
+            )}}
+
         invalid_board?(component) ->
           {:halt,
            {:error,
@@ -92,9 +108,10 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
     verify_groups(component, module)
   end
 
-  defp verify_component(%{name: :table, row_layout: layout} = component, module)
-       when not is_nil(layout) do
-    verify_row_layout(component, layout, module)
+  defp verify_component(%{name: :table} = component, module) do
+    with :ok <- verify_table_row_layout(component, module) do
+      verify_columns(component, module)
+    end
   end
 
   defp verify_component(_component, _module), do: :ok
@@ -182,6 +199,151 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
          )}
     end
   end
+
+  defp verify_table_row_layout(%{row_layout: nil}, _module), do: :ok
+
+  defp verify_table_row_layout(component, module),
+    do: verify_row_layout(component, component.row_layout, module)
+
+  # --- columns ----------------------------------------------------------------
+
+  defp verify_columns(%{columns: []}, _module), do: :ok
+
+  defp verify_columns(component, module) do
+    with :ok <- verify_unique_column_names(component, module),
+         :ok <- verify_column_fields_known(component, module),
+         :ok <- verify_folded_fields(component, module) do
+      Enum.reduce_while(component.columns, :ok, fn column, :ok ->
+        halt_on_error(verify_column_options(component, column, module))
+      end)
+    end
+  end
+
+  defp verify_unique_column_names(component, module) do
+    component.columns
+    |> Enum.frequencies_by(& &1.name)
+    |> Enum.find(fn {_name, count} -> count > 1 end)
+    |> case do
+      nil ->
+        :ok
+
+      {name, _count} ->
+        {:error,
+         error(module, column_path(component, name),
+           message: "duplicate column #{inspect(name)}: one column per table field"
+         )}
+    end
+  end
+
+  defp verify_column_fields_known(%{fields: nil}, _module), do: :ok
+
+  defp verify_column_fields_known(component, module) do
+    known = MapSet.new(component.fields)
+
+    Enum.reduce_while(component.columns, :ok, fn column, :ok ->
+      case Enum.find([column.name | AshA2ui.Column.source_fields(column)], &(&1 not in known)) do
+        nil ->
+          {:cont, :ok}
+
+        unknown ->
+          {:halt,
+           {:error,
+            error(module, column_path(component, column.name),
+              message: """
+              column #{inspect(column.name)} references field #{inspect(unknown)}, which is \
+              not one of the table's fields.
+
+              A column and the fields it reads from must all be in the table component's \
+              (declared or inferred) fields list: #{inspect(component.fields)}
+              """
+            )}}
+      end
+    end)
+  end
+
+  # A field a column reads from is drawn inside that column, so it cannot
+  # also be a column of its own.
+  defp verify_folded_fields(component, module) do
+    names = MapSet.new(component.columns, & &1.name)
+
+    component.columns
+    |> Enum.flat_map(fn column ->
+      Enum.map(AshA2ui.Column.source_fields(column), &{column, &1})
+    end)
+    |> Enum.find(fn {_column, field} -> MapSet.member?(names, field) end)
+    |> case do
+      nil ->
+        :ok
+
+      {column, field} ->
+        {:error,
+         error(module, column_path(component, column.name),
+           message:
+             "column #{inspect(column.name)} reads from #{inspect(field)}, which is a column " <>
+               "of its own: a field a column reads from is drawn inside it"
+         )}
+    end
+  end
+
+  defp verify_column_options(component, column, module) do
+    path = column_path(component, column.name)
+
+    cond do
+      is_nil(column.icon) and
+          [column.icon_names, column.icon_tones, column.icon_labels] != [[], [], []] ->
+        {:error,
+         error(module, path,
+           message:
+             "column #{inspect(column.name)} declares icon_names, icon_tones or icon_labels " <>
+               "without an icon field"
+         )}
+
+      is_nil(column.detail) and
+          (column.detail_text != [] or not is_nil(column.detail_date) or
+             column.detail_icon_names != [] or column.detail_icon_tones != []) ->
+        {:error,
+         error(module, path,
+           message:
+             "column #{inspect(column.name)} declares detail_text, detail_date or detail icons " <>
+               "without a detail field"
+         )}
+
+      true ->
+        verify_column_mappings(column, path, module)
+    end
+  end
+
+  defp verify_column_mappings(column, path, module) do
+    [
+      {:icon_names, column.icon_names, &(&1 in AshA2ui.Column.icons()),
+       "one of #{inspect(AshA2ui.Column.icons())}"},
+      {:icon_tones, column.icon_tones, &(&1 in AshA2ui.RowLayout.tones()),
+       "one of #{inspect(AshA2ui.RowLayout.tones())}"},
+      {:icon_labels, column.icon_labels, &is_binary/1, "a string"},
+      {:detail_text, column.detail_text, &is_binary/1, "a string"},
+      {:detail_icon_names, column.detail_icon_names, &(&1 in AshA2ui.Column.icons()),
+       "one of #{inspect(AshA2ui.Column.icons())}"},
+      {:detail_icon_tones, column.detail_icon_tones, &(&1 in AshA2ui.RowLayout.tones()),
+       "one of #{inspect(AshA2ui.RowLayout.tones())}"}
+    ]
+    |> Enum.find_value(:ok, &invalid_mapping(&1, path, module))
+  end
+
+  defp invalid_mapping({option, mapping, valid?, expected}, path, module) do
+    case Enum.find(mapping, fn {_value, mapped} -> not valid?.(mapped) end) do
+      nil ->
+        nil
+
+      {value, mapped} ->
+        {:error,
+         error(module, path ++ [option],
+           message: "#{option} for #{inspect(value)} must be #{expected}, got: #{inspect(mapped)}"
+         )}
+    end
+  end
+
+  defp column_path(component, name),
+    do: [:a2ui, :component, AshA2ui.Component.key(component), :column, name]
 
   # --- row_layout -------------------------------------------------------------
 

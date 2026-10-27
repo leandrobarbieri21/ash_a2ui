@@ -110,7 +110,7 @@ defmodule AshA2ui.Experience do
   1.7 added sortable headers (column `sortable`, the dataGrid's `sort`).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.7.0"
+  def admin_catalog_version, do: "1.8.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item

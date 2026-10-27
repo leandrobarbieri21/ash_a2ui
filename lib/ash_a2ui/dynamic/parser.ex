@@ -145,7 +145,7 @@ defmodule AshA2ui.Dynamic.Parser do
   @displays %{"list" => :list, "board" => :board, "calendar" => :calendar}
   @granularities Map.new(AshA2ui.Calendar.granularities(), &{Atom.to_string(&1), &1})
 
-  @component_nested ~w(row_layout groups nested_forms sections)
+  @component_nested ~w(row_layout columns groups nested_forms sections)
 
   defp parse_component(entry, path, allowlist) when is_map(entry) do
     with :ok <- require_kind(entry, path),
@@ -231,12 +231,14 @@ defmodule AshA2ui.Dynamic.Parser do
   defp parse_component_nested(entry, path, allowlist) do
     component_def = entity_def(:component)
     [row_layout_def] = component_def.entities[:row_layout]
+    [column_def] = component_def.entities[:columns]
     [group_def] = component_def.entities[:groups]
     [nested_form_def] = component_def.entities[:nested_forms]
     [sections_def] = component_def.entities[:sections]
 
     with {:ok, row_layout} <-
            parse_row_layout(Map.get(entry, "row_layout"), row_layout_def, path),
+         {:ok, columns} <- parse_columns(Map.get(entry, "columns"), column_def, path),
          {:ok, groups} <- parse_groups(Map.get(entry, "groups"), group_def, path),
          {:ok, nested_forms} <-
            parse_nested_forms(Map.get(entry, "nested_forms"), nested_form_def, path),
@@ -245,6 +247,7 @@ defmodule AshA2ui.Dynamic.Parser do
       {:ok,
        [
          row_layout: row_layout,
+         columns: columns,
          groups: groups,
          nested_forms: nested_forms,
          sections: sections
@@ -278,6 +281,57 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp parse_row_layout(_entry, _def, path),
     do: {:error, [Error.new("#{path}.row_layout", "row_layout must be a JSON object")]}
+
+  @column_keys %{
+    "name" => :name,
+    "subtitle" => :subtitle,
+    "icon" => :icon,
+    "icon_names" => :icon_names,
+    "icon_tones" => :icon_tones,
+    "icon_labels" => :icon_labels,
+    "more" => :more,
+    "detail" => :detail,
+    "detail_date" => :detail_date,
+    "detail_text" => :detail_text,
+    "detail_icon_names" => :detail_icon_names,
+    "detail_icon_tones" => :detail_icon_tones
+  }
+
+  # The cell icon vocabulary, string -> atom over AshA2ui.Column.icons/0:
+  # an icon is looked up, never created from input.
+  @cell_icons Map.new(AshA2ui.Column.icons(), &{Atom.to_string(&1), &1})
+
+  defp parse_columns(nil, _def, _path), do: {:ok, []}
+
+  defp parse_columns(entries, column_def, path)
+       when is_list(entries) and length(entries) <= @max_list_entries do
+    entries
+    |> Enum.with_index()
+    |> Enum.reduce_while({:ok, []}, fn {entry, index}, {:ok, acc} ->
+      column_path = "#{path}.columns[#{index}]"
+
+      result =
+        with true <- is_map(entry) || {:error, [Error.new(column_path, "must be a JSON object")]},
+             {:ok, opts} <- convert_options(entry, @column_keys, [], column_path) do
+          build_entity(:column, column_def, opts, [], column_path)
+        end
+
+      case result do
+        {:ok, column} -> {:cont, {:ok, acc ++ [column]}}
+        {:error, errors} -> {:halt, {:error, errors}}
+      end
+    end)
+  end
+
+  defp parse_columns(_entries, _def, path),
+    do:
+      {:error,
+       [
+         Error.new(
+           "#{path}.columns",
+           "columns must be an array of at most #{@max_list_entries} objects"
+         )
+       ]}
 
   @group_keys %{"name" => :name, "label" => :label, "columns" => :columns, "fields" => :fields}
 
@@ -847,6 +901,12 @@ defmodule AshA2ui.Dynamic.Parser do
   defp convert_shaped({:enum_list, _values}, option, _value, path),
     do: {:error, [Error.new("#{path}.#{option}", "#{option} must be an array")]}
 
+  defp convert_shaped({:enum_keyword, values}, option, value, path),
+    do: convert_keyword(option, value, path, &convert_enum(option, &1, values, path))
+
+  defp convert_shaped(:icon_tone_keyword, option, value, path),
+    do: convert_keyword(option, value, path, &convert_tone(&1, "#{path}.#{option}"))
+
   defp convert_shaped(:existing_name, option, value, path),
     do: convert_existing_name(option, value, path)
 
@@ -890,6 +950,11 @@ defmodule AshA2ui.Dynamic.Parser do
               :badge,
               :depends_on,
               :default_preset,
+              :subtitle,
+              :icon,
+              :more,
+              :detail,
+              :detail_date,
               :value,
               :sort,
               :links,
@@ -918,6 +983,14 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:context_filter), do: :name_keyword
   defp option_shape(option) when option in [:visible_when, :filter], do: :raw_keyword
   defp option_shape(:badge_text), do: :string_keyword
+  defp option_shape(option) when option in [:icon_labels, :detail_text], do: :string_keyword
+
+  defp option_shape(option) when option in [:icon_names, :detail_icon_names],
+    do: {:enum_keyword, @cell_icons}
+
+  defp option_shape(option) when option in [:icon_tones, :detail_icon_tones],
+    do: :icon_tone_keyword
+
   defp option_shape(:badge_tones), do: :tone_keyword
   defp option_shape(:link), do: :link
   defp option_shape(:search_fields), do: :search_fields

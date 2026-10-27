@@ -48,6 +48,20 @@ defmodule AshA2ui.Dynamic.Promoter do
     columns: :raw
   ]
 
+  @column_options [
+    subtitle: :name,
+    icon: :name,
+    icon_names: :name_keyword,
+    icon_tones: :name_keyword,
+    icon_labels: :string_keyword,
+    more: :name,
+    detail: :name,
+    detail_date: :name,
+    detail_text: :string_keyword,
+    detail_icon_names: :name_keyword,
+    detail_icon_tones: :name_keyword
+  ]
+
   @group_options [label: :raw, columns: :raw, fields: :name_list]
 
   @nested_form_options [
@@ -202,6 +216,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     nested =
       [
         entry |> Map.get("row_layout") |> row_layout_block(),
+        entry |> Map.get("columns", []) |> Enum.map(&column_block/1),
         entry |> Map.get("groups", []) |> Enum.map(&group_block/1),
         entry |> Map.get("nested_forms", []) |> Enum.map(&nested_form_block/1),
         entry |> Map.get("sections") |> sections_block(allowlist)
@@ -228,6 +243,10 @@ defmodule AshA2ui.Dynamic.Promoter do
 
   defp row_layout_block(entry) do
     block("row_layout", option_lines(entry, @row_layout_options))
+  end
+
+  defp column_block(entry) do
+    block(~s(column :#{Map.fetch!(entry, "name")}), option_lines(entry, @column_options))
   end
 
   defp group_block(entry) do

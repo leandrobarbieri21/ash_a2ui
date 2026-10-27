@@ -196,6 +196,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("context", component.context)
       |> put_display(component)
       |> put_row_layout(component.row_layout)
+      |> put_columns(component.columns)
       |> put_groups(component.groups)
       |> put_nested_forms(component.nested_forms)
       |> put_sections(component.sections)
@@ -270,6 +271,28 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_value("columns", layout.columns)
 
     Map.put(spec, "row_layout", row_layout)
+  end
+
+  defp put_columns(spec, []), do: spec
+
+  defp put_columns(spec, columns) do
+    entries =
+      Enum.map(columns, fn column ->
+        %{"name" => to_string(column.name)}
+        |> put_opt("subtitle", column.subtitle)
+        |> put_opt("icon", column.icon)
+        |> put_keyword("icon_names", column.icon_names, :name)
+        |> put_keyword("icon_tones", column.icon_tones, :name)
+        |> put_keyword("icon_labels", column.icon_labels, :raw)
+        |> put_opt("more", column.more)
+        |> put_opt("detail", column.detail)
+        |> put_opt("detail_date", column.detail_date)
+        |> put_keyword("detail_text", column.detail_text, :raw)
+        |> put_keyword("detail_icon_names", column.detail_icon_names, :name)
+        |> put_keyword("detail_icon_tones", column.detail_icon_tones, :name)
+      end)
+
+    Map.put(spec, "columns", entries)
   end
 
   defp put_groups(spec, []), do: spec

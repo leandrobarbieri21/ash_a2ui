@@ -655,6 +655,87 @@ defmodule AshA2ui.Dynamic do
           "required" => ["title"],
           "additionalProperties" => false
         },
+        "columns" => %{
+          "type" => "array",
+          "maxItems" => 64,
+          "description" =>
+            "Tables only: how the data grid draws a field's cell beyond its value. " <>
+              "The fields a column reads from must be table fields; they are drawn " <>
+              "inside it, not as columns of their own.",
+          "items" => %{
+            "type" => "object",
+            "properties" => %{
+              "name" => Map.put(name, "description", "The table field this column draws."),
+              "subtitle" =>
+                Map.put(name, "description", "Field drawn as a second line under the value."),
+              "icon" =>
+                Map.put(name, "description", "Field whose value picks an icon before the value."),
+              "icon_names" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.Column.icons(), &Atom.to_string/1)
+                },
+                "description" => "Icon per icon value, e.g. {\"high\": \"alert\"}."
+              },
+              "icon_tones" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
+                },
+                "description" => "Tone per icon value, e.g. {\"high\": \"danger\"}."
+              },
+              "icon_labels" => %{
+                "type" => "object",
+                "additionalProperties" => %{"type" => "string"},
+                "description" => "Accessible label per icon value (default: the humanized value)."
+              },
+              "more" =>
+                Map.put(
+                  name,
+                  "description",
+                  "Field counting the cell's values; 2 or more adds a \"+N more\" tag."
+                ),
+              "detail" =>
+                Map.put(
+                  name,
+                  "description",
+                  "Field whose value picks a detail line under the value."
+                ),
+              "detail_date" =>
+                Map.put(
+                  name,
+                  "description",
+                  "Date field put in place of {date} in the detail text."
+                ),
+              "detail_text" => %{
+                "type" => "object",
+                "additionalProperties" => %{"type" => "string"},
+                "description" =>
+                  "Detail text per detail value, e.g. {\"overdue\": \"Overdue since {date}\"}."
+              },
+              "detail_icon_names" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.Column.icons(), &Atom.to_string/1)
+                },
+                "description" => "Icon before the detail line per detail value."
+              },
+              "detail_icon_tones" => %{
+                "type" => "object",
+                "additionalProperties" => %{
+                  "type" => "string",
+                  "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
+                },
+                "description" => "Tone of that icon per detail value."
+              }
+            },
+            "required" => ["name"],
+            "additionalProperties" => false
+          }
+        },
         "groups" => %{
           "type" => "array",
           "maxItems" => 64,

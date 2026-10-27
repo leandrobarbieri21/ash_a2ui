@@ -375,6 +375,49 @@ export function createAdminStyles(css) {
       background: var(--ash-admin-badge-accent-background, var(--am-primary));
       color: var(--ash-admin-badge-accent-text, var(--am-on-primary));
     }
+    /* 1.8 column cells: a second line, a leading icon, a "+N more" tag
+     * and a detail line, all tokens. */
+    .am-cell {
+      display: inline-flex;
+      flex-direction: column;
+      gap: var(--am-space-2xs);
+      min-width: 0;
+    }
+    .am-cell-line {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--am-space-xs);
+    }
+    .am-cell-icon {
+      flex: none;
+      color: var(--am-text-muted);
+    }
+    .am-cell-icon[data-tone="info"] {
+      color: var(--am-primary);
+    }
+    .am-cell-icon[data-tone="success"] {
+      color: var(--am-success);
+    }
+    .am-cell-icon[data-tone="warning"] {
+      color: var(--am-warning);
+    }
+    .am-cell-icon[data-tone="danger"] {
+      color: var(--am-error);
+    }
+    .am-cell-icon[data-tone="accent"] {
+      color: var(--am-primary);
+    }
+    .am-cell-sub,
+    .am-cell-detail {
+      font-size: var(--am-font-size-xs);
+      color: var(--am-text-muted);
+    }
+    .am-cell-detail {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--am-space-2xs);
+    }
     .am-mono {
       font-family: var(--am-font-mono);
       font-size: 0.92em;
@@ -396,6 +439,48 @@ export function createAdminStyles(css) {
 
 /** The badge tone vocabulary (row_layout `badge_tones`). */
 export const BADGE_TONES = ["neutral", "info", "success", "warning", "danger", "accent"];
+
+/**
+ * The data grid's cell icons (catalog 1.8 column `icon`): each generic name
+ * as stroke paths on a 20px grid, every one starting with a moveto, so a
+ * renderer can join them into one `d` and keep the <path> inside the <svg>
+ * template (a nested html`` template would create it in the HTML namespace,
+ * where it doesn't draw). A renderer with its own icon set maps the
+ * same names onto it.
+ */
+export const CELL_ICONS = {
+  check: ["M4 10.5l4 4 8-9"],
+  x: ["M5 5l10 10", "M15 5L5 15"],
+  user_check: ["M8 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M2.5 16.5a5.5 5.5 0 0 1 11 0", "M13.5 9.5l1.75 1.75L18.5 8"],
+  user_x: ["M8 3.5a3 3 0 1 0 0 6 3 3 0 0 0 0-6z", "M2.5 16.5a5.5 5.5 0 0 1 11 0", "M14 8l4 4", "M18 8l-4 4"],
+  alert: ["M10 3.5l7 12.5H3l7-12.5z", "M10 8.5v3", "M10 14v.01"],
+  clock: ["M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M10 6.5V10l2.5 1.5"],
+  info: ["M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14z", "M10 9v5", "M10 6.5v.01"],
+  refresh: ["M15.5 3.5v4h-4", "M4.5 16.5v-4h4", "M15.2 7.5A5.75 5.75 0 0 0 4.5 8.5", "M4.8 12.5a5.75 5.75 0 0 0 10.7-1"],
+  extend: ["M3 10h10", "M10 6.5l3.5 3.5-3.5 3.5", "M17 4.5v11"],
+};
+
+/** The cell icon for a row's `_icon_<column>` value, or null for none. */
+export function cellIcon(name) {
+  return typeof name === "string" && Object.hasOwn(CELL_ICONS, name) ? CELL_ICONS[name] : null;
+}
+
+/** How many values a "+N more" tag counts: the rest after the first, or 0
+ * when the cell holds one value or none (`more` binds a count). */
+export function moreCount(count) {
+  const n = typeof count === "string" ? Number(count) : count;
+  return Number.isInteger(n) && n >= 2 ? n - 1 : 0;
+}
+
+/** A row's detail line: the served text (`_detail_<column>`) with
+ * `{date}` replaced by the date formatted for the reader, or "" when the
+ * row has no detail. A missing date leaves no dangling placeholder. */
+export function detailText(text, date) {
+  if (typeof text !== "string" || text === "") return "";
+  if (!text.includes("{date}")) return text;
+  const formatted = date === null || date === undefined || date === "" ? "" : formatDisplayValue(date, "datetime");
+  return text.replaceAll("{date}", formatted).replace(/[\s·:,-]+$/u, "").trim();
+}
 
 /** A badge tone value from the row (`_badge_tone_<field>`), constrained to
  * the vocabulary — anything else is "neutral". */
