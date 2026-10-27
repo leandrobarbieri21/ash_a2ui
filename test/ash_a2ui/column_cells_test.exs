@@ -1,7 +1,7 @@
 defmodule AshA2ui.ColumnCellsTest do
   @moduledoc """
   `column` entities on a `:table`: the admin dataGrid column hints
-  (`subtitle`, `icon`, `more`, `detail`, catalog 1.9), the fields they read
+  (`subtitle`, `icon`, `more`, `detail`, catalog 1.8), the fields they read
   from folded out of the column list, the per-row `_icon_*` / `_detail_*`
   keys, and the compile-time checks.
   """

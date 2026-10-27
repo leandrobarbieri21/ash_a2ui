@@ -926,7 +926,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp put_grid_sort(grid, _view, _table), do: grid
 
-  # A `column` entity's cell hints (catalog 1.9, all optional): the
+  # A `column` entity's cell hints (catalog 1.8, all optional): the
   # subtitle and count fields are read straight off the row; the icon and
   # detail line are the server-computed `_icon_*` / `_detail_*` row keys
   # (`AshA2ui.Column.row_data/2`). The fields a column reads from are
