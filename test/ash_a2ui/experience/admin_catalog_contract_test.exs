@@ -103,11 +103,28 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.9 is additive: dataGrid column subtitle, icon, more and detail" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.9.0"
+    assert Experience.admin_catalog_version() == "1.9.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.9.0")
+
+    column = catalog["components"]["dataGrid"]["properties"]["columns"]["items"]
+    assert column["required"] == ["label", "path"]
+
+    assert %{"subtitle" => subtitle, "icon" => icon, "more" => more, "detail" => detail} =
+             column["properties"]
+
+    assert subtitle["required"] == ["path"]
+    assert icon["required"] == ["path", "labelPath"]
+    assert more["required"] == ["path"]
+    assert detail["required"] == ["path"]
+  end
+
   test "catalog 1.7 is additive: sortable dataGrid headers" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.7.0"
-    assert Experience.admin_catalog_version() == "1.7.0"
     assert Map.has_key?(catalog["x-changelog"], "1.7.0")
 
     grid = catalog["components"]["dataGrid"]

@@ -729,6 +729,118 @@ defmodule AshA2ui do
     ]
   }
 
+  @column %Spark.Dsl.Entity{
+    name: :column,
+    describe: """
+    How the data grid draws one of a `:table` component's fields: a second
+    line under the value, a leading icon chosen per row, a "+N more" tag
+    from a count, and a detail line under the value (under the badge, on
+    the `row_layout` badge column). The fields a column reads from must be
+    table fields; the grid draws them inside the column rather than as
+    columns of their own. Renderers that ignore these hints draw the plain
+    value, with the other fields as their own columns.
+    """,
+    examples: [
+      """
+      column :title do
+        subtitle :assignee_name
+        icon :priority
+        icon_names high: :alert, low: :check
+        icon_tones high: :danger, low: :success
+        icon_labels high: "High priority", low: "Low priority"
+      end
+      """,
+      """
+      column :status do
+        more :tag_count
+        detail :status_detail
+        detail_date :due_on
+        detail_text overdue: "Overdue since {date}", due_soon: "Due {date}"
+      end
+      """
+    ],
+    target: AshA2ui.Column,
+    args: [:name],
+    schema: [
+      name: [
+        type: :atom,
+        required: true,
+        doc: "The table field this column draws. One column per field."
+      ],
+      subtitle: [
+        type: :atom,
+        doc: "A table field drawn as a second line under the value."
+      ],
+      icon: [
+        type: :atom,
+        doc: """
+        A table field whose value picks an icon drawn before the value
+        (`icon_names`). Rows carry the icon at the reserved
+        `_icon_<column>` key, its tone at `_icon_tone_<column>` and its
+        accessible label at `_icon_label_<column>` (`""` when the value has
+        no icon).
+        """
+      ],
+      icon_names: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The icon per `icon` value, from `AshA2ui.Column.icons/0` (`:check`,
+        `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`). A value
+        without an entry gets no icon.
+        """
+      ],
+      icon_tones: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The tone per `icon` value, from the badge tone vocabulary
+        (`AshA2ui.RowLayout.tones/0`). Unmatched values are `:neutral`.
+        """
+      ],
+      icon_labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The accessible label per `icon` value. Defaults to the humanized
+        value.
+        """
+      ],
+      more: [
+        type: :atom,
+        doc: """
+        A table field holding how many values the cell's field has (a
+        `count` aggregate beside a `first` one): when it is 2 or more the
+        grid adds a "+N more" tag, N being the count minus one.
+        """
+      ],
+      detail: [
+        type: :atom,
+        doc: """
+        A table field whose value picks a detail line drawn under the value
+        (`detail_text`). Rows carry the text at the reserved
+        `_detail_<column>` key (`""` when the value has none).
+        """
+      ],
+      detail_date: [
+        type: :atom,
+        doc: """
+        A table field holding the date the renderer puts in place of
+        `{date}` in the detail text, formatted in the reader's locale.
+        """
+      ],
+      detail_text: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The detail text per `detail` value, e.g.
+        `detail_text overdue: "Overdue since {date}"`. A value without an
+        entry gets no detail line.
+        """
+      ]
+    ]
+  }
+
   @row_layout %Spark.Dsl.Entity{
     name: :row_layout,
     describe: """
@@ -1106,6 +1218,7 @@ defmodule AshA2ui do
       groups: [@group],
       steps: [@step],
       row_layout: [@row_layout],
+      columns: [@column],
       sections: [@table_sections],
       editable: [@editable],
       export: [@export]

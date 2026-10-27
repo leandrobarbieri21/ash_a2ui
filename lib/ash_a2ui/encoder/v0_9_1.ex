@@ -885,13 +885,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       end
 
     layout = table.component.row_layout
+    columns = Map.new(table.component.columns, &{&1.name, &1})
 
-    Enum.map(fields, fn field ->
+    (fields -- AshA2ui.Column.folded_fields(table.component.columns))
+    |> Enum.map(fn field ->
       %{"label" => view.fields[field].label, "path" => to_string(field)}
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field)
+      |> put_column_cells(columns[field])
     end)
   end
 
@@ -922,6 +925,36 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp put_grid_sort(grid, _view, _table), do: grid
+
+  # A `column` entity's cell hints (catalog 1.9, all optional): the
+  # subtitle and count fields are read straight off the row; the icon and
+  # detail line are the server-computed `_icon_*` / `_detail_*` row keys
+  # (`AshA2ui.Column.row_data/2`). The fields a column reads from are
+  # folded into it and left out as columns of their own.
+  defp put_column_cells(column, nil), do: column
+
+  defp put_column_cells(column, cells) do
+    name = cells.name
+
+    column
+    |> maybe_put("subtitle", cells.subtitle && %{"path" => to_string(cells.subtitle)})
+    |> maybe_put("icon", cells.icon && icon_binding(name, cells))
+    |> maybe_put("more", cells.more && %{"path" => to_string(cells.more)})
+    |> maybe_put("detail", cells.detail && detail_binding(name, cells))
+  end
+
+  defp icon_binding(name, cells) do
+    %{"path" => "_icon_#{name}", "labelPath" => "_icon_label_#{name}"}
+    |> maybe_put("tonePath", if(cells.icon_tones != [], do: "_icon_tone_#{name}"))
+  end
+
+  defp detail_binding(name, cells) do
+    maybe_put(
+      %{"path" => "_detail_#{name}"},
+      "datePath",
+      cells.detail_date && to_string(cells.detail_date)
+    )
+  end
 
   # Per-type presentation hints (additive; renderers that read only
   # label/path are unaffected): `format` (number/datetime/boolean, as
@@ -4411,6 +4444,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     row
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
     |> Map.merge(AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record))
+    |> Map.merge(AshA2ui.Column.row_data((table && table.component.columns) || [], record))
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     |> Map.merge(AshA2ui.Bulk.row_data(table))
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))

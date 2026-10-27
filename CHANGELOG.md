@@ -10,6 +10,17 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`column` entities on tables.** A table can say how the admin data grid
+  draws a field's cell: a second line under the value (`subtitle`), a
+  leading icon picked per row (`icon`, `icon_names`, `icon_tones`,
+  `icon_labels`), a "+N more" tag from a count (`more`) and a detail line
+  under the value with a date (`detail`, `detail_date`, `detail_text`).
+  The fields a column reads from ride in the row and are not columns of
+  their own. Admin catalog 1.9.0 adds the optional `subtitle`, `icon`,
+  `more` and `detail` column properties; rows gain the reserved
+  `_icon_<column>`, `_icon_tone_<column>`, `_icon_label_<column>` and
+  `_detail_<column>` keys. Tables without columns are unchanged. Dynamic
+  specs carry them as `"columns": [...]`.
 - **`apply_on_change true` on a query.** The controls apply as they
   change: a picker at once, search after a 300 ms pause in typing. The
   `/query` state carries `"autoApply": {"debounceMs": 300}`; the merged

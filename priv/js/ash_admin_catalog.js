@@ -132,6 +132,9 @@ import {
   applyWeight,
   childRefs,
   badgeTone,
+  cellIcon,
+  moreCount,
+  detailText,
   linkEntries,
   listItems,
   pageWindow,
@@ -175,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.7.0";
+export const ADMIN_CATALOG_VERSION = "1.9.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -424,6 +427,12 @@ export function buildSchemas() {
           // 1.7: the header is a sort control (the field is in the query's
           // sortable allowlist), driven by the grid's `sort`.
           sortable: Bool.optional(),
+          // 1.9 cell hints (column entities): a second line, a leading
+          // icon, a "+N more" tag and a detail line, all row-relative.
+          subtitle: RecordAny.optional(),
+          icon: RecordAny.optional(),
+          more: RecordAny.optional(),
+          detail: RecordAny.optional(),
         }),
       ),
       // Row arrays / a "/rows" binding / a function call — DynamicValue's
@@ -1554,12 +1563,63 @@ function defineAdminElements(deps, {adminApis}) {
       }
 
       /**
-       * One cell: the column's link(s) when the row carries them (pruned
+       * One cell: its value (below), framed by the column's 1.9 hints when
+       * it declares any — a leading icon and a "+N more" tag on the value's
+       * line, a second line and a detail line under it.
+       */
+      renderCell(row, column) {
+        const value = this.renderCellValue(row, column);
+        if (!column.subtitle && !column.icon && !column.more && !column.detail) return value;
+
+        const at = (binding) =>
+          binding && typeof binding.path === "string" ? getByPath(row, binding.path) : undefined;
+        const icon = cellIcon(at(column.icon));
+        const label = column.icon ? str(getByPath(row, column.icon.labelPath)) : "";
+        const tone = column.icon?.tonePath ? badgeTone(getByPath(row, column.icon.tonePath)) : "neutral";
+        const more = moreCount(at(column.more));
+        const subtitle = at(column.subtitle);
+        const detail = column.detail
+          ? detailText(at(column.detail), column.detail.datePath ? getByPath(row, column.detail.datePath) : null)
+          : "";
+
+        return html`<span class="am-cell">
+          <span class="am-cell-line">
+            ${icon
+              ? html`<svg
+                  class="am-cell-icon"
+                  data-tone=${tone}
+                  viewBox="0 0 20 20"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  role=${label ? "img" : nothing}
+                  aria-label=${label || nothing}
+                  aria-hidden=${label ? nothing : "true"}
+                >
+                  ${icon.map((path) => html`<path d=${path}></path>`)}
+                </svg>`
+              : nothing}
+            <span>${value}</span>
+            ${more > 0 ? html`<span class="am-badge" data-tone="neutral">+${more} more</span>` : nothing}
+          </span>
+          ${subtitle === null || subtitle === undefined || subtitle === ""
+            ? nothing
+            : html`<span class="am-cell-sub">${str(subtitle)}</span>`}
+          ${detail ? html`<span class="am-cell-detail">${detail}</span>` : nothing}
+        </span>`;
+      }
+
+      /**
+       * A cell's value: the column's link(s) when the row carries them (pruned
        * per actor server-side — absent means plain value), a toned status
        * pill for badge columns, identifiers in mono, lists as lists, and
        * everything else through the format rules.
        */
-      renderCell(row, column) {
+      renderCellValue(row, column) {
         if (column.link && typeof column.link.path === "string") {
           const links = linkEntries(getByPath(row, column.link.path));
           if (links.length > 0) return renderLinks(this, links);
