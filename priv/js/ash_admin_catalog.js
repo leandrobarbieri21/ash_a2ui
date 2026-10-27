@@ -175,7 +175,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.10.0";
+export const ADMIN_CATALOG_VERSION = "1.9.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -456,7 +456,7 @@ export function buildSchemas() {
         label: DynamicStringSchema,
         action: Str,
         context: RecordAny.optional(),
-        // 1.10: the row click drawn as one button per row (`inline`), its
+        // 1.9: the row click drawn as one button per row (`inline`), its
         // label and Button variant read from the row (`_primary_label`,
         // `_primary_variant`). Static, like the rest of the envelope.
         labelPath: Str.optional(),
@@ -1534,7 +1534,7 @@ function defineAdminElements(deps, {adminApis}) {
           : value;
       }
 
-      /** The row click when it is also drawn as a button per row (1.10
+      /** The row click when it is also drawn as a button per row (1.9
        * `inline`), else null. */
       inlinePrimary() {
         const rowClick = this.controller?.props?.rowClick;

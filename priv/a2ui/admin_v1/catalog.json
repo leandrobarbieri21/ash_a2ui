@@ -4,9 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.10.0",
+  "version": "1.9.0",
   "x-changelog": {
-    "1.10.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope. Without these the row click is unchanged. The catalogId is unchanged.",
+    "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope. Without these the row click is unchanged. The catalogId is unchanged.",
     "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
     "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
     "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
@@ -133,15 +133,15 @@
             "context": {"type": "object"},
             "labelPath": {
               "type": "string",
-              "description": "Optional (1.10): row-relative path of the row's button label (the _primary_label key); label when absent on a row."
+              "description": "Optional (1.9): row-relative path of the row's button label (the _primary_label key); label when absent on a row."
             },
             "variantPath": {
               "type": "string",
-              "description": "Optional (1.10): row-relative path of the row's Button variant (the _primary_variant key): default | primary | borderless. default when absent or unknown."
+              "description": "Optional (1.9): row-relative path of the row's Button variant (the _primary_variant key): default | primary | borderless. default when absent or unknown."
             },
             "inline": {
               "type": "boolean",
-              "description": "Optional (1.10): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. Whole-row activation is unchanged."
+              "description": "Optional (1.9): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. Whole-row activation is unchanged."
             }
           },
           "required": ["label", "action", "context"],
