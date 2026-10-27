@@ -33,7 +33,8 @@ defmodule AshA2ui.Dynamic.Diff do
     * `kind` — `:added` / `:removed` (a named entity appeared or
       disappeared) or `:changed` (an option of a matched entity differs).
     * `entity` — the vocabulary level: `:surface`, `:component`, `:query`,
-      `:preset`, `:field`, `:action`, `:context`, or `:group`.
+      `:preset`, `:field`, `:action`, `:context`, `:column`, `:group` or
+      `:nested_form`.
     * `name` — the entity's own name (`nil` for surface-level changes).
     * `path` — the fully qualified human-readable location, e.g.
       `surface`, `component "table"`, `query "default" preset "drafts"`.
@@ -56,6 +57,7 @@ defmodule AshA2ui.Dynamic.Diff do
               | :field
               | :action
               | :context
+              | :column
               | :group
               | :nested_form,
             name: String.t() | nil,
@@ -211,6 +213,18 @@ defmodule AshA2ui.Dynamic.Diff do
         )
       end
 
+    column_changes =
+      diff_entities(
+        :column,
+        &~s(#{path} column "#{&1}"),
+        Map.get(old_entry, "columns", []),
+        Map.get(new_entry, "columns", []),
+        &name_of/1,
+        fn column_path, old_column, new_column ->
+          flat_changes(:column, column_path, old_column, new_column, [])
+        end
+      )
+
     group_changes =
       diff_entities(
         :group,
@@ -235,8 +249,8 @@ defmodule AshA2ui.Dynamic.Diff do
         end
       )
 
-    flat_changes(:component, path, old_entry, new_entry, singleton_options) ++
-      List.flatten(singleton_changes) ++ group_changes ++ nested_form_changes
+    flat_changes(:component, path, old_entry, new_entry, ["columns" | singleton_options]) ++
+      List.flatten(singleton_changes) ++ column_changes ++ group_changes ++ nested_form_changes
   end
 
   defp entity_option_changes(entity, path, old_entry, new_entry) do

@@ -54,6 +54,7 @@ for the resource named by `for_resource`).
    * group
    * step
    * row_layout
+   * column
    * sections
    * editable
    * export
@@ -374,6 +375,7 @@ distinguishing name via the optional second argument, e.g.
  * [group](#a2ui-component-group)
  * [step](#a2ui-component-step)
  * [row_layout](#a2ui-component-row_layout)
+ * [column](#a2ui-component-column)
  * [sections](#a2ui-component-sections)
  * [editable](#a2ui-component-editable)
  * [export](#a2ui-component-export)
@@ -644,6 +646,74 @@ end
 ### Introspection
 
 Target: `AshA2ui.RowLayout`
+
+### a2ui.component.column
+```elixir
+column name
+```
+
+
+How the data grid draws one of a `:table` component's fields: a second
+line under the value, a leading icon chosen per row, a "+N more" tag
+from a count, and a detail line under the value (under the badge, on
+the `row_layout` badge column). The fields a column reads from must be
+table fields; the grid draws them inside the column rather than as
+columns of their own. Renderers that ignore these hints draw the plain
+value, with the other fields as their own columns.
+
+
+
+
+### Examples
+```
+column :title do
+  subtitle :assignee_name
+  icon :priority
+  icon_names high: :alert, low: :check
+  icon_tones high: :danger, low: :success
+  icon_labels high: "High priority", low: "Low priority"
+end
+
+```
+
+```
+column :status do
+  more :tag_count
+  detail :status_detail
+  detail_date :due_on
+  detail_text overdue: "Overdue since {date}", due_soon: "Due {date}"
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#a2ui-component-column-name){: #a2ui-component-column-name .spark-required} | `atom` |  | The table field this column draws. One column per field. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`subtitle`](#a2ui-component-column-subtitle){: #a2ui-component-column-subtitle } | `atom` |  | A table field drawn as a second line under the value. |
+| [`icon`](#a2ui-component-column-icon){: #a2ui-component-column-icon } | `atom` |  | A table field whose value picks an icon drawn before the value (`icon_names`). Rows carry the icon at the reserved `_icon_<column>` key, its tone at `_icon_tone_<column>` and its accessible label at `_icon_label_<column>` (`""` when the value has no icon). |
+| [`icon_names`](#a2ui-component-column-icon_names){: #a2ui-component-column-icon_names } | `keyword` | `[]` | The icon per `icon` value, from `AshA2ui.Column.icons/0` (`:check`, `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`). A value without an entry gets no icon. |
+| [`icon_tones`](#a2ui-component-column-icon_tones){: #a2ui-component-column-icon_tones } | `keyword` | `[]` | The tone per `icon` value, from the badge tone vocabulary (`AshA2ui.RowLayout.tones/0`). Unmatched values are `:neutral`. |
+| [`icon_labels`](#a2ui-component-column-icon_labels){: #a2ui-component-column-icon_labels } | `keyword` | `[]` | The accessible label per `icon` value. Defaults to the humanized value. |
+| [`more`](#a2ui-component-column-more){: #a2ui-component-column-more } | `atom` |  | A table field holding how many values the cell's field has (a `count` aggregate beside a `first` one): when it is 2 or more the grid adds a "+N more" tag, N being the count minus one. |
+| [`detail`](#a2ui-component-column-detail){: #a2ui-component-column-detail } | `atom` |  | A table field whose value picks a detail line drawn under the value (`detail_text`). Rows carry the text at the reserved `_detail_<column>` key (`""` when the value has none). |
+| [`detail_date`](#a2ui-component-column-detail_date){: #a2ui-component-column-detail_date } | `atom` |  | A table field holding the date the renderer puts in place of `{date}` in the detail text, formatted in the reader's locale. |
+| [`detail_text`](#a2ui-component-column-detail_text){: #a2ui-component-column-detail_text } | `keyword` | `[]` | The detail text per `detail` value, e.g. `detail_text overdue: "Overdue since {date}"`. A value without an entry gets no detail line. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.Column`
 
 ### a2ui.component.sections
 
