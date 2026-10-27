@@ -904,7 +904,6 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The row data of a table's primary action: its label and variant for this
   # row (see `AshA2ui.PrimaryAction.row_data/3`), the row click's own label
   # standing in for values without one.
-  defp primary_action_data(_view, nil, _record), do: %{}
   defp primary_action_data(_view, %{component: %{primary_action: nil}}, _record), do: %{}
 
   defp primary_action_data(view, table, record) do
