@@ -932,10 +932,9 @@ function defineAnatomyElements({lit, basicCatalog}) {
       const props = this.controller?.props;
       if (!props) return nothing;
 
-      // An apply_on_change query's Apply button applies by itself.
-      const autoApply = autoApplyConfig(this);
-      this.toggleAttribute("hidden", autoApply !== null);
-      if (autoApply) return nothing;
+      // An apply_on_change query's Apply button applies by itself (and
+      // updated() hides the host).
+      if (autoApplyConfig(this)) return nothing;
 
       const isDisabled = props.isValid === false;
       const variant = props.variant ?? "default";
@@ -966,6 +965,7 @@ function defineAnatomyElements({lit, basicCatalog}) {
     updated(changedProperties) {
       super.updated(changedProperties);
       watchAutoApply(this);
+      hideAutoApplyHost(this);
     }
 
     disconnectedCallback() {
@@ -1119,6 +1119,24 @@ export function watchAutoApply(element) {
   });
   watch.active = autoApplyConfig(element) !== null;
   element._autoApply = watch;
+}
+
+// An apply_on_change query's Apply button is hidden on its host, from
+// updated(): a host app that subclasses the Button and draws it its own way
+// (overriding render) inherits the hiding without checking autoApplyConfig
+// itself. The `hidden` attribute names the state; the inline display covers
+// Light DOM renderers, where no shadow-scoped `:host([hidden])` rule applies.
+// Only what this set is undone.
+export function hideAutoApplyHost(element) {
+  const hide = autoApplyConfig(element) !== null;
+  element.toggleAttribute("hidden", hide);
+  if (hide) {
+    element.style.setProperty("display", "none");
+    element._autoApplyHidden = true;
+  } else if (element._autoApplyHidden) {
+    element.style.removeProperty("display");
+    element._autoApplyHidden = false;
+  }
 }
 
 export function unwatchAutoApply(element) {
