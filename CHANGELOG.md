@@ -10,6 +10,11 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Rows carry the value of a labelled choice.** A field with declared
+  choices (`one_of` atoms, `Ash.Type.Enum`) still shows its label in the
+  row, and the row now also has the value at the reserved
+  `_values/<field>` key, so a client that keys its own words by value can
+  read it. Rows without such fields are unchanged.
 - **`hidden_filters` on a query.** For a filter the page sets itself
   (links to `?q[filters][<name>]=...`): the query controls draw no picker
   for it, and it still applies. Each entry must be in `filters`. The
