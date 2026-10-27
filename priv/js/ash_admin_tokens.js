@@ -437,7 +437,10 @@ export const BADGE_TONES = ["neutral", "info", "success", "warning", "danger", "
 
 /**
  * The data grid's cell icons (catalog 1.8 column `icon`): each generic name
- * as stroke paths on a 20px grid. A renderer with its own icon set maps the
+ * as stroke paths on a 20px grid, every one starting with a moveto, so a
+ * renderer can join them into one `d` and keep the <path> inside the <svg>
+ * template (a nested html`` template would create it in the HTML namespace,
+ * where it doesn't draw). A renderer with its own icon set maps the
  * same names onto it.
  */
 export const CELL_ICONS = {
