@@ -3,6 +3,7 @@ spark_locals_without_parens = [
   action: 1,
   action: 2,
   add_render_action?: 1,
+  apply_on_change: 1,
   as: 1,
   auto_select_single: 1,
   badge: 1,

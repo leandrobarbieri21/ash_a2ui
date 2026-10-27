@@ -21,6 +21,7 @@ defmodule AshA2ui.QueryRunner do
         "ranges" => %{"inserted_at" => %{"from" => "", "to" => ""}},
                                                             # only when the query declares range_filters
         "preset" => "pending",                              # only when the query declares presets
+        "autoApply" => %{"debounceMs" => 300},              # only on apply_on_change queries
         "sort" => %{"field" => "name", "dir" => "asc"},     # or nil when unsorted
         "page" => 1,
         "pageSize" => 25,
@@ -226,7 +227,18 @@ defmodule AshA2ui.QueryRunner do
     |> put_preset_state(query, params)
     |> put_ranges_state(query, params)
     |> put_window_state(params)
+    |> put_auto_apply_state(query)
   end
+
+  @auto_apply_debounce_ms 300
+
+  # The "autoApply" key only exists on `apply_on_change` queries: it tells
+  # the renderer to send the Apply envelope as the controls change (search
+  # after a pause in typing) rather than on a click.
+  defp put_auto_apply_state(state, %{apply_on_change: true}),
+    do: Map.put(state, "autoApply", %{"debounceMs" => @auto_apply_debounce_ms})
+
+  defp put_auto_apply_state(state, _query), do: state
 
   # The "window" key only exists on calendar tables (marks are filled in by
   # run/4, which read them).

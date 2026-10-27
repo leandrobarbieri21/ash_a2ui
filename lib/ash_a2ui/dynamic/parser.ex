@@ -455,6 +455,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "range_filters" => :range_filters,
     "default_sort" => :default_sort,
     "default_preset" => :default_preset,
+    "apply_on_change" => :apply_on_change,
     "page_size" => :page_size,
     "max_page_size" => :max_page_size
   }

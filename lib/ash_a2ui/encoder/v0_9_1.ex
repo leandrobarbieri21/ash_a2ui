@@ -22,7 +22,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     * `context_<name>` — the pickers of declared contexts
     * then, per `:table` (in declaration order):
     * `table_heading` — `Text` (h2) with the humanized resource name
-    * `query_controls` — only when the table declares a `query`: a `Row` of a
+    * `query_controls` — only when the table declares a `query` with search,
+      presets, filters or range filters (a query for sort and page size
+      alone gets no controls): a `Row` of a
       search `TextField` (`query_search_input`, bound to `/query/search`,
       omitted when the query has no `search_fields`), a preset `ChoicePicker`
       (`query_preset_picker`, bound to `/query/preset`, only when the query
@@ -741,7 +743,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
          create_button_components(view, table, sfx) ++
          admin_calendar_components(view, table, sfx) ++
          admin_data_grid_components(view, table, sfx),
-       ((table.query && ["query#{sfx}_controls"]) || []) ++
+       ((query_controls?(table) && ["query#{sfx}_controls"]) || []) ++
          create_button_ids(view, table, sfx) ++ [admin_collection_id(table, sfx)]}
     else
       {table_components(view, table, sfx) ++
@@ -1267,7 +1269,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     sfx = table_suffix(view, table)
 
     ["table_heading#{sfx}"] ++
-      child_if(table.query, "query#{sfx}_controls") ++
+      child_if(query_controls?(table), "query#{sfx}_controls") ++
       create_button_ids(view, table, sfx) ++
       child_if(AshA2ui.Bulk.enabled?(table), AshA2ui.Bulk.toolbar_id(sfx)) ++
       child_if(AshA2ui.Calendar.calendar?(table), "calendar#{sfx}") ++
@@ -1440,7 +1442,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp board_lane_components(view, table) do
     sfx = table_suffix(view, table)
-    controls? = lane_controls?(table)
+    controls? = query_controls?(table)
 
     lane = %{
       "id" => "lane#{sfx}",
@@ -1681,11 +1683,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       ((table.export && ["export#{sfx}_controls"]) || [])
   end
 
-  # Lanes show query controls only when there is something to control: a
-  # query used for page size or default sort alone adds no per-lane Card.
-  defp lane_controls?(%{query: nil}), do: false
+  # Tables and lanes show query controls only when there is something to
+  # control: a query used for page size or default sort alone adds no Card
+  # (it would hold nothing but Apply).
+  defp query_controls?(%{query: nil}), do: false
 
-  defp lane_controls?(%{query: query}) do
+  defp query_controls?(%{query: query}) do
     query.search_fields != [] or query.presets != [] or query.filters != [] or
       query.range_filters != []
   end
@@ -2058,9 +2061,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The search/preset/filter/range controls plus the Apply button — the
   # query section MINUS pagination (the admin emission composes its own
   # semantic pagination, so it consumes this variant directly).
-  defp query_control_components(_view, %{query: nil}, _sfx), do: []
-
   defp query_control_components(view, table, sfx) do
+    if query_controls?(table), do: query_control_card(view, table, sfx), else: []
+  end
+
+  defp query_control_card(view, table, sfx) do
     query = table.query
     search = (query.search_fields != [] && [search_input(table, sfx)]) || []
     presets = (query.presets != [] && [preset_picker(query, table, sfx)]) || []

@@ -471,6 +471,17 @@ defmodule AshA2ui do
         type: :atom,
         doc: "The preset applied when the client selects none. Must name a declared preset."
       ],
+      apply_on_change: [
+        type: :boolean,
+        default: false,
+        doc: """
+        Apply the query as its controls change, instead of on Apply: a picker
+        applies when picked, search after a 300 ms pause in typing. The
+        `/query` state then carries `autoApply` (`%{"debounceMs" => 300}`);
+        a renderer that honours it hides the Apply button and sends its
+        envelope on change, and one that doesn't keeps showing Apply.
+        """
+      ],
       default_sort: [
         type: {:list, {:tuple, [:atom, {:in, [:asc, :desc]}]}},
         default: [],

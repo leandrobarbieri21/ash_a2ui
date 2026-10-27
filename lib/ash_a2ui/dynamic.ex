@@ -880,6 +880,12 @@ defmodule AshA2ui.Dynamic do
           }
         },
         "default_preset" => name,
+        "apply_on_change" => %{
+          "type" => "boolean",
+          "description" =>
+            "true to apply the query as its controls change (search after a pause), " <>
+              "without an Apply click. Defaults to false."
+        },
         "page_size" => %{"type" => "integer", "minimum" => 1, "maximum" => 100},
         "max_page_size" => %{"type" => "integer", "minimum" => 1, "maximum" => 100}
       },

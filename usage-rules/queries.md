@@ -66,6 +66,11 @@ end
   client selects none *and* closes the set (no `""`/"All" escape to the
   unscoped base read); without it, `""` means "no preset". Presets are UX
   scoping — authorization stays in Ash policies.
+- `apply_on_change true` applies the query as its controls change (search
+  after a 300 ms pause) instead of on Apply. The Apply button stays in the
+  tree; renderers that honour the `/query` state's `autoApply` hide it.
+  A query with nothing to pick (sort and page size only) gets no controls
+  card either way.
 - On multi-table surfaces each named table may attach its own query; state
   lives at `/query/<component_name>` and the `query` action context requires
   `"component"` (the emitted controls send it automatically).

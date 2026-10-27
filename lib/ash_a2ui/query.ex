@@ -17,6 +17,7 @@ defmodule AshA2ui.Query do
     filters: [],
     range_filters: [],
     presets: [],
+    apply_on_change: false,
     default_sort: [],
     page_size: 25,
     max_page_size: 100,
@@ -31,6 +32,7 @@ defmodule AshA2ui.Query do
           range_filters: [atom],
           presets: [AshA2ui.Preset.t()],
           default_preset: atom | nil,
+          apply_on_change: boolean,
           default_sort: [{atom, :asc | :desc}],
           page_size: pos_integer,
           max_page_size: pos_integer

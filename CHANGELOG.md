@@ -10,6 +10,17 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`apply_on_change true` on a query.** The controls apply as they
+  change: a picker at once, search after a 300 ms pause in typing. The
+  `/query` state carries `"autoApply": {"debounceMs": 300}`; the merged
+  catalog's Button (`createAshA2uiCatalog`) then hides Apply and sends its
+  envelope itself. A renderer without it keeps showing Apply. Defaults to
+  `false`; dynamic specs carry it as `"apply_on_change": true`.
+- **No controls card for a query with nothing to pick.** A query with no
+  search, presets, filters or range filters (sort and page size only) no
+  longer gets a controls card holding only Apply; its pagination stays.
+  Board lanes already did this.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:

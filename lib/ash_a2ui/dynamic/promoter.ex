@@ -81,6 +81,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     range_filters: :name_list,
     filters: :name_list,
     default_preset: :name,
+    apply_on_change: :raw,
     default_sort: :default_sort,
     page_size: :raw,
     max_page_size: :raw

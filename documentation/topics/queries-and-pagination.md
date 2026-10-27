@@ -158,6 +158,17 @@ When the table declares a query, the encoder adds to the component tree:
   `/query/ranges/<field>/from|to` (see above),
 - an **Apply** button and **Previous/Next** pagination buttons.
 
+A query with no search, presets, filters or range filters (sort and page
+size only) gets no controls card, only the pagination.
+
+With `apply_on_change true` the `/query` state also carries
+`"autoApply": {"debounceMs": 300}`. A renderer that honours it (the merged
+catalog's Button, `createAshA2uiCatalog`) hides the Apply button and sends
+its envelope itself when the controls change: at once for a picker or a
+range, after a 300 ms pause in typing for search. The server sees exactly an
+Apply click. A renderer that doesn't know `autoApply` keeps showing Apply,
+which still works.
+
 All of them dispatch the `"query"` client action. The wire contract:
 
 ```json
