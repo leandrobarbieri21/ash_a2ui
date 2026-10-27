@@ -103,12 +103,12 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
-  test "catalog 1.10 is additive: dataGrid rowClick labelPath, variantPath and inline" do
+  test "catalog 1.9 is additive: dataGrid rowClick labelPath, variantPath and inline" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.10.0"
-    assert Experience.admin_catalog_version() == "1.10.0"
-    assert Map.has_key?(catalog["x-changelog"], "1.10.0")
+    assert catalog["version"] == "1.9.0"
+    assert Experience.admin_catalog_version() == "1.9.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.9.0")
 
     row_click = catalog["components"]["dataGrid"]["properties"]["rowClick"]
     assert row_click["properties"]["labelPath"]["type"] == "string"
