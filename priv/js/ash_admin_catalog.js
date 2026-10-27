@@ -1600,7 +1600,7 @@ function defineAdminElements(deps, {adminApis}) {
                   aria-label=${label || nothing}
                   aria-hidden=${label ? nothing : "true"}
                 >
-                  ${icon.map((path) => html`<path d=${path}></path>`)}
+                  <path d=${icon.join(" ")}></path>
                 </svg>`
               : nothing}
             <span>${value}</span>
