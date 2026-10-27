@@ -1,6 +1,6 @@
 /**
  * Admin-catalog primary-action probe — the browser gate for
- * `primary_action` on a table (catalog 1.10 rowClick `inline`,
+ * `primary_action` on a table (catalog 1.9 rowClick `inline`,
  * `labelPath`, `variantPath`):
  *
  *   - the grid draws one button per row in a final column, its label and
