@@ -854,15 +854,51 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # (`select_context`) when declared, else View when the surface has a
   # record panel. The envelope is byte-identical to the matching rowActions
   # entry, so clicking a row is exactly clicking that button.
+  #
+  # A `primary_action` draws that envelope as one button per row (`inline`),
+  # its label and variant read from the row (`_primary_label`,
+  # `_primary_variant`).
   defp put_row_click(grid, view, table) do
+    case row_click(view, table) do
+      nil -> grid
+      entry -> Map.put(grid, "rowClick", put_primary_action(entry, table))
+    end
+  end
+
+  defp row_click(view, table) do
     case select_context_entries(view, table) do
       [entry | _] ->
-        Map.put(grid, "rowClick", entry)
+        entry
 
       [] ->
         if record_controls?(view, table),
-          do: Map.put(grid, "rowClick", admin_row_envelope("View", "view_record", table)),
-          else: grid
+          do: admin_row_envelope("View", "view_record", table)
+    end
+  end
+
+  defp put_primary_action(entry, %{component: %{primary_action: %AshA2ui.PrimaryAction{}}}) do
+    Map.merge(entry, %{
+      "labelPath" => "_primary_label",
+      "variantPath" => "_primary_variant",
+      "inline" => true
+    })
+  end
+
+  defp put_primary_action(entry, _table), do: entry
+
+  # The row data of a table's primary action: its label and variant for this
+  # row (see `AshA2ui.PrimaryAction.row_data/3`), the row click's own label
+  # standing in for values without one.
+  defp primary_action_data(_view, nil, _record), do: %{}
+  defp primary_action_data(_view, %{component: %{primary_action: nil}}, _record), do: %{}
+
+  defp primary_action_data(view, table, record) do
+    case row_click(view, table) do
+      nil ->
+        %{}
+
+      entry ->
+        AshA2ui.PrimaryAction.row_data(table.component.primary_action, record, entry["label"])
     end
   end
 
@@ -4449,6 +4485,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     |> Map.merge(AshA2ui.Bulk.row_data(table))
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))
+    |> Map.merge(primary_action_data(view, table, record))
   end
 
   # The row's fields, plus the values of rewritten choices at `_values`

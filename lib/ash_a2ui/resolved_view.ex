@@ -687,7 +687,9 @@ defmodule AshA2ui.ResolvedView do
         query: query,
         loads:
           Enum.uniq(
-            loads(resource, component, fields) ++ condition_loads(resource, component, actions)
+            loads(resource, component, fields) ++
+              condition_loads(resource, component, actions) ++
+              primary_action_loads(resource, component)
           ),
         row_actions: component.row_actions,
         bulk_actions: component.bulk_actions,
@@ -949,6 +951,15 @@ defmodule AshA2ui.ResolvedView do
     end)
     |> Enum.uniq()
   end
+
+  # A primary action's `label_from` is loaded with the table when it is a
+  # calculation or aggregate, whether or not it is one of the table's fields.
+  defp primary_action_loads(resource, %{primary_action: %{label_from: name}})
+       when not is_nil(name) do
+    if calculation_or_aggregate?(resource, name), do: [name], else: []
+  end
+
+  defp primary_action_loads(_resource, _component), do: []
 
   # --- relationship selects ---------------------------------------------------
 

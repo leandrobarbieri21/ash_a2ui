@@ -199,7 +199,7 @@ defmodule AshA2ui.Dynamic.Diff do
   defp entity_option_changes(:component, path, old_entry, new_entry) do
     name = component_key(new_entry)
 
-    singleton_options = ["row_layout", "sections"]
+    singleton_options = ["row_layout", "sections", "primary_action"]
 
     singleton_changes =
       for option <- singleton_options do

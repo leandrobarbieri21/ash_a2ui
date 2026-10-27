@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.8.0",
+  "version": "1.10.0",
   "x-changelog": {
+    "1.10.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope. Without these the row click is unchanged. The catalogId is unchanged.",
     "1.8.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?, iconPath?, iconTonePath?}: a detail line under the value, {date} filled in by the renderer, after an optional icon). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
     "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
     "1.6.0": "Additive: entityPage gains an optional headerVisible boolean. false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true. The title stays required. The catalogId is unchanged.",
@@ -177,7 +178,19 @@
           "properties": {
             "label": {"type": "string"},
             "action": {"type": "string"},
-            "context": {"type": "object"}
+            "context": {"type": "object"},
+            "labelPath": {
+              "type": "string",
+              "description": "Optional (1.10): row-relative path of the row's button label (the _primary_label key); label when absent on a row."
+            },
+            "variantPath": {
+              "type": "string",
+              "description": "Optional (1.10): row-relative path of the row's Button variant (the _primary_variant key): default | primary | borderless. default when absent or unknown."
+            },
+            "inline": {
+              "type": "boolean",
+              "description": "Optional (1.10): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. Whole-row activation is unchanged."
+            }
           },
           "required": ["label", "action", "context"],
           "additionalProperties": false

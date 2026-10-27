@@ -151,6 +151,35 @@ contracts.
   ignores them draws the plain value, and the basic composition keeps
   showing the folded fields as cells.
 
+## Primary action (admin dataGrid)
+
+- `primary_action` on a `:table` draws the row click (the
+  `select_context` selection, else View) as one button per row, in a final
+  column. Use it when the list's last column reads differently per row but
+  always opens the record ("Review", "Approve", "View"):
+
+  ```elixir
+  primary_action do
+    label_from :next_step
+    labels review: "Review", approve: "Approve"
+    variants review: :primary, approve: :default
+    variant :borderless
+  end
+  ```
+
+- `label_from` is any public attribute, calculation or aggregate; it is
+  loaded for the table without becoming a column. Values with no
+  `labels`/`variants` entry get `label` (default: the row click's own
+  label) and `variant` (default `:default`). Variants are the A2UI
+  Button's: `:default`, `:primary`, `:borderless`.
+- Rows carry `_primary_label` and `_primary_variant`; the grid's
+  `rowClick` gains `labelPath`, `variantPath` and `inline: true`. The
+  button dispatches exactly what the row click does: never use it for an
+  action that does something else (declare a row action with
+  `visible_when` instead).
+- The table needs a row click: a `select_context`, or a `:form` on the
+  surface with the table over the surface's own resource (verified).
+
 ## Boards
 
 - A board is a sectioned `:table` whose sections are the values of an
