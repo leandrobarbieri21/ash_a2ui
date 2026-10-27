@@ -46,7 +46,10 @@
  *     (progressive enhancement, no custom component types on the wire).
  *   - **Text** → `<ash-a2ui-text>` and **Button** → `<ash-a2ui-button>`:
  *     the CLIN-10 neobrutalist anatomy overrides — see the
- *     "Neobrutalist anatomy overrides" section below the imports.
+ *     "Neobrutalist anatomy overrides" section below the imports. The
+ *     Button also honours `apply_on_change` queries: their Apply button
+ *     hides and sends its own envelope as the controls change — see
+ *     "Apply on change" below.
  *   - **Row** → `<ash-a2ui-row>`: renders as upstream, except that a
  *     table's query controls Row wraps (the basic Row has no wrap
  *     property).
@@ -800,6 +803,11 @@ function defineAnatomyElements({lit, basicCatalog}) {
           box-shadow: none;
         }
 
+        /* An apply_on_change query's Apply button applies by itself. */
+        :host([hidden]) {
+          display: none !important;
+        }
+
         /* Borderless stays the quiet link tier. */
         .a2ui-button.borderless {
           border: none;
@@ -924,6 +932,11 @@ function defineAnatomyElements({lit, basicCatalog}) {
       const props = this.controller?.props;
       if (!props) return nothing;
 
+      // An apply_on_change query's Apply button applies by itself.
+      const autoApply = autoApplyConfig(this);
+      this.toggleAttribute("hidden", autoApply !== null);
+      if (autoApply) return nothing;
+
       const isDisabled = props.isValid === false;
       const variant = props.variant ?? "default";
       const link = this.isReferenceLink(variant);
@@ -948,6 +961,16 @@ function defineAnatomyElements({lit, basicCatalog}) {
           ${props.child ? html`${this.renderNode(props.child)}` : nothing}
         </button>
       `;
+    }
+
+    updated(changedProperties) {
+      super.updated(changedProperties);
+      watchAutoApply(this);
+    }
+
+    disconnectedCallback() {
+      super.disconnectedCallback();
+      unwatchAutoApply(this);
     }
 
     // A reference link: the encoder's `<value id>_link` borderless Button
@@ -1004,6 +1027,110 @@ function defineRowElement(basicCatalog) {
   }
 
   customElements.define(ROW_TAG, AshA2uiRowElement);
+}
+
+// --- Apply on change -----------------------------------------------------------
+//
+// A query declared `apply_on_change true` carries `autoApply`
+// (`{"debounceMs": 300}`) in its `/query` state. Its Apply button (the
+// `query` event with `page: 1`) then hides, watches the query state, and
+// sends its own envelope when the user changes it: at once for a picker or a
+// range, `debounceMs` after the last keystroke for search. The envelope is
+// the button's own, so the server sees exactly an Apply click.
+//
+// The watch compares the controls' values (search, preset, filters, ranges)
+// with the last values applied or written by the server. The reply to an
+// apply writes the same values back, so it does not apply again; a write
+// replacing the whole data model (a PubSub refresh) resets the baseline
+// without applying. A renderer without this keeps showing Apply.
+//
+// Exported for priv/js/probe/auto_apply_probe.mjs.
+
+const AUTO_APPLY_KEYS = ["search", "preset", "filters", "ranges"];
+
+// The query path an Apply button applies, or null for any other button.
+function autoApplyQueryPath(element) {
+  try {
+    const event = element.context?.componentModel?.properties?.action?.event;
+    if (event?.name !== "query" || event.context?.page !== 1) return null;
+    const path = event.context?.query?.path;
+    return typeof path === "string" ? path : null;
+  } catch {
+    return null;
+  }
+}
+
+function autoApplyDataModel(element) {
+  try {
+    return element.context?.dataContext?.surface?.dataModel ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The query's `autoApply` settings when its Apply button should apply by
+// itself, else null.
+export function autoApplyConfig(element) {
+  const path = autoApplyQueryPath(element);
+  const dataModel = autoApplyDataModel(element);
+  if (!path || !dataModel) return null;
+  const config = dataModel.get(`${path}/autoApply`);
+  return config && typeof config === "object" ? config : null;
+}
+
+function autoApplyValues(dataModel, path) {
+  const state = dataModel.get(path) || {};
+  return AUTO_APPLY_KEYS.map((key) => JSON.stringify(state[key] ?? null));
+}
+
+export function watchAutoApply(element) {
+  const path = autoApplyQueryPath(element);
+  const dataModel = autoApplyDataModel(element);
+  if (!path || !dataModel || typeof dataModel.subscribe !== "function") return;
+  if (element._autoApply?.path === path && element._autoApply.dataModel === dataModel) return;
+  unwatchAutoApply(element);
+
+  const watch = {path, dataModel, root: dataModel.get("/"), timer: null, active: false};
+  watch.applied = autoApplyValues(dataModel, path);
+  watch.subscription = dataModel.subscribe(path, () => {
+    const config = autoApplyConfig(element);
+    if ((config !== null) !== watch.active) {
+      watch.active = config !== null;
+      element.requestUpdate();
+    }
+
+    const values = autoApplyValues(dataModel, path);
+    const root = dataModel.get("/");
+    if (!config || root !== watch.root) {
+      watch.root = root;
+      watch.applied = values;
+      return;
+    }
+
+    const changed = values.map((value, index) => value !== watch.applied[index]);
+    if (!changed.includes(true)) return;
+    watch.applied = values;
+
+    // Only search waits for a pause in typing.
+    const searchOnly = changed.every((change, index) => !change || AUTO_APPLY_KEYS[index] === "search");
+    const delay = searchOnly ? Number(config.debounceMs) || 0 : 0;
+    clearTimeout(watch.timer);
+    watch.timer = setTimeout(() => element.controller?.props?.action?.(), delay);
+  });
+  watch.active = autoApplyConfig(element) !== null;
+  element._autoApply = watch;
+}
+
+export function unwatchAutoApply(element) {
+  const watch = element._autoApply;
+  if (!watch) return;
+  clearTimeout(watch.timer);
+  try {
+    watch.subscription.unsubscribe();
+  } catch {
+    // The data model may already be gone (surface torn down).
+  }
+  element._autoApply = null;
 }
 
 // --- Action outcomes ------------------------------------------------------------
