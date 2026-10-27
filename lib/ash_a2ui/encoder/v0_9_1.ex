@@ -794,6 +794,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => ["empty_state#{sfx}" | pagination_children] ++ prompt_ids
       }
       |> put_row_click(view, table)
+      |> put_grid_sort(view, table)
 
     [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)] ++
       prompt_components
@@ -857,8 +858,37 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
       |> put_link_binding(view, field, "_links/#{field}")
+      |> put_column_sortable(table, field)
     end)
   end
+
+  # A column the table's query lets sort (`sortable`) says so; the grid's
+  # `sort` binding (put_grid_sort/3) carries the current sort and the
+  # envelope a header click sends.
+  defp put_column_sortable(column, %{query: %{sortable: sortable}}, field) do
+    if field in sortable, do: Map.put(column, "sortable", true), else: column
+  end
+
+  defp put_column_sortable(column, _table, _field), do: column
+
+  # Sortable headers (1.7): the current sort (`/query/sort`, `{field, dir}`
+  # or nil) and the `query` envelope a header click dispatches — the Apply
+  # envelope (page 1), which the renderer sends with the new sort set in the
+  # resolved query state. The server validates the sort against the same
+  # `sortable` allowlist. Absent when no column sorts.
+  defp put_grid_sort(grid, view, %{query: %{sortable: [_ | _]}} = table) do
+    action = %{
+      "name" => "query",
+      "context" =>
+        %{"query" => %{"path" => table.query_path}, "page" => 1}
+        |> Map.put("component", to_string(table.name))
+        |> put_contexts_binding(view)
+    }
+
+    Map.put(grid, "sort", %{"path" => "#{table.query_path}/sort", "action" => action})
+  end
+
+  defp put_grid_sort(grid, _view, _table), do: grid
 
   # Per-type presentation hints (additive; renderers that read only
   # label/path are unaffected): `format` (number/datetime/boolean, as

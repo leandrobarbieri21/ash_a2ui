@@ -10,6 +10,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Sortable headers in the admin dataGrid (catalog 1.7.0).** Columns whose
+  field is in the table query's `sortable` list carry `sortable: true`, and
+  the grid a `sort` binding: the current sort (`/query/sort`) and the
+  `query` envelope a header click sends with the new sort and page 1. The
+  stock grid draws those headers as buttons with a sort mark and
+  `aria-sort`. Renderers that ignore the new keys draw plain headers, as
+  before.
+
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface
   launcher (`ctrl+k`) and `/open <surface> [id | n]`, generic over any
   host:
