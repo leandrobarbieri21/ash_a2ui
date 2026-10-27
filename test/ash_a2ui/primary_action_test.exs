@@ -58,8 +58,11 @@ defmodule AshA2ui.PrimaryActionTest do
              "inline" => true
            }
 
-    # the row actions are untouched: View stays in the row's menu too
-    assert Enum.any?(grid["rowActions"], &(&1["action"] == "view_record"))
+    # the button is the row's View, so View leaves the row actions; the
+    # others stay
+    actions = Enum.map(grid["rowActions"], & &1["action"])
+    refute "view_record" in actions
+    assert "start_edit" in actions
 
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 

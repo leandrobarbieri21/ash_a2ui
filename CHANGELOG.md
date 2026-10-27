@@ -69,7 +69,9 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   `next_step` calculation: "Review" as primary, "View" as borderless). The
   admin catalog goes to 1.9.0: `rowClick` gains optional `labelPath`,
   `variantPath` and `inline`; rows carry `_primary_label` and
-  `_primary_variant`. Tables without it are unchanged. Dynamic specs carry
+  `_primary_variant`. The row action the button stands for (View, or the
+  `select_context` entry) leaves the row's actions, so it shows once.
+  Tables without it are unchanged. Dynamic specs carry
   it as `"primary_action"`.
 
 - **The shell (AST-174).** A command palette (`ctrl+p`), a surface

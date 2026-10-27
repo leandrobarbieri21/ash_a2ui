@@ -828,6 +828,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       }
       |> put_row_click(view, table)
       |> put_grid_sort(view, table)
+      |> drop_inline_duplicate(view, table)
 
     [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)] ++
       prompt_components
@@ -857,7 +858,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   #
   # A `primary_action` draws that envelope as one button per row (`inline`),
   # its label and variant read from the row (`_primary_label`,
-  # `_primary_variant`).
+  # `_primary_variant`), in place of the rowActions entry it mirrors.
   defp put_row_click(grid, view, table) do
     case row_click(view, table) do
       nil -> grid
@@ -885,6 +886,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp put_primary_action(entry, _table), do: entry
+
+  # The inline button already is the row click, so the rowActions entry the
+  # row click mirrors (View, or the select_context entry) is left out: one
+  # button per row, not the same action twice.
+  defp drop_inline_duplicate(
+         grid,
+         view,
+         %{component: %{primary_action: %AshA2ui.PrimaryAction{}}} = table
+       ) do
+    entry = row_click(view, table)
+    Map.update!(grid, "rowActions", fn actions -> Enum.reject(actions, &(&1 == entry)) end)
+  end
+
+  defp drop_inline_duplicate(grid, _view, _table), do: grid
 
   # The row data of a table's primary action: its label and variant for this
   # row (see `AshA2ui.PrimaryAction.row_data/3`), the row click's own label

@@ -173,7 +173,9 @@ contracts.
   label) and `variant` (default `:default`). Variants are the A2UI
   Button's: `:default`, `:primary`, `:borderless`.
 - Rows carry `_primary_label` and `_primary_variant`; the grid's
-  `rowClick` gains `labelPath`, `variantPath` and `inline: true`. The
+  `rowClick` gains `labelPath`, `variantPath` and `inline: true`, and the
+  row action the row click mirrors (View, or the `select_context` entry)
+  leaves `rowActions`, so the row shows that action once. The
   button dispatches exactly what the row click does: never use it for an
   action that does something else (declare a row action with
   `visible_when` instead).
