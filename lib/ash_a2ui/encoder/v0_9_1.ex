@@ -1712,7 +1712,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp lane_controls?(%{query: nil}), do: false
 
   defp lane_controls?(%{query: query}) do
-    query.search_fields != [] or query.presets != [] or query.filters != [] or
+    query.search_fields != [] or preset_picker?(query) or query.filters != [] or
       query.range_filters != []
   end
 
@@ -2089,7 +2089,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp query_control_components(view, table, sfx) do
     query = table.query
     search = (query.search_fields != [] && [search_input(table, sfx)]) || []
-    presets = (query.presets != [] && [preset_picker(query, table, sfx)]) || []
+    presets = (preset_picker?(query) && [preset_picker(query, table, sfx)]) || []
     filters = Enum.map(query.filters, &filter_picker(view.resource, table, &1, sfx))
     ranges = Enum.flat_map(query.range_filters, &range_inputs(table, &1, sfx))
 
@@ -2130,6 +2130,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # predicates live server-side. With a default_preset the option set is
   # closed (no "" escape back to the unscoped base read); without one an
   # "All" option ("" = no preset) comes first, mirroring the filter pickers.
+  # A query's presets get a picker unless the page selects them itself
+  # (`preset_picker false`); the presets apply either way.
+  defp preset_picker?(query), do: query.presets != [] and query.preset_picker != false
+
   defp preset_picker(query, table, sfx) do
     preset_options =
       Enum.map(query.presets, &%{"label" => humanize(&1.name), "value" => to_string(&1.name)})

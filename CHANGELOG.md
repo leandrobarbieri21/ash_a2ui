@@ -10,6 +10,11 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`preset_picker false` on a query.** For a page that selects the preset
+  itself (tabs linking to `?q[preset]=...`): the query controls leave the
+  "View" picker out, and the presets still apply. Defaults to `true`; the
+  output is unchanged without it. Dynamic specs carry it as
+  `"preset_picker": false`.
 - **`header: false` leaves a surface's own heading out.** For a host page
   that already renders the `<h1>` (a second one is a duplicate and an
   outline error). `AshA2ui.Info.build_surface/2` and `AshA2ui.LiveRenderer`

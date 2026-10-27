@@ -880,6 +880,12 @@ defmodule AshA2ui.Dynamic do
           }
         },
         "default_preset" => name,
+        "preset_picker" => %{
+          "type" => "boolean",
+          "description" =>
+            "false when the page selects the preset itself: the presets apply, the " <>
+              "picker is not emitted. Defaults to true."
+        },
         "page_size" => %{"type" => "integer", "minimum" => 1, "maximum" => 100},
         "max_page_size" => %{"type" => "integer", "minimum" => 1, "maximum" => 100}
       },

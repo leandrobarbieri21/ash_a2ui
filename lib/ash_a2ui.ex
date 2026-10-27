@@ -471,6 +471,16 @@ defmodule AshA2ui do
         type: :atom,
         doc: "The preset applied when the client selects none. Must name a declared preset."
       ],
+      preset_picker: [
+        type: :boolean,
+        default: true,
+        doc: """
+        Whether the query controls include the preset picker. Set `false` when
+        the page around the surface selects the preset itself (tabs that link
+        to `?q[preset]=...`): the presets still apply, only the picker is not
+        emitted.
+        """
+      ],
       default_sort: [
         type: {:list, {:tuple, [:atom, {:in, [:asc, :desc]}]}},
         default: [],

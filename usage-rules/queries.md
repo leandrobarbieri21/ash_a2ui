@@ -65,7 +65,9 @@ end
   richer (`not is_nil`, ranges, ORs). `default_preset` applies when the
   client selects none *and* closes the set (no `""`/"All" escape to the
   unscoped base read); without it, `""` means "no preset". Presets are UX
-  scoping — authorization stays in Ash policies.
+  scoping — authorization stays in Ash policies. `preset_picker false`
+  leaves the picker out when the page selects presets itself (tabs linking
+  to `?q[preset]=...`); the presets still apply.
 - On multi-table surfaces each named table may attach its own query; state
   lives at `/query/<component_name>` and the `query` action context requires
   `"component"` (the emitted controls send it automatically).
