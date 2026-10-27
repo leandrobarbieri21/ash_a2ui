@@ -69,6 +69,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         `:open_surface`, the initial surface is built with
         `link_buttons: true`, so basic-catalog to-one links render as
         link Buttons; without both they stay plain text.
+      * `:header` (optional, default `true`) — `false` when the page
+        around the surface already owns its heading: the surface is built
+        with `header: false` (see `AshA2ui.Info.build_surface/2`), so it
+        does not render a second `<h1>`.
       * `:pubsub` (optional) — enables live refresh:
         `pubsub: [module: MyApp.PubSub, topics: ["providers:created", ...]]`.
         Topics are explicit configuration: pass the topics your resource's
@@ -263,6 +267,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         time_travel: Keyword.get(opts, :time_travel, false),
         open_surface: Keyword.get(opts, :open_surface),
         open_surface_url: Keyword.get(opts, :open_surface_url),
+        header: Keyword.get(opts, :header, true),
         surface_fn: Keyword.get(opts, :surface_fn, &AshA2ui.Info.build_surface/2),
         data_model_fn: Keyword.get(opts, :data_model_fn, &AshA2ui.Info.build_data_model/2),
         action_fn: Keyword.get(opts, :action_fn, &AshA2ui.ActionHandler.handle/3)
@@ -303,7 +308,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
             config.surface_fn.(
               config.ui,
-              opts ++ initial_state_opts(config.ui, url_state, opts) ++ link_button_opts(config)
+              opts ++
+                initial_state_opts(config.ui, url_state, opts) ++
+                link_button_opts(config) ++ header_opts(config)
             )
           end)
         else
@@ -361,6 +368,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp link_button_opts(config) do
       if navigates?(config), do: [link_buttons: true], else: []
     end
+
+    # `header: false` only when configured, so the default build is unchanged.
+    defp header_opts(%{header: false}), do: [header: false]
+    defp header_opts(_config), do: []
 
     defp navigates?(config) do
       is_function(config.open_surface, 2) or
