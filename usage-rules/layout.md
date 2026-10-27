@@ -141,7 +141,7 @@ contracts.
 - Rows carry the computed parts at reserved keys: `_icon_<column>`,
   `_icon_tone_<column>`, `_icon_label_<column>` and `_detail_<column>`
   (`""` when the row's value has none).
-- Only the admin data grid draws these hints (catalog 1.9); a renderer that
+- Only the admin data grid draws these hints (catalog 1.8); a renderer that
   ignores them draws the plain value, and the basic composition keeps
   showing the folded fields as cells.
 

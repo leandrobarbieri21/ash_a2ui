@@ -1,5 +1,5 @@
 /**
- * Column cells probe (catalog 1.9): the pure helpers the data grid draws a
+ * Column cells probe (catalog 1.8): the pure helpers the data grid draws a
  * column's icon, "+N more" tag and detail line with. Plain Node, no
  * browser:
  *
