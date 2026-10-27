@@ -10,6 +10,13 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Sortable headers in the admin dataGrid (catalog 1.7.0).** Columns whose
+  field is in the table query's `sortable` list carry `sortable: true`, and
+  the grid a `sort` binding: the current sort (`/query/sort`) and the
+  `query` envelope a header click sends with the new sort and page 1. The
+  stock grid draws those headers as buttons with a sort mark and
+  `aria-sort`. Renderers that ignore the new keys draw plain headers, as
+  before.
 - **Rows carry the value of a labelled choice.** A field with declared
   choices (`one_of` atoms, `Ash.Type.Enum`) still shows its label in the
   row, and the row now also has the value at the reserved

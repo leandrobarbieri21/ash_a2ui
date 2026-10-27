@@ -175,7 +175,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.6.0";
+export const ADMIN_CATALOG_VERSION = "1.7.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -421,6 +421,9 @@ export function buildSchemas() {
           mono: Bool.optional(),
           badge: RecordAny.optional(),
           link: RecordAny.optional(),
+          // 1.7: the header is a sort control (the field is in the query's
+          // sortable allowlist), driven by the grid's `sort`.
+          sortable: Bool.optional(),
         }),
       ),
       // Row arrays / a "/rows" binding / a function call — DynamicValue's
@@ -459,6 +462,11 @@ export function buildSchemas() {
         action: Str,
         context: RecordAny.optional(),
       }).optional(),
+      // 1.7: {path, action} — the current sort's binding ({field, dir} or
+      // null) and the query envelope a sortable header dispatches. Static,
+      // like rowActions: the grid reads the path and resolves the envelope
+      // itself at click time.
+      sort: RecordAny.optional(),
       children: ChildListSchema.optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
@@ -1088,6 +1096,28 @@ function defineAdminElements(deps, {adminApis}) {
             border-bottom: var(--am-border-width) solid var(--am-border-strong);
             white-space: nowrap;
           }
+          .grid-table thead th .sort-button {
+            all: unset;
+            display: inline-flex;
+            align-items: center;
+            gap: var(--am-space-xs);
+            cursor: pointer;
+            font: inherit;
+            letter-spacing: inherit;
+            text-transform: inherit;
+            color: inherit;
+          }
+          .grid-table thead th .sort-button:focus-visible {
+            outline: 2px solid var(--am-focus);
+            outline-offset: 2px;
+          }
+          .grid-table thead th .sort-mark {
+            opacity: 0.5;
+          }
+          .grid-table thead th[aria-sort="ascending"] .sort-mark,
+          .grid-table thead th[aria-sort="descending"] .sort-mark {
+            opacity: 1;
+          }
           .grid-table tbody tr:hover {
             background: var(--am-hover-tint);
           }
@@ -1398,10 +1428,7 @@ function defineAdminElements(deps, {adminApis}) {
             <table class="grid-table" aria-label=${label || "Records"}>
               <thead>
                 <tr>
-                  ${columns.map(
-                    (column) =>
-                      html`<th scope="col" class=${alignClass(column)}>${str(column.label)}</th>`,
-                  )}
+                  ${columns.map((column) => this.renderHeader(column))}
                   ${hasActions
                     ? html`<th scope="col"><span class="sr-only">Actions</span></th>`
                     : nothing}
@@ -1415,6 +1442,58 @@ function defineAdminElements(deps, {adminApis}) {
             </table>
           </div>
         `;
+      }
+
+      /** The column's current sort direction ("asc" | "desc") or null. */
+      sortDirection(column) {
+        const path = this.controller?.props?.sort?.path;
+        const current = path ? this.surface?.dataModel?.get(path) : null;
+        return current && current.field === column.path ? current.dir : null;
+      }
+
+      /**
+       * A header cell: plain text, or (1.7) for a sortable column a button
+       * with the label and a sort mark, the th carrying aria-sort.
+       */
+      renderHeader(column) {
+        const label = str(column.label);
+        if (!column.sortable || !this.controller?.props?.sort) {
+          return html`<th scope="col" class=${alignClass(column)}>${label}</th>`;
+        }
+        const dir = this.sortDirection(column);
+        const ariaSort = dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none";
+        const mark = dir === "asc" ? "\u2191" : dir === "desc" ? "\u2193" : "\u2195";
+        return html`<th scope="col" class=${alignClass(column)} aria-sort=${ariaSort}>
+          <button
+            type="button"
+            class="sort-button"
+            data-sort=${ariaSort}
+            @click=${() => this.sortBy(column)}
+          >
+            <span>${label}</span><span class="sort-mark" aria-hidden="true">${mark}</span>
+          </button>
+        </th>`;
+      }
+
+      /**
+       * Dispatches the grid's sort envelope with the clicked column's sort:
+       * ascending first, then toggling. The query state is resolved as for
+       * Apply and the new sort replaces its `sort`; the server's refresh
+       * rewrites the bound sort, which re-marks the header.
+       */
+      sortBy(column) {
+        const sort = this.controller?.props?.sort;
+        const surface = this.surface;
+        if (!sort?.action || !surface || !this.context?.componentModel) return;
+        const dir = this.sortDirection(column) === "asc" ? "desc" : "asc";
+        const resolved = resolveEventContext(
+          {event: {name: sort.action.name, context: sort.action.context || {}}},
+          surface.dataModel,
+          "/",
+        );
+        const context = resolved.event.context;
+        context.query = {...(context.query || {}), sort: {field: column.path, dir}};
+        surface.dispatchAction(resolved, this.context.componentModel.id);
       }
 
       renderTableRow(row, index, columns, rowActions, hasActions) {

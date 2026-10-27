@@ -37,6 +37,10 @@ a2ui do
 end
 ```
 
+- **`sortable` drives the admin grid's headers.** Under the admin catalog
+  (1.7) every column whose field is in `sortable` gets a sort control in
+  its header; a click sends the `query` action with the new sort and page 1,
+  validated against the same allowlist.
 - **Declare allowlists minimally.** Only add fields to `sortable`/`filters`/
   `search_fields` that the surface actually needs — every entry is
   client-reachable. Never mirror all public attributes "because they exist".

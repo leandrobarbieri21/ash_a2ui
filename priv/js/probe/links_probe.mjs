@@ -330,6 +330,47 @@ async function main() {
     await page.screenshot({path: join(probeDir, "screenshots", "links_paged.png"), fullPage: true});
     await page.close();
 
+    /* --- sortable headers (1.7) ------------------------------------------- */
+    page = await openCase(browser, base, "payload=sort");
+    await installDeep(page);
+
+    await check("sort: only the sortable column's header is a button, marked by aria-sort", async () => {
+      const headers = await page.evaluate(() =>
+        window.__deepAll(".grid-table thead th").map((th) => ({
+          text: th.textContent.replace(/\s+/g, " ").trim(),
+          ariaSort: th.getAttribute("aria-sort"),
+          button: !!th.querySelector("button.sort-button"),
+        })),
+      );
+      const title = headers.find((h) => h.text.startsWith("Title"));
+      const amount = headers.find((h) => h.text === "Amount");
+      if (!title || !amount) throw new Error(`headers ${JSON.stringify(headers)}`);
+      expect(title.button, true, "title is a sort control");
+      expect(title.ariaSort, "ascending", "default sort title asc");
+      expect(amount.button, false, "amount is plain");
+      expect(amount.ariaSort, null, "no aria-sort on a plain header");
+    });
+
+    await check("sort: a click sends the query envelope with the toggled sort and page 1", async () => {
+      await page.evaluate(() => {
+        window.__dispatched.length = 0;
+        window.__deepAll(".grid-table thead th button.sort-button")[0].click();
+      });
+      await page.waitForTimeout(100);
+      const dispatched = await page.evaluate(() => window.__dispatched);
+      expect(dispatched.length, 1, "one dispatch");
+      expect(dispatched[0].name, "query", "query action");
+      expect(dispatched[0].context.page, 1, "page reset");
+      expect(dispatched[0].context.component, "table", "component");
+      expect(dispatched[0].context.query.sort, {field: "title", dir: "desc"}, "asc → desc");
+      expect(dispatched[0].context.query.pageSize, 1, "rest of the query state resolved");
+    });
+
+    await check("no console errors (sort case)", async () => {
+      expect(page.__errors, [], "errors");
+    });
+    await page.close();
+
     /* --- host tokens drive the grid -------------------------------------- */
     page = await openCase(browser, base, "payload=links&nb=1");
     await installDeep(page);

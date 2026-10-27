@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "x-changelog": {
+    "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
     "1.6.0": "Additive: entityPage gains an optional headerVisible boolean. false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true. The title stays required. The catalogId is unchanged.",
     "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
     "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
@@ -73,6 +74,10 @@
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
+              },
+              "sortable": {
+                "type": "boolean",
+                "description": "Optional (1.7): true when the table's query lets the client sort by this column (the field is in its sortable allowlist). The renderer makes the header a sort control driven by the dataGrid's sort. Absent = not sortable."
               }
             },
             "required": ["label", "path"],
@@ -137,6 +142,21 @@
             "context": {"type": "object"}
           },
           "required": ["label", "action", "context"],
+          "additionalProperties": false
+        },
+        "sort": {
+          "type": "object",
+          "description": "Optional (1.7), present when a column is sortable: path binds the table's current sort ({field, dir} with dir asc | desc, or null; e.g. {\"path\": \"/query/sort\"}); action is the query envelope ({name: \"query\", context}, the Apply envelope with page 1) a sortable header dispatches after setting sort in the resolved query state to {field: <column path>, dir}. The renderer marks the sorted column (aria-sort) and toggles asc/desc on repeat clicks. The server validates the sort against the same allowlist.",
+          "properties": {
+            "path": {"type": "string"},
+            "action": {
+              "type": "object",
+              "properties": {"name": {"type": "string"}, "context": {"type": "object"}},
+              "required": ["name", "context"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["path", "action"],
           "additionalProperties": false
         },
         "children": {

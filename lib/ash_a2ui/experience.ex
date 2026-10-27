@@ -106,10 +106,11 @@ defmodule AshA2ui.Experience do
   unchanged `admin_catalog_id/0` — 1.1 added the column presentation hints
   (format/align/mono/badge/link), `rowClick`, FieldDisplay `link` and the
   `openSurface` client function; 1.2 added the `rowActions` entries'
-  `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs).
+  `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs);
+  1.7 added sortable headers (column `sortable`, the dataGrid's `sort`).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.6.0"
+  def admin_catalog_version, do: "1.7.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item
