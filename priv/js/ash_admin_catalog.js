@@ -1581,6 +1581,14 @@ function defineAdminElements(deps, {adminApis}) {
         const detail = column.detail
           ? detailText(at(column.detail), column.detail.datePath ? getByPath(row, column.detail.datePath) : null)
           : "";
+        const detailIcon =
+          detail && typeof column.detail.iconPath === "string"
+            ? cellIcon(getByPath(row, column.detail.iconPath))
+            : null;
+        const detailTone =
+          typeof column.detail?.iconTonePath === "string"
+            ? badgeTone(getByPath(row, column.detail.iconTonePath))
+            : "neutral";
 
         return html`<span class="am-cell">
           <span class="am-cell-line">
@@ -1609,7 +1617,25 @@ function defineAdminElements(deps, {adminApis}) {
           ${subtitle === null || subtitle === undefined || subtitle === ""
             ? nothing
             : html`<span class="am-cell-sub">${str(subtitle)}</span>`}
-          ${detail ? html`<span class="am-cell-detail">${detail}</span>` : nothing}
+          ${detail
+            ? html`<span class="am-cell-detail">${detailIcon
+                ? html`<svg
+                    class="am-cell-icon"
+                    data-tone=${detailTone}
+                    viewBox="0 0 20 20"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d=${detailIcon.join(" ")}></path>
+                  </svg>`
+                : nothing}<span>${detail}</span></span>`
+            : nothing}
         </span>`;
       }
 

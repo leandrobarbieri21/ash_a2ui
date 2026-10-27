@@ -57,7 +57,9 @@ defmodule AshA2ui.Dynamic.Promoter do
     more: :name,
     detail: :name,
     detail_date: :name,
-    detail_text: :string_keyword
+    detail_text: :string_keyword,
+    detail_icon_names: :name_keyword,
+    detail_icon_tones: :name_keyword
   ]
 
   @group_options [label: :raw, columns: :raw, fields: :name_list]

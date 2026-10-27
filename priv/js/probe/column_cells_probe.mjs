@@ -32,7 +32,7 @@ const expect = (label, actual, expected) => {
 };
 
 // icons: the catalog's vocabulary, nothing else
-expect("icon vocabulary", Object.keys(CELL_ICONS), ["check", "x", "user_check", "user_x", "alert", "clock", "info"]);
+expect("icon vocabulary", Object.keys(CELL_ICONS), ["check", "x", "user_check", "user_x", "alert", "clock", "info", "refresh", "extend"]);
 expect("known icon", cellIcon("user_check"), CELL_ICONS.user_check);
 expect("no icon", cellIcon(""), null);
 expect("unknown icon", cellIcon("rocket"), null);

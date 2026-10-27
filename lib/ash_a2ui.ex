@@ -786,8 +786,8 @@ defmodule AshA2ui do
         default: [],
         doc: """
         The icon per `icon` value, from `AshA2ui.Column.icons/0` (`:check`,
-        `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`). A value
-        without an entry gets no icon.
+        `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`,
+        `:refresh`, `:extend`). A value without an entry gets no icon.
         """
       ],
       icon_tones: [
@@ -836,6 +836,23 @@ defmodule AshA2ui do
         The detail text per `detail` value, e.g.
         `detail_text overdue: "Overdue since {date}"`. A value without an
         entry gets no detail line.
+        """
+      ],
+      detail_icon_names: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The icon drawn before the detail line, per `detail` value, from
+        `AshA2ui.Column.icons/0`. Decorative (the text says the same). Rows
+        carry it at `_detail_icon_<column>`.
+        """
+      ],
+      detail_icon_tones: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The tone of that icon per `detail` value, from the badge tone
+        vocabulary. Unmatched values are `:neutral`.
         """
       ]
     ]

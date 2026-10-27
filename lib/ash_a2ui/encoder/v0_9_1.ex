@@ -949,11 +949,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp detail_binding(name, cells) do
-    maybe_put(
-      %{"path" => "_detail_#{name}"},
-      "datePath",
-      cells.detail_date && to_string(cells.detail_date)
-    )
+    icons? = cells.detail_icon_names != []
+
+    %{"path" => "_detail_#{name}"}
+    |> maybe_put("datePath", cells.detail_date && to_string(cells.detail_date))
+    |> maybe_put("iconPath", if(icons?, do: "_detail_icon_#{name}"))
+    |> maybe_put("iconTonePath", if(icons?, do: "_detail_icon_tone_#{name}"))
   end
 
   # Per-type presentation hints (additive; renderers that read only

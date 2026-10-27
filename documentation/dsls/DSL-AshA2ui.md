@@ -702,13 +702,15 @@ end
 |------|------|---------|------|
 | [`subtitle`](#a2ui-component-column-subtitle){: #a2ui-component-column-subtitle } | `atom` |  | A table field drawn as a second line under the value. |
 | [`icon`](#a2ui-component-column-icon){: #a2ui-component-column-icon } | `atom` |  | A table field whose value picks an icon drawn before the value (`icon_names`). Rows carry the icon at the reserved `_icon_<column>` key, its tone at `_icon_tone_<column>` and its accessible label at `_icon_label_<column>` (`""` when the value has no icon). |
-| [`icon_names`](#a2ui-component-column-icon_names){: #a2ui-component-column-icon_names } | `keyword` | `[]` | The icon per `icon` value, from `AshA2ui.Column.icons/0` (`:check`, `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`). A value without an entry gets no icon. |
+| [`icon_names`](#a2ui-component-column-icon_names){: #a2ui-component-column-icon_names } | `keyword` | `[]` | The icon per `icon` value, from `AshA2ui.Column.icons/0` (`:check`, `:x`, `:user_check`, `:user_x`, `:alert`, `:clock`, `:info`, `:refresh`, `:extend`). A value without an entry gets no icon. |
 | [`icon_tones`](#a2ui-component-column-icon_tones){: #a2ui-component-column-icon_tones } | `keyword` | `[]` | The tone per `icon` value, from the badge tone vocabulary (`AshA2ui.RowLayout.tones/0`). Unmatched values are `:neutral`. |
 | [`icon_labels`](#a2ui-component-column-icon_labels){: #a2ui-component-column-icon_labels } | `keyword` | `[]` | The accessible label per `icon` value. Defaults to the humanized value. |
 | [`more`](#a2ui-component-column-more){: #a2ui-component-column-more } | `atom` |  | A table field holding how many values the cell's field has (a `count` aggregate beside a `first` one): when it is 2 or more the grid adds a "+N more" tag, N being the count minus one. |
 | [`detail`](#a2ui-component-column-detail){: #a2ui-component-column-detail } | `atom` |  | A table field whose value picks a detail line drawn under the value (`detail_text`). Rows carry the text at the reserved `_detail_<column>` key (`""` when the value has none). |
 | [`detail_date`](#a2ui-component-column-detail_date){: #a2ui-component-column-detail_date } | `atom` |  | A table field holding the date the renderer puts in place of `{date}` in the detail text, formatted in the reader's locale. |
 | [`detail_text`](#a2ui-component-column-detail_text){: #a2ui-component-column-detail_text } | `keyword` | `[]` | The detail text per `detail` value, e.g. `detail_text overdue: "Overdue since {date}"`. A value without an entry gets no detail line. |
+| [`detail_icon_names`](#a2ui-component-column-detail_icon_names){: #a2ui-component-column-detail_icon_names } | `keyword` | `[]` | The icon drawn before the detail line, per `detail` value, from `AshA2ui.Column.icons/0`. Decorative (the text says the same). Rows carry it at `_detail_icon_<column>`. |
+| [`detail_icon_tones`](#a2ui-component-column-detail_icon_tones){: #a2ui-component-column-detail_icon_tones } | `keyword` | `[]` | The tone of that icon per `detail` value, from the badge tone vocabulary. Unmatched values are `:neutral`. |
 
 
 

@@ -292,7 +292,9 @@ defmodule AshA2ui.Dynamic.Parser do
     "more" => :more,
     "detail" => :detail,
     "detail_date" => :detail_date,
-    "detail_text" => :detail_text
+    "detail_text" => :detail_text,
+    "detail_icon_names" => :detail_icon_names,
+    "detail_icon_tones" => :detail_icon_tones
   }
 
   # The cell icon vocabulary, string -> atom over AshA2ui.Column.icons/0:
@@ -982,8 +984,13 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(option) when option in [:visible_when, :filter], do: :raw_keyword
   defp option_shape(:badge_text), do: :string_keyword
   defp option_shape(option) when option in [:icon_labels, :detail_text], do: :string_keyword
-  defp option_shape(:icon_names), do: {:enum_keyword, @cell_icons}
-  defp option_shape(:icon_tones), do: :icon_tone_keyword
+
+  defp option_shape(option) when option in [:icon_names, :detail_icon_names],
+    do: {:enum_keyword, @cell_icons}
+
+  defp option_shape(option) when option in [:icon_tones, :detail_icon_tones],
+    do: :icon_tone_keyword
+
   defp option_shape(:badge_tones), do: :tone_keyword
   defp option_shape(:link), do: :link
   defp option_shape(:search_fields), do: :search_fields

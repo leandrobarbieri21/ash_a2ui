@@ -44,13 +44,18 @@ defmodule AshA2ui.ColumnCellsTest do
                "label" => "Status",
                "path" => "status",
                "badge" => %{"path" => "_badge_status", "tonePath" => "_badge_tone_status"},
-               "detail" => %{"path" => "_detail_status", "datePath" => "due_on"}
+               "detail" => %{
+                 "path" => "_detail_status",
+                 "datePath" => "due_on",
+                 "iconPath" => "_detail_icon_status",
+                 "iconTonePath" => "_detail_icon_tone_status"
+               }
              },
              %{"label" => "First tag", "path" => "first_tag", "more" => %{"path" => "tag_count"}}
            ]
   end
 
-  test "rows carry the icon, its tone and label, and the detail text" do
+  test "rows carry the icon, its tone and label, and the detail text and its icon" do
     Ash.create!(
       ColumnTask,
       %{
@@ -75,6 +80,8 @@ defmodule AshA2ui.ColumnCellsTest do
              "_icon_tone_title" => "danger",
              "_icon_label_title" => "High priority",
              "_detail_status" => "Overdue since {date}",
+             "_detail_icon_status" => "alert",
+             "_detail_icon_tone_status" => "danger",
              "assignee_name" => "Sam Okafor",
              "tag_count" => 3,
              "due_on" => "2026-11-01"
@@ -85,7 +92,9 @@ defmodule AshA2ui.ColumnCellsTest do
              "_icon_title" => "",
              "_icon_tone_title" => "neutral",
              "_icon_label_title" => "",
-             "_detail_status" => ""
+             "_detail_status" => "",
+             "_detail_icon_status" => "",
+             "_detail_icon_tone_status" => "neutral"
            } = rows["Order filters"]
   end
 
@@ -112,6 +121,9 @@ defmodule AshA2ui.ColumnCellsTest do
            ] = table["columns"]
 
     assert title["icon_names"] == %{"high" => "alert", "low" => "check"}
+    status = List.last(table["columns"])
+    assert status["detail_icon_names"] == %{"due_soon" => "clock", "overdue" => "alert"}
+    assert status["detail_icon_tones"] == %{"overdue" => "danger"}
 
     allowlist = Dynamic.allowlist([ColumnTask])
     {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
@@ -129,6 +141,7 @@ defmodule AshA2ui.ColumnCellsTest do
     assert source =~ "column :title do"
     assert source =~ "icon_names high: :alert, low: :check"
     assert source =~ "detail_text"
+    assert source =~ "detail_icon_names due_soon: :clock, overdue: :alert"
   end
 
   test "a dynamic spec's columns go through the same checks" do
@@ -241,6 +254,31 @@ defmodule AshA2ui.ColumnCellsTest do
         )
 
       assert result =~ ~r/without an icon field/
+    end
+
+    test "detail icons come from the vocabulary and need a detail field" do
+      bad_icon =
+        define(
+          quote do
+            column :title do
+              detail :priority
+              detail_icon_names high: :rocket
+            end
+          end
+        )
+
+      assert bad_icon =~ ~r/detail_icon_names for :high must be one of/
+
+      no_detail =
+        define(
+          quote do
+            column :title do
+              detail_icon_names high: :alert
+            end
+          end
+        )
+
+      assert no_detail =~ ~r/without a detail field/
     end
   end
 end

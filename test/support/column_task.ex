@@ -83,6 +83,8 @@ defmodule AshA2ui.Test.ColumnTask do
         detail :status_detail
         detail_date :due_on
         detail_text due_soon: "Due {date}", overdue: "Overdue since {date}"
+        detail_icon_names due_soon: :clock, overdue: :alert
+        detail_icon_tones overdue: :danger
       end
     end
   end
