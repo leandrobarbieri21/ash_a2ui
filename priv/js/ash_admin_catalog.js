@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.9.0";
+export const ADMIN_CATALOG_VERSION = "1.8.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -427,7 +427,7 @@ export function buildSchemas() {
           // 1.7: the header is a sort control (the field is in the query's
           // sortable allowlist), driven by the grid's `sort`.
           sortable: Bool.optional(),
-          // 1.9 cell hints (column entities): a second line, a leading
+          // 1.8 cell hints (column entities): a second line, a leading
           // icon, a "+N more" tag and a detail line, all row-relative.
           subtitle: RecordAny.optional(),
           icon: RecordAny.optional(),
@@ -1563,7 +1563,7 @@ function defineAdminElements(deps, {adminApis}) {
       }
 
       /**
-       * One cell: its value (below), framed by the column's 1.9 hints when
+       * One cell: its value (below), framed by the column's 1.8 hints when
        * it declares any — a leading icon and a "+N more" tag on the value's
        * line, a second line and a detail line under it.
        */

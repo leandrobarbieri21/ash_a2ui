@@ -4,9 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.9.0",
+  "version": "1.8.0",
   "x-changelog": {
-    "1.9.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?}: a detail line under the value, {date} filled in by the renderer). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
+    "1.8.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?}: a detail line under the value, {date} filled in by the renderer). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
     "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
     "1.6.0": "Additive: entityPage gains an optional headerVisible boolean. false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true. The title stays required. The catalogId is unchanged.",
     "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
@@ -82,14 +82,14 @@
               },
               "subtitle": {
                 "type": "object",
-                "description": "Optional (1.9): row-relative binding to a second line drawn under the cell's value (a column's subtitle field). Absent or empty on a row = no second line.",
+                "description": "Optional (1.8): row-relative binding to a second line drawn under the cell's value (a column's subtitle field). Absent or empty on a row = no second line.",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
               },
               "icon": {
                 "type": "object",
-                "description": "Optional (1.9): a leading icon picked per row. path (row-relative) is the icon name (the server-computed _icon_<column> key): check | x | user_check | user_x | alert | clock | info, empty for none; labelPath its accessible label (_icon_label_<column>); tonePath (optional) its tone (_icon_tone_<column>), from the badge tone vocabulary. Renderers map the names onto their own icons.",
+                "description": "Optional (1.8): a leading icon picked per row. path (row-relative) is the icon name (the server-computed _icon_<column> key): check | x | user_check | user_x | alert | clock | info, empty for none; labelPath its accessible label (_icon_label_<column>); tonePath (optional) its tone (_icon_tone_<column>), from the badge tone vocabulary. Renderers map the names onto their own icons.",
                 "properties": {
                   "path": {"type": "string"},
                   "labelPath": {"type": "string"},
@@ -100,14 +100,14 @@
               },
               "more": {
                 "type": "object",
-                "description": "Optional (1.9): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1).",
+                "description": "Optional (1.8): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1).",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
               },
               "detail": {
                 "type": "object",
-                "description": "Optional (1.9): a detail line drawn under the cell's value (under the pill on a badge column). path (row-relative) is its text (the server-computed _detail_<column> key, empty for none); datePath (row-relative, optional) a date the renderer formats in the reader's locale and puts in place of {date}.",
+                "description": "Optional (1.8): a detail line drawn under the cell's value (under the pill on a badge column). path (row-relative) is its text (the server-computed _detail_<column> key, empty for none); datePath (row-relative, optional) a date the renderer formats in the reader's locale and puts in place of {date}.",
                 "properties": {
                   "path": {"type": "string"},
                   "datePath": {"type": "string"}
