@@ -103,11 +103,22 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.7 is additive: sortable dataGrid headers" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.7.0"
+    assert Experience.admin_catalog_version() == "1.7.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.7.0")
+
+    grid = catalog["components"]["dataGrid"]
+    assert grid["properties"]["columns"]["items"]["properties"]["sortable"]["type"] == "boolean"
+    assert grid["properties"]["sort"]["required"] == ["path", "action"]
+    refute "sort" in grid["required"]
+  end
+
   test "catalog 1.6 is additive: entityPage headerVisible" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.6.0"
-    assert Experience.admin_catalog_version() == "1.6.0"
     assert Map.has_key?(catalog["x-changelog"], "1.6.0")
 
     page = catalog["components"]["entityPage"]

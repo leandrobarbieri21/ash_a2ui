@@ -160,6 +160,75 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
     end
   end
 
+  describe "sortable headers (1.7)" do
+    test "a query's sortable columns are marked, and the grid carries the sort binding" do
+      [_create, components, _data] =
+        AshA2ui.Info.build_surface(AshA2ui.Test.Links.PagedNotesUI, actor: nil)
+
+      grid = components_by_id(components)["data_grid"]
+      columns = Map.new(grid["columns"], &{&1["path"], &1})
+
+      # only the allowlisted field
+      assert columns["title"]["sortable"] == true
+      refute Map.has_key?(columns["amount"], "sortable")
+      refute Map.has_key?(columns["person_name"], "sortable")
+
+      # the current sort, and the Apply envelope (page 1) a header sends
+      assert grid["sort"] == %{
+               "path" => "/query/sort",
+               "action" => %{
+                 "name" => "query",
+                 "context" => %{
+                   "query" => %{"path" => "/query"},
+                   "page" => 1,
+                   "component" => "table"
+                 }
+               }
+             }
+    end
+
+    test "the envelope a header sends, with the new sort, is accepted" do
+      alias AshA2ui.Test.Links.{Note, PagedNotesUI}
+
+      for title <- ["Alpha", "Beta"],
+          do: Ash.create!(Note, %{title: title}, authorize?: false)
+
+      [_create, components, data] = AshA2ui.Info.build_surface(PagedNotesUI, actor: nil)
+      %{"action" => %{"context" => context}} = components_by_id(components)["data_grid"]["sort"]
+
+      # what the renderer sends: the resolved query state, its sort replaced
+      query =
+        Map.put(data["updateDataModel"]["value"]["query"], "sort", %{
+          "field" => "title",
+          "dir" => "desc"
+        })
+
+      context = Map.put(context, "query", query)
+
+      envelope = %{
+        "version" => "v0.9.1",
+        "action" => %{"name" => "query", "surfaceId" => "paged_notes", "context" => context}
+      }
+
+      assert {:ok, messages} = ActionHandler.handle(PagedNotesUI, envelope, actor: nil)
+
+      assert %{
+               "updateDataModel" => %{
+                 "value" => %{"sort" => %{"field" => "title", "dir" => "desc"}}
+               }
+             } =
+               Enum.find(messages, &match?(%{"updateDataModel" => %{"path" => "/query"}}, &1))
+    end
+
+    test "a grid without a query, or with nothing sortable, has neither" do
+      [_create, components, _data] = AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+      grid = components_by_id(components)["data_grid"]
+
+      refute Map.has_key?(grid, "sort")
+      refute Enum.any?(grid["columns"], &Map.has_key?(&1, "sortable"))
+    end
+  end
+
   describe "master/detail on admin grids" do
     test "a select_context table carries the context_select row action" do
       [_create, components, _data] =
