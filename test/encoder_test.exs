@@ -441,7 +441,8 @@ defmodule AshA2ui.EncoderTest do
                # Enum values carry their display label, the same one the form
                # picker for this field has always shown.
                "status" => "Published",
-               "inserted_at" => "2026-07-10T12:00:00.000000Z"
+               "inserted_at" => "2026-07-10T12:00:00.000000Z",
+               "_values" => %{"status" => "published"}
              }
     end
 

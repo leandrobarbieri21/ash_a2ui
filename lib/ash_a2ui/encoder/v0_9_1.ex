@@ -212,6 +212,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   with `visible_when` row actions gain the `"_actions"` /
   `"_visible_<action>"` keys (see the sections above).
 
+  A field with declared choices serializes as its label; the row also carries
+  the value at the reserved `"_values"` key (`%{"<field>" => value}`, only for
+  rewritten fields, absent when there are none).
+
   `source` table columns serialize by walking the loaded relationship path
   (`[:user, :email]` -> `record.user.email`); a nil or unloaded relationship
   serializes to `""`.
@@ -4367,10 +4371,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           view.fields |> Map.values() |> Enum.reject(& &1.hidden) |> Enum.map(& &1.name)
       end
 
-    row =
-      [:id | field_names]
-      |> Enum.uniq()
-      |> Map.new(fn name -> {to_string(name), field_value(view, record, name)} end)
+    row = field_values(view, record, [:id | field_names])
 
     row
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
@@ -4380,18 +4381,40 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))
   end
 
+  # The row's fields, plus the values of rewritten choices at `_values`
+  # (absent when there are none).
+  defp field_values(view, record, names) do
+    {row, choice_values} =
+      names
+      |> Enum.uniq()
+      |> Enum.reduce({%{}, %{}}, fn name, {row, choice_values} ->
+        key = to_string(name)
+
+        case field_value(view, record, name) do
+          {:choice, value, label} ->
+            {Map.put(row, key, label), Map.put(choice_values, key, value)}
+
+          {:value, value} ->
+            {Map.put(row, key, value), choice_values}
+        end
+      end)
+
+    if choice_values == %{}, do: row, else: Map.put(row, "_values", choice_values)
+  end
+
   # `source` columns read through the loaded relationship path (nil-safe: a
   # nil or unloaded relationship serializes to ""); plain fields read the
-  # record key directly.
+  # record key directly. A declared choice comes back as both its value and
+  # its label (`{:choice, value, label}`), anything else as `{:value, value}`.
   defp field_value(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->
-        record |> walk_source(source) |> source_safe()
+        {:value, record |> walk_source(source) |> source_safe()}
 
       field ->
         case AshA2ui.Links.virtual_value(field, record) do
           {:ok, value} ->
-            value
+            {:value, value}
 
           :not_virtual ->
             # The record's own resource: a related table's rows are not the surface's.
@@ -4410,14 +4433,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # them; humanized underscores otherwise. Only values the field actually
   # declares are rewritten, so anything unrecognised passes through untouched
   # rather than being mangled by a guess.
+  #
+  # The cell shows the label, so a client that keys its own words by value (a
+  # translated label, a status detail line) gets the value too: rows carry it
+  # at the reserved `_values/<field>` key, for rewritten fields only.
   defp humanize_choice(value, resource, name) when is_binary(value) do
     case choice_labels(resource, name) do
-      %{^value => label} -> label
-      _ -> value
+      %{^value => label} -> {:choice, value, label}
+      _ -> {:value, value}
     end
   end
 
-  defp humanize_choice(value, _resource, _name), do: value
+  defp humanize_choice(value, _resource, _name), do: {:value, value}
 
   defp choice_labels(resource, name) do
     resource
