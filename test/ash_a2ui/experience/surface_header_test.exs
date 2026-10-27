@@ -12,6 +12,7 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
   use ExUnit.Case, async: false
 
   alias AshA2ui.Test.Experience.EstateUser
+  alias AshA2ui.Test.SchemaHelper
 
   setup do
     on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
@@ -43,7 +44,7 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
       [_create, message, _data] =
         AshA2ui.Info.build_surface(EstateUser, actor: nil, header: false)
 
-      AshA2ui.Test.SchemaHelper.assert_valid_server_message(message)
+      SchemaHelper.assert_valid_server_message(message)
     end
 
     test "header: false changes nothing else" do
