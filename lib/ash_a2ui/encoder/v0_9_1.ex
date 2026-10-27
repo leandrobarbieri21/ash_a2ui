@@ -28,8 +28,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       (`query_preset_picker`, bound to `/query/preset`, only when the query
       declares presets — options are the preset names, preceded by an
       `"All"`/`""` option unless a `default_preset` is declared), one
-      `ChoicePicker` per declared filter (`query_filter_<name>`, bound to
-      `/query/filters/<name>`, with an `"All"` option first) and a
+      `ChoicePicker` per declared filter not in `hidden_filters`
+      (`query_filter_<name>`, bound to `/query/filters/<name>`, with an
+      `"All"` option first) and a
       `query_apply_button` (event `query`, context
       `{"query": {"path": "/query"}, "page": 1}` — the page-1 reset)
     * `create_button` — only when the view declares a create action and
@@ -1712,7 +1713,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp lane_controls?(%{query: nil}), do: false
 
   defp lane_controls?(%{query: query}) do
-    query.search_fields != [] or preset_picker?(query) or query.filters != [] or
+    query.search_fields != [] or preset_picker?(query) or filter_pickers(query) != [] or
       query.range_filters != []
   end
 
@@ -2090,7 +2091,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     query = table.query
     search = (query.search_fields != [] && [search_input(table, sfx)]) || []
     presets = (preset_picker?(query) && [preset_picker(query, table, sfx)]) || []
-    filters = Enum.map(query.filters, &filter_picker(view.resource, table, &1, sfx))
+    filters = Enum.map(filter_pickers(query), &filter_picker(view.resource, table, &1, sfx))
     ranges = Enum.flat_map(query.range_filters, &range_inputs(table, &1, sfx))
 
     # Query controls render as a Card (`query<sfx>_controls`, the id root
@@ -2154,6 +2155,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "options" => options
     }
   end
+
+  # Every filter gets a picker unless the page sets it itself
+  # (`hidden_filters`); the filter applies either way.
+  defp filter_pickers(query), do: query.filters -- query.hidden_filters
 
   defp filter_picker(resource, table, field, sfx) do
     %{

@@ -349,6 +349,7 @@ defmodule AshA2ui.Dynamic.Importer do
         |> put_list("search_fields", query.search_fields)
         |> put_list("sortable", query.sortable)
         |> put_list("filters", query.filters)
+        |> put_list("hidden_filters", query.hidden_filters)
         |> put_list("range_filters", query.range_filters)
         |> put_default_sort(query.default_sort)
         |> put_opt("default_preset", query.default_preset)
