@@ -64,10 +64,9 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
 
         with :ok <- verify_unique_names(queries, module),
              :ok <-
-               verify_queries(queries, query_targets(dsl_state, target), source_fields, module) do
-          with :ok <- verify_references(dsl_state, queries, module) do
-            verify_column_sorts(dsl_state, queries, module)
-          end
+               verify_queries(queries, query_targets(dsl_state, target), source_fields, module),
+             :ok <- verify_references(dsl_state, queries, module) do
+          verify_column_sorts(dsl_state, queries, module)
         end
     end
   end
@@ -627,11 +626,11 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
   defp verify_filter_texts(query, module) do
     [filter_labels: query.filter_labels, filter_hints: query.filter_hints]
     |> Enum.find_value(:ok, fn {option, entries} ->
-      case Enum.reject(entries, fn {_name, text} -> is_binary(text) end) do
-        [] ->
+      case Enum.find(entries, &(not is_binary(elem(&1, 1)))) do
+        nil ->
           nil
 
-        [{name, text} | _] ->
+        {name, text} ->
           {:error,
            DslError.exception(
              module: module,

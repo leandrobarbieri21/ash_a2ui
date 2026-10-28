@@ -358,7 +358,9 @@ defmodule AshA2ui.Experience do
     # keeps the pager whenever there are rows: its size select must stay
     # reachable after a larger size fits everything on one page.
     sizable? = Map.has_key?(query_state, "appliedPageSize")
-    has_rows? = (is_integer(total) and total > 0) or (is_integer(record_count) and record_count > 0)
+
+    has_rows? =
+      (is_integer(total) and total > 0) or (is_integer(record_count) and record_count > 0)
 
     %{
       visible?: page > 1 or has_more or (sizable? and has_rows?),

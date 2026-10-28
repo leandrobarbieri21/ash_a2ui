@@ -6,6 +6,10 @@ defmodule AshA2ui.Component do
   outside an integration commit.
   """
 
+  # One key per option and entity of the `component` DSL entity (Spark sets
+  # each by name), so the struct is as wide as the DSL. Narrowing it means
+  # moving an option out of the public DSL.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct [
     :name,
     :as,

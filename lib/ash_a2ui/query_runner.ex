@@ -101,8 +101,10 @@ defmodule AshA2ui.QueryRunner do
 
   require Ash.Query
 
+  alias Ash.Query.Aggregate
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshA2ui.ResolvedView
+  alias AshA2ui.Verifiers.VerifyQueries
 
   @typedoc """
   Validated query parameters, safe to execute. Each `ranges` entry is a
@@ -321,7 +323,8 @@ defmodule AshA2ui.QueryRunner do
           _error -> ""
         end
 
-      put_in(state, ["emptyState"], %{empty | "message" => String.replace(message, "{total}", total)})
+      empty = %{empty | "message" => String.replace(message, "{total}", total)}
+      %{state | "emptyState" => empty}
     else
       state
     end
@@ -536,24 +539,28 @@ defmodule AshA2ui.QueryRunner do
     end
   end
 
+  # `Ash.Query.aggregate/5` is specced for one relationship, so a path's
+  # aggregate is built the way it builds one (over the related resource's
+  # primary read) and loaded.
   defp distinct_values(base, path) do
     {relationships, [attribute]} = Enum.split(path, -1)
+    base = Ash.Query.new(base)
+    related = ResourceInfo.related(base.resource, relationships)
+    related_read = ResourceInfo.primary_action!(related, :read).name
 
-    base
-    |> Ash.Query.select([])
-    |> Ash.Query.aggregate(:a2ui_path_values, :list, relationships,
-      field: attribute,
-      uniq?: true
-    )
-    |> Ash.read()
-    |> case do
-      {:ok, records} ->
-        records
-        |> Enum.flat_map(&(&1.aggregates[:a2ui_path_values] || []))
-        |> sorted_values()
-
-      {:error, _error} ->
-        []
+    with {:ok, aggregate} <-
+           Aggregate.new(base.resource, :a2ui_path_values, :list,
+             path: relationships,
+             field: attribute,
+             uniq?: true,
+             query: Ash.Query.for_read(related, related_read)
+           ),
+         {:ok, records} <- base |> Ash.Query.select([]) |> Ash.Query.load(aggregate) |> Ash.read() do
+      records
+      |> Enum.flat_map(&(&1.aggregates[:a2ui_path_values] || []))
+      |> sorted_values()
+    else
+      {:error, _error} -> []
     end
   end
 
@@ -939,7 +946,7 @@ defmodule AshA2ui.QueryRunner do
         {type, constraints}
 
       nil ->
-        {AshA2ui.Verifiers.VerifyQueries.computed_type(resource, field) || Ash.Type.String, []}
+        {VerifyQueries.computed_type(resource, field) || Ash.Type.String, []}
     end
   end
 

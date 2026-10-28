@@ -2496,26 +2496,36 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             {[option | acc], seen}
 
           group ->
-            if MapSet.member?(seen, group) do
-              {acc, seen}
-            else
-              leaves =
-                groups
-                |> Keyword.fetch!(group)
-                |> Enum.map(&Map.put(by_value[to_string(&1)], "parent", to_string(group)))
-
-              group_option = %{
-                "label" => group_label(resource, query, field, group),
-                "value" => to_string(group),
-                "group" => true
-              }
-
-              {Enum.reverse(leaves) ++ [group_option | acc], MapSet.put(seen, group)}
-            end
+            emit_group({acc, seen}, group, {resource, query, field, groups, by_value})
         end
       end)
 
     Enum.reverse(emitted)
+  end
+
+  # A group is emitted once, at its first leaf: its option and its leaves
+  # (each carrying `"parent"`), reversed for `group_options/5`'s accumulator.
+  defp emit_group({acc, seen}, group, ctx) do
+    if MapSet.member?(seen, group) do
+      {acc, seen}
+    else
+      {group_with_leaves(ctx, group) ++ acc, MapSet.put(seen, group)}
+    end
+  end
+
+  defp group_with_leaves({resource, query, field, groups, by_value}, group) do
+    leaves =
+      groups
+      |> Keyword.fetch!(group)
+      |> Enum.map(&Map.put(by_value[to_string(&1)], "parent", to_string(group)))
+
+    group_option = %{
+      "label" => group_label(resource, query, field, group),
+      "value" => to_string(group),
+      "group" => true
+    }
+
+    Enum.reverse(leaves) ++ [group_option]
   end
 
   defp group_label(resource, query, field, group) do

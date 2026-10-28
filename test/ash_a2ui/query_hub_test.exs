@@ -13,7 +13,7 @@ defmodule AshA2ui.QueryHubTest do
 
   alias AshA2ui.QueryRunner
   alias AshA2ui.ResolvedView
-  alias AshA2ui.Test.{HubContract, HubLine, HubRole, HubUI}
+  alias AshA2ui.Test.{HubContract, HubLine, HubRole, HubUI, SchemaHelper}
 
   setup do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
@@ -256,7 +256,7 @@ defmodule AshA2ui.QueryHubTest do
     test "the basic surface stays valid against the A2UI schema" do
       HubUI
       |> AshA2ui.Info.build_surface(authorize?: false)
-      |> Enum.each(&AshA2ui.Test.SchemaHelper.assert_valid_server_message/1)
+      |> Enum.each(&SchemaHelper.assert_valid_server_message/1)
     end
   end
 

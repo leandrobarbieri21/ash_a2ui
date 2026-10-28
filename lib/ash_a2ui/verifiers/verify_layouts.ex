@@ -288,47 +288,37 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
   defp verify_column_options(component, column, module) do
     path = column_path(component, column.name)
 
-    cond do
-      is_nil(column.icon) and
-          [column.icon_names, column.icon_tones, column.icon_labels] != [[], [], []] ->
-        {:error,
-         error(module, path,
-           message:
-             "column #{inspect(column.name)} declares icon_names, icon_tones or icon_labels " <>
-               "without an icon field"
-         )}
-
-      is_nil(column.detail) and
-          (column.detail_text != [] or not is_nil(column.detail_date) or
-             column.detail_icon_names != [] or column.detail_icon_tones != []) ->
-        {:error,
-         error(module, path,
-           message:
-             "column #{inspect(column.name)} declares detail_text, detail_date or detail icons " <>
-               "without a detail field"
-         )}
-
-      is_nil(column.more) and not is_nil(Map.get(column, :more_values)) ->
-        {:error,
-         error(module, path,
-           message: "column #{inspect(column.name)} declares more_values without a more field"
-         )}
-
-      is_nil(column.detail) and not is_nil(Map.get(column, :detail_help)) ->
-        {:error,
-         error(module, path,
-           message: "column #{inspect(column.name)} declares detail_help without a detail field"
-         )}
-
-      is_nil(Map.get(column, :help)) and not is_nil(Map.get(column, :help_title)) ->
-        {:error,
-         error(module, path,
-           message: "column #{inspect(column.name)} declares help_title without help"
-         )}
-
-      true ->
+    case Enum.find(orphaned_column_options(column), &elem(&1, 0)) do
+      nil ->
         verify_column_mappings(column, path, module)
+
+      {true, declared} ->
+        {:error,
+         error(module, path, message: "column #{inspect(column.name)} declares #{declared}")}
     end
+  end
+
+  # Options that only mean something alongside another option, each as
+  # `{orphaned?, what the column declares}`; the first orphan is the error.
+  defp orphaned_column_options(column) do
+    [
+      {is_nil(column.icon) and
+         [column.icon_names, column.icon_tones, column.icon_labels] != [[], [], []],
+       "icon_names, icon_tones or icon_labels without an icon field"},
+      {is_nil(column.detail) and detail_options?(column),
+       "detail_text, detail_date or detail icons without a detail field"},
+      {is_nil(column.more) and not is_nil(Map.get(column, :more_values)),
+       "more_values without a more field"},
+      {is_nil(column.detail) and not is_nil(Map.get(column, :detail_help)),
+       "detail_help without a detail field"},
+      {is_nil(Map.get(column, :help)) and not is_nil(Map.get(column, :help_title)),
+       "help_title without help"}
+    ]
+  end
+
+  defp detail_options?(column) do
+    column.detail_text != [] or not is_nil(column.detail_date) or
+      column.detail_icon_names != [] or column.detail_icon_tones != []
   end
 
   defp verify_column_mappings(column, path, module) do

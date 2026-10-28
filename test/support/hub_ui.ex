@@ -15,37 +15,33 @@ defmodule AshA2ui.Test.HubUI do
 
     query :default do
       search_fields [:name, :vendor_name]
-      search_placeholder("Search contracts or vendors")
+      search_placeholder "Search contracts or vendors"
       sortable [:name, :status]
       filters [:status, :verified]
-      path_filters(property: [:lines, :property], vendor: :vendor_name)
-      multi_select_filters([:status, :property, :vendor])
-      filter_groups(status: [expiring: [:expiring_soon, :renewal_scheduled]])
-      group_labels(status: [expiring: "Expiring soon"])
-      filter_labels(property: "Property")
-      filter_hints(status: "Statuses update nightly.")
-      facet_counts(true)
-      controls_card(false)
+      path_filters property: [:lines, :property], vendor: :vendor_name
+      multi_select_filters [:status, :property, :vendor]
+      filter_groups status: [expiring: [:expiring_soon, :renewal_scheduled]]
+      group_labels status: [expiring: "Expiring soon"]
+      filter_labels property: "Property"
+      filter_hints status: "Statuses update nightly."
+      facet_counts true
+      controls_card false
       apply_on_change true
       page_size 2
-      page_size_options([2, 10])
+      page_size_options [2, 10]
       max_page_size 10
       default_sort name: :asc
       default_preset :all
       preset_picker false
 
-      empty_state(
-        title: "No contracts yet",
-        message: "Contracts you add show here.",
-        icon: :inbox
-      )
+      empty_state title: "No contracts yet",
+                  message: "Contracts you add show here.",
+                  icon: :inbox
 
-      no_results_state(
-        title: "No results",
-        message: "Try other words or filters.",
-        icon: :search,
-        clear_action: "Clear search and filters"
-      )
+      no_results_state title: "No results",
+                       message: "Try other words or filters.",
+                       icon: :search,
+                       clear_action: "Clear search and filters"
 
       preset :all do
         read_action :active
@@ -53,7 +49,7 @@ defmodule AshA2ui.Test.HubUI do
 
       preset :archived do
         read_action :archived
-        empty_state(title: "No archived contracts", icon: :archive)
+        empty_state title: "No archived contracts", icon: :archive
       end
     end
 
@@ -76,7 +72,7 @@ defmodule AshA2ui.Test.HubUI do
 
       read_action :active
       query :default
-      column_order(:fields)
+      column_order :fields
 
       row_layout do
         title :name
@@ -89,27 +85,27 @@ defmodule AshA2ui.Test.HubUI do
 
       primary_action do
         label "Open"
-        width(96)
+        width 96
       end
 
       column :name do
         subtitle :vendor_name
-        width(320)
+        width 320
       end
 
       column :property_name do
         more :line_count
-        more_values(:property_names)
-        more_noun("properties")
-        help_title("Property")
-        help("Where the work happens.\n\n**Portfolio** — every property of the PMC.")
+        more_values :property_names
+        more_noun "properties"
+        help_title "Property"
+        help "Where the work happens.\n\n**Portfolio** — every property of the PMC."
       end
 
       column :status_text do
-        sort_by(:status)
+        sort_by :status
         detail :status
         detail_text expiring_soon: "Ends soon", renewal_scheduled: "Renews soon"
-        detail_help(:status_help)
+        detail_help :status_help
       end
     end
 
