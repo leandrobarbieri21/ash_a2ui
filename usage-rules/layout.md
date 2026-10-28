@@ -99,7 +99,9 @@ contracts.
   every refresh alike).
 - Give the badge a semantic tone with `badge_tones` (matched like
   `badge_text`, e.g. `badge_tones true: :success, false: :neutral`). Tones
-  are `:neutral`, `:info`, `:success`, `:warning`, `:danger` and `:accent`;
+  are `:neutral`, `:info`, `:success`, `:warning`, `:danger`, `:accent`,
+  `:pending` (gold: waiting on someone) and `:gray` (inactive, distinct from
+  `:neutral`);
   unmatched values are `:neutral`. Rows carry the tone at
   `_badge_tone_<field>` and the admin dataGrid's badge column binds it as
   `tonePath`. Use tones for meaning (state), not decoration.
@@ -150,6 +152,26 @@ contracts.
 - Only the admin data grid draws these hints (catalog 1.8); a renderer that
   ignores them draws the plain value, and the basic composition keeps
   showing the folded fields as cells.
+- Catalog 1.10 adds, all optional and admin-only:
+  - `help_title` + `help` — header help behind an info mark; paragraphs
+    split on blank lines, a line `**Term** — text` is a definition. The
+    column carries `"help": {"title", "body"}`.
+  - `detail_help :field` — a field explaining the detail line, drawn as an
+    info mark with a tooltip; rows carry it at `_detail_help_<column>` and
+    the column's `detail` at `helpPath`. Needs `detail`.
+  - `sort_by :field` — the header sorts by another field (a module
+    calculation shown, a stored copy sorted). It must be in the query's
+    `sortable`; the column carries `"sortField"`.
+  - `width 320` — a fixed width in px (`"width"`); `primary_action` takes
+    `width` too (`rowClick.width`).
+  - `more_values :field` (a `list` aggregate) and `more_noun "properties"`
+    — every value behind "+N more", as strings at `_more_values_<column>`
+    (`more.valuesPath`), and the noun for their caption (`"moreNoun"`).
+    Needs `more`.
+- `column_order :fields` on a table with a `row_layout` orders the admin
+  grid's columns as the component's `fields` (default `:layout`: title,
+  badge, meta). The badge column keeps its `badge_text`/`badge_tones`
+  wherever it lands.
 
 ## Primary action (admin dataGrid)
 

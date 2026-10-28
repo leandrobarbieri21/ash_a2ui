@@ -830,7 +830,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_grid_sort(view, table)
       |> drop_inline_duplicate(view, table)
 
-    [data_grid, admin_empty_state(sfx) | admin_pagination_components(view, table, sfx)] ++
+    [
+      data_grid,
+      admin_empty_state(view, table, sfx) | admin_pagination_components(view, table, sfx)
+    ] ++
       prompt_components
   end
 
@@ -877,12 +880,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
-  defp put_primary_action(entry, %{component: %{primary_action: %AshA2ui.PrimaryAction{}}}) do
-    Map.merge(entry, %{
+  defp put_primary_action(entry, %{
+         component: %{primary_action: %AshA2ui.PrimaryAction{} = action}
+       }) do
+    entry
+    |> Map.merge(%{
       "labelPath" => "_primary_label",
       "variantPath" => "_primary_variant",
       "inline" => true
     })
+    |> maybe_put("width", Map.get(action, :width))
   end
 
   defp put_primary_action(entry, _table), do: entry
@@ -923,11 +930,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # template.
   defp admin_columns(view, table) do
     fields =
-      case table.component.row_layout do
-        nil ->
+      case {table.component.row_layout, Map.get(table.component, :column_order, :layout)} do
+        {nil, _order} ->
           table.component.fields
 
-        layout ->
+        {_layout, :fields} ->
+          # The primary action's label source rides in the row for the
+          # button; it is not a column of its own.
+          table.component.fields -- primary_action_sources(table.component)
+
+        {layout, _order} ->
           [layout.title, layout.badge]
           |> Enum.reject(&is_nil/1)
           |> Kernel.++(layout.meta)
@@ -943,19 +955,33 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
       |> put_link_binding(view, field, "_links/#{field}")
-      |> put_column_sortable(table, field)
+      |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field])
     end)
   end
 
+  defp primary_action_sources(%{primary_action: %{label_from: field}}) when not is_nil(field),
+    do: [field]
+
+  defp primary_action_sources(_component), do: []
+
   # A column the table's query lets sort (`sortable`) says so; the grid's
   # `sort` binding (put_grid_sort/3) carries the current sort and the
   # envelope a header click sends.
-  defp put_column_sortable(column, %{query: %{sortable: sortable}}, field) do
-    if field in sortable, do: Map.put(column, "sortable", true), else: column
+  defp put_column_sortable(column, %{query: %{sortable: sortable}}, field, cells) do
+    case cells && Map.get(cells, :sort_by) do
+      nil ->
+        if field in sortable, do: Map.put(column, "sortable", true), else: column
+
+      sort_by ->
+        # A column sorted by another field (`sort_by`) says which.
+        if sort_by in sortable,
+          do: Map.merge(column, %{"sortable" => true, "sortField" => to_string(sort_by)}),
+          else: column
+    end
   end
 
-  defp put_column_sortable(column, _table, _field), do: column
+  defp put_column_sortable(column, _table, _field, _cells), do: column
 
   # Sortable headers (1.7): the current sort (`/query/sort`, `{field, dir}`
   # or nil) and the `query` envelope a header click dispatches — the Apply
@@ -989,8 +1015,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     column
     |> maybe_put("subtitle", cells.subtitle && %{"path" => to_string(cells.subtitle)})
     |> maybe_put("icon", cells.icon && icon_binding(name, cells))
-    |> maybe_put("more", cells.more && %{"path" => to_string(cells.more)})
+    |> maybe_put("more", cells.more && more_binding(name, cells))
     |> maybe_put("detail", cells.detail && detail_binding(name, cells))
+    |> maybe_put("help", AshA2ui.Column.help(cells))
+    |> maybe_put("width", Map.get(cells, :width))
+    |> maybe_put("moreNoun", Map.get(cells, :more_noun))
+  end
+
+  defp more_binding(name, cells) do
+    %{"path" => to_string(cells.more)}
+    |> maybe_put("valuesPath", if(Map.get(cells, :more_values), do: "_more_values_#{name}"))
   end
 
   defp icon_binding(name, cells) do
@@ -1005,6 +1039,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> maybe_put("datePath", cells.detail_date && to_string(cells.detail_date))
     |> maybe_put("iconPath", if(icons?, do: "_detail_icon_#{name}"))
     |> maybe_put("iconTonePath", if(icons?, do: "_detail_icon_tone_#{name}"))
+    |> maybe_put("helpPath", if(Map.get(cells, :detail_help), do: "_detail_help_#{name}"))
   end
 
   # Per-type presentation hints (additive; renderers that read only
@@ -1181,14 +1216,58 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
-  defp admin_empty_state(sfx) do
+  defp admin_empty_state(view, table, sfx) do
     %{
       "id" => "empty_state#{sfx}",
       "component" => "emptyState",
       "message" => %{"path" => "_empty_message#{sfx}"},
       "children" => []
     }
+    |> put_declared_empty_state(view, table)
   end
+
+  # A query declaring `empty_state` (1.10): title, message and icon bind the
+  # `/query` state's `emptyState` (the runner picks no-results, preset or
+  # plain), and with a `no_results_state` `clear_action` the component
+  # carries the clear action (`{label, action}`, the query envelope at page
+  # 1), shown while `clearVisible`.
+  defp put_declared_empty_state(component, view, %{query: %{empty_state: [_ | _]}} = table) do
+    base = "#{table.query_path}/emptyState"
+    query = table.query
+
+    component
+    |> Map.merge(%{
+      "title" => %{"path" => "#{base}/title"},
+      "message" => %{"path" => "#{base}/message"},
+      "icon" => %{"path" => "#{base}/icon"}
+    })
+    |> maybe_put(
+      "clearAction",
+      case query.no_results_state && Keyword.get(query.no_results_state, :clear_action) do
+        label when is_binary(label) ->
+          %{
+            "label" => label,
+            "action" => %{
+              "name" => "query",
+              "context" =>
+                %{"query" => %{"path" => table.query_path}, "page" => 1}
+                |> Map.put("component", to_string(table.name))
+                |> put_contexts_binding(view)
+            }
+          }
+
+        _none ->
+          nil
+      end
+    )
+    |> then(fn component ->
+      if Map.has_key?(component, "clearAction"),
+        do: Map.put(component, "clearVisible", %{"path" => "#{base}/clear"}),
+        else: component
+    end)
+  end
+
+  defp put_declared_empty_state(component, _view, _table), do: component
 
   # The pagination component binds PLAIN values — the query state's
   # boolean keys (no zero-or-one sentinel lists). prev/next dispatch the
@@ -1214,7 +1293,27 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "previousAction" => admin_page_action(table, -1, view),
         "nextAction" => admin_page_action(table, 1, view)
       }
+      |> put_page_size_options(table, view)
     ]
+  end
+
+  # `page_size_options`: the sizes the reader may pick and the envelope the
+  # renderer sends after writing the picked size to `pageSize` (the Apply
+  # envelope: page 1).
+  defp put_page_size_options(pagination, %{query: %{page_size_options: []}}, _view),
+    do: pagination
+
+  defp put_page_size_options(pagination, table, view) do
+    Map.merge(pagination, %{
+      "pageSizeOptions" => table.query.page_size_options |> Enum.uniq() |> Enum.sort(),
+      "pageSizeAction" => %{
+        "name" => "query",
+        "context" =>
+          %{"query" => %{"path" => table.query_path}, "page" => 1}
+          |> Map.put("component", to_string(table.name))
+          |> put_contexts_binding(view)
+      }
+    })
   end
 
   defp admin_page_action(table, page_delta, view) do
@@ -2214,12 +2313,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     query = table.query
     search = (query.search_fields != [] && [search_input(table, sfx)]) || []
     presets = (preset_picker?(query) && [preset_picker(query, table, sfx)]) || []
-    filters = Enum.map(filter_pickers(query), &filter_picker(view.resource, table, &1, sfx))
+    filters = Enum.flat_map(filter_pickers(query), &filter_picker(view, table, &1, sfx))
     ranges = Enum.flat_map(query.range_filters, &range_inputs(table, &1, sfx))
 
     # Query controls render as a Card (`query<sfx>_controls`, the id root
     # children reference) over a `_body` Row — section chrome on every
     # renderer, same shape as form groups and the context/detail sections.
+    # `controls_card false` emits the Row itself under the Card's id.
     card = %{
       "id" => "query#{sfx}_controls",
       "component" => "Card",
@@ -2229,7 +2329,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     # `align: "end"` bottom-aligns the controls, so inputs with a label above
     # them and the Apply button without one sit on one baseline.
     controls = %{
-      "id" => "query#{sfx}_controls_body",
+      "id" =>
+        if(query.controls_card == false,
+          do: "query#{sfx}_controls",
+          else: "query#{sfx}_controls_body"
+        ),
       "component" => "Row",
       "align" => "end",
       "children" =>
@@ -2237,10 +2341,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           ["query#{sfx}_apply_button"]
     }
 
-    [card, controls | search ++ presets ++ filters ++ ranges] ++
-      apply_button(view, table, sfx)
+    chrome = if query.controls_card == false, do: [controls], else: [card, controls]
+
+    chrome ++ search ++ presets ++ filters ++ ranges ++ apply_button(view, table, sfx)
   end
 
+  # The search placeholder rides only on the admin catalog's TextField (the
+  # basic TextField takes no placeholder); the label stays, as the input's
+  # accessible name.
   defp search_input(table, sfx) do
     %{
       "id" => "query#{sfx}_search_input",
@@ -2248,6 +2356,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "label" => "Search",
       "value" => %{"path" => "#{table.query_path}/search"}
     }
+    |> maybe_put(
+      "placeholder",
+      if(AshA2ui.Experience.admin?(), do: table.query.search_placeholder)
+    )
   end
 
   # The preset picker sends only the preset NAME over the wire — the
@@ -2281,25 +2393,136 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # Every filter gets a picker unless the page sets it itself
   # (`hidden_filters`); the filter applies either way.
-  defp filter_pickers(query), do: query.filters -- query.hidden_filters
+  defp filter_pickers(query), do: AshA2ui.Query.filter_names(query) -- query.hidden_filters
 
-  defp filter_picker(resource, table, field, sfx) do
-    %{
-      "id" => "query#{sfx}_filter_#{field}",
-      "component" => "ChoicePicker",
-      "label" => humanize(field),
-      "variant" => "mutuallyExclusive",
-      "value" => %{"path" => "#{table.query_path}/filters/#{field}"},
-      "options" => [%{"label" => "All", "value" => ""} | filter_options(resource, field)]
-    }
+  # A filter's ChoicePicker. Multi-select filters (`multi_select_filters`)
+  # take `multipleSelection` and no "All" option. The admin catalog's
+  # picker also carries what the basic one cannot: the hint, the facet
+  # counts binding, grouped options, and a path filter's options bound from
+  # the query state (`dynamicOptions`). Under the basic catalog groups
+  # flatten to their leaves and path filters get no picker.
+  defp filter_picker(view, table, name, sfx) do
+    query = table.query
+    admin? = AshA2ui.Experience.admin?()
+    path? = AshA2ui.Query.path_filter?(query, name)
+    multi? = AshA2ui.Query.multi_select?(query, name)
+
+    if path? and not admin? do
+      []
+    else
+      all = if multi?, do: [], else: [%{"label" => "All", "value" => ""}]
+      options = if path?, do: [], else: filter_options(view.resource, query, name, admin?)
+
+      [
+        %{
+          "id" => "query#{sfx}_filter_#{name}",
+          "component" => "ChoicePicker",
+          "label" => filter_label(view, query, name),
+          "variant" => if(multi?, do: "multipleSelection", else: "mutuallyExclusive"),
+          "value" => %{"path" => "#{table.query_path}/filters/#{name}"},
+          "options" => all ++ options
+        }
+        |> put_admin_filter_hints(admin?, table, name)
+      ]
+    end
   end
 
-  defp filter_options(resource, field) do
-    if attribute_type(resource, field) == Ash.Type.Boolean do
-      [%{"label" => "True", "value" => "true"}, %{"label" => "False", "value" => "false"}]
-    else
-      choice_options(resource, field)
+  defp put_admin_filter_hints(picker, false, _table, _name), do: picker
+
+  defp put_admin_filter_hints(picker, true, table, name) do
+    query = table.query
+
+    picker
+    |> maybe_put("hint", Keyword.get(query.filter_hints, name))
+    |> maybe_put(
+      "counts",
+      if(name in AshA2ui.Query.faceted_filters(query),
+        do: %{"path" => "#{table.query_path}/facets/#{name}"}
+      )
+    )
+    |> maybe_put(
+      "dynamicOptions",
+      if(AshA2ui.Query.path_filter?(query, name),
+        do: %{"path" => "#{table.query_path}/options/#{name}"}
+      )
+    )
+  end
+
+  # `filter_labels`, else the field's declared label, else the humanized
+  # name (the field label defaults to the same humanized name).
+  defp filter_label(view, query, name) do
+    Keyword.get(query.filter_labels, name) ||
+      case view.fields[name] do
+        %{label: label} when is_binary(label) -> label
+        _none -> humanize(name)
+      end
+  end
+
+  defp filter_options(resource, query, field, admin?) do
+    options =
+      if attribute_type(resource, field) == Ash.Type.Boolean do
+        [%{"label" => "True", "value" => "true"}, %{"label" => "False", "value" => "false"}]
+      else
+        choice_options(resource, field)
+      end
+
+    case {Keyword.get(query.filter_groups, field), admin?} do
+      {groups, true} when is_list(groups) and groups != [] ->
+        group_options(resource, query, field, groups, options)
+
+      _ungrouped ->
+        options
     end
+  end
+
+  # Grouped options: each group (`{"label", "value", "group": true}`) is
+  # placed where its first leaf would be, followed by its leaves in the
+  # group's order, each carrying `"parent"`. Ungrouped options keep their
+  # place.
+  defp group_options(resource, query, field, groups, options) do
+    by_value = Map.new(options, &{&1["value"], &1})
+
+    parent_of =
+      for {group, leaves} <- groups, leaf <- leaves, into: %{} do
+        {to_string(leaf), group}
+      end
+
+    {emitted, _seen} =
+      Enum.reduce(options, {[], MapSet.new()}, fn option, {acc, seen} ->
+        value = option["value"]
+
+        case Map.get(parent_of, value) do
+          nil ->
+            {[option | acc], seen}
+
+          group ->
+            if MapSet.member?(seen, group) do
+              {acc, seen}
+            else
+              leaves =
+                groups
+                |> Keyword.fetch!(group)
+                |> Enum.map(&Map.put(by_value[to_string(&1)], "parent", to_string(group)))
+
+              group_option = %{
+                "label" => group_label(resource, query, field, group),
+                "value" => to_string(group),
+                "group" => true
+              }
+
+              {Enum.reverse(leaves) ++ [group_option | acc], MapSet.put(seen, group)}
+            end
+        end
+      end)
+
+    Enum.reverse(emitted)
+  end
+
+  defp group_label(resource, query, field, group) do
+    query.group_labels
+    |> Keyword.get(field, [])
+    |> Keyword.get(group) ||
+      Map.get(choice_labels(resource, field), to_string(group)) || humanize(group)
   end
 
   # Each range_filters field emits a from/to TextField pair bound to the

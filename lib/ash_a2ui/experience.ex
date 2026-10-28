@@ -107,10 +107,12 @@ defmodule AshA2ui.Experience do
   (format/align/mono/badge/link), `rowClick`, FieldDisplay `link` and the
   `openSurface` client function; 1.2 added the `rowActions` entries'
   `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs);
-  1.7 added sortable headers (column `sortable`, the dataGrid's `sort`).
+  1.7 added sortable headers (column `sortable`, the dataGrid's `sort`);
+  1.10 added column `help` and `sortField`, the detail line's `helpPath`,
+  pagination page sizes and the extended ChoicePicker/TextField keys.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.9.0"
+  def admin_catalog_version, do: "1.10.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item
@@ -352,8 +354,14 @@ defmodule AshA2ui.Experience do
     first = (page - 1) * page_size + 1
     last = last_entry(first, page * page_size, total, has_more, record_count)
 
+    # A query with page_size_options (its state carries `appliedPageSize`)
+    # keeps the pager whenever there are rows: its size select must stay
+    # reachable after a larger size fits everything on one page.
+    sizable? = Map.has_key?(query_state, "appliedPageSize")
+    has_rows? = (is_integer(total) and total > 0) or (is_integer(record_count) and record_count > 0)
+
     %{
-      visible?: page > 1 or has_more,
+      visible?: page > 1 or has_more or (sizable? and has_rows?),
       previous?: page > 1,
       next?: has_more,
       range_text: range_text(first, last, total)

@@ -56,7 +56,7 @@ defmodule AshA2ui.RowLayout do
     }
   end
 
-  @tones ~w(neutral info success warning danger accent)a
+  @tones ~w(neutral info success warning danger accent pending gray)a
 
   @doc "The badge tone vocabulary `badge_tones` values are drawn from."
   @spec tones() :: [atom]

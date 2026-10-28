@@ -10,6 +10,61 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **`filter_order` on a query.** The filter pickers follow the listed
+  names (entries of `filters` or `path_filters`); unlisted filters keep
+  their declared order after them. Unset, `filters` come first, then the
+  `path_filters`, as before.
+- **The pager stays with `page_size_options`.** A query that offers page
+  sizes keeps its pagination whenever there are rows, even on a single
+  page, so the size select stays reachable.
+- **`hide_controls true` on a preset.** The `/query` state carries
+  `"controlsHidden"` while that preset is selected, so a renderer can hide
+  the search and filter pickers (an Archived tab that only lists).
+- **`{total}` in an empty-state message.** It is replaced by the read's
+  count before search and filters, counted only when the message uses it.
+- **A hub page's filter bar and table header (admin catalog 1.10).** All
+  opt-in; queries and tables that declare none of it emit byte-identical
+  output. On a `query`:
+  - `multi_select_filters` — `multipleSelection` pickers with no "All";
+    the filter state is a list (`[]` = inactive).
+  - `filter_groups` (+ `group_labels`) — nested options: a group option
+    (`"group": true`) before its leaves (`"parent"`); only leaf values are
+    ever filter values.
+  - `facet_counts` — `/query/facets/<filter>/<value>` counts on every run,
+    each with search, ranges, preset, scope and every other filter (not its
+    own) under the actor's policies; one aggregate call per filter. Pickers
+    bind them as `"counts"`.
+  - `filter_hints` (`"hint"`) and `filter_labels`; a filter picker without
+    one now takes the field's declared `label` (unchanged where none is
+    declared).
+  - `path_filters` — filters over a relationship path (any related value)
+    or one attribute/aggregate/calculation, options read for the actor into
+    `/query/options/<name>` and bound as `"dynamicOptions"`.
+  - `search_placeholder` (`"placeholder"`), `controls_card false` (the
+    controls Row without the Card, same id) and `page_size_options`
+    (pagination `pageSizeOptions` + `pageSizeAction`; a size change starts
+    at page 1, also when sent with `pageDelta: 0`).
+  - `empty_state`, `no_results_state` (`clear_action`) and a preset's
+    `empty_state` — the emptyState binds `title`/`message`/`icon` to
+    `/query/emptyState`, with `clearAction` and `clearVisible`.
+  - `search_fields` may name a string aggregate or expression calculation.
+  On a `column`: `help_title`/`help` (`"help"`), `detail_help`
+  (`_detail_help_<column>`, `detail.helpPath`), `sort_by` (`"sortField"`),
+  `width`, `more_values` (`_more_values_<column>`, `more.valuesPath`) and
+  `more_noun`; `primary_action` takes `width`. A table takes
+  `column_order :fields`. Badge and icon tones gain `:pending` and `:gray`.
+  Under the basic catalog groups flatten to leaves and the non-spec keys
+  (hint, counts, placeholder, path-filter pickers) are left out. Dynamic
+  specs do not carry these options yet.
+- **Admin catalog 1.10.** The stock elements draw the new wire: grouped
+  multi-select pickers with counts and a hint, path-filter options, the
+  search placeholder, a rows-per-page select, the new tones, column help, a
+  detail line's help mark, fixed widths, the more-values list, declared
+  empty states with their clear action, and headers sorted by `sortField`.
+  ChoicePicker and TextField validate against extended schemas (the basic
+  ones are strict). An empty status banner now takes no layout space, so
+  the page body's gap no longer opens above the controls.
+
 - **`column` entities on tables.** A table can say how the admin data grid
   draws a field's cell: a second line under the value (`subtitle`), a
   leading icon picked per row (`icon`, `icon_names`, `icon_tones`,

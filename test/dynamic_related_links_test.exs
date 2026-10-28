@@ -305,7 +305,9 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
       spec = spec_with(%{"fields" => ["title", "status"], "row_layout" => layout})
 
       assert [{"components[1].row_layout.badge_tones", message}] = errors(spec)
-      assert message =~ "use one of: accent, danger, info, neutral, success, warning"
+
+      assert message =~
+               "use one of: accent, danger, gray, info, neutral, pending, success, warning"
     end
 
     test "a link's surface key stays a string — no atom is created from it" do

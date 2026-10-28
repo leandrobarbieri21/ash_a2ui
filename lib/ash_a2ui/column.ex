@@ -17,6 +17,13 @@ defmodule AshA2ui.Column do
     :more,
     :detail,
     :detail_date,
+    :detail_help,
+    :help_title,
+    :help,
+    :sort_by,
+    :width,
+    :more_values,
+    :more_noun,
     icon_names: [],
     icon_tones: [],
     icon_labels: [],
@@ -38,7 +45,14 @@ defmodule AshA2ui.Column do
           detail_date: atom | nil,
           detail_text: keyword(String.t()),
           detail_icon_names: keyword(atom),
-          detail_icon_tones: keyword(atom)
+          detail_icon_tones: keyword(atom),
+          detail_help: atom | nil,
+          help_title: String.t() | nil,
+          help: String.t() | nil,
+          sort_by: atom | nil,
+          width: pos_integer | nil,
+          more_values: atom | nil,
+          more_noun: String.t() | nil
         }
 
   @icons ~w(check x user_check user_x alert clock info refresh extend)a
@@ -52,15 +66,35 @@ defmodule AshA2ui.Column do
 
   @doc """
   The fields a column reads from besides its own: its subtitle, icon,
-  count, detail and detail date fields, in that order.
+  count, detail, detail date and detail help fields, in that order.
   """
   @spec source_fields(t()) :: [atom]
   def source_fields(column) do
     Enum.reject(
-      [column.subtitle, column.icon, column.more, column.detail, column.detail_date],
+      [
+        column.subtitle,
+        column.icon,
+        column.more,
+        column.detail,
+        column.detail_date,
+        Map.get(column, :detail_help),
+        Map.get(column, :more_values)
+      ],
       &is_nil/1
     )
   end
+
+  @doc """
+  The wire form of a column's header help (`help_title` + `help`):
+  `%{"title" => title, "body" => body}`, `nil` without `help`. The body is
+  the declared text, trimmed; paragraphs stay separated by blank lines.
+  """
+  @spec help(t()) :: %{String.t() => String.t()} | nil
+  def help(%{help: help} = column) when is_binary(help) do
+    %{"title" => Map.get(column, :help_title) || "", "body" => String.trim(help)}
+  end
+
+  def help(_column), do: nil
 
   @doc """
   The fields of a table's columns that ride in each row without being
@@ -86,7 +120,7 @@ defmodule AshA2ui.Column do
   `serialize_row`) so initial renders and refreshes serialize rows
   identically.
   """
-  @spec row_data([t()], Ash.Resource.record()) :: %{String.t() => String.t()}
+  @spec row_data([t()], Ash.Resource.record()) :: %{String.t() => String.t() | [String.t()]}
   def row_data(columns, record) do
     columns
     |> Enum.flat_map(&column_data(&1, record))
@@ -94,8 +128,22 @@ defmodule AshA2ui.Column do
   end
 
   defp column_data(column, record) do
-    icon_data(column, record) ++ detail_data(column, record)
+    icon_data(column, record) ++ detail_data(column, record) ++ more_values_data(column, record)
   end
+
+  # `more_values`: every value behind the "+N more" tag, as strings.
+  defp more_values_data(%{more_values: field} = column, record) when not is_nil(field) do
+    values =
+      record
+      |> Map.get(field)
+      |> List.wrap()
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&to_string/1)
+
+    [{"_more_values_#{column.name}", values}]
+  end
+
+  defp more_values_data(_column, _record), do: []
 
   defp icon_data(%{icon: nil}, _record), do: []
 
@@ -118,8 +166,23 @@ defmodule AshA2ui.Column do
   defp detail_data(column, record) do
     value = Map.get(record, column.detail)
     text = lookup(column.detail_text, value)
-    [{"_detail_#{column.name}", text || ""} | detail_icon_data(column, value)]
+
+    [{"_detail_#{column.name}", text || ""} | detail_icon_data(column, value)] ++
+      detail_help_data(column, record)
   end
+
+  defp detail_help_data(%{detail_help: field} = column, record) when not is_nil(field) do
+    help =
+      case Map.get(record, field) do
+        nil -> ""
+        value when is_binary(value) -> value
+        value -> to_string(value)
+      end
+
+    [{"_detail_help_#{column.name}", help}]
+  end
+
+  defp detail_help_data(_column, _record), do: []
 
   defp detail_icon_data(%{detail_icon_names: []}, _value), do: []
 

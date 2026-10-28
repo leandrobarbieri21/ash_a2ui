@@ -334,6 +334,15 @@ defmodule AshA2ui do
     ]
   }
 
+  @empty_state_keys [
+    title: [type: :string, doc: "The empty state's heading."],
+    message: [type: :string, doc: "The empty state's body text."],
+    icon: [
+      type: {:in, [:inbox, :search, :archive]},
+      doc: "A generic icon name (`:inbox`, `:search`, `:archive`)."
+    ]
+  ]
+
   @preset %Spark.Dsl.Entity{
     name: :preset,
     describe: """
@@ -396,6 +405,25 @@ defmodule AshA2ui do
         wherever the user had navigated. `0` is today. Ignored on other
         tables.
         """
+      ],
+      empty_state: [
+        type: {:keyword_list, @empty_state_keys},
+        doc: """
+        The empty state shown while this preset is selected and nothing
+        matches, e.g. `empty_state title: "No archived contracts", icon:
+        :archive`. Needs the query's own `empty_state`.
+        """
+      ],
+      hide_controls: [
+        type: :boolean,
+        default: false,
+        doc: """
+        Whether the query's controls (search and filter pickers) are hidden
+        while this preset is selected, e.g. an Archived tab that lists
+        without filtering. The `/query` state carries `"controlsHidden"`
+        (only on queries with such a preset); renderers that honour it hide
+        the controls row.
+        """
       ]
     ]
   }
@@ -438,7 +466,9 @@ defmodule AshA2ui do
         default: [],
         doc: """
         Fields searched with a case-insensitive contains, OR'd together. Each
-        entry is a public string attribute (`:subject`) or a relationship path
+        entry is a public string attribute (`:subject`), a string-typed public
+        aggregate or expression calculation (`:vendor_name`, a `first`
+        aggregate — searched in the data layer), or a relationship path
         to one (`[:author, :email]` — every step but the last a public
         relationship, the last a public string attribute of the destination).
         Empty means search is rejected.
@@ -500,6 +530,159 @@ defmodule AshA2ui do
         `/query` state then carries `autoApply` (`%{"debounceMs" => 300}`);
         a renderer that honours it hides the Apply button and sends its
         envelope on change, and one that doesn't keeps showing Apply.
+        """
+      ],
+      multi_select_filters: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Filters (entries of `filters` or `path_filters`) whose picker selects
+        several values: the ChoicePicker is emitted with `"variant":
+        "multipleSelection"` and no "All" option, and its value at
+        `/query/filters/<name>` is a list (`[]` = inactive). The read keeps
+        the records whose value is any of the selected ones.
+        """
+      ],
+      filter_groups: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Nested options for a filter with declared choices, per field: a
+        group value and the leaf values it stands for, e.g.
+        `filter_groups status: [expiring: [:expiring_soon, :scheduled_renewal]]`.
+        The group is emitted as an option `{"label", "value", "group": true}`
+        right before its leaves, which carry `"parent": "<group>"`. Only leaf
+        values are filter values: selecting a group selects its leaves. A
+        group value must not also be a leaf value. Needs the AshA2ui (merged
+        or admin) catalog, whose ChoicePicker accepts the extra option keys.
+        """
+      ],
+      group_labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The label of each `filter_groups` group, per field, e.g.
+        `group_labels status: [expiring: "Expiring soon"]`. Defaults to the
+        field's choice label for that value, else the humanized value.
+        """
+      ],
+      filter_labels: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The picker label per filter (`filters` or `path_filters` name), e.g.
+        `filter_labels vendor: "Vendor"`. Defaults to the field's declared
+        `label`, else the humanized name.
+        """
+      ],
+      filter_hints: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        A short hint per filter, shown with its options (the menu footer),
+        e.g. `filter_hints status: "Statuses update nightly."`. Emitted as
+        the ChoicePicker's `"hint"`.
+        """
+      ],
+      facet_counts: [
+        type: {:or, [:boolean, {:list, :atom}]},
+        default: false,
+        doc: """
+        Count the records behind each filter option. `true` counts every
+        picked filter (not `hidden_filters`); a list counts those filters.
+        On every run the `/query` state carries
+        `"facets" => %{"<filter>" => %{"<value>" => count}}` (a group: the
+        sum of its leaves), each counted with search, ranges, the preset,
+        the context scope and every *other* filter applied, but not the
+        filter's own selection. Each faceted filter costs one aggregate
+        query (one filtered count per option, run together).
+        """
+      ],
+      filter_order: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        The order of the filter pickers in the controls row, by name (entries
+        of `filters` or `path_filters`). Filters left out keep their declared
+        order after the listed ones. Without it, `filters` come first, then
+        the `path_filters`.
+        """
+      ],
+      path_filters: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Filters over a related value, by name: a relationship path ending in
+        an attribute (`property: [:lines, :property, :name]`, matching
+        records with *any* related value among the selected ones), or a
+        single public attribute, aggregate or expression calculation
+        (`vendor: :vendor_name`, `field in values`). The client sends them
+        under `/query/filters/<name>` like `filters`. Their options are the
+        distinct non-nil values the actor can read through the table's read
+        (same preset, tenant and context scope), sorted, written on every
+        run to the `/query` state's `"options" => %{"<name>" => [...]}`; the
+        picker binds them (`"dynamicOptions"`). Incoming values must cast to
+        the terminal field's type. Pickers for path filters render under the
+        admin catalog only.
+        """
+      ],
+      search_placeholder: [
+        type: :string,
+        doc: """
+        The search box's placeholder, e.g. `"Search contracts or vendors"`.
+        Emitted as the search TextField's `"placeholder"`; the field keeps
+        its `"label"` (an accessible name).
+        """
+      ],
+      controls_card: [
+        type: :boolean,
+        default: true,
+        doc: """
+        Whether the query controls sit in a Card. `false` emits the controls
+        Row itself as `query<sfx>_controls` (the id the page references),
+        for a page that draws a bare filter bar.
+        """
+      ],
+      empty_state: [
+        type: {:keyword_list, @empty_state_keys},
+        doc: """
+        The admin grid's empty state when there are no records:
+        `empty_state title: "No contracts yet", message: "...", icon: :inbox`.
+        The emptyState component then binds `title`, `message` and `icon` to
+        the `/query` state's `"emptyState"`, which the runner fills with this,
+        `no_results_state` or the selected preset's `empty_state`.
+        """
+      ],
+      no_results_state: [
+        type:
+          {:keyword_list,
+           @empty_state_keys ++
+             [
+               clear_action: [
+                 type: :string,
+                 doc: "The label of a button that clears search and filters."
+               ]
+             ]},
+        doc: """
+        The empty state while search, filters or ranges are active and nothing
+        matches, e.g. `no_results_state title: "No results", icon: :search,
+        clear_action: "Clear search and filters"`. With `clear_action` the
+        emptyState carries `clearAction` (`{label, action}`: the query
+        envelope at page 1, sent after the client clears search and
+        filters), shown while `clearVisible` is true. Needs `empty_state`.
+        A `message` may say `{total}`: the read's count before search and
+        filters ("There are {total} contracts on this account.").
+        """
+      ],
+      page_size_options: [
+        type: {:list, :pos_integer},
+        default: [],
+        doc: """
+        Page sizes the reader may pick, e.g. `[10, 20, 50]`. The admin
+        pagination carries them as `"pageSizeOptions"` with the current
+        `pageSize`; the client sets `/query/pageSize` and applies, and the
+        runner accepts a listed size (and no more than `max_page_size`),
+        starting again at page 1. Each must be at most `max_page_size`.
         """
       ],
       default_sort: [
@@ -854,6 +1037,55 @@ defmodule AshA2ui do
         The tone of that icon per `detail` value, from the badge tone
         vocabulary. Unmatched values are `:neutral`.
         """
+      ],
+      detail_help: [
+        type: :atom,
+        doc: """
+        A table field whose value explains the detail line, drawn as an
+        info mark with a tooltip after it. Rows carry the text at the
+        reserved `_detail_help_<column>` key (`""` when there is none).
+        """
+      ],
+      width: [
+        type: :pos_integer,
+        doc: "A fixed column width in pixels. The column carries `\"width\"`."
+      ],
+      more_values: [
+        type: :atom,
+        doc: """
+        A table field holding all the values behind `more` (a `list`
+        aggregate), so the grid can list them. Rows carry them, as strings, at
+        the reserved `_more_values_<column>` key. Needs `more`.
+        """
+      ],
+      more_noun: [
+        type: :string,
+        doc: """
+        The plural noun for that list's caption ("3 properties"). The column
+        carries `\"moreNoun\"`.
+        """
+      ],
+      sort_by: [
+        type: :atom,
+        doc: """
+        The field the column's header sorts by, when it is not the column's
+        own field (a module calculation shown, a stored copy sorted), e.g.
+        `sort_by :status_cache`. Must be in the table query's `sortable`.
+        The column carries `"sortable": true` and `"sortField"`.
+        """
+      ],
+      help_title: [
+        type: :string,
+        doc: "The title of the column's header help (see `help`)."
+      ],
+      help: [
+        type: :string,
+        doc: """
+        Help for the column, opened from an info mark after the header label.
+        Paragraphs are separated by blank lines; a line
+        `**Term** — text` is a definition. The column carries
+        `"help": {"title", "body"}`.
+        """
       ]
     ]
   }
@@ -1204,6 +1436,10 @@ defmodule AshA2ui do
         type: {:in, [:default, :primary, :borderless]},
         default: :default,
         doc: "The variant for rows whose value has no `variants` entry."
+      ],
+      width: [
+        type: :pos_integer,
+        doc: "A fixed width in pixels for the button column (`rowClick.width`)."
       ]
     ]
   }
@@ -1467,6 +1703,18 @@ defmodule AshA2ui do
         Context names (a subset of this table's `context_filter` contexts) of
         which **at least one** must be selected before the table reads —
         otherwise it renders no records (and no read is executed).
+        """
+      ],
+      column_order: [
+        type: {:one_of, [:layout, :fields]},
+        default: :layout,
+        doc: """
+        The order of the admin data grid's columns on a table with a
+        `row_layout`. `:layout` (the default) is the layout's title, badge,
+        then meta fields; `:fields` keeps the component's `fields` order
+        (the fields `column` entities read from still fold into their
+        columns). The badge column keeps its `badge_text`/`badge_tones`
+        wherever it sits.
         """
       ],
       select_context: [

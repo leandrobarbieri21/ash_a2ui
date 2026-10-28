@@ -1,0 +1,371 @@
+{
+  "updateComponents": {
+    "components": [
+      {
+        "children": [
+          "status_text",
+          "table_heading",
+          "query_controls",
+          "records_list",
+          "empty_state",
+          "query_pagination",
+          "action_result_panel"
+        ],
+        "component": "Column",
+        "id": "root"
+      },
+      {
+        "component": "Text",
+        "id": "table_heading",
+        "text": "Hub contract",
+        "variant": "h2"
+      },
+      {
+        "children": {
+          "componentId": "record_row",
+          "path": "/records"
+        },
+        "component": "List",
+        "id": "records_list"
+      },
+      {
+        "align": "end",
+        "children": [
+          "query_search_input",
+          "query_filter_status",
+          "query_filter_verified",
+          "query_apply_button"
+        ],
+        "component": "Row",
+        "id": "query_controls"
+      },
+      {
+        "component": "TextField",
+        "id": "query_search_input",
+        "label": "Search",
+        "value": {
+          "path": "/query/search"
+        }
+      },
+      {
+        "component": "ChoicePicker",
+        "id": "query_filter_status",
+        "label": "Contract status",
+        "options": [
+          {
+            "label": "Active",
+            "value": "active"
+          },
+          {
+            "label": "Expiring soon",
+            "value": "expiring_soon"
+          },
+          {
+            "label": "Renewal scheduled",
+            "value": "renewal_scheduled"
+          },
+          {
+            "label": "Expired",
+            "value": "expired"
+          },
+          {
+            "label": "Draft",
+            "value": "draft"
+          }
+        ],
+        "value": {
+          "path": "/query/filters/status"
+        },
+        "variant": "multipleSelection"
+      },
+      {
+        "component": "ChoicePicker",
+        "id": "query_filter_verified",
+        "label": "Verified",
+        "options": [
+          {
+            "label": "All",
+            "value": ""
+          },
+          {
+            "label": "True",
+            "value": "true"
+          },
+          {
+            "label": "False",
+            "value": "false"
+          }
+        ],
+        "value": {
+          "path": "/query/filters/verified"
+        },
+        "variant": "mutuallyExclusive"
+      },
+      {
+        "action": {
+          "event": {
+            "context": {
+              "component": "table",
+              "contexts": {
+                "path": "/context"
+              },
+              "page": 1,
+              "query": {
+                "path": "/query"
+              }
+            },
+            "name": "query"
+          }
+        },
+        "child": "query_apply_text",
+        "component": "Button",
+        "id": "query_apply_button"
+      },
+      {
+        "component": "Text",
+        "id": "query_apply_text",
+        "text": "Apply"
+      },
+      {
+        "children": {
+          "componentId": "query_pagination_row",
+          "path": "/query/_pagination_visible"
+        },
+        "component": "List",
+        "id": "query_pagination"
+      },
+      {
+        "children": [
+          "query_prev_slot",
+          "query_page_text",
+          "query_next_slot"
+        ],
+        "component": "Row",
+        "id": "query_pagination_row"
+      },
+      {
+        "children": {
+          "componentId": "query_prev_button",
+          "path": "/query/_previous_visible"
+        },
+        "component": "List",
+        "id": "query_prev_slot"
+      },
+      {
+        "action": {
+          "event": {
+            "context": {
+              "component": "table",
+              "contexts": {
+                "path": "/context"
+              },
+              "pageDelta": -1,
+              "query": {
+                "path": "/query"
+              }
+            },
+            "name": "query"
+          }
+        },
+        "child": "query_prev_text",
+        "component": "Button",
+        "id": "query_prev_button"
+      },
+      {
+        "component": "Text",
+        "id": "query_prev_text",
+        "text": "Previous"
+      },
+      {
+        "component": "Text",
+        "id": "query_page_text",
+        "text": {
+          "path": "/query/_range_text"
+        }
+      },
+      {
+        "children": {
+          "componentId": "query_next_button",
+          "path": "/query/_next_visible"
+        },
+        "component": "List",
+        "id": "query_next_slot"
+      },
+      {
+        "action": {
+          "event": {
+            "context": {
+              "component": "table",
+              "contexts": {
+                "path": "/context"
+              },
+              "pageDelta": 1,
+              "query": {
+                "path": "/query"
+              }
+            },
+            "name": "query"
+          }
+        },
+        "child": "query_next_text",
+        "component": "Button",
+        "id": "query_next_button"
+      },
+      {
+        "component": "Text",
+        "id": "query_next_text",
+        "text": "Next"
+      },
+      {
+        "child": "record_row_body",
+        "component": "Card",
+        "id": "record_row"
+      },
+      {
+        "children": [
+          "record_row_header",
+          "record_row_meta_row_0"
+        ],
+        "component": "Column",
+        "id": "record_row_body"
+      },
+      {
+        "align": "center",
+        "children": [
+          "record_row_title",
+          "record_row_header_right"
+        ],
+        "component": "Row",
+        "id": "record_row_header",
+        "justify": "spaceBetween"
+      },
+      {
+        "component": "Text",
+        "id": "record_row_title",
+        "text": {
+          "path": "name"
+        },
+        "variant": "h4",
+        "weight": 1
+      },
+      {
+        "align": "center",
+        "children": [
+          "record_row_badge",
+          "row_context_button"
+        ],
+        "component": "Row",
+        "id": "record_row_header_right"
+      },
+      {
+        "component": "Text",
+        "id": "record_row_badge",
+        "text": {
+          "path": "_badge_status_text"
+        },
+        "variant": "caption"
+      },
+      {
+        "children": [
+          "record_row_meta_cell_property_name",
+          "record_row_meta_spacer_0_1"
+        ],
+        "component": "Row",
+        "id": "record_row_meta_row_0"
+      },
+      {
+        "children": [
+          "record_row_meta_label_property_name",
+          "record_row_meta_value_property_name"
+        ],
+        "component": "Column",
+        "id": "record_row_meta_cell_property_name",
+        "weight": 1
+      },
+      {
+        "component": "Text",
+        "id": "record_row_meta_label_property_name",
+        "text": "Property name",
+        "variant": "caption"
+      },
+      {
+        "component": "Text",
+        "id": "record_row_meta_value_property_name",
+        "text": {
+          "path": "property_name"
+        }
+      },
+      {
+        "children": [],
+        "component": "Column",
+        "id": "record_row_meta_spacer_0_1",
+        "weight": 1
+      },
+      {
+        "action": {
+          "event": {
+            "context": {
+              "context": "contract",
+              "contexts": {
+                "path": "/context"
+              },
+              "query": {
+                "path": "/query"
+              },
+              "value": {
+                "path": "id"
+              }
+            },
+            "name": "context_select"
+          }
+        },
+        "child": "row_context_text",
+        "component": "Button",
+        "id": "row_context_button"
+      },
+      {
+        "component": "Text",
+        "id": "row_context_text",
+        "text": "Select contract"
+      },
+      {
+        "children": {
+          "componentId": "empty_state_text",
+          "path": "/_empty_visible"
+        },
+        "component": "List",
+        "id": "empty_state"
+      },
+      {
+        "component": "Text",
+        "id": "empty_state_text",
+        "text": {
+          "path": "_empty_message"
+        }
+      },
+      {
+        "component": "Text",
+        "id": "status_text",
+        "text": {
+          "path": "/ui/feedback/message"
+        }
+      },
+      {
+        "children": [
+          "action_result_text"
+        ],
+        "component": "Column",
+        "id": "action_result_panel"
+      },
+      {
+        "component": "Text",
+        "id": "action_result_text",
+        "text": {
+          "path": "/ui/action_result_text"
+        }
+      }
+    ],
+    "surfaceId": "hub"
+  },
+  "version": "v0.9.1"
+}

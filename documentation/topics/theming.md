@@ -203,7 +203,7 @@ header and tone from tokens (each falls back to the existing
 | `--ash-admin-font-mono` | system mono stack | identifier cells (`mono`) |
 | `--ash-admin-link` / `-link-hover` | `primary` / `primary-hover` | reference links |
 | `--ash-admin-badge-radius` / `-badge-border` | pill / `transparent` | badge pills |
-| `--ash-admin-badge-<tone>-background` / `-text` | subtle/strong feedback pairs | tones `neutral info success warning danger accent` |
+| `--ash-admin-badge-<tone>-background` / `-text` | subtle/strong feedback pairs | tones `neutral info success warning danger accent pending gray` |
 | `--ash-admin-pager-chip-background` / `-border` / `-radius` / `-shadow` | surface / border / radius-s / none | windowed page chips |
 | `--ash-admin-field-label-transform` / `-tracking` / `-text` | `uppercase` / wide / muted | FieldDisplay labels |
 

@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "x-changelog": {
+    "1.10.0": "Additive: the filter bar and the table header. dataGrid columns gain optional help ({title, body}: header help opened from an info mark; body paragraphs separated by blank lines, a line `**Term** — text` a definition) and sortField (the field a sortable header sorts by when it is not the column's path); a column's detail gains an optional helpPath (row-relative, the _detail_help_<column> key: an info mark with a tooltip after the line). dataGrid columns also gain optional width (px) and moreNoun, more gains valuesPath (the row's list of all the values), and rowClick an optional width. emptyState gains optional title, icon (inbox | search | archive), clearAction ({label, action}) and clearVisible. pagination gains optional pageSizeOptions (the sizes offered) and pageSizeAction (the query envelope sent with the picked pageSize and page 1). The basic inputs this catalog replaces accept more keys: ChoicePicker hint (a footer under the options), counts (a binding to a value → count map), dynamicOptions (a binding to an option list) and options carrying parent (their group's value) or group: true (a group: picking it picks all its leaves; only leaf values are written); TextField placeholder. An empty statusBanner takes no layout space. Badge and icon tones gain pending and gray. The catalogId is unchanged.",
     "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope; the rowActions entry the row click mirrors is then left out. Without these the row click and rowActions are unchanged. The catalogId is unchanged.",
     "1.8.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?, iconPath?, iconTonePath?}: a detail line under the value, {date} filled in by the renderer, after an optional icon). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
     "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
@@ -101,22 +102,43 @@
               },
               "more": {
                 "type": "object",
-                "description": "Optional (1.8): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1).",
-                "properties": {"path": {"type": "string"}},
+                "description": "Optional (1.8): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1). valuesPath (optional, 1.10) names the row's list of all the values (the _more_values_<column> key, strings), for a list of them.",
+                "properties": {"path": {"type": "string"}, "valuesPath": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
               },
               "detail": {
                 "type": "object",
-                "description": "Optional (1.8): a detail line drawn under the cell's value (under the pill on a badge column). path (row-relative) is its text (the server-computed _detail_<column> key, empty for none); datePath (row-relative, optional) a date the renderer formats in the reader's locale and puts in place of {date}; iconPath and iconTonePath (row-relative, optional) the icon drawn before the line and its tone (the _detail_icon_<column> and _detail_icon_tone_<column> keys, from the same icon and tone vocabularies; decorative).",
+                "description": "Optional (1.8): a detail line drawn under the cell's value (under the pill on a badge column). path (row-relative) is its text (the server-computed _detail_<column> key, empty for none); datePath (row-relative, optional) a date the renderer formats in the reader's locale and puts in place of {date}; iconPath and iconTonePath (row-relative, optional) the icon drawn before the line and its tone (the _detail_icon_<column> and _detail_icon_tone_<column> keys, from the same icon and tone vocabularies; decorative); helpPath (row-relative, optional, 1.10) the line's explanation (the _detail_help_<column> key), drawn as an info mark with a tooltip, empty for none.",
                 "properties": {
                   "path": {"type": "string"},
                   "datePath": {"type": "string"},
                   "iconPath": {"type": "string"},
-                  "iconTonePath": {"type": "string"}
+                  "iconTonePath": {"type": "string"},
+                  "helpPath": {"type": "string"}
                 },
                 "required": ["path"],
                 "additionalProperties": false
+              },
+              "help": {
+                "type": "object",
+                "description": "Optional (1.10): the column's header help, drawn as an info mark after the label opening title and body. body paragraphs are separated by blank lines; a line `**Term** — text` is a definition.",
+                "properties": {"title": {"type": "string"}, "body": {"type": "string"}},
+                "required": ["body"],
+                "additionalProperties": false
+              },
+              "width": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Optional (1.10): a fixed column width in pixels."
+              },
+              "moreNoun": {
+                "type": "string",
+                "description": "Optional (1.10): the plural noun captioning the list of more values (\"3 properties\")."
+              },
+              "sortField": {
+                "type": "string",
+                "description": "Optional (1.10): the field a sortable header sorts by (sent as the query's sort field and matched against the current sort) when it is not the column's path."
               }
             },
             "required": ["label", "path"],
@@ -190,6 +212,11 @@
             "inline": {
               "type": "boolean",
               "description": "Optional (1.9): true to also draw the row click as one button per row in a final column (label from labelPath, variant from variantPath), dispatching the same envelope. The rowActions entry the row click mirrors is then left out of rowActions. Whole-row activation is unchanged."
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional (1.10): the inline button column's fixed width in pixels."
             }
           },
           "required": ["label", "action", "context"],
@@ -232,6 +259,25 @@
           "type": "array",
           "items": {"type": "string"},
           "description": "Optional hint / action button."
+        },
+        "title": {
+          "type": "object",
+          "description": "Optional (1.10): the empty state's heading, a literal or a binding (the query state's emptyState/title)."
+        },
+        "icon": {
+          "type": "object",
+          "description": "Optional (1.10): inbox | search | archive, a literal or a binding (emptyState/icon)."
+        },
+        "clearAction": {
+          "type": "object",
+          "description": "Optional (1.10): {label, action}: a button that clears the query state's search, filters and ranges at action.context.query.path, then dispatches action (the query envelope at page 1).",
+          "properties": {"label": {"type": "string"}, "action": {"type": "object"}},
+          "required": ["label", "action"],
+          "additionalProperties": false
+        },
+        "clearVisible": {
+          "type": "object",
+          "description": "Optional (1.10): whether the clear action shows (bound to emptyState/clear: true while search or filters are active)."
         }
       },
       "required": ["component", "message", "children"],
@@ -257,6 +303,15 @@
         "nextAction": {
           "type": "object",
           "description": "The next-page action envelope: the existing `query` action with pageDelta 1."
+        },
+        "pageSizeOptions": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "description": "Optional (1.10): the page sizes the reader may pick (the query's page_size_options)."
+        },
+        "pageSizeAction": {
+          "type": "object",
+          "description": "Optional (1.10): the `query` action envelope (page 1) the renderer dispatches with the picked size as the query state's pageSize."
         }
       },
       "required": [

@@ -21,7 +21,18 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
       public expression calculations with castable values, and `read_action`
       must name a `:read` action of the resource,
     * `default_preset` must name a declared preset,
-    * `hidden_filters` must name entries of `filters`,
+    * `hidden_filters` must name entries of `filters` (or `path_filters`),
+    * `path_filters` entries must be a relationship path to a public
+      attribute, or a single public attribute, aggregate or expression
+      calculation, under a name no `filters` entry takes,
+    * `multi_select_filters`, `filter_labels`, `filter_hints` and a
+      `facet_counts` list must name filters of the query,
+    * `filter_groups` must group declared choices of a `filters` field, a
+      leaf in at most one group, no group value also a leaf (and
+      `group_labels` must label declared groups),
+    * `page_size_options` must each be at most `max_page_size`,
+    * `no_results_state` and preset `empty_state`s need the query's own
+      `empty_state`,
     * `page_size` must not exceed `max_page_size`,
     * query names must be unique, and
     * a component's `query` option must reference a declared query.
@@ -54,7 +65,9 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
         with :ok <- verify_unique_names(queries, module),
              :ok <-
                verify_queries(queries, query_targets(dsl_state, target), source_fields, module) do
-          verify_references(dsl_state, queries, module)
+          with :ok <- verify_references(dsl_state, queries, module) do
+            verify_column_sorts(dsl_state, queries, module)
+          end
         end
     end
   end
@@ -121,7 +134,13 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
   defp verify_query(query, ctx) do
     with :ok <- verify_allowlists(query, ctx),
          :ok <- verify_search_fields(query, ctx),
+         :ok <- verify_path_filters(query, ctx),
          :ok <- verify_hidden_filters(query, ctx.module),
+         :ok <- verify_filter_order(query, ctx.module),
+         :ok <- verify_filter_name_options(query, ctx.module),
+         :ok <- verify_filter_groups(query, ctx),
+         :ok <- verify_page_size_options(query, ctx.module),
+         :ok <- verify_empty_states(query, ctx.module),
          :ok <- verify_presets(query, ctx) do
       verify_page_sizes(query, ctx.module)
     end
@@ -290,12 +309,16 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
       :attribute ->
         verify_search_type(query, name, ctx.attributes[name], ctx.module)
 
+      kind when kind in [:aggregate, :calculation] ->
+        verify_search_computed(query, name, kind, ctx)
+
       _other ->
         {:error,
          allowlist_error(query, :search_fields, ctx.module, """
          query #{inspect(query.name)} references unknown field #{inspect(name)} in search_fields.
 
-         Every search_fields entry must be a public string-typed attribute, or a \
+         Every search_fields entry must be a public string-typed attribute (or a \
+         string-typed public aggregate or expression calculation), or a \
          relationship path to one (e.g. `[:author, :email]`). \
          Available attributes: #{inspect(Map.keys(ctx.attributes))}
          """)}
@@ -337,6 +360,68 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
     {:error, search_path_error(query, path, ctx.module, "a path must have at least two steps")}
   end
 
+  # A computed search field (`search_fields [:vendor_name]`, a `first`
+  # aggregate) is searched in the data layer like an attribute, so it must
+  # be expressible there (`sortable?/3`: expression calculations, and
+  # aggregates other than a `first` over an unsortable field) and resolve to
+  # a string.
+  defp verify_search_computed(query, name, kind, ctx) do
+    cond do
+      not Info.sortable?(ctx.target, name, include_private?: false) ->
+        {:error,
+         allowlist_error(
+           query,
+           :search_fields,
+           ctx.module,
+           "query #{inspect(query.name)} search_fields entry #{inspect(name)} is " <>
+             "#{with_article(kind)} the data layer cannot filter on (only expression " <>
+             "calculations and data-layer aggregates can be searched)"
+         )}
+
+      computed_type(ctx.target, name) in @string_types ->
+        :ok
+
+      true ->
+        {:error,
+         allowlist_error(
+           query,
+           :search_fields,
+           ctx.module,
+           "query #{inspect(query.name)} search_fields entry #{inspect(name)} must " <>
+             "resolve to a string (search uses a case-insensitive contains)"
+         )}
+    end
+  end
+
+  # The Ash type a field resolves to: an attribute's or calculation's own
+  # type, an aggregate's field type (`first`/`min`/`max`/`list` keep it).
+  @doc false
+  def computed_type(target, name) do
+    case Info.field(target, name) do
+      %Ash.Resource.Aggregate{} = aggregate ->
+        aggregate_field_type(target, aggregate)
+
+      %{type: type} ->
+        Ash.Type.get_type(type)
+
+      nil ->
+        nil
+    end
+  end
+
+  defp aggregate_field_type(target, %{kind: kind, field: field, relationship_path: path})
+       when kind in [:first, :min, :max, :list] and not is_nil(field) do
+    case Info.related(target, path) do
+      nil -> nil
+      related -> computed_type(related, field)
+    end
+  end
+
+  defp aggregate_field_type(_target, %{kind: kind}) when kind in [:count, :sum],
+    do: Ash.Type.Integer
+
+  defp aggregate_field_type(_target, _aggregate), do: nil
+
   defp walk_relationships(steps, target) do
     Enum.reduce_while(steps, {:ok, target}, fn step, {:ok, current} ->
       case Info.relationship(current, step) do
@@ -373,7 +458,7 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
   end
 
   defp verify_hidden_filters(query, module) do
-    case query.hidden_filters -- query.filters do
+    case query.hidden_filters -- AshA2ui.Query.filter_names(query) do
       [] ->
         :ok
 
@@ -384,10 +469,319 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
            path: [:a2ui, :query, query.name, :hidden_filters],
            message:
              "query #{inspect(query.name)} hidden_filters #{inspect(unknown)} " <>
-               "are not in its filters (declared: #{inspect(query.filters)})"
+               "are not in its filters (declared: " <>
+               "#{inspect(AshA2ui.Query.filter_names(query))})"
          )}
     end
   end
+
+  defp verify_filter_order(query, module) do
+    case query.filter_order -- AshA2ui.Query.filter_names(query) do
+      [] ->
+        :ok
+
+      unknown ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :query, query.name, :filter_order],
+           message:
+             "query #{inspect(query.name)} filter_order #{inspect(unknown)} " <>
+               "are not in its filters (declared: " <>
+               "#{inspect(AshA2ui.Query.filter_names(query))})"
+         )}
+    end
+  end
+
+  # --- path filters -----------------------------------------------------------
+
+  defp verify_path_filters(query, ctx) do
+    query.path_filters
+    |> Enum.reduce_while(:ok, fn {name, target}, :ok ->
+      case verify_path_filter(query, name, target, ctx) do
+        :ok -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
+
+  defp verify_path_filter(query, name, target, ctx) do
+    cond do
+      name in query.filters ->
+        {:error, path_filter_error(query, ctx.module, "#{inspect(name)} is already in filters")}
+
+      Enum.count(query.path_filters, &(elem(&1, 0) == name)) > 1 ->
+        {:error, path_filter_error(query, ctx.module, "#{inspect(name)} is declared twice")}
+
+      true ->
+        verify_path_filter_target(query, name, target, ctx)
+    end
+  end
+
+  defp verify_path_filter_target(query, name, field, ctx) when is_atom(field) do
+    filterable? =
+      case field_kind(field, ctx) do
+        :attribute ->
+          true
+
+        kind when kind in [:aggregate, :calculation] ->
+          Info.sortable?(ctx.target, field, include_private?: false)
+
+        _other ->
+          false
+      end
+
+    if filterable? do
+      :ok
+    else
+      {:error,
+       path_filter_error(
+         query,
+         ctx.module,
+         "#{inspect(name)}: #{inspect(field)} must be a public attribute, a data-layer " <>
+           "aggregate or an expression calculation of the resource"
+       )}
+    end
+  end
+
+  defp verify_path_filter_target(query, name, [_, _ | _] = path, ctx) do
+    {steps, [terminal]} = Enum.split(path, -1)
+
+    case walk_relationships(steps, ctx.target) do
+      {:error, step} ->
+        {:error,
+         path_filter_error(
+           query,
+           ctx.module,
+           "#{inspect(name)}: step #{inspect(step)} of #{inspect(path)} is not a public relationship"
+         )}
+
+      {:ok, destination} ->
+        case Info.attribute(destination, terminal) do
+          %{public?: true} ->
+            :ok
+
+          _private_or_missing ->
+            {:error,
+             path_filter_error(
+               query,
+               ctx.module,
+               "#{inspect(name)}: #{inspect(terminal)} is not a public attribute of " <>
+                 inspect(destination)
+             )}
+        end
+    end
+  end
+
+  defp verify_path_filter_target(query, name, other, ctx) do
+    {:error,
+     path_filter_error(
+       query,
+       ctx.module,
+       "#{inspect(name)}: expected a field or a relationship path of at least two steps " <>
+         "ending in an attribute, got: #{inspect(other)}"
+     )}
+  end
+
+  defp path_filter_error(query, module, detail) do
+    DslError.exception(
+      module: module,
+      path: [:a2ui, :query, query.name, :path_filters],
+      message: "query #{inspect(query.name)} path_filters #{detail}"
+    )
+  end
+
+  # multi_select_filters, a facet_counts list and the keys of filter_labels
+  # and filter_hints all name filters of the query.
+  defp verify_filter_name_options(query, module) do
+    names = AshA2ui.Query.filter_names(query)
+
+    [
+      multi_select_filters: query.multi_select_filters,
+      facet_counts: (is_list(query.facet_counts) && query.facet_counts) || [],
+      filter_labels: Keyword.keys(query.filter_labels),
+      filter_hints: Keyword.keys(query.filter_hints)
+    ]
+    |> Enum.find_value(:ok, fn {option, listed} ->
+      case Enum.uniq(listed) -- names do
+        [] ->
+          nil
+
+        unknown ->
+          {:error,
+           DslError.exception(
+             module: module,
+             path: [:a2ui, :query, query.name, option],
+             message:
+               "query #{inspect(query.name)} #{option} #{inspect(unknown)} are not " <>
+                 "filters of the query (declared: #{inspect(names)})"
+           )}
+      end
+    end)
+    |> case do
+      :ok -> verify_filter_texts(query, module)
+      error -> error
+    end
+  end
+
+  defp verify_filter_texts(query, module) do
+    [filter_labels: query.filter_labels, filter_hints: query.filter_hints]
+    |> Enum.find_value(:ok, fn {option, entries} ->
+      case Enum.reject(entries, fn {_name, text} -> is_binary(text) end) do
+        [] ->
+          nil
+
+        [{name, text} | _] ->
+          {:error,
+           DslError.exception(
+             module: module,
+             path: [:a2ui, :query, query.name, option],
+             message:
+               "query #{inspect(query.name)} #{option} for #{inspect(name)} must be a " <>
+                 "string, got: #{inspect(text)}"
+           )}
+      end
+    end)
+  end
+
+  # --- filter groups ------------------------------------------------------------
+
+  defp verify_filter_groups(query, ctx) do
+    with :ok <- verify_groups(query, ctx) do
+      verify_group_labels(query, ctx.module)
+    end
+  end
+
+  defp verify_groups(query, ctx) do
+    Enum.find_value(query.filter_groups, :ok, fn {field, groups} ->
+      case verify_field_groups(query, field, groups, ctx) do
+        :ok -> nil
+        {:error, error} -> {:error, error}
+      end
+    end)
+  end
+
+  defp verify_field_groups(query, field, groups, ctx) do
+    choices =
+      ctx.target |> AshA2ui.TypeMapper.choices(field) |> Enum.map(&to_string(elem(&1, 0)))
+
+    error = &group_error(query, field, ctx.module, &1)
+
+    cond do
+      field not in query.filters ->
+        {:error, error.("#{inspect(field)} is not in the query's filters")}
+
+      choices == [] ->
+        {:error, error.("#{inspect(field)} declares no choices (one_of or an Ash.Type.Enum)")}
+
+      not (Keyword.keyword?(groups) and Enum.all?(groups, fn {_g, leaves} -> is_list(leaves) end)) ->
+        {:error, error.("expected `group: [leaf, ...]` entries, got: #{inspect(groups)}")}
+
+      true ->
+        verify_group_leaves(groups, choices, error)
+    end
+  end
+
+  defp verify_group_leaves(groups, choices, error) do
+    leaves = Enum.flat_map(groups, fn {_group, leaves} -> Enum.map(leaves, &to_string/1) end)
+    group_values = Enum.map(groups, fn {group, _leaves} -> to_string(group) end)
+
+    cond do
+      (unknown = Enum.uniq(leaves) -- choices) != [] ->
+        {:error, error.("leaves #{inspect(unknown)} are not choices of the field")}
+
+      (dupes = leaves -- Enum.uniq(leaves)) != [] ->
+        {:error, error.("leaves #{inspect(Enum.uniq(dupes))} are in more than one group")}
+
+      (clash = Enum.filter(group_values, &(&1 in leaves))) != [] ->
+        {:error,
+         error.(
+           "group values #{inspect(clash)} are also leaf values: a group needs a value of " <>
+             "its own"
+         )}
+
+      Enum.any?(groups, fn {_group, leaves} -> leaves == [] end) ->
+        {:error, error.("every group needs at least one leaf")}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp verify_group_labels(query, module) do
+    Enum.find_value(query.group_labels, :ok, fn {field, labels} ->
+      groups = Keyword.keys(Keyword.get(query.filter_groups, field, []))
+
+      cond do
+        not Keyword.keyword?(labels) ->
+          {:error, group_error(query, field, module, "group_labels must be `group: \"Label\"`")}
+
+        (unknown = Keyword.keys(labels) -- groups) != [] ->
+          {:error,
+           group_error(
+             query,
+             field,
+             module,
+             "group_labels #{inspect(unknown)} are not groups of the field " <>
+               "(declared: #{inspect(groups)})"
+           )}
+
+        true ->
+          nil
+      end
+    end)
+  end
+
+  defp group_error(query, field, module, detail) do
+    DslError.exception(
+      module: module,
+      path: [:a2ui, :query, query.name, :filter_groups],
+      message: "query #{inspect(query.name)} filter_groups for #{inspect(field)}: #{detail}"
+    )
+  end
+
+  defp verify_page_size_options(query, module) do
+    case Enum.filter(query.page_size_options, &(&1 > query.max_page_size)) do
+      [] ->
+        :ok
+
+      too_big ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :query, query.name, :page_size_options],
+           message:
+             "query #{inspect(query.name)} page_size_options #{inspect(too_big)} exceed " <>
+               "max_page_size #{query.max_page_size}"
+         )}
+    end
+  end
+
+  # no_results_state and a preset's empty_state are variants of the query's
+  # empty_state, which the runner falls back to.
+  defp verify_empty_states(%{empty_state: nil} = query, module) do
+    with_variant =
+      cond do
+        query.no_results_state -> "no_results_state"
+        Enum.any?(query.presets, & &1.empty_state) -> "a preset empty_state"
+        true -> nil
+      end
+
+    if with_variant do
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :query, query.name, :empty_state],
+         message:
+           "query #{inspect(query.name)} declares #{with_variant} without its own " <>
+             "empty_state (the state shown when nothing else applies)"
+       )}
+    else
+      :ok
+    end
+  end
+
+  defp verify_empty_states(_query, _module), do: :ok
 
   # --- presets ----------------------------------------------------------------
 
@@ -600,6 +994,36 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
             Declared queries: #{inspect(MapSet.to_list(declared))}
             """
           )}}
+      end
+    end)
+  end
+
+  # A column's `sort_by` names the field its header sorts by: it must be in
+  # the sortable allowlist of the table's query.
+  defp verify_column_sorts(dsl_state, queries, module) do
+    by_name = Map.new(queries, &{&1.name, &1})
+
+    dsl_state
+    |> Verifier.get_entities([:a2ui])
+    |> Enum.filter(&is_struct(&1, AshA2ui.Component))
+    |> Enum.flat_map(fn component ->
+      for column <- component.columns, column.sort_by, do: {component, column}
+    end)
+    |> Enum.find_value(:ok, fn {component, column} ->
+      query = component.query && by_name[component.query]
+
+      if query && column.sort_by in query.sortable do
+        nil
+      else
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, AshA2ui.Component.key(component), :column, column.name],
+           message:
+             "column #{inspect(column.name)} sort_by #{inspect(column.sort_by)} must be in " <>
+               "the sortable list of the table's query" <>
+               ((query && " (sortable: #{inspect(query.sortable)})") || " (the table has none)")
+         )}
       end
     end)
   end

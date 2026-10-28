@@ -18,10 +18,14 @@ defmodule AshA2ui.QueryRunner do
       %{
         "search" => "",
         "filters" => %{"status" => "", "category" => ""},   # every declared filter, "" = inactive
+                                                            # (multi-select: a list, [] = inactive)
         "ranges" => %{"inserted_at" => %{"from" => "", "to" => ""}},
                                                             # only when the query declares range_filters
         "preset" => "pending",                              # only when the query declares presets
         "autoApply" => %{"debounceMs" => 300},              # only on apply_on_change queries
+        "facets" => %{"status" => %{"open" => 3}},          # only with facet_counts
+        "options" => %{"vendor" => [%{"label" => _, "value" => _}]},
+                                                            # only with path_filters
         "sort" => %{"field" => "name", "dir" => "asc"},     # or nil when unsorted
         "page" => 1,
         "pageSize" => 25,
@@ -54,6 +58,24 @@ defmodule AshA2ui.QueryRunner do
   action instead of the table's `read_action`. A missing `"preset"` key (and
   `""`) falls back to the query's `default_preset` (or no preset when none
   is declared); unknown names are rejected.
+
+  ## Multi-select filters, path filters and facets
+
+  A `multi_select_filters` entry's state is always a list (`[]` = inactive).
+  A `path_filters` entry is allowlisted like `filters` (under the same
+  `"filters"` key); its values cast to the terminal field's type, and it
+  keeps the records with a related value (any, through a to-many path)
+  among the selected ones. Its options are written to `"options"` on every
+  run: the distinct non-nil values of the field over the table's read
+  (preset, actor, tenant and context scope; not search or filters), sorted.
+
+  With `facet_counts`, `"facets"` holds per faceted filter the count of
+  records per option value — search, ranges, the preset, the scope, the
+  calendar window and every OTHER filter applied, not the filter's own
+  selection — and per `filter_groups` group the sum of its leaves. Each
+  faceted filter is one `Ash.aggregate/3` call: one filtered `count` per
+  option, which a SQL data layer runs as one query. A failing count leaves
+  the filter's facets empty rather than failing the read.
 
   ## Calendar windows
 
@@ -133,6 +155,7 @@ defmodule AshA2ui.QueryRunner do
          {:ok, sort} <- parse_sort(query, state),
          {:ok, page} <- parse_page(state, context),
          {:ok, page_size} <- parse_page_size(query, state),
+         page = resized_page(page, page_size, state),
          {:ok, window, moved?} <- parse_window(view, state, context, preset) do
       {:ok,
        %{
@@ -228,6 +251,102 @@ defmodule AshA2ui.QueryRunner do
     |> put_ranges_state(query, params)
     |> put_window_state(params)
     |> put_auto_apply_state(query)
+    |> put_controls_hidden(query, params)
+    |> put_facets_state(query)
+    |> put_options_state(query)
+    |> put_empty_state(query, params)
+    |> put_applied_page_size(query, params)
+  end
+
+  # "controlsHidden" exists only on queries with a `hide_controls` preset:
+  # whether the selected preset hides the search and filter pickers.
+  defp put_controls_hidden(state, query, params) do
+    if Enum.any?(query.presets, &Map.get(&1, :hide_controls, false)) do
+      preset = preset_entity(query, params.preset)
+      Map.put(state, "controlsHidden", !!(preset && Map.get(preset, :hide_controls, false)))
+    else
+      state
+    end
+  end
+
+  # Queries with page_size_options remember the size the state was read
+  # with (`appliedPageSize`): a request whose `pageSize` differs from it
+  # starts again at page 1, however it was sent (Apply, or a pageDelta 0
+  # re-query).
+  defp put_applied_page_size(state, %{page_size_options: []}, _params), do: state
+
+  defp put_applied_page_size(state, _query, params),
+    do: Map.put(state, "appliedPageSize", params.page_size)
+
+  # "emptyState" exists only on queries declaring an empty_state: the
+  # state to show when nothing matches — no_results_state while search,
+  # filters or ranges are active, else the selected preset's empty_state,
+  # else the query's. `clear` says whether the clear action applies.
+  defp put_empty_state(state, %{empty_state: nil}, _params), do: state
+
+  defp put_empty_state(state, query, params) do
+    active? = params.search != "" or params.filters != [] or params.ranges != []
+    preset = preset_entity(query, params.preset)
+
+    {chosen, clear?} =
+      cond do
+        active? and query.no_results_state != nil ->
+          {query.no_results_state, Keyword.has_key?(query.no_results_state, :clear_action)}
+
+        preset && preset.empty_state ->
+          {preset.empty_state, false}
+
+        true ->
+          {query.empty_state, false}
+      end
+
+    Map.put(state, "emptyState", %{
+      "title" => Keyword.get(chosen, :title, ""),
+      "message" => Keyword.get(chosen, :message, ""),
+      "icon" => to_string(Keyword.get(chosen, :icon, "")),
+      "clear" => clear?
+    })
+  end
+
+  # An empty-state message may name the read's size before search and
+  # filters ("There are {total} contracts on this account."): `{total}` is
+  # the base read's count (preset and scope applied), counted only when the
+  # chosen message uses it.
+  defp put_empty_total(%{"emptyState" => %{"message" => message} = empty} = state, base)
+       when is_binary(message) do
+    if String.contains?(message, "{total}") do
+      total =
+        case Ash.count(base) do
+          {:ok, count} -> Integer.to_string(count)
+          _error -> ""
+        end
+
+      put_in(state, ["emptyState"], %{empty | "message" => String.replace(message, "{total}", total)})
+    else
+      state
+    end
+  end
+
+  defp put_empty_total(state, _base), do: state
+
+  # "facets" and "options" exist only on queries that declare facet_counts
+  # or path_filters; run/4 fills them, a state built without a read holds
+  # every faceted filter (and path filter) empty so bindings are stable.
+  defp put_facets_state(state, query) do
+    case AshA2ui.Query.faceted_filters(query) do
+      [] -> state
+      names -> Map.put(state, "facets", Map.new(names, &{to_string(&1), %{}}))
+    end
+  end
+
+  defp put_options_state(state, %{path_filters: []}), do: state
+
+  defp put_options_state(state, query) do
+    Map.put(
+      state,
+      "options",
+      Map.new(query.path_filters, fn {name, _} -> {to_string(name), []} end)
+    )
   end
 
   @auto_apply_debounce_ms 300
@@ -300,11 +419,14 @@ defmodule AshA2ui.QueryRunner do
     params = with_window(params, view)
     effective_sort = read_sort(effective_sort(query, params), calendar)
 
-    filtered =
+    base =
       view
       |> preset_read(params, ash_opts)
       |> AshA2ui.ContextRunner.apply_scope(scope)
-      |> apply_filters(params.filters)
+
+    filtered =
+      base
+      |> apply_filters(query, params.filters)
       |> apply_ranges(params.ranges)
       |> apply_search(query, params.search)
 
@@ -321,10 +443,15 @@ defmodule AshA2ui.QueryRunner do
          has_more = length(rows) > params.page_size,
          records = Enum.take(rows, params.page_size),
          {:ok, marks} <- window_marks(filtered, calendar, params, records, has_more) do
+      options = path_filter_options(base, query)
+
       state =
         query
         |> state(params, total_count(windowed), has_more)
         |> put_marks(marks)
+        |> put_path_options(options)
+        |> put_facets(facets(base, query, params, calendar, options))
+        |> put_empty_total(base)
 
       {:ok, records, state}
     end
@@ -371,6 +498,146 @@ defmodule AshA2ui.QueryRunner do
 
   defp window_marks(filtered, calendar, params, _records, _has_more),
     do: AshA2ui.Calendar.read_marks(filtered, calendar, params.window)
+
+  defp put_path_options(state, options) when options == %{}, do: state
+
+  defp put_path_options(state, options) do
+    Map.put(
+      state,
+      "options",
+      Map.new(options, fn {name, values} ->
+        {to_string(name),
+         Enum.map(values, &%{"label" => to_string(&1), "value" => to_string(&1)})}
+      end)
+    )
+  end
+
+  defp put_facets(state, facets) when facets == %{}, do: state
+  defp put_facets(state, facets), do: Map.put(state, "facets", facets)
+
+  # --- path filter options and facets ------------------------------------------
+
+  # The distinct non-nil values of each path filter's field over the table's
+  # read (preset, actor, tenant, context scope), sorted. One aggregate per
+  # path filter: a `list` aggregate of the field (or, through a relationship
+  # path, of each record's related values).
+  defp path_filter_options(_base, %{path_filters: []}), do: %{}
+
+  defp path_filter_options(base, query) do
+    Map.new(query.path_filters, fn {name, target} ->
+      {name, distinct_values(base, target)}
+    end)
+  end
+
+  defp distinct_values(base, field) when is_atom(field) do
+    case Ash.aggregate(base, {:values, :list, field: field, uniq?: true}) do
+      {:ok, %{values: values}} -> sorted_values(values)
+      {:error, _error} -> []
+    end
+  end
+
+  defp distinct_values(base, path) do
+    {relationships, [attribute]} = Enum.split(path, -1)
+
+    base
+    |> Ash.Query.select([])
+    |> Ash.Query.aggregate(:a2ui_path_values, :list, relationships,
+      field: attribute,
+      uniq?: true
+    )
+    |> Ash.read()
+    |> case do
+      {:ok, records} ->
+        records
+        |> Enum.flat_map(&(&1.aggregates[:a2ui_path_values] || []))
+        |> sorted_values()
+
+      {:error, _error} ->
+        []
+    end
+  end
+
+  defp sorted_values(values) do
+    values |> List.wrap() |> Enum.reject(&is_nil/1) |> Enum.uniq() |> Enum.sort()
+  end
+
+  defp facets(base, query, params, calendar, options) do
+    case AshA2ui.Query.faceted_filters(query) do
+      [] ->
+        %{}
+
+      names ->
+        Map.new(names, fn name ->
+          {to_string(name), facet_counts(base, query, params, calendar, options, name)}
+        end)
+    end
+  end
+
+  # One filter's counts: the read with every other filter (and search,
+  # ranges, window) applied, one filtered count per option value, all in
+  # one aggregate call. Groups sum their leaves.
+  defp facet_counts(base, query, params, calendar, options, name) do
+    others = Enum.reject(params.filters, fn {filter, _value} -> filter == name end)
+
+    counted =
+      base
+      |> apply_filters(query, others)
+      |> apply_ranges(params.ranges)
+      |> apply_search(query, params.search)
+      |> apply_window(calendar, params)
+
+    values = facet_values(counted.resource, query, options, name)
+
+    aggregates =
+      values
+      |> Enum.with_index()
+      |> Enum.map(fn {value, index} ->
+        {facet_key(index), :count, query: [filter: filter_condition(query, name, value)]}
+      end)
+
+    case aggregates != [] && Ash.aggregate(counted, aggregates) do
+      {:ok, counts} ->
+        leaf_counts =
+          values
+          |> Enum.with_index()
+          |> Map.new(fn {value, index} -> {stringify(value), counts[facet_key(index)] || 0} end)
+
+        Map.merge(leaf_counts, group_counts(query, name, leaf_counts))
+
+      _none_or_error ->
+        %{}
+    end
+  end
+
+  # Bounded: one atom per option index, reused across filters and runs.
+  defp facet_key(index), do: String.to_atom("a2ui_facet_#{index}")
+
+  defp group_counts(query, name, leaf_counts) do
+    query
+    |> AshA2ui.Query.group_leaves(name)
+    |> Map.new(fn {group, leaves} ->
+      {group, leaves |> Enum.map(&Map.get(leaf_counts, &1, 0)) |> Enum.sum()}
+    end)
+  end
+
+  # The values a filter's options carry: a path filter's loaded options, a
+  # boolean's true/false, a field's declared choices, else the distinct
+  # values of the field over the read.
+  defp facet_values(resource, query, options, name) do
+    cond do
+      AshA2ui.Query.path_filter?(query, name) ->
+        Map.get(options, name, [])
+
+      field_type(resource, name) |> elem(0) |> Ash.Type.get_type() == Ash.Type.Boolean ->
+        [true, false]
+
+      (choices = AshA2ui.TypeMapper.choices(resource, name)) != [] ->
+        Enum.map(choices, &elem(&1, 0))
+
+      true ->
+        []
+    end
+  end
 
   defp put_marks(state, nil), do: state
   defp put_marks(state, marks), do: put_in(state, ["window", "marks"], marks)
@@ -466,16 +733,35 @@ defmodule AshA2ui.QueryRunner do
   defp inactive_filter_value?(value), do: value in [nil, ""]
 
   defp parse_filter(resource, query, key, value) do
-    case allowlisted(query.filters, key) do
+    case allowlisted(AshA2ui.Query.filter_names(query), key) do
       nil ->
         {:error,
          "Filter #{inspect(key)} is not allowlisted: it is not declared in the query's filters."}
 
-      field ->
-        case cast_filter_value(resource, field, value) do
-          {:ok, cast} -> {:ok, {field, cast}}
+      name ->
+        {cast_resource, field} = filter_field(resource, query, name)
+
+        case cast_filter_value(cast_resource, field, value) do
+          {:ok, cast} -> {:ok, {name, cast}}
           :error -> {:error, "Filter #{inspect(key)} value #{inspect(value)} is invalid."}
         end
+    end
+  end
+
+  # The resource and field a filter's values cast against: the field
+  # itself, a path filter's single field, or the terminal attribute of a
+  # path filter's relationship path on its destination.
+  defp filter_field(resource, query, name) do
+    case Keyword.get(query.path_filters, name) do
+      nil ->
+        {resource, name}
+
+      field when is_atom(field) ->
+        {resource, field}
+
+      path ->
+        {relationships, [attribute]} = Enum.split(path, -1)
+        {ResourceInfo.related(resource, relationships), attribute}
     end
   end
 
@@ -635,14 +921,25 @@ defmodule AshA2ui.QueryRunner do
   # Filters may target attributes or (expression-backed, verified at compile
   # time) public calculations; both carry a type + constraints to cast with.
   defp cast_filter_value(resource, field, value) do
-    %{type: type, constraints: constraints} =
-      ResourceInfo.attribute(resource, field) || ResourceInfo.calculation(resource, field)
+    {type, constraints} = field_type(resource, field)
 
     with {:ok, cast} <- Ash.Type.cast_input(type, value, constraints),
          {:ok, cast} <- Ash.Type.apply_constraints(type, cast, constraints) do
       {:ok, cast}
     else
       _error -> :error
+    end
+  end
+
+  # Attributes and calculations carry their type; an aggregate (a path
+  # filter's single field) casts as the field it aggregates.
+  defp field_type(resource, field) do
+    case ResourceInfo.attribute(resource, field) || ResourceInfo.calculation(resource, field) do
+      %{type: type, constraints: constraints} ->
+        {type, constraints}
+
+      nil ->
+        {AshA2ui.Verifiers.VerifyQueries.computed_type(resource, field) || Ash.Type.String, []}
     end
   end
 
@@ -683,12 +980,35 @@ defmodule AshA2ui.QueryRunner do
     end
   end
 
+  defp parse_page_size(%{page_size_options: [_ | _]} = query, state) do
+    case integer_or_default(Map.get(state, "pageSize"), query.page_size, "pageSize") do
+      {:ok, size} ->
+        if size == query.page_size or size in query.page_size_options do
+          {:ok, size |> min(query.max_page_size) |> max(1)}
+        else
+          {:error,
+           "Page size #{size} is not offered: use one of " <>
+             "#{inspect(Enum.uniq([query.page_size | query.page_size_options]))}."}
+        end
+
+      error ->
+        error
+    end
+  end
+
   defp parse_page_size(query, state) do
     case integer_or_default(Map.get(state, "pageSize"), query.page_size, "pageSize") do
       {:ok, size} -> {:ok, size |> min(query.max_page_size) |> max(1)}
       error -> error
     end
   end
+
+  # A size other than the one the state was read with starts at page 1.
+  defp resized_page(_page, page_size, %{"appliedPageSize" => applied})
+       when is_integer(applied) and applied != page_size,
+       do: 1
+
+  defp resized_page(page, _page_size, _state), do: page
 
   defp integer_or_default(nil, default, _key), do: {:ok, default}
   defp integer_or_default(value, _default, _key) when is_integer(value), do: {:ok, value}
@@ -722,14 +1042,35 @@ defmodule AshA2ui.QueryRunner do
 
   defp apply_preset(query, _no_filter_preset), do: query
 
-  defp apply_filters(query, filters) do
-    Enum.reduce(filters, query, fn
-      {field, values}, query when is_list(values) ->
-        Ash.Query.filter(query, ^ref(field) in ^values)
-
-      {field, value}, query ->
-        Ash.Query.filter(query, ^ref(field) == ^value)
+  defp apply_filters(ash_query, ui_query, filters) do
+    Enum.reduce(filters, ash_query, fn {name, value}, ash_query ->
+      Ash.Query.filter(ash_query, ^filter_condition(ui_query, name, value))
     end)
+  end
+
+  # A filter's condition: equality (membership for a list) on the field, on
+  # a path filter's single field, or on the terminal attribute through a
+  # path filter's relationship path (any related value matches).
+  defp filter_condition(ui_query, name, value) do
+    target = filter_ref(ui_query, name)
+
+    if is_list(value),
+      do: expr(^target in ^value),
+      else: expr(^target == ^value)
+  end
+
+  defp filter_ref(ui_query, name) do
+    case Keyword.get(ui_query.path_filters, name) do
+      nil ->
+        ref(name)
+
+      field when is_atom(field) ->
+        ref(field)
+
+      path ->
+        {relationships, [attribute]} = Enum.split(path, -1)
+        ref(relationships, attribute)
+    end
   end
 
   defp apply_ranges(query, ranges) do
@@ -810,8 +1151,15 @@ defmodule AshA2ui.QueryRunner do
   defp filters_state(query, active_filters) do
     active = Map.new(active_filters)
 
-    Map.new(query.filters, fn field ->
-      {to_string(field), stringify(Map.get(active, field, ""))}
+    Map.new(AshA2ui.Query.filter_names(query), fn field ->
+      value = Map.get(active, field, "")
+
+      value =
+        if AshA2ui.Query.multi_select?(query, field),
+          do: value |> List.wrap() |> Enum.reject(&(&1 == "")),
+          else: value
+
+      {to_string(field), stringify(value)}
     end)
   end
 

@@ -81,6 +81,44 @@ end
   tree; renderers that honour the `/query` state's `autoApply` hide it.
   A query with nothing to pick (sort and page size only) gets no controls
   card either way.
+- **Filter bar options (admin catalog 1.10).** All opt-in; a query
+  without them emits exactly what it did.
+  - `multi_select_filters [:status]` — a picker of several values
+    (`multipleSelection`, no "All"); `/query/filters/<name>` is a list
+    (`[]` = inactive) applied with `in`.
+  - `filter_groups status: [expiring: [:expiring_soon, :renewal_scheduled]]`
+    (+ `group_labels status: [expiring: "Expiring soon"]`) — nested
+    options. A group is UI only: the filter only ever receives leaf values,
+    so a link selecting a group lists its leaves
+    (`?q[filters][status][]=expiring_soon&...`). Leaves must be declared
+    choices, each in one group, and a group value is never also a leaf.
+  - `facet_counts true` (or a list) — per-option counts at
+    `/query/facets/<name>/<value>`, counted with search, ranges, the
+    preset, the context scope and every *other* filter, under the actor's
+    policies. One aggregate call per faceted filter (a filtered count per
+    option); keep option lists short.
+  - `filter_hints status: "..."` and `filter_labels vendor: "Vendor"` —
+    the picker's footer hint and label (the label defaults to the field's
+    declared `label`, then the humanized name).
+  - `path_filters property: [:lines, :property, :name], vendor: :vendor_name`
+    — filters over a related value: a relationship path (any related value
+    matches) or one attribute/aggregate/expression calculation. Use a
+    filtered aggregate when the path alone would match the wrong related
+    records (a vendor party, not the PMC). Options are the distinct values
+    of the read the actor can see, at `/query/options/<name>`. Values cast
+    to the terminal field's type. Admin catalog only.
+  - `search_placeholder "..."`, `controls_card false` (the bare Row under
+    the same `query<sfx>_controls` id) and `page_size_options [10, 20, 50]`
+    (each `<= max_page_size`; a size change starts at page 1).
+  - `empty_state`, `no_results_state` (with `clear_action`) and a preset's
+    `empty_state` — the admin grid's empty states; the runner writes the
+    one that applies to `/query/emptyState`. The variants need the query's
+    own `empty_state`.
+  - `search_fields` may name a string aggregate (`:vendor_name`) — searched
+    in the data layer like an attribute.
+  Under the basic catalog groups flatten to their leaves, and hints,
+  counts, placeholders and path-filter pickers are left out (the basic
+  schemas are strict).
 - On multi-table surfaces each named table may attach its own query; state
   lives at `/query/<component_name>` and the `query` action context requires
   `"component"` (the emitted controls send it automatically).

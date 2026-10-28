@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.9.0";
+export const ADMIN_CATALOG_VERSION = "1.10.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -302,12 +302,12 @@ export function createAshAdminCatalog(deps) {
     );
   }
 
-  const schemas = buildSchemas();
+  const schemas = buildSchemas(basicCatalog);
   const adminApis = Object.fromEntries(
     Object.keys(TAGS).map((kind) => [kind, {name: kind, schema: schemas[kind], tagName: TAGS[kind]}]),
   );
 
-  defineAdminElements(deps, {adminApis});
+  defineAdminElements(deps, {adminApis, inputSchemas: schemas.inputs});
 
   // The admin catalog extends the basic catalog: carry every basic component
   // (or the host's merged/overridden version of it), swapping the four input
@@ -317,7 +317,10 @@ export function createAshAdminCatalog(deps) {
   const modal = promptModalComponent(basicCatalog);
   const components = [...basicCatalog.components.values()].map((component) => {
     if (INPUT_OVERRIDE_KINDS.includes(component.name)) {
-      return {...component, tagName: INPUT_OVERRIDE_TAGS[component.name]};
+      // 1.10: ChoicePicker and TextField validate against their extended
+      // schemas (the basic ones are strict and reject the added keys).
+      const schema = schemas.inputs[component.name] || component.schema;
+      return {...component, schema, tagName: INPUT_OVERRIDE_TAGS[component.name]};
     }
     if (component.name === "Modal" && modal) return modal;
     return component;
@@ -373,7 +376,7 @@ export function createAshAdminCatalog(deps) {
  * contract allows it, so the Elixir encoder can add props without breaking
  * component validation.
  */
-export function buildSchemas() {
+export function buildSchemas(basicCatalog = null) {
   // --- static primitives on web_core's own zod ------------------------------
   // Derived once from web_core's exported schemas via public zod-3
   // accessors (`.shape`, `.unwrap()`, static `.create()`), so static props
@@ -399,7 +402,36 @@ export function buildSchemas() {
   // values (dispatchAction drops payloads without an `event`).
   const bareEvent = () => EmptyObject.extend({name: Str, context: RecordAny.optional()});
 
+  // 1.10: the basic ChoicePicker and TextField, extended with the keys the
+  // admin emission adds (both basic schemas are strict). ChoicePicker:
+  // `hint` (static), `counts` and `dynamicOptions` (bindings: a value→count
+  // map and an option list from the query state) and options that may carry
+  // `parent` / `group`. TextField: `placeholder`. Kept as the basic schema
+  // when the host's catalog has none to extend.
+  const inputs = {};
+  const choice = basicCatalog?.components?.get?.("ChoicePicker")?.schema;
+  if (choice && typeof choice.extend === "function") {
+    inputs.ChoicePicker = choice.extend({
+      options: ArrayOf(
+        EmptyObject.extend({
+          label: DynamicStringSchema,
+          value: Str,
+          parent: Str.optional(),
+          group: Bool.optional(),
+        }),
+      ),
+      hint: Str.optional(),
+      counts: DynamicValueSchema.optional(),
+      dynamicOptions: DynamicValueSchema.optional(),
+    });
+  }
+  const text = basicCatalog?.components?.get?.("TextField")?.schema;
+  if (text && typeof text.extend === "function") {
+    inputs.TextField = text.extend({placeholder: Str.optional()});
+  }
+
   return {
+    inputs,
     entityPage: EmptyObject.extend({
       title: DynamicStringSchema,
       description: DynamicStringSchema.nullable().optional(),
@@ -433,6 +465,14 @@ export function buildSchemas() {
           icon: RecordAny.optional(),
           more: RecordAny.optional(),
           detail: RecordAny.optional(),
+          // 1.10: header help ({title, body}) and the field a header
+          // sorts by when it is not the column's own path.
+          help: RecordAny.optional(),
+          sortField: Str.optional(),
+          // 1.10: a fixed width in px, and the plural noun of the "+N
+          // more" list (more.valuesPath names the row's list of values).
+          width: Num.optional(),
+          moreNoun: Str.optional(),
         }),
       ),
       // Row arrays / a "/rows" binding / a function call — DynamicValue's
@@ -476,6 +516,8 @@ export function buildSchemas() {
         labelPath: Str.optional(),
         variantPath: Str.optional(),
         inline: Bool.optional(),
+        // 1.10: the inline button column's fixed width in px.
+        width: Num.optional(),
       }).optional(),
       // 1.7: {path, action} — the current sort's binding ({field, dir} or
       // null) and the query envelope a sortable header dispatches. Static,
@@ -489,6 +531,14 @@ export function buildSchemas() {
 
     emptyState: EmptyObject.extend({
       message: DynamicStringSchema.nullable().optional(),
+      // 1.10: a declared empty state — title and icon (inbox | search |
+      // archive) bound like the message, and the clear action
+      // ({label, action}: the query envelope sent after the client clears
+      // search and filters) shown while clearVisible.
+      title: DynamicStringSchema.nullable().optional(),
+      icon: DynamicStringSchema.nullable().optional(),
+      clearAction: RecordAny.optional(),
+      clearVisible: DynamicBooleanSchema.nullable().optional(),
       child: Str.optional(),
       children: ChildListSchema.optional(),
       accessibility: Any.optional(),
@@ -510,6 +560,10 @@ export function buildSchemas() {
       // stays accepted for older emissions.
       previousAction: bareEvent().optional(),
       nextAction: bareEvent().optional(),
+      // 1.10: the page sizes offered and the envelope sent (with the picked
+      // pageSize, page 1) when one is picked.
+      pageSizeOptions: ArrayOf(Num).optional(),
+      pageSizeAction: bareEvent().optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -615,6 +669,43 @@ export function buildSchemas() {
 
 function str(value) {
   return value === null || value === undefined ? "" : String(value);
+}
+
+/** 1.10 empty-state icons (Feather-style paths, 24-unit viewBox). */
+const EMPTY_ICONS = {
+  inbox:
+    "M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+  search: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35",
+  archive: "M21 8v13H3V8 M1 3h22v5H1z M10 12h4",
+};
+
+/** The field a column's header sorts by: its `sortField` (1.10), else its path. */
+function sortField(column) {
+  return typeof column?.sortField === "string" && column.sortField !== ""
+    ? column.sortField
+    : column?.path;
+}
+
+/**
+ * A column help body (1.10) as paragraphs: blank lines separate them, and a
+ * line `**Term** — text` is a definition `{term, text}`.
+ */
+function helpParagraphs(body) {
+  const definition = (line) => line.match(/^\*\*(.+?)\*\*\s*[—–-]\s*(.*)$/);
+  return String(body)
+    .split(/\n\s*\n/)
+    .flatMap((block) => {
+      const lines = block.split("\n").map((line) => line.trim()).filter((line) => line !== "");
+      if (lines.length === 0) return [];
+      // A block of definitions is one entry per line; prose lines join.
+      if (lines.every((line) => definition(line))) {
+        return lines.map((line) => {
+          const [, term, text] = definition(line);
+          return {term, text};
+        });
+      }
+      return [{text: lines.join(" ")}];
+    });
 }
 
 /** The cell alignment class of a DataGrid column (`align` hint). */
@@ -760,7 +851,7 @@ function buildSubmitFormContext(surface) {
  * and hot reloads). All classes are created inside the factory so they close
  * over the host's single Lit instance and the freshly-built APIs.
  */
-function defineAdminElements(deps, {adminApis}) {
+function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   const {basicCatalog, A2uiLitElement, A2uiController, lit} = deps;
   const {html, css, nothing} = lit;
   const {shared, buttons, content} = createAdminStyles(css);
@@ -969,7 +1060,8 @@ function defineAdminElements(deps, {adminApis}) {
     if (!entry) {
       throw new Error(`createAshAdminCatalog: basicCatalog has no ${name} component to extend.`);
     }
-    return {name: entry.name, schema: entry.schema, tagName: INPUT_OVERRIDE_TAGS[name]};
+    const schema = inputSchemas[name] || entry.schema;
+    return {name: entry.name, schema, tagName: INPUT_OVERRIDE_TAGS[name]};
   }
 
   // --- EntityPage: page shell ---------------------------------------------
@@ -1478,11 +1570,34 @@ function defineAdminElements(deps, {adminApis}) {
         `;
       }
 
+      /**
+       * 1.10 column help: an info mark after the header label opening the
+       * column's help (title, paragraphs, `**Term** — text` definitions) in
+       * a disclosure.
+       */
+      renderColumnHelp(column) {
+        const help = column?.help;
+        if (!help || typeof help.body !== "string" || help.body === "") return nothing;
+        const title = str(help.title);
+        const label = title ? `About ${title}` : `About ${str(column.label)}`;
+        return html`<details class="am-col-help" @click=${(event) => event.stopPropagation()}>
+          <summary class="am-help-mark" aria-label=${label}>ⓘ</summary>
+          <div class="am-col-help-body" role="note">
+            ${title ? html`<strong class="am-col-help-title">${title}</strong>` : nothing}
+            ${helpParagraphs(help.body).map((paragraph) =>
+              paragraph.term
+                ? html`<p><strong>${paragraph.term}</strong> — ${paragraph.text}</p>`
+                : html`<p>${paragraph.text}</p>`,
+            )}
+          </div>
+        </details>`;
+      }
+
       /** The column's current sort direction ("asc" | "desc") or null. */
       sortDirection(column) {
         const path = this.controller?.props?.sort?.path;
         const current = path ? this.surface?.dataModel?.get(path) : null;
-        return current && current.field === column.path ? current.dir : null;
+        return current && current.field === sortField(column) ? current.dir : null;
       }
 
       /**
@@ -1491,13 +1606,16 @@ function defineAdminElements(deps, {adminApis}) {
        */
       renderHeader(column) {
         const label = str(column.label);
+        const help = this.renderColumnHelp(column);
+        // 1.10: a fixed column width.
+        const width = Number.isInteger(column.width) ? `width: ${column.width}px` : nothing;
         if (!column.sortable || !this.controller?.props?.sort) {
-          return html`<th scope="col" class=${alignClass(column)}>${label}</th>`;
+          return html`<th scope="col" class=${alignClass(column)} style=${width}>${label}${help}</th>`;
         }
         const dir = this.sortDirection(column);
         const ariaSort = dir === "asc" ? "ascending" : dir === "desc" ? "descending" : "none";
         const mark = dir === "asc" ? "\u2191" : dir === "desc" ? "\u2193" : "\u2195";
-        return html`<th scope="col" class=${alignClass(column)} aria-sort=${ariaSort}>
+        return html`<th scope="col" class=${alignClass(column)} aria-sort=${ariaSort} style=${width}>
           <button
             type="button"
             class="sort-button"
@@ -1505,7 +1623,7 @@ function defineAdminElements(deps, {adminApis}) {
             @click=${() => this.sortBy(column)}
           >
             <span>${label}</span><span class="sort-mark" aria-hidden="true">${mark}</span>
-          </button>
+          </button>${help}
         </th>`;
       }
 
@@ -1526,7 +1644,7 @@ function defineAdminElements(deps, {adminApis}) {
           "/",
         );
         const context = resolved.event.context;
-        context.query = {...(context.query || {}), sort: {field: column.path, dir}};
+        context.query = {...(context.query || {}), sort: {field: sortField(column), dir}};
         surface.dispatchAction(resolved, this.context.componentModel.id);
       }
 
@@ -1608,6 +1726,12 @@ function defineAdminElements(deps, {adminApis}) {
         const label = column.icon ? str(getByPath(row, column.icon.labelPath)) : "";
         const tone = column.icon?.tonePath ? badgeTone(getByPath(row, column.icon.tonePath)) : "neutral";
         const more = moreCount(at(column.more));
+        // 1.10: all the values behind the tag, listed in its title.
+        const moreValues =
+          typeof column.more?.valuesPath === "string" ? getByPath(row, column.more.valuesPath) : null;
+        const moreTitle = Array.isArray(moreValues)
+          ? `${moreValues.length} ${str(column.moreNoun) || "values"}: ${moreValues.join(", ")}`
+          : "";
         const subtitle = at(column.subtitle);
         const detail = column.detail
           ? detailText(at(column.detail), column.detail.datePath ? getByPath(row, column.detail.datePath) : null)
@@ -1620,6 +1744,11 @@ function defineAdminElements(deps, {adminApis}) {
           typeof column.detail?.iconTonePath === "string"
             ? badgeTone(getByPath(row, column.detail.iconTonePath))
             : "neutral";
+        // 1.10: a detail line's explanation, an info mark with a tooltip.
+        const detailHelp =
+          detail && typeof column.detail.helpPath === "string"
+            ? str(getByPath(row, column.detail.helpPath))
+            : "";
 
         return html`<span class="am-cell">
           <span class="am-cell-line">
@@ -1643,7 +1772,11 @@ function defineAdminElements(deps, {adminApis}) {
                 </svg>`
               : nothing}
             <span>${value}</span>
-            ${more > 0 ? html`<span class="am-badge" data-tone="neutral">+${more} more</span>` : nothing}
+            ${more > 0
+              ? html`<span class="am-badge" data-tone="neutral" title=${moreTitle || nothing}
+                  >+${more} more</span
+                >`
+              : nothing}
           </span>
           ${subtitle === null || subtitle === undefined || subtitle === ""
             ? nothing
@@ -1665,7 +1798,16 @@ function defineAdminElements(deps, {adminApis}) {
                   >
                     <path d=${detailIcon.join(" ")}></path>
                   </svg>`
-                : nothing}<span>${detail}</span></span>`
+                : nothing}<span>${detail}</span>${detailHelp
+                ? html`<span
+                    class="am-help-mark"
+                    role="img"
+                    tabindex="0"
+                    title=${detailHelp}
+                    aria-label=${detailHelp}
+                    >ⓘ</span
+                  >`
+                : nothing}</span>`
             : nothing}
         </span>`;
       }
@@ -2058,6 +2200,7 @@ function defineAdminElements(deps, {adminApis}) {
     class AshAdminEmptyState extends A2uiLitElement {
       static styles = [
         shared,
+        buttons,
         css`
           :host {
             display: block;
@@ -2080,6 +2223,11 @@ function defineAdminElements(deps, {adminApis}) {
             background: var(--am-surface-sunken);
             border: 1px solid var(--am-border);
             color: var(--am-text-faint);
+          }
+          .empty-title {
+            margin: 0;
+            font-size: var(--am-font-size-l, 1.125rem);
+            font-weight: var(--am-font-weight-semibold);
           }
           .empty-message {
             margin: 0;
@@ -2125,13 +2273,54 @@ function defineAdminElements(deps, {adminApis}) {
                 stroke-linejoin="round"
                 aria-hidden="true"
               >
-                <path d="M4 7h16M4 12h16M4 17h10"></path>
+                <path d=${EMPTY_ICONS[str(props.icon)] || "M4 7h16M4 12h16M4 17h10"}></path>
               </svg>
             </span>
+            ${props.title ? html`<h3 class="empty-title">${str(props.title)}</h3>` : nothing}
             <p class="empty-message">${str(props.message)}</p>
             ${action.length > 0 ? html`<div class="empty-action">${action}</div>` : nothing}
+            ${this.renderClear(props)}
           </div>
         `;
+      }
+
+      /** 1.10: the clear action, while clearVisible. */
+      renderClear(props) {
+        const clear = props.clearAction;
+        if (!clear || props.clearVisible !== true || !clear.action?.name) return nothing;
+        return html`<div class="empty-action">
+          <button type="button" class="am-btn am-btn-primary" @click=${() => this.clear()}>
+            ${str(clear.label)}
+          </button>
+        </div>`;
+      }
+
+      /**
+       * Clears search, filters and ranges in the query state the clear
+       * action names, then sends it (page 1).
+       */
+      clear() {
+        const clear = this.controller?.props?.clearAction;
+        const context = this.context;
+        const surface = context?.dataContext?.surface;
+        if (!clear?.action || !surface || !context.componentModel) return;
+        const queryPath = clear.action.context?.query?.path;
+        if (typeof queryPath === "string") {
+          const state = surface.dataModel.get(queryPath) || {};
+          surface.dataModel.set(`${queryPath}/search`, "");
+          for (const [name, value] of Object.entries(state.filters || {})) {
+            surface.dataModel.set(`${queryPath}/filters/${name}`, Array.isArray(value) ? [] : "");
+          }
+          for (const name of Object.keys(state.ranges || {})) {
+            surface.dataModel.set(`${queryPath}/ranges/${name}`, {from: "", to: ""});
+          }
+        }
+        const resolved = resolveEventContext(
+          {event: {name: clear.action.name, context: clear.action.context || {}}},
+          surface.dataModel,
+          "/",
+        );
+        surface.dispatchAction(resolved, context.componentModel.id);
       }
     }
 
@@ -2215,6 +2404,22 @@ function defineAdminElements(deps, {adminApis}) {
             color: var(--am-text-muted);
             padding: 0 var(--am-space-2xs);
           }
+          /* 1.10: the rows-per-page select. */
+          .pager-size {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--am-space-xs);
+            font-size: var(--am-font-size-s);
+            color: var(--am-text-muted);
+          }
+          .pager-size select {
+            font: inherit;
+            color: var(--am-text);
+            background: var(--am-surface);
+            border: var(--am-border-width) solid var(--am-border);
+            border-radius: var(--am-radius-s);
+            padding: var(--am-space-2xs) var(--am-space-xs);
+          }
         `,
       ];
 
@@ -2230,7 +2435,17 @@ function defineAdminElements(deps, {adminApis}) {
       render() {
         const props = this.controller?.props;
         if (!props) return nothing;
-        if (props.visible !== true) return nothing;
+        if (props.visible !== true) {
+          // 1.10: with page sizes to pick, the size select stays while there
+          // are more records than the smallest size shows.
+          if (!this.pageSizeOffered(props)) return nothing;
+          return html`<nav class="pager" aria-label=${str(props.label) || "Results"}>
+            ${props.rangeText
+              ? html`<span class="pager-range">${str(props.rangeText)}</span>`
+              : nothing}
+            ${this.renderPageSize(props)}
+          </nav>`;
+        }
 
         const showPrevious = props.previousVisible === true;
         const showNext = props.nextVisible === true;
@@ -2267,6 +2482,7 @@ function defineAdminElements(deps, {adminApis}) {
                 ? html`<span class="pager-range">${str(props.rangeText)}</span>`
                 : nothing}
             </span>
+            ${this.renderPageSize(props)}
             ${showNext
               ? html`
                   <button
@@ -2333,8 +2549,64 @@ function defineAdminElements(deps, {adminApis}) {
             ${props.rangeText
               ? html`<span class="pager-range">${str(props.rangeText)}</span>`
               : nothing}
+            ${this.renderPageSize(props)}
           </nav>
         `;
+      }
+
+      /** The page sizes offered (1.10 `pageSizeOptions`), or []. */
+      pageSizeOptions(props) {
+        return Array.isArray(props.pageSizeOptions)
+          ? props.pageSizeOptions.map(Number).filter((size) => Number.isInteger(size) && size > 0)
+          : [];
+      }
+
+      /** Whether a size select is worth showing: more records than the
+       * smallest size holds (or an unknown total past the first page). */
+      pageSizeOffered(props) {
+        const sizes = this.pageSizeOptions(props);
+        if (sizes.length === 0 || !props.pageSizeAction) return false;
+        const total = Number(props.total);
+        if (props.total === null || props.total === undefined || !Number.isFinite(total)) {
+          return props.hasNext === true;
+        }
+        return total > Math.min(...sizes);
+      }
+
+      renderPageSize(props) {
+        const sizes = this.pageSizeOptions(props);
+        if (sizes.length === 0 || !props.pageSizeAction) return nothing;
+        const current = Number(props.pageSize);
+        const id = `${this.context?.componentModel?.id || "pagination"}-size`;
+        return html`<label class="pager-size" for=${id}>
+          <span>Rows per page</span>
+          <select
+            id=${id}
+            class="am-select"
+            @change=${(event) => this.setPageSize(Number(event.target.value))}
+          >
+            ${sizes.map(
+              (size) => html`<option value=${size} ?selected=${size === current}>${size}</option>`,
+            )}
+          </select>
+        </label>`;
+      }
+
+      /** Sends the pageSizeAction envelope (page 1) with the picked size. */
+      setPageSize(size) {
+        const props = this.controller?.props;
+        const envelope = props?.pageSizeAction;
+        const context = this.context;
+        const surface = context?.dataContext?.surface;
+        if (!envelope || !surface || !context.componentModel || !Number.isInteger(size)) return;
+        const resolved = resolveEventContext(
+          {event: {name: envelope.name, context: envelope.context || {}}},
+          surface.dataModel,
+          "/",
+        );
+        const eventContext = resolved.event.context;
+        eventContext.query = {...(eventContext.query || {}), pageSize: size, page: 1};
+        surface.dispatchAction(resolved, context.componentModel.id);
       }
 
       /**
@@ -3050,6 +3322,9 @@ function defineAdminElements(deps, {adminApis}) {
           :host {
             display: block;
           }
+          :host([hidden]) {
+            display: none;
+          }
           .banner {
             display: flex;
             align-items: flex-start;
@@ -3097,7 +3372,12 @@ function defineAdminElements(deps, {adminApis}) {
 
       willUpdate(changedProperties) {
         super.willUpdate(changedProperties);
-        applyWeight(this, this.controller?.props);
+        const props = this.controller?.props;
+        applyWeight(this, props);
+        // 1.10: with no feedback to show the banner takes no layout space
+        // (a page body's gap would otherwise open around an empty host).
+        const kind = props?.kind === null || props?.kind === undefined ? "" : String(props.kind);
+        this.toggleAttribute("hidden", kind === "");
       }
 
       render() {
@@ -3767,6 +4047,14 @@ function defineAdminElements(deps, {adminApis}) {
             --tone: var(--am-diagram-neutral);
             --ink: var(--am-diagram-neutral-ink);
           }
+          .marker[data-tone="pending"] {
+            --tone: var(--ash-admin-diagram-pending, var(--am-pending));
+            --ink: var(--ash-admin-diagram-pending-ink, #ffffff);
+          }
+          .marker[data-tone="gray"] {
+            --tone: var(--ash-admin-diagram-gray, var(--am-gray));
+            --ink: var(--ash-admin-diagram-gray-ink, #ffffff);
+          }
           .marker[data-status="waiting"] {
             border-style: dashed;
             border-color: var(--tone);
@@ -4278,6 +4566,7 @@ function defineAdminElements(deps, {adminApis}) {
               ? html`<textarea
                   id=${inputId}
                   class="control"
+                  placeholder=${props.placeholder ? str(props.placeholder) : nothing}
                   .value=${props.value ?? ""}
                   aria-invalid=${invalid ? "true" : "false"}
                   aria-describedby=${invalid ? errorId : ""}
@@ -4287,6 +4576,7 @@ function defineAdminElements(deps, {adminApis}) {
                   id=${inputId}
                   class="control"
                   type=${type}
+                  placeholder=${props.placeholder ? str(props.placeholder) : nothing}
                   .value=${props.value ?? ""}
                   aria-invalid=${invalid ? "true" : "false"}
                   aria-describedby=${invalid ? errorId : ""}
@@ -4363,6 +4653,14 @@ function defineAdminElements(deps, {adminApis}) {
         shared,
         inputBaseStyles,
         css`
+          .hint {
+            margin-top: var(--am-space-2xs);
+            font-size: var(--am-font-size-xs);
+            color: var(--am-text-muted);
+          }
+          .choice-leaf {
+            padding-inline-start: var(--am-space-l);
+          }
           select.control {
             appearance: none;
             background-image: linear-gradient(45deg, transparent 50%, var(--am-text-muted) 50%),
@@ -4403,7 +4701,12 @@ function defineAdminElements(deps, {adminApis}) {
         // (e.g. AshA2ui's /query/filters/<name>); accept both.
         const raw = props.value;
         const selected = Array.isArray(raw) ? raw : raw == null ? [] : [String(raw)];
-        const options = Array.isArray(props.options) ? props.options : [];
+        // 1.10: a path filter's options arrive bound (`dynamicOptions`),
+        // after any static ones.
+        const options = [
+          ...(Array.isArray(props.options) ? props.options : []),
+          ...(Array.isArray(props.dynamicOptions) ? props.dynamicOptions : []),
+        ];
         const baseId = this.context?.componentModel?.id || "choice";
         const errorId = `${baseId}-error`;
         const errors = fieldErrors(props, this._amErrText);
@@ -4441,19 +4744,37 @@ function defineAdminElements(deps, {adminApis}) {
               ${hasMatch
                 ? nothing
                 : html`<option value="" disabled selected hidden>Select…</option>`}
-              ${options.map(
-                (option) => html`
-                  <option value=${option.value} ?selected=${option.value === current}>
-                    ${option.label}
-                  </option>
-                `,
-              )}
+              ${options
+                .filter((option) => option.group !== true)
+                .map(
+                  (option) => html`
+                    <option value=${option.value} ?selected=${option.value === current}>
+                      ${option.label}${this.countText(props, option)}
+                    </option>
+                  `,
+                )}
             </select>
+            ${this.renderHint(props, baseId)}
             ${invalid
               ? html`<div class="error" id=${`${baseId}-error`}>${errors[0]}</div>`
               : nothing}
           </div>
         `;
+      }
+
+      /** " (n)" from the 1.10 `counts` map, for an option with a value. */
+      countText(props, option) {
+        const counts = props.counts;
+        if (!counts || typeof counts !== "object" || option.value === "") return "";
+        const count = counts[option.value];
+        return typeof count === "number" ? ` (${count})` : "";
+      }
+
+      /** The 1.10 `hint`, under the options. */
+      renderHint(props, baseId) {
+        return props.hint
+          ? html`<div class="hint" id=${`${baseId}-hint`}>${str(props.hint)}</div>`
+          : nothing;
       }
 
       renderCheckboxes(props, options, selected, baseId, errors) {
@@ -4466,26 +4787,65 @@ function defineAdminElements(deps, {adminApis}) {
             props.setValue([...selected, value]);
           }
         };
+        // 1.10 groups: a group selects (or clears) all its leaves; only leaf
+        // values are ever written.
+        const leavesOf = (group) =>
+          options.filter((option) => option.parent === group).map((option) => option.value);
+        const toggleGroup = (group) => {
+          if (!props.setValue) return;
+          const leaves = leavesOf(group);
+          const all = leaves.every((leaf) => selected.includes(leaf));
+          props.setValue(
+            all
+              ? selected.filter((item) => !leaves.includes(item))
+              : [...selected, ...leaves.filter((leaf) => !selected.includes(leaf))],
+          );
+        };
 
         return html`
           <div class="field">
-            <fieldset class="choices" aria-describedby=${errors.length ? errorId : ""}>
+            <fieldset
+              class="choices"
+              aria-describedby=${[errors.length ? errorId : "", props.hint ? `${baseId}-hint` : ""]
+                .filter(Boolean)
+                .join(" ")}
+            >
               ${props.label ? html`<legend class="choices-legend">${props.label}</legend>` : nothing}
               ${options.map((option, index) => {
                 const optionId = `${baseId}-opt-${index}`;
+                if (option.group === true) {
+                  const leaves = leavesOf(option.value);
+                  const picked = leaves.filter((leaf) => selected.includes(leaf)).length;
+                  return html`
+                    <label class="choice choice-group" for=${optionId}>
+                      <input
+                        id=${optionId}
+                        type="checkbox"
+                        .checked=${leaves.length > 0 && picked === leaves.length}
+                        .indeterminate=${picked > 0 && picked < leaves.length}
+                        @change=${() => toggleGroup(option.value)}
+                      />
+                      ${option.label}${this.countText(props, option)}
+                    </label>
+                  `;
+                }
                 return html`
-                  <label class="choice" for=${optionId}>
+                  <label
+                    class=${option.parent ? "choice choice-leaf" : "choice"}
+                    for=${optionId}
+                  >
                     <input
                       id=${optionId}
                       type="checkbox"
                       .checked=${selected.includes(option.value)}
                       @change=${() => toggle(option.value)}
                     />
-                    ${option.label}
+                    ${option.label}${this.countText(props, option)}
                   </label>
                 `;
               })}
             </fieldset>
+            ${this.renderHint(props, baseId)}
             ${errors.length > 0 ? html`<div class="error" id=${errorId}>${errors[0]}</div>` : nothing}
           </div>
         `;

@@ -99,7 +99,7 @@ defmodule AshA2ui.Board.BoardSwimlanesVerifierTest do
 
     # Tones come from the badge_tones vocabulary.
     assert compile_ui(swimlanes("swimlanes_by :severity\nswimlane_tones low: :red")) =~
-             ~r/swimlane_tones for :low must be one of :neutral, :info, :success, :warning, :danger, :accent, got: :red/
+             ~r/swimlane_tones for :low must be one of :neutral, :info, :success, :warning, :danger, :accent, :pending, :gray, got: :red/
 
     # No two swimlanes share a runtime name.
     assert compile_ui(swimlanes("swimlanes_by :severity\nswimlane_values [:low, \"low\"]")) =~

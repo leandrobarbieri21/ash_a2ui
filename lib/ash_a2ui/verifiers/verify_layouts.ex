@@ -308,6 +308,24 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
                "without a detail field"
          )}
 
+      is_nil(column.more) and not is_nil(Map.get(column, :more_values)) ->
+        {:error,
+         error(module, path,
+           message: "column #{inspect(column.name)} declares more_values without a more field"
+         )}
+
+      is_nil(column.detail) and not is_nil(Map.get(column, :detail_help)) ->
+        {:error,
+         error(module, path,
+           message: "column #{inspect(column.name)} declares detail_help without a detail field"
+         )}
+
+      is_nil(Map.get(column, :help)) and not is_nil(Map.get(column, :help_title)) ->
+        {:error,
+         error(module, path,
+           message: "column #{inspect(column.name)} declares help_title without help"
+         )}
+
       true ->
         verify_column_mappings(column, path, module)
     end

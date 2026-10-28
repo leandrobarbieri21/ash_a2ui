@@ -17,6 +17,7 @@ defmodule AshA2ui.PrimaryAction do
     labels: [],
     variants: [],
     variant: :default,
+    width: nil,
     __spark_metadata__: nil
   ]
 
@@ -27,7 +28,8 @@ defmodule AshA2ui.PrimaryAction do
           label: String.t() | nil,
           labels: keyword(String.t()),
           variants: keyword(variant),
-          variant: variant
+          variant: variant,
+          width: pos_integer | nil
         }
 
   @variants [:default, :primary, :borderless]

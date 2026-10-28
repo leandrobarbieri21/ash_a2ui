@@ -133,6 +133,11 @@ export function createAdminStyles(css) {
       --am-success-subtle: var(--ash-admin-success-subtle, #ecfdf5);
       --am-warning: var(--ash-admin-warning, #b45309);
       --am-warning-subtle: var(--ash-admin-warning-subtle, #fffbeb);
+      /* 1.10 tones: pending (gold) and gray (distinct from neutral). */
+      --am-pending: var(--ash-admin-pending, #8a6d00);
+      --am-pending-subtle: var(--ash-admin-pending-subtle, #fef9c3);
+      --am-gray: var(--ash-admin-gray, #475569);
+      --am-gray-subtle: var(--ash-admin-gray-subtle, #e2e8f0);
       --am-error: var(--ash-admin-error, #b91c1c);
       --am-error-subtle: var(--ash-admin-error-subtle, #fef2f2);
       --am-error-strong: var(--ash-admin-error-strong, #991b1b);
@@ -375,6 +380,14 @@ export function createAdminStyles(css) {
       background: var(--ash-admin-badge-accent-background, var(--am-primary));
       color: var(--ash-admin-badge-accent-text, var(--am-on-primary));
     }
+    .am-badge[data-tone="pending"] {
+      background: var(--ash-admin-badge-pending-background, var(--am-pending-subtle));
+      color: var(--ash-admin-badge-pending-text, var(--am-pending));
+    }
+    .am-badge[data-tone="gray"] {
+      background: var(--ash-admin-badge-gray-background, var(--am-gray-subtle));
+      color: var(--ash-admin-badge-gray-text, var(--am-gray));
+    }
     /* 1.8 column cells: a second line, a leading icon, a "+N more" tag
      * and a detail line, all tokens. */
     .am-cell {
@@ -408,6 +421,64 @@ export function createAdminStyles(css) {
     .am-cell-icon[data-tone="accent"] {
       color: var(--am-primary);
     }
+    .am-cell-icon[data-tone="pending"] {
+      color: var(--am-pending);
+    }
+    .am-cell-icon[data-tone="gray"] {
+      color: var(--am-gray);
+    }
+    /* 1.10: the info mark of a column's help and of a detail line. */
+    .am-help-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-inline-start: var(--am-space-2xs);
+      color: var(--am-text-muted);
+      font-size: var(--am-font-size-xs);
+      font-weight: var(--am-font-weight-regular, 400);
+      line-height: 1;
+      cursor: help;
+      border-radius: var(--am-radius-pill);
+    }
+    .am-help-mark:focus-visible {
+      outline: 2px solid var(--am-focus);
+      outline-offset: 2px;
+    }
+    .am-col-help {
+      display: inline-block;
+      position: relative;
+    }
+    .am-col-help > summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .am-col-help > summary::-webkit-details-marker {
+      display: none;
+    }
+    .am-col-help-body {
+      position: absolute;
+      z-index: 10;
+      inset-block-start: calc(100% + var(--am-space-xs));
+      inset-inline-start: 0;
+      width: max-content;
+      max-width: 20rem;
+      padding: var(--am-space-s) var(--am-space-m);
+      background: var(--am-surface-raised);
+      color: var(--am-text);
+      border: var(--am-border-width) solid var(--am-border);
+      border-radius: var(--am-radius-m);
+      box-shadow: var(--am-shadow-2);
+      font-size: var(--am-font-size-s, 0.875rem);
+      font-weight: var(--am-font-weight-regular, 400);
+      text-align: start;
+      white-space: normal;
+    }
+    .am-col-help-body p {
+      margin: var(--am-space-2xs) 0 0;
+    }
+    .am-col-help-title {
+      display: block;
+    }
     .am-cell-sub,
     .am-cell-detail {
       font-size: var(--am-font-size-xs);
@@ -438,7 +509,16 @@ export function createAdminStyles(css) {
 }
 
 /** The badge tone vocabulary (row_layout `badge_tones`). */
-export const BADGE_TONES = ["neutral", "info", "success", "warning", "danger", "accent"];
+export const BADGE_TONES = [
+  "neutral",
+  "info",
+  "success",
+  "warning",
+  "danger",
+  "accent",
+  "pending",
+  "gray",
+];
 
 /**
  * The data grid's cell icons (catalog 1.8 column `icon`): each generic name

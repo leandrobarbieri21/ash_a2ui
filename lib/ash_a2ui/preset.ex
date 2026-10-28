@@ -25,6 +25,8 @@ defmodule AshA2ui.Preset do
     :filter,
     :read_action,
     :calendar_anchor,
+    :empty_state,
+    hide_controls: false,
     __spark_metadata__: nil
   ]
 
@@ -32,6 +34,8 @@ defmodule AshA2ui.Preset do
           name: atom,
           filter: [{atom, term}] | nil,
           read_action: atom | nil,
-          calendar_anchor: integer | nil
+          calendar_anchor: integer | nil,
+          empty_state: keyword | nil,
+          hide_controls: boolean
         }
 end

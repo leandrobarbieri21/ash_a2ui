@@ -366,7 +366,9 @@ defmodule AshA2ui.QueryDslTest do
       assert result =~ ~r/expression-backed calculations/
     end
 
-    test "aggregate in search_fields does not compile cleanly" do
+    # A string aggregate may be searched (see query_hub_test.exs); a count
+    # cannot.
+    test "a non-string aggregate in search_fields does not compile cleanly" do
       result =
         capture_io(:stderr, fn ->
           defmodule AggregateSearch do
@@ -405,8 +407,7 @@ defmodule AshA2ui.QueryDslTest do
           end
         end)
 
-      assert result =~ ~r/references unknown field :comment_count in search_fields/
-      assert result =~ ~r/public string-typed attribute/
+      assert result =~ ~r/search_fields entry :comment_count must resolve to a string/
     end
 
     test "table referencing an undeclared query does not compile cleanly" do
