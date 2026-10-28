@@ -15,6 +15,7 @@
  *   - does nothing on a query without `autoApply`.
  */
 
+import {existsSync} from "node:fs";
 import {dirname, join, resolve} from "node:path";
 import {fileURLToPath, pathToFileURL} from "node:url";
 
@@ -25,9 +26,11 @@ const index = args.indexOf("--node-modules");
 const nodeModules =
   index !== -1 ? args[index + 1] : join(repoPrivJs, "../../../clinic-demo/assets/node_modules");
 
-const {DataModel} = await import(
-  pathToFileURL(join(nodeModules, "@a2ui/web_core/src/v0_9/state/data-model.js")).href
-);
+// DataModel moved out of v0_9/ in @a2ui/web_core 0.12.
+const dataModelPath = ["src/state/data-model.js", "src/v0_9/state/data-model.js"]
+  .map((path) => join(nodeModules, "@a2ui/web_core", path))
+  .find((path) => existsSync(path));
+const {DataModel} = await import(pathToFileURL(dataModelPath).href);
 const {autoApplyConfig, watchAutoApply, unwatchAutoApply} = await import(
   pathToFileURL(join(repoPrivJs, "ash_a2ui_catalog.js")).href
 );

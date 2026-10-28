@@ -86,11 +86,11 @@
  *
  * The anatomy overrides subclass the upstream Text and Button elements.
  * No published `@a2ui/web_core` or `@a2ui/lit` entry point exports those
- * classes, so they are resolved at RUNTIME from the custom-element
- * registry: `customElements.get(basicCatalog.components.get("Text").tagName)`.
- * Importing `@a2ui/lit/v0_9` (which is where the host gets `basicCatalog`)
- * registers them, so they are always present by the time the factory
- * runs. Subclassing keeps markdown rendering, controller wiring, action
+ * classes, so they are resolved at RUNTIME from the basic catalog's entry:
+ * its `element` on @a2ui 0.12+, where the renderer defines a basic element
+ * on first render rather than on import, and otherwise the custom-element
+ * registry under its `tagName`, which importing `@a2ui/lit/v0_9` fills on
+ * 0.10 and 0.11. Subclassing keeps markdown rendering, controller wiring, action
  * dispatch and `renderNode` semantics correct BY CONSTRUCTION — the
  * overrides layer styles and id-keyed anatomy on top, and anything they do
  * not match renders exactly upstream. If an upstream element is not
@@ -100,9 +100,9 @@
  * Verified against @a2ui/lit 0.10.1 / @a2ui/web_core 0.10.4 (the
  * reference-link tier and the banner teardown also against @a2ui/lit +
  * @a2ui/web_core 0.11.0, where the basic components render into light DOM
- * and web_core's A2uiLitElement scopes `static styles` to the tag):
- * `new Catalog(id, components, functions, themeSchema)` takes
- * `{...ComponentApi, tagName}` entries; the renderer resolves
+ * and web_core's A2uiLitElement scopes `static styles` to the tag), and the
+ * probes against 0.11 and 0.12: a Catalog (`catalogLike`, below) takes
+ * `{...ComponentApi, tagName, element}` entries; the renderer resolves
  * `createSurface.catalogId` by exact string match and renders each
  * component type via `catalog.components.get(type).tagName`. Custom
  * elements reach the surface state through `this.context`
@@ -147,8 +147,8 @@ export function createAshA2uiCatalog(deps) {
   if (ColumnApi) defineColumnElement(deps);
   defineAnatomyElements(deps);
 
-  const overrides = new Map([["ChoicePicker", {...ChoicePickerApi, tagName: CHOICEPICKER_TAG}]]);
-  if (ColumnApi) overrides.set("Column", {...ColumnApi, tagName: COLUMN_TAG});
+  const overrides = new Map([["ChoicePicker", retagged(ChoicePickerApi, CHOICEPICKER_TAG)]]);
+  if (ColumnApi) overrides.set("Column", retagged(ColumnApi, COLUMN_TAG));
   // The CLIN-10 anatomy overrides spread the basic catalog's own API
   // entries (the components map holds them) and swap only the tag.
   for (const [type, tag] of [
@@ -157,7 +157,7 @@ export function createAshA2uiCatalog(deps) {
     ["Row", ROW_TAG],
   ]) {
     const api = basicCatalog.components.get(type);
-    if (api && customElements.get(tag)) overrides.set(type, {...api, tagName: tag});
+    if (api && customElements.get(tag)) overrides.set(type, retagged(api, tag));
   }
   const modal = promptModalComponent(basicCatalog);
   if (modal) overrides.set("Modal", modal);
@@ -166,12 +166,32 @@ export function createAshA2uiCatalog(deps) {
     (component) => overrides.get(component.name) || component,
   );
 
-  return new Catalog(
-    basicCatalog.id,
-    components,
-    [...basicCatalog.functions.values()],
-    basicCatalog.themeSchema,
-  );
+  return catalogLike(Catalog, basicCatalog, basicCatalog.id, components, [
+    ...basicCatalog.functions.values(),
+  ]);
+}
+
+/**
+ * A catalog entry drawn by the element defined under `tagName`. From @a2ui
+ * 0.12 the renderer defines an entry's `element` under its `tagName` on first
+ * render, so an entry that kept the stock `element` under another tag would
+ * collide with the element defined for that tag; it carries that one instead.
+ * Shared with `createAshAdminCatalog`.
+ */
+export function retagged(api, tagName) {
+  return {...api, tagName, element: customElements.get(tagName)};
+}
+
+/**
+ * A new Catalog built the way `base` was. @a2ui 0.12 added the protocol
+ * version as the constructor's second argument (and a catalog carries it);
+ * 0.10 and 0.11 take `(id, components, functions, themeSchema)`. Shared with
+ * `createAshAdminCatalog`.
+ */
+export function catalogLike(Catalog, base, id, components, functions) {
+  return base.protocolVersion
+    ? new Catalog(id, base.protocolVersion, components, functions, base.themeSchema, base.instructions)
+    : new Catalog(id, components, functions, base.themeSchema);
 }
 
 // --- shared helpers ---------------------------------------------------------
@@ -451,12 +471,14 @@ function componentIdOf(element) {
   }
 }
 
-// The upstream element class for a basic-catalog component type, taken from
-// the custom-element registry under the tag the basic catalog renders it
-// with. Returns undefined when the type or its element is not registered.
+// The upstream element class for a basic-catalog component type: the entry's
+// `element` (@a2ui 0.12+), or the custom-element registry under the tag the
+// basic catalog renders it with (0.10, 0.11). Returns undefined when the type
+// or its element is not there.
 function upstreamElementClass(basicCatalog, type) {
-  const tagName = basicCatalog?.components?.get(type)?.tagName;
-  return tagName ? customElements.get(tagName) : undefined;
+  const api = basicCatalog?.components?.get(type);
+  if (typeof api?.element === "function") return api.element;
+  return api?.tagName ? customElements.get(api.tagName) : undefined;
 }
 
 function defineAnatomyElements({lit, basicCatalog}) {
@@ -1334,7 +1356,7 @@ export function promptModalComponent(basicCatalog) {
   const api = basicCatalog?.components?.get("Modal");
   if (!api) return null;
   if (api.tagName === MODAL_TAG) return api;
-  return definePromptModalElement(basicCatalog) ? {...api, tagName: MODAL_TAG} : null;
+  return definePromptModalElement(basicCatalog) ? retagged(api, MODAL_TAG) : null;
 }
 
 // classMap fallback: the deps contract passes `lit: {html, css, nothing}`

@@ -145,7 +145,9 @@ import {
 // here too), and the action-outcome subscription both catalogs settle on.
 // The file defines its element only when asked.
 import {
+  catalogLike,
   promptModalComponent,
+  retagged,
   subscribeActionOutcomes,
   unsubscribeActionOutcomes,
 } from "./ash_a2ui_catalog.js";
@@ -317,7 +319,7 @@ export function createAshAdminCatalog(deps) {
   const modal = promptModalComponent(basicCatalog);
   const components = [...basicCatalog.components.values()].map((component) => {
     if (INPUT_OVERRIDE_KINDS.includes(component.name)) {
-      return {...component, tagName: INPUT_OVERRIDE_TAGS[component.name]};
+      return retagged(component, INPUT_OVERRIDE_TAGS[component.name]);
     }
     if (component.name === "Modal" && modal) return modal;
     return component;
@@ -336,14 +338,15 @@ export function createAshAdminCatalog(deps) {
     },
   };
 
-  return new Catalog(
+  return catalogLike(
+    Catalog,
+    basicCatalog,
     ADMIN_CATALOG_ID,
     [...components, ...Object.values(adminApis)],
     [
       ...[...basicCatalog.functions.values()].filter((fn) => fn.name !== "openSurface"),
       openSurfaceFunction,
     ],
-    basicCatalog.themeSchema,
   );
 }
 

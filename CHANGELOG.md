@@ -322,6 +322,16 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Bug Fixes:
 
+- **The catalogs run on `@a2ui/lit` / `@a2ui/web_core` 0.12.** From 0.12
+  the renderer defines a basic component's element on first render, under
+  its catalog entry's `tagName`, instead of on import, and `Catalog` takes
+  the protocol version as its second argument. The overrides (ChoicePicker,
+  Column, Text, Button, Row, Modal and the admin inputs) now take the
+  upstream element from the entry's `element` and carry their own `element`
+  with their tag, which kept the stock one and collided with it on first
+  render; and both catalogs are built the way the catalog they extend was.
+  0.10 and 0.11 keep working. The probes map the new `@a2ui/web_core`
+  subpaths and `validate-color`, and run against 0.11 and 0.12.
 - **A table's query controls sit on one baseline.** The controls row
   (`query_controls_body`, or `query_<table>_controls_body`) is sent with
   `align: "end"`, so labelled inputs and the label-less Apply button line up
