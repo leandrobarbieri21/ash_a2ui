@@ -1,0 +1,34 @@
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Save"
+msgstr "Enregistrer"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Search"
+msgstr "Rechercher"
+
+msgid "Create %{resource}"
+msgstr "Créer : %{resource}"
+
+msgid "%{first}–%{last} of %{total}"
+msgstr "%{first}–%{last} sur %{total}"
+
+msgid "Updated %{field}."
+msgstr "%{field} mis à jour."
+
+msgid "%{action} completed."
+msgstr "%{action} : terminé."
+
+msgid "Return to now"
+msgstr "Revenir au présent"
+
+msgid "As of %{instant}"
+msgstr "Au %{instant}"
+
+msgid "Title"
+msgstr "Titre"

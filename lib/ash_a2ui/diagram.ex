@@ -70,7 +70,11 @@ defmodule AshA2ui.Diagram do
   `/diagram/<name>` writes for other transports.
   """
 
+  import AshA2ui.Gettext, only: [msg: 1]
+
   alias Ash.Resource.Info, as: ResourceInfo
+  alias AshA2ui.L10n
+  alias AshA2ui.Label
   alias AshA2ui.ResolvedView
 
   # `rendered_source` and `link_buttons?` are render annotations the
@@ -117,7 +121,6 @@ defmodule AshA2ui.Diagram do
     failed: :danger,
     done: :success
   }
-  @unavailable "This diagram is unavailable."
 
   @doc "The marker statuses."
   @spec statuses() :: [atom]
@@ -127,13 +130,17 @@ defmodule AshA2ui.Diagram do
   @spec data_path(atom | String.t()) :: String.t()
   def data_path(name), do: "/diagram/#{name}"
 
-  @doc "The heading of a diagram: its `label`, else the humanized name."
-  @spec label(t()) :: String.t()
-  def label(%__MODULE__{label: label}) when is_binary(label) and label != "", do: label
+  @doc """
+  The heading of a diagram: its `label`, else the humanized name, translated
+  with `l10n` (see `AshA2ui.L10n`).
+  """
+  @spec label(t(), L10n.t()) :: String.t()
+  def label(diagram, l10n \\ nil)
 
-  def label(%__MODULE__{name: name}) do
-    name |> to_string() |> String.replace("_", " ") |> String.capitalize()
-  end
+  def label(%__MODULE__{label: label}, l10n) when is_binary(label) and label != "",
+    do: Label.translate(l10n, label)
+
+  def label(%__MODULE__{name: name}, l10n), do: Label.resolve(l10n, nil, name)
 
   @doc "The empty state of a diagram (no markers, no error)."
   @spec empty_state() :: map
@@ -177,7 +184,12 @@ defmodule AshA2ui.Diagram do
       {:ok, %{source: source, markers: markers} = result}
       when is_binary(source) and is_list(markers) ->
         link_context = %{actor: opts[:actor], tenant: opts[:tenant]}
-        wire = markers |> Enum.with_index() |> Enum.map(&normalize(&1, diagram, link_context))
+
+        wire =
+          markers
+          |> Enum.with_index()
+          |> Enum.map(&normalize(&1, diagram, link_context, view.l10n))
+
         %{source: source, state: state(wire, Map.get(result, :nodes))}
 
       {:ok, other} ->
@@ -186,7 +198,8 @@ defmodule AshA2ui.Diagram do
                 "{:ok, %{source: binary, markers: list}}, got: {:ok, #{inspect(other)}}"
 
       {:error, _reason} ->
-        %{source: "", state: %{empty_state() | "error" => @unavailable}}
+        unavailable = L10n.t(view.l10n, msg("This diagram is unavailable."))
+        %{source: "", state: %{empty_state() | "error" => unavailable}}
 
       other ->
         raise ArgumentError,
@@ -202,12 +215,18 @@ defmodule AshA2ui.Diagram do
   The `/diagram/<name>` writes of every diagram (in declaration order),
   re-read as the actor in
   `opts` — for transports that push marker moves without a full data-model
-  refresh. `opts` takes `build_surface/2`'s `:actor`, `:tenant` and
-  `:context_state`.
+  refresh. `opts` takes `build_surface/2`'s `:actor`, `:tenant`,
+  `:context_state` and localization options (`:locale`, `:gettext_backend`,
+  `:gettext_fn`).
   """
   @spec refresh_messages(module | Spark.Dsl.t(), keyword) :: [map]
   def refresh_messages(resource_or_ui_module, opts \\ []) do
-    view = ResolvedView.resolve(resource_or_ui_module, Keyword.take(opts, [:actor, :tenant]))
+    view =
+      ResolvedView.resolve(
+        resource_or_ui_module,
+        Keyword.take(opts, [:actor, :tenant | AshA2ui.L10n.option_keys()])
+      )
+
     selected = AshA2ui.ContextRunner.selected(view, opts[:context_state])
 
     loaded_by_name = load_all(view, selected, opts)
@@ -249,7 +268,7 @@ defmodule AshA2ui.Diagram do
 
   # --- normalization ----------------------------------------------------------
 
-  defp normalize({marker, index}, diagram, link_context) when is_map(marker) do
+  defp normalize({marker, index}, diagram, link_context, l10n) when is_map(marker) do
     node_id = required_string(marker, :node_id, diagram)
     label = required_string(marker, :label, diagram)
     status = status!(fetch(marker, :status), diagram)
@@ -261,16 +280,22 @@ defmodule AshA2ui.Diagram do
       "label" => label,
       "initials" => optional_string(marker, :initials) || initials(label),
       "status" => Atom.to_string(status),
-      "statusLabel" => status |> Atom.to_string() |> String.capitalize(),
+      "statusLabel" => status_label(status, l10n),
       "tone" => tone!(fetch(marker, :tone), status, diagram)
     }
     |> put_link(fetch(marker, :link), label, link_context, diagram)
   end
 
-  defp normalize({marker, _index}, diagram, _link_context) do
+  defp normalize({marker, _index}, diagram, _link_context, _l10n) do
     raise ArgumentError,
           "diagram #{inspect(diagram.name)}: a marker must be a map, got: #{inspect(marker)}"
   end
+
+  defp status_label(:active, l10n), do: L10n.t(l10n, msg("Active"))
+  defp status_label(:executing, l10n), do: L10n.t(l10n, msg("Executing"))
+  defp status_label(:waiting, l10n), do: L10n.t(l10n, msg("Waiting"))
+  defp status_label(:failed, l10n), do: L10n.t(l10n, msg("Failed"))
+  defp status_label(:done, l10n), do: L10n.t(l10n, msg("Done"))
 
   defp fetch(marker, key), do: Map.get(marker, key, Map.get(marker, Atom.to_string(key)))
 

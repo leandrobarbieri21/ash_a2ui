@@ -313,7 +313,7 @@ defmodule AshA2ui.Wave4ReferralTest do
                }
              ] = messages
 
-      assert status =~ ~s("approve" is not available for this record)
+      assert status =~ "Approve is not available for this record"
     end
 
     test "invoking a visible action succeeds", %{pending: pending} do
@@ -448,7 +448,7 @@ defmodule AshA2ui.Wave4ReferralTest do
                }
              ] = messages
 
-      assert status =~ ~s("decline" is not available for this record)
+      assert status =~ "Decline is not available for this record"
     end
 
     test "rejects non-allowlisted actions", %{pending: pending} do

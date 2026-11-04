@@ -72,6 +72,10 @@ defmodule AshA2ui.Experience do
     * `"cancel_record_task"` — back to browse, form reset, feedback cleared.
   """
 
+  import AshA2ui.Gettext, only: [msg: 1]
+
+  alias AshA2ui.L10n
+  alias AshA2ui.Label
   alias AshA2ui.ResolvedView
 
   @typedoc "The record task panel modes (`:hidden` for the closed state)."
@@ -167,13 +171,15 @@ defmodule AshA2ui.Experience do
   resource name` (e.g. `"Create Appointment"`).
   """
   @spec create_label(ResolvedView.t()) :: String.t()
-  def create_label(view), do: "Create #{resource_label(view)}"
+  def create_label(view),
+    do: L10n.t(view.l10n, msg("Create %{resource}"), resource: resource_label(view))
 
   @doc """
-  The edit-task primary button label.
+  The edit-task primary button label, translated with `l10n` (see
+  `AshA2ui.L10n`).
   """
-  @spec save_changes_label() :: String.t()
-  def save_changes_label, do: "Save changes"
+  @spec save_changes_label(L10n.t()) :: String.t()
+  def save_changes_label(l10n \\ nil), do: L10n.t(l10n, msg("Save changes"))
 
   @doc """
   The panel heading for `mode` (`:create` / `:view` / `:edit`), e.g.
@@ -181,8 +187,12 @@ defmodule AshA2ui.Experience do
   """
   @spec panel_title(:create | :view | :edit, ResolvedView.t()) :: String.t()
   def panel_title(:create, view), do: create_label(view)
-  def panel_title(:view, view), do: "View #{resource_label(view)}"
-  def panel_title(:edit, view), do: "Edit #{resource_label(view)}"
+
+  def panel_title(:view, view),
+    do: L10n.t(view.l10n, msg("View %{resource}"), resource: resource_label(view))
+
+  def panel_title(:edit, view),
+    do: L10n.t(view.l10n, msg("Edit %{resource}"), resource: resource_label(view))
 
   @doc """
   The surface's heading — what the page is a page *of*.
@@ -195,7 +205,9 @@ defmodule AshA2ui.Experience do
   right words in their own navigation; `title` is how they say so.
   """
   @spec surface_title(ResolvedView.t()) :: String.t()
-  def surface_title(%{title: title}) when is_binary(title) and title != "", do: title
+  def surface_title(%{title: title} = view) when is_binary(title) and title != "",
+    do: Label.translate(view.l10n, title)
+
   def surface_title(view), do: resource_label(view)
 
   @doc """
@@ -205,15 +217,10 @@ defmodule AshA2ui.Experience do
   resource short name (e.g. `"Appointment"`).
   """
   @spec resource_label(ResolvedView.t()) :: String.t()
-  def resource_label(%{record_label: label}) when is_binary(label) and label != "", do: label
+  def resource_label(%{record_label: label} = view) when is_binary(label) and label != "",
+    do: Label.translate(view.l10n, label)
 
-  def resource_label(view) do
-    view.resource
-    |> Module.split()
-    |> List.last()
-    |> Macro.underscore()
-    |> humanize()
-  end
+  def resource_label(view), do: Label.translate(view.l10n, Label.resource_name(view.resource))
 
   @doc """
   The per-table empty-state text (e.g. `"No Appointment records yet."`).
@@ -222,9 +229,12 @@ defmodule AshA2ui.Experience do
   def empty_message(view, table) do
     # A board lane is headed by its value already; its empty state names
     # the records ("No Task records yet."), not the runtime lane name.
-    if AshA2ui.Board.lane?(table),
-      do: "No #{resource_label(view)} records yet.",
-      else: "No #{collection_label(view, table)} records yet."
+    resource =
+      if AshA2ui.Board.lane?(table),
+        do: resource_label(view),
+        else: collection_label(view, table)
+
+    L10n.t(view.l10n, msg("No %{resource} records yet."), resource: resource)
   end
 
   @doc false
@@ -234,7 +244,7 @@ defmodule AshA2ui.Experience do
   @spec collection_label(ResolvedView.t(), ResolvedView.table()) :: String.t()
   def collection_label(view, table) do
     if ResolvedView.multi_table?(view) do
-      table.name |> to_string() |> humanize()
+      Label.resolve(view.l10n, nil, table.name)
     else
       resource_label(view)
     end
@@ -293,9 +303,9 @@ defmodule AshA2ui.Experience do
 
     primary_label =
       case mode do
-        _form_mode when next_step? -> AshA2ui.Wizard.next_label()
+        _form_mode when next_step? -> AshA2ui.Wizard.next_label(view.l10n)
         :create -> create_label(view)
-        :edit -> save_changes_label()
+        :edit -> save_changes_label(view.l10n)
         :view -> ""
       end
 
@@ -339,14 +349,15 @@ defmodule AshA2ui.Experience do
       entry on a sparse final page. Empty result sets render `""`.
 
   `record_count` defaults to `nil` (upper-bound estimate from page/pageSize).
+  `l10n` translates the range text (see `AshA2ui.L10n`).
   """
-  @spec pagination_state(map, non_neg_integer | nil) :: %{
+  @spec pagination_state(map, non_neg_integer | nil, L10n.t()) :: %{
           visible?: boolean,
           previous?: boolean,
           next?: boolean,
           range_text: String.t()
         }
-  def pagination_state(query_state, record_count \\ nil) when is_map(query_state) do
+  def pagination_state(query_state, record_count \\ nil, l10n \\ nil) when is_map(query_state) do
     page = integer_value(query_state["page"], 1)
     page_size = integer_value(query_state["pageSize"], 10)
     has_more = query_state["hasMore"] == true
@@ -366,7 +377,7 @@ defmodule AshA2ui.Experience do
       visible?: page > 1 or has_more or (sizable? and has_rows?),
       previous?: page > 1,
       next?: has_more,
-      range_text: range_text(first, last, total)
+      range_text: range_text(first, last, total, l10n)
     }
   end
 
@@ -382,17 +393,21 @@ defmodule AshA2ui.Experience do
 
   defp last_entry(_first, upper, _total, false, _count), do: upper
 
-  defp range_text(_first, last, _total) when last < 1, do: ""
-  defp range_text(first, last, total) when is_integer(total), do: "#{first}–#{last} of #{total}"
-  defp range_text(first, last, _total), do: "Showing #{first}–#{last}"
+  defp range_text(_first, last, _total, _l10n) when last < 1, do: ""
+
+  defp range_text(first, last, total, l10n) when is_integer(total),
+    do: L10n.t(l10n, msg("%{first}–%{last} of %{total}"), first: first, last: last, total: total)
+
+  defp range_text(first, last, _total, l10n),
+    do: L10n.t(l10n, msg("Showing %{first}–%{last}"), first: first, last: last)
 
   @doc false
   # Adorns a `/query` state map with the pagination sentinel keys.
   # Idempotent, so callers that already-adorned states pass through
   # unchanged in value.
-  def with_pagination_sentinels(query_state, record_count) do
+  def with_pagination_sentinels(query_state, record_count, l10n \\ nil) do
     if is_map(query_state) do
-      state = pagination_state(query_state, record_count)
+      state = pagination_state(query_state, record_count, l10n)
 
       Map.merge(query_state, %{
         "_pagination_visible" => sentinel(state.visible?),
@@ -435,11 +450,4 @@ defmodule AshA2ui.Experience do
   end
 
   defp integer_value(_value, default), do: default
-
-  defp humanize(name) do
-    name
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
-  end
 end

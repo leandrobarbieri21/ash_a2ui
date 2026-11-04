@@ -29,6 +29,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
   alias AshA2ui.Canvas.Object
   alias AshA2ui.Canvas.ObjectRef
   alias AshA2ui.Canvas.Registry
+  alias AshA2ui.Label
 
   # Every emitted projection must be one of the declared kinds, in the
   # declared order.
@@ -148,7 +149,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
       ref: ref,
       label:
         Registry.label(registry, :application) ||
-          Registry.application_id(registry) |> tail_segment() |> humanize(),
+          Registry.application_id(registry) |> tail_segment() |> Label.humanize(),
       description: nil,
       projections: [:browse],
       capabilities: [],
@@ -165,7 +166,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
       ref: ref,
       label:
         Registry.label(registry, domain) ||
-          domain |> Ash.Domain.Info.short_name() |> Atom.to_string() |> humanize(),
+          domain |> Ash.Domain.Info.short_name() |> Atom.to_string() |> Label.humanize(),
       description: nil,
       projections: [:browse],
       capabilities: [],
@@ -180,7 +181,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
     object = %Object{
       ref: ref,
-      label: Registry.label(registry, resource) || humanize(resource_short(resource)),
+      label: Registry.label(registry, resource) || Label.humanize(resource_short(resource)),
       description: nil,
       projections: host_projections(registry, resource, resource_projections(resource)),
       capabilities: resource_capabilities(ref, resource),
@@ -307,7 +308,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
       verb: verb,
       action_name: to_string(action_name),
       object_ref: ref.id,
-      label: humanize(action_name),
+      label: Label.humanize(action_name),
       consequence: consequence,
       confirmation: confirmation,
       authorized?: authorized?
@@ -385,12 +386,5 @@ defmodule AshA2ui.Canvas.ObjectResolver do
         value -> to_string(value)
       end
     end) || "record"
-  end
-
-  defp humanize(name) do
-    name
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
   end
 end

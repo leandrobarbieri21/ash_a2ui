@@ -10,6 +10,8 @@ defmodule AshA2ui.Column do
   them inside the column rather than as columns of their own.
   """
 
+  alias AshA2ui.Label
+
   defstruct [
     :name,
     :subtitle,
@@ -159,7 +161,9 @@ defmodule AshA2ui.Column do
   end
 
   defp icon_label(_column, _value, nil), do: ""
-  defp icon_label(column, value, _name), do: lookup(column.icon_labels, value) || humanize(value)
+
+  defp icon_label(column, value, _name),
+    do: lookup(column.icon_labels, value) || Label.humanize(value)
 
   defp detail_data(%{detail: nil}, _record), do: []
 
@@ -206,8 +210,4 @@ defmodule AshA2ui.Column do
   end
 
   defp lookup(_mapping, _value), do: nil
-
-  defp humanize(value) do
-    value |> to_string() |> String.replace("_", " ") |> String.capitalize()
-  end
 end

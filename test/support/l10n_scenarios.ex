@@ -1,0 +1,220 @@
+defmodule AshA2ui.Test.L10nScenarios do
+  @moduledoc false
+  # The localization golden scenarios (ADR 0060): the initial build, a
+  # refresh, option lists and action feedback, on v0.9.1 and v1.0, with the
+  # basic and the admin catalog. Shared by the golden test and the
+  # pseudo-locale test, which re-runs them with a translator.
+
+  import AshA2ui.Test.BulkHelpers, only: [rows: 2, contexts: 1]
+
+  alias AshA2ui.ActionHandler
+  alias AshA2ui.Info
+  alias AshA2ui.Test.BulkHelpers
+  alias AshA2ui.Test.BulkTasksUI
+  alias AshA2ui.Test.Experience.Task
+
+  # The scenarios, each `{name, catalog, fun}` where `fun.(extra_opts)` returns the
+  # messages. `extra_opts` is how the localization tests re-run the same
+  # scenarios with a translator.
+  def scenarios do
+    for {catalog, catalog_tag} <- [basic: "basic", admin_v1: "admin"],
+        {spec, spec_tag} <- [{"0.9.1", "v0_9_1"}, {"1.0", "v1_0"}],
+        {name, fun} <- scenario_funs(spec) do
+      {"#{name}_#{spec_tag}_#{catalog_tag}", catalog, fun}
+    end
+  end
+
+  defp scenario_funs(spec) do
+    [
+      {"bulk_build", &bulk_build(spec, &1)},
+      {"bulk_refresh", &bulk_refresh(spec, &1)},
+      {"bulk_options", &bulk_options(spec, &1)},
+      {"bulk_invoke", &bulk_invoke(spec, &1)},
+      {"bulk_select_page", &bulk_select_page(spec, &1)},
+      {"task_build", &task_build(spec, &1)},
+      {"task_actions", &task_actions(spec, &1)}
+    ]
+  end
+
+  # Runs one scenario under its catalog and returns the normalized JSON.
+  def run({_name, catalog, fun}, extra_opts) do
+    Application.put_env(:ash_a2ui, :catalog, catalog)
+
+    try do
+      {messages, substitutions} = fun.(extra_opts)
+      normalize(messages, substitutions)
+    after
+      Application.delete_env(:ash_a2ui, :catalog)
+    end
+  end
+
+  @scenario_names for catalog <- ~w(basic admin),
+                      spec <- ~w(v0_9_1 v1_0),
+                      name <-
+                        ~w(bulk_build bulk_refresh bulk_options bulk_invoke bulk_select_page
+                           task_build task_actions),
+                      do: "#{name}_#{spec}_#{catalog}"
+
+  def scenario_names, do: @scenario_names
+
+  def scenario(name), do: Enum.find(scenarios(), &(elem(&1, 0) == name))
+
+  # --- scenarios --------------------------------------------------------------
+
+  defp bulk_seed do
+    project = BulkHelpers.project!("Apollo")
+
+    tasks =
+      for {title, score} <- [{"alpha", 1}, {"bravo", -1}, {"charlie", 2}] do
+        BulkHelpers.task!(title, %{project_id: project.id, score: score})
+      end
+
+    substitutions =
+      [{project.id, "PROJECT_APOLLO"}] ++
+        Enum.map(tasks, &{&1.id, "TASK_#{String.upcase(&1.title)}"})
+
+    {project, tasks, substitutions}
+  end
+
+  defp bulk_opts(spec, project, extra) do
+    [actor: BulkHelpers.actor(), spec_version: spec, context_state: contexts(project)] ++ extra
+  end
+
+  defp bulk_build(spec, extra) do
+    {project, _tasks, subs} = bulk_seed()
+    {Info.build_surface(BulkTasksUI, bulk_opts(spec, project, extra)), subs}
+  end
+
+  defp bulk_refresh(spec, extra) do
+    {project, _tasks, subs} = bulk_seed()
+
+    query_state = %{
+      "search" => "a",
+      "page" => 1,
+      "sort" => %{"field" => "title", "dir" => "desc"}
+    }
+
+    opts = bulk_opts(spec, project, [query_state: query_state] ++ extra)
+
+    {[Info.build_data_model(BulkTasksUI, opts)], subs}
+  end
+
+  defp bulk_options(spec, extra) do
+    {project, _tasks, subs} = bulk_seed()
+
+    {_outcome, messages} =
+      ActionHandler.handle(
+        BulkTasksUI,
+        BulkHelpers.envelope("context_search", %{
+          "context" => "project",
+          "search" => "Apo",
+          "contexts" => contexts(project)
+        }),
+        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+      )
+
+    {messages, subs}
+  end
+
+  defp bulk_invoke(spec, extra) do
+    {project, tasks, subs} = bulk_seed()
+
+    {_outcome, messages} =
+      ActionHandler.handle(
+        BulkTasksUI,
+        BulkHelpers.envelope("bulk_invoke", %{
+          "action" => "approve",
+          "component" => "table",
+          "records" => rows(tasks, tasks),
+          "contexts" => contexts(project)
+        }),
+        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+      )
+
+    {messages, subs}
+  end
+
+  defp bulk_select_page(spec, extra) do
+    {project, tasks, subs} = bulk_seed()
+
+    {_outcome, messages} =
+      ActionHandler.handle(
+        BulkTasksUI,
+        BulkHelpers.envelope("bulk_select", %{
+          "component" => "table",
+          "selected" => true,
+          "records" => rows(tasks, []),
+          "contexts" => contexts(project)
+        }),
+        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+      )
+
+    {messages, subs}
+  end
+
+  defp task_seed do
+    tasks = for name <- ["one", "two", "three"], do: Ash.create!(Task, %{name: name})
+    {tasks, Enum.map(tasks, &{&1.id, "TASK_#{String.upcase(&1.name)}"})}
+  end
+
+  defp task_build(spec, extra) do
+    {_tasks, subs} = task_seed()
+    {Info.build_surface(Task, [spec_version: spec] ++ extra), subs}
+  end
+
+  # Every task-panel transition and outcome a reader sees feedback or chrome
+  # for: create, a failed create, view, edit, cancel, a query page, a
+  # destroy, a malformed message and an unknown action.
+  defp task_actions(spec, extra) do
+    {[one | _] = _tasks, subs} = task_seed()
+    opts = [spec_version: spec] ++ extra
+
+    envelopes = [
+      {"start_create", %{}},
+      {"submit_form", %{"values" => %{"name" => ""}}},
+      {"submit_form", %{"values" => %{"name" => "four"}}},
+      {"view_record", %{"recordId" => one.id}},
+      {"start_edit", %{"recordId" => one.id}},
+      {"submit_form", %{"values" => %{"name" => "uno"}, "recordId" => one.id}},
+      {"cancel_record_task", %{}},
+      {"query", %{"query" => %{"page" => 1}, "pageDelta" => 1}},
+      {"invoke", %{"action" => "destroy", "recordId" => one.id}},
+      {"invoke", %{"action" => "nope"}},
+      {"bogus", %{}}
+    ]
+
+    messages =
+      Enum.flat_map(envelopes, fn {name, context} ->
+        {outcome, messages} = ActionHandler.handle(Task, envelope(name, context), opts)
+        [%{"outcome" => to_string(outcome), "action" => name} | messages]
+      end)
+
+    created = Task |> Ash.read!() |> Enum.reject(&(&1.id in Enum.map(subs, fn {id, _} -> id end)))
+    {messages, subs ++ Enum.map(created, &{&1.id, "TASK_CREATED"})}
+  end
+
+  defp envelope(name, context) do
+    %{
+      "version" => "v0.9.1",
+      "action" => %{
+        "name" => name,
+        "surfaceId" => "experience_task",
+        "sourceComponentId" => "test_component",
+        "timestamp" => "2026-11-04T00:00:00Z",
+        "context" => context
+      }
+    }
+  end
+
+  # --- helpers -------------------------------------------------------------------
+
+  defp normalize(messages, substitutions) do
+    json = Jason.encode!(messages, pretty: true)
+
+    substitutions
+    |> Enum.flat_map(fn {id, tag} ->
+      for separator <- ["-", "_", " "], do: {String.replace(id, "-", separator), tag}
+    end)
+    |> Enum.reduce(json, fn {id, tag}, acc -> String.replace(acc, id, tag) end)
+  end
+end

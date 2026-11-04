@@ -256,7 +256,7 @@ defmodule AshA2ui.MultiTableTest do
       # the standard form/errors/ui follow-ups are unaffected by refreshes
       assert value_at(messages, "/form") == %{}
       assert value_at(messages, "/errors") == %{}
-      assert value_at(messages, "/ui/feedback")["message"] =~ "approve"
+      assert value_at(messages, "/ui/feedback")["message"] == "Approve completed."
     end
 
     test "an action without refreshes metadata refreshes every table" do

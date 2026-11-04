@@ -88,6 +88,30 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "localization options" do
+      test "locale_fn and the translator reach the build and every action", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/localized")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        assert opts[:locale] == "pseudo"
+        assert opts[:gettext_fn] == {AshA2ui.Test.PseudoLocale, :translate}
+
+        envelope = Fixtures.action_envelope()
+        render_hook(view, "a2ui:action", envelope)
+
+        assert_receive {:action_fn, MinimalUI, ^envelope, opts}
+        assert opts[:locale] == "pseudo"
+        assert opts[:gettext_fn] == {AshA2ui.Test.PseudoLocale, :translate}
+      end
+
+      test "without them no localization option is passed", %{conn: conn} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/stubbed")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        refute Enum.any?(AshA2ui.L10n.option_keys(), &Keyword.has_key?(opts, &1))
+      end
+    end
+
     describe "a2ui:action round-trip" do
       test "routes the envelope through action_fn and pushes the ok messages", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/stubbed")

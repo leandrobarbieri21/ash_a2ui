@@ -67,6 +67,28 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert html =~ ~s(id="t-now")
         assert html =~ ~s(aria-current="true")
       end
+
+      test "translates its own text with the given locale, not the marks or instants" do
+        mark = %{at: ~U[2026-01-06 00:05:00Z], label: "Merged", tone: :secondary}
+
+        html =
+          render_component(&TimeScrubber.scrubber/1,
+            id: "t",
+            from: @from,
+            to: @to,
+            as_of: mark.at,
+            marks: [mark],
+            path: &AsOf.put_param("/plans", &1),
+            gettext_backend: {AshA2ui.Test.Gettext, "ash_a2ui"},
+            locale: "fr"
+          )
+
+        assert html =~ "Au 2026-01-06 00:05 UTC"
+        assert html =~ "Revenir au présent"
+        # Not in the French test catalog: falls back to the msgid.
+        assert html =~ "Time travel"
+        assert html =~ "Merged"
+      end
     end
 
     describe "LiveRenderer time_travel: true" do

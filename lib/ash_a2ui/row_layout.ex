@@ -74,10 +74,6 @@ defmodule AshA2ui.RowLayout do
   defp badge_text(layout, value) do
     declared = is_atom(value) && Keyword.get(layout.badge_text, value)
 
-    declared ||
-      value
-      |> to_string()
-      |> String.replace("_", " ")
-      |> String.capitalize()
+    declared || AshA2ui.Label.humanize(value)
   end
 end

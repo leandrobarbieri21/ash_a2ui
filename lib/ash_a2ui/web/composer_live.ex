@@ -102,6 +102,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     alias AshA2ui.Dynamic
     alias AshA2ui.Dynamic.Error
     alias AshA2ui.Dynamic.Importer
+    alias AshA2ui.Label
     alias Spark.Dsl.Extension
 
     @composed_suffix "Composed"
@@ -551,8 +552,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp input_name(section_key, index, key), do: "spec[#{section_key}][#{index}][#{key}]"
     defp input_id(section_key, index, key), do: "composer-#{section_key}-#{index}-#{key}"
-
-    defp humanize(key), do: key |> String.replace("_", " ")
 
     defp input_value(:checkbox, value), do: value == true
 
@@ -1010,7 +1009,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ~H"""
       <div class="a2ui-composer-field">
         <label for={@id}>
-          {humanize(@field.key)}{required_text(@required)}
+          {Label.words(@field.key)}{required_text(@required)}
         </label>
         <select :if={@field.type == :select} id={@id} name={@name}>
           <option value="">—</option>

@@ -1,0 +1,99 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/records",
+      "surfaceId": "bulk_tasks",
+      "value": [
+        {
+          "_actions": [
+            "approve",
+            "flag"
+          ],
+          "_selected": true,
+          "_values": {
+            "status": "open"
+          },
+          "_visible_approve": [
+            {
+              "id": "TASK_ALPHA"
+            }
+          ],
+          "id": "TASK_ALPHA",
+          "score": 1,
+          "status": "Open",
+          "title": "alpha"
+        },
+        {
+          "_actions": [
+            "approve",
+            "flag"
+          ],
+          "_selected": true,
+          "_values": {
+            "status": "open"
+          },
+          "_visible_approve": [
+            {
+              "id": "TASK_BRAVO"
+            }
+          ],
+          "id": "TASK_BRAVO",
+          "score": -1,
+          "status": "Open",
+          "title": "bravo"
+        },
+        {
+          "_actions": [
+            "approve",
+            "flag"
+          ],
+          "_selected": true,
+          "_values": {
+            "status": "open"
+          },
+          "_visible_approve": [
+            {
+              "id": "TASK_CHARLIE"
+            }
+          ],
+          "id": "TASK_CHARLIE",
+          "score": 2,
+          "status": "Open",
+          "title": "charlie"
+        }
+      ]
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/_empty_visible",
+      "surfaceId": "bulk_tasks",
+      "value": []
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/query",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "_next_visible": [],
+        "_pagination_visible": [],
+        "_previous_visible": [],
+        "_range_text": "1–3 of 3",
+        "filters": {},
+        "hasMore": false,
+        "page": 1,
+        "pageSize": 5,
+        "search": "",
+        "sort": {
+          "dir": "asc",
+          "field": "title"
+        },
+        "totalCount": 3
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

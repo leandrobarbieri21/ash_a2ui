@@ -174,7 +174,7 @@ defmodule AshA2ui.ActionHandlerTest do
 
       # the regular refresh messages still accompany the action result
       assert "/records" in paths(messages)
-      assert value_at(messages, "/ui/feedback")["message"] =~ "generate_secret"
+      assert value_at(messages, "/ui/feedback")["message"] == "Generate secret completed."
     end
 
     test "serializes a map result to display text at /ui/action_result_text" do
@@ -212,7 +212,7 @@ defmodule AshA2ui.ActionHandlerTest do
 
       assert [row] = value_at(messages, "/records")
       assert row["touched"] == true
-      assert value_at(messages, "/ui/feedback")["message"] =~ "touch"
+      assert value_at(messages, "/ui/feedback")["message"] == "Touch completed."
     end
 
     test "subsequent actions clear /ui/action_result and /ui/action_result_text" do
@@ -252,7 +252,7 @@ defmodule AshA2ui.ActionHandlerTest do
 
       assert [row] = value_at(messages, "/records")
       assert row["status"] == "checked_in"
-      assert value_at(messages, "/ui/feedback")["message"] =~ "check_in"
+      assert value_at(messages, "/ui/feedback")["message"] == "Check in completed."
 
       call = Process.get({CheckInFacade, :last_call})
       assert call.source == :board
@@ -273,7 +273,7 @@ defmodule AshA2ui.ActionHandlerTest do
       assert_all_valid(messages)
 
       assert Ash.get!(Ticket, record.id, authorize?: false).status == "open"
-      assert value_at(messages, "/ui/feedback")["message"] =~ "check_in"
+      assert value_at(messages, "/ui/feedback")["message"] == "Check in completed."
     end
 
     test "propagates a delegate error into /errors/<field> and /ui/feedback" do

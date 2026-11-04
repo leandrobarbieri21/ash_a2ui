@@ -1,0 +1,138 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "_empty_message": "No Bulk task records yet.",
+        "_empty_visible": [],
+        "bulk": {
+          "table": {
+            "result": {
+              "errors": [],
+              "failed": 0,
+              "ok": 0,
+              "refused": 0,
+              "skipped": 0
+            }
+          }
+        },
+        "context": {
+          "project": {
+            "label": "Apollo",
+            "search": "",
+            "value": "PROJECT_APOLLO"
+          }
+        },
+        "errors": {},
+        "form": {},
+        "options": {
+          "project": [
+            {
+              "label": "Apollo",
+              "value": "PROJECT_APOLLO"
+            }
+          ]
+        },
+        "query": {
+          "_next_visible": [],
+          "_pagination_visible": [],
+          "_previous_visible": [],
+          "_range_text": "1–3 of 3",
+          "filters": {},
+          "hasMore": false,
+          "nextVisible": false,
+          "page": 1,
+          "pageSize": 5,
+          "paginationVisible": false,
+          "previousVisible": false,
+          "search": "a",
+          "sort": {
+            "dir": "desc",
+            "field": "title"
+          },
+          "totalCount": 3
+        },
+        "records": [
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_CHARLIE"
+              }
+            ],
+            "id": "TASK_CHARLIE",
+            "score": 2,
+            "status": "Open",
+            "title": "charlie"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_BRAVO"
+              }
+            ],
+            "id": "TASK_BRAVO",
+            "score": -1,
+            "status": "Open",
+            "title": "bravo"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_ALPHA"
+              }
+            ],
+            "id": "TASK_ALPHA",
+            "score": 1,
+            "status": "Open",
+            "title": "alpha"
+          }
+        ],
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          }
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

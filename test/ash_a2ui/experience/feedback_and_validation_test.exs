@@ -107,12 +107,12 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
       # typed success on the path the status Text binds...
       assert values["/ui/feedback"] == %{
                "kind" => "success",
-               "message" => ~s(Action "destroy" completed.)
+               "message" => "Destroy completed."
              }
 
       # ...with the classic status text still flowing alongside (the
       # programmatic contract, unchanged)...
-      assert values["/ui/feedback"]["message"] == ~s(Action "destroy" completed.)
+      assert values["/ui/feedback"]["message"] == "Destroy completed."
 
       # ...and no panel/mode writes: a browse-mode invoke never closes a task
       refute Map.has_key?(values, "/ui/intent")

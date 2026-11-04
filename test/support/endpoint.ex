@@ -38,6 +38,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       live("/live-renderer/deep-link", AshA2ui.Test.DeepLinkLive)
       live("/live-renderer/people-deep-link", AshA2ui.Test.PeopleDeepLinkLive)
       live("/live-renderer/open-surface-callback", AshA2ui.Test.OpenSurfaceCallbackLive)
+      live("/live-renderer/localized", AshA2ui.Test.LocalizedLive)
       live("/live-renderer/time-travel", AshA2ui.Test.TimeTravelLive)
 
       # The actor picker, reachable both ways hosts wire it: standalone

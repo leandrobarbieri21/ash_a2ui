@@ -51,12 +51,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       * `:format` — `(DateTime.t() -> String.t())` for every instant the
         scrubber prints. Defaults to `format/1` (UTC).
       * `:label` — the group's accessible name, default "Time travel".
+      * `:locale`, `:gettext_backend`, `:gettext_fn` — translate the
+        scrubber's own text ("Return to now", "As of …"), as
+        `AshA2ui.Info.build_surface/2` does. Pass the values the surface uses.
+        The `:format` output and the marks' labels are yours and are not
+        translated.
 
     It renders in the shared neobrutalist vocabulary (2px borders, hard
     shadows, `--a2ui-*` tokens with fallbacks) and needs no host CSS.
     """
 
     use Phoenix.Component
+
+    import AshA2ui.Gettext, only: [msg: 1]
+
+    alias AshA2ui.L10n
 
     @steps 1000
 
@@ -149,15 +158,37 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     attr(:path, :any, required: true, doc: "(DateTime.t() | nil -> String.t())")
     attr(:event, :string, default: "as_of_scrub")
     attr(:format, :any, default: &__MODULE__.format/1)
-    attr(:label, :string, default: "Time travel")
+    attr(:label, :string, default: nil, doc: ~s(The group's accessible name; "Time travel".))
+    attr(:locale, :string, default: nil, doc: "The locale for the scrubber's own text.")
+    attr(:gettext_backend, :any, default: nil, doc: "`{backend, domain}`; see `AshA2ui.L10n`.")
+    attr(:gettext_fn, :any, default: nil, doc: "`{module, function}`; see `AshA2ui.L10n`.")
 
     @doc "The scrubber. See the moduledoc."
     def scrubber(assigns) do
+      l10n =
+        AshA2ui.L10n.new(
+          Enum.reject(
+            [
+              locale: assigns.locale,
+              gettext_backend: assigns.gettext_backend,
+              gettext_fn: assigns.gettext_fn
+            ],
+            &is_nil(elem(&1, 1))
+          )
+        )
+
       assigns =
         assign(assigns,
           steps: @steps,
+          label: assigns.label || L10n.t(l10n, msg("Time travel")),
+          text: %{
+            return: L10n.t(l10n, msg("Return to now")),
+            move: L10n.t(l10n, msg("Move through time")),
+            now: L10n.t(l10n, msg("Now")),
+            moments: L10n.t(l10n, msg("Moments"))
+          },
           value: position(assigns.as_of, assigns.from, assigns.to),
-          readout: readout(assigns.as_of, assigns.format),
+          readout: readout(assigns.as_of, assigns.format, l10n),
           live_end?: live_end?(assigns.to),
           on_track: Enum.filter(assigns.marks, &within?(&1.at, assigns.from, assigns.to)),
           listed: Enum.sort_by(assigns.marks, & &1.at, {:desc, DateTime})
@@ -199,13 +230,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                    font:700 var(--a2ui-font-size-s, 0.875rem) var(--a2ui-font-family, inherit);
                    text-decoration:none;"
           >
-            Return to now
+            {@text.return}
           </.link>
         </div>
 
         <form id={"#{@id}-form"} phx-change={@event} style="margin:0;">
           <label for={"#{@id}-input"} style="display:block;font:700 var(--a2ui-font-size-s, 0.875rem) var(--a2ui-font-family, inherit);margin-bottom:0.25rem;">
-            Move through time
+            {@text.move}
           </label>
           <input
             type="range"
@@ -234,14 +265,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           </div>
           <div style="display:flex;justify-content:space-between;font-size:var(--a2ui-font-size-xs, 0.75rem);opacity:0.7;">
             <span>{@format.(@from)}</span>
-            <span>{if @live_end?, do: "Now", else: @format.(@to)}</span>
+            <span>{if @live_end?, do: @text.now, else: @format.(@to)}</span>
           </div>
         </form>
 
         <ol
           :if={@listed != []}
           id={"#{@id}-marks"}
-          aria-label="Moments"
+          aria-label={@text.moments}
           style="display:flex;flex-wrap:wrap;gap:0.375rem;margin:0;padding:0;list-style:none;"
         >
           <li :for={{mark, index} <- Enum.with_index(@listed)}>
@@ -278,8 +309,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "background:var(--a2ui-marker-warning-background, #7c2d12);" <>
           "color:var(--a2ui-marker-warning-color, #fff);"
 
-    defp readout(nil, _format), do: "Live: now"
-    defp readout(at, format), do: "As of #{format.(at)}"
+    defp readout(nil, _format, l10n), do: L10n.t(l10n, msg("Live: now"))
+
+    defp readout(at, format, l10n),
+      do: L10n.t(l10n, msg("As of %{instant}"), instant: format.(at))
 
     defp within?(at, from, to),
       do: DateTime.compare(at, from) != :lt and DateTime.compare(at, to) != :gt

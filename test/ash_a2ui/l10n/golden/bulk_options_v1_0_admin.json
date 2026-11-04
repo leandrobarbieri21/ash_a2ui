@@ -1,0 +1,27 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/ui/response",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "code": "INVALID_ACTION",
+        "message": "Context \"project\" is not searchable: it declares no option_search.",
+        "result": {},
+        "resultText": "",
+        "status": "error"
+      }
+    },
+    "version": "v1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/ui/feedback",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "kind": "error",
+        "message": "Context \"project\" is not searchable: it declares no option_search."
+      }
+    },
+    "version": "v1.0"
+  }
+]

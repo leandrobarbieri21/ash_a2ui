@@ -200,7 +200,10 @@ defmodule AshA2ui.MixProject do
       {:junit_formatter, "~> 3.3", only: :test},
       # A time zone database for the calendar time zone tests
       # (`config :ash_a2ui, :calendar_time_zone`); hosts bring their own.
-      {:tz, "~> 0.28", only: :test}
+      {:tz, "~> 0.28", only: :test},
+      # Exercises the `gettext_backend:` translator against a real backend.
+      # The library itself never depends on gettext (see AshA2ui.L10n).
+      {:gettext, "~> 0.26 or ~> 1.0", only: :test}
     ] ++ phoenix_deps()
   end
 

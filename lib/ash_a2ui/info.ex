@@ -150,6 +150,21 @@ defmodule AshA2ui.Info do
       emitted. Admin catalog: the `entityPage` carries
       `headerVisible: false` (catalog 1.6) and the renderer skips its
       header. Defaults to `true` (the output is unchanged).
+    * `:locale` — the locale to translate the library's own strings into
+      (`"fr"`). Always explicit: ash_a2ui never reads the ambient Gettext
+      locale. Needed with `:gettext_backend`; passed to `:gettext_fn` as a
+      third argument when given.
+    * `:gettext_backend` — `{backend, domain}`, e.g.
+      `{MyAppWeb.Gettext, "ash_a2ui"}`: translate through Gettext.
+    * `:gettext_fn` — `{module, function}`: translate through
+      `module.function(msgid, bindings)` (or `/3` with `:locale`).
+
+      Only display text is translated: declared and derived labels, titles,
+      the library's chrome (buttons, pagination, empty states) and feedback
+      templates. Ids, paths, enum and option values, action and field names
+      and record data never are. Without a translator the output is
+      unchanged. See `AshA2ui.L10n` and the "Localizing ash_a2ui" section
+      of the README.
   """
   @spec build_surface(module | Spark.Dsl.t(), keyword) :: [map]
   def build_surface(resource_or_ui_module, opts \\ []) do

@@ -73,6 +73,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         around the surface already owns its heading: the surface is built
         with `header: false` (see `AshA2ui.Info.build_surface/2`), so it
         does not render a second `<h1>`.
+      * `:locale_fn` (optional) — a 1-arity function `socket -> locale`
+        (`"fr"`), called on mount. The locale is assigned as
+        `:ash_a2ui_locale` and passed to every surface, data-model and
+        action call as `:locale`; ash_a2ui never reads the ambient Gettext
+        locale. Defaults to `nil` (no locale).
+      * `:gettext_backend` / `:gettext_fn` (optional) — the translator for
+        the library's own strings, passed to every call (see
+        `AshA2ui.Info.build_surface/2` and `AshA2ui.L10n`), e.g.
+        `gettext_backend: {MyAppWeb.Gettext, "ash_a2ui"}`. Without either
+        nothing is translated.
       * `:pubsub` (optional) — enables live refresh:
         `pubsub: [module: MyApp.PubSub, topics: ["providers:created", ...]]`.
         Topics are explicit configuration: pass the topics your resource's
@@ -156,7 +166,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     ## Introspection assigns
 
     `mount/3` assigns `:ash_a2ui_ui`, `:ash_a2ui_actor`,
-    `:ash_a2ui_tenant` and `:ash_a2ui_as_of` (always `nil` without
+    `:ash_a2ui_tenant`, `:ash_a2ui_locale` and `:ash_a2ui_as_of` (always `nil` without
     `time_travel: true`) on the socket.
 
     ## Test seams (not public API)
@@ -268,6 +278,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         open_surface: Keyword.get(opts, :open_surface),
         open_surface_url: Keyword.get(opts, :open_surface_url),
         header: Keyword.get(opts, :header, true),
+        locale_fn: Keyword.get(opts, :locale_fn) || fn _socket -> nil end,
+        l10n: Keyword.take(opts, [:gettext_backend, :gettext_fn]),
         surface_fn: Keyword.get(opts, :surface_fn, &AshA2ui.Info.build_surface/2),
         data_model_fn: Keyword.get(opts, :data_model_fn, &AshA2ui.Info.build_data_model/2),
         action_fn: Keyword.get(opts, :action_fn, &AshA2ui.ActionHandler.handle/3)
@@ -278,6 +290,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def mount(config, params, _session, socket) do
       actor = config.actor_fn.(socket)
       tenant = config.tenant_fn.(socket)
+      locale = config.locale_fn.(socket)
       url_state = url_state(params)
       as_of = url_as_of(config, params)
 
@@ -287,6 +300,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_actor: actor,
           ash_a2ui_tenant: tenant,
           ash_a2ui_as_of: as_of,
+          ash_a2ui_locale: locale,
+          ash_a2ui_l10n: l10n_opts(config, locale),
           ash_a2ui_refresh_scheduled?: false,
           ash_a2ui_query_state: nil,
           ash_a2ui_context_state: nil,
@@ -304,7 +319,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           # hydrate the surface when the task lands. URL-carried state is
           # validated inside the task (authorized context reads).
           start_async(socket, :ash_a2ui_surface, fn ->
-            opts = [actor: actor, tenant: tenant] ++ AshA2ui.AsOf.read_opt(as_of)
+            opts =
+              [actor: actor, tenant: tenant] ++
+                AshA2ui.AsOf.read_opt(as_of) ++ l10n_opts(config, locale)
 
             config.surface_fn.(
               config.ui,
@@ -700,8 +717,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     defp call_opts(socket) do
       [actor: socket.assigns.ash_a2ui_actor, tenant: socket.assigns.ash_a2ui_tenant] ++
-        AshA2ui.AsOf.read_opt(socket.assigns[:ash_a2ui_as_of])
+        AshA2ui.AsOf.read_opt(socket.assigns[:ash_a2ui_as_of]) ++
+        Map.get(socket.assigns, :ash_a2ui_l10n, [])
     end
+
+    defp l10n_opts(config, nil), do: config.l10n
+    defp l10n_opts(config, locale), do: [{:locale, locale} | config.l10n]
 
     defp refresh_opts(socket) do
       opts =

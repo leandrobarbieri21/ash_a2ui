@@ -1,0 +1,754 @@
+[
+  {
+    "createSurface": {
+      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+      "surfaceId": "bulk_tasks"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateComponents": {
+      "components": [
+        {
+          "children": [
+            "status_text",
+            "context_project",
+            "table_heading",
+            "query_controls",
+            "bulk_toolbar",
+            "records_list",
+            "empty_state",
+            "query_pagination",
+            "action_result_panel"
+          ],
+          "component": "Column",
+          "id": "root"
+        },
+        {
+          "child": "context_project_body",
+          "component": "Card",
+          "id": "context_project"
+        },
+        {
+          "children": [
+            "context_project_label",
+            "context_project_selected_row",
+            "context_project_options"
+          ],
+          "component": "Column",
+          "id": "context_project_body"
+        },
+        {
+          "component": "Text",
+          "id": "context_project_label",
+          "text": "Project",
+          "variant": "h3"
+        },
+        {
+          "children": [
+            "context_project_selected",
+            "context_project_clear_button"
+          ],
+          "component": "Row",
+          "id": "context_project_selected_row"
+        },
+        {
+          "component": "Text",
+          "id": "context_project_selected",
+          "text": {
+            "path": "/context/project/label"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "context": "project",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "context_clear"
+            }
+          },
+          "child": "context_project_clear_text",
+          "component": "Button",
+          "id": "context_project_clear_button",
+          "variant": "borderless"
+        },
+        {
+          "component": "Text",
+          "id": "context_project_clear_text",
+          "text": "Clear"
+        },
+        {
+          "children": {
+            "componentId": "context_project_option_button",
+            "path": "/options/project"
+          },
+          "component": "List",
+          "id": "context_project_options"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "context": "project",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "value": {
+                  "path": "value"
+                }
+              },
+              "name": "context_select"
+            }
+          },
+          "child": "context_project_option_text",
+          "component": "Button",
+          "id": "context_project_option_button",
+          "variant": "borderless"
+        },
+        {
+          "component": "Text",
+          "id": "context_project_option_text",
+          "text": {
+            "path": "label"
+          }
+        },
+        {
+          "component": "Text",
+          "id": "table_heading",
+          "text": "Bulk task",
+          "variant": "h2"
+        },
+        {
+          "children": {
+            "componentId": "record_row",
+            "path": "/records"
+          },
+          "component": "List",
+          "id": "records_list"
+        },
+        {
+          "align": "center",
+          "children": [
+            "bulk_action_approve_button",
+            "bulk_action_reject_button",
+            "bulk_action_destroy_button",
+            "bulk_select_page_button",
+            "bulk_clear_button"
+          ],
+          "component": "Row",
+          "id": "bulk_toolbar"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "approve",
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "records": {
+                  "path": "/records"
+                }
+              },
+              "name": "bulk_invoke"
+            }
+          },
+          "child": "bulk_action_approve_text",
+          "component": "Button",
+          "id": "bulk_action_approve_button"
+        },
+        {
+          "component": "Text",
+          "id": "bulk_action_approve_text",
+          "text": "Approve"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "reject",
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "records": {
+                  "path": "/records"
+                }
+              },
+              "name": "bulk_invoke"
+            }
+          },
+          "child": "bulk_action_reject_text",
+          "component": "Button",
+          "id": "bulk_action_reject_button"
+        },
+        {
+          "component": "Text",
+          "id": "bulk_action_reject_text",
+          "text": "Reject"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "destroy",
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "records": {
+                  "path": "/records"
+                }
+              },
+              "name": "bulk_invoke"
+            }
+          },
+          "child": "bulk_action_destroy_text",
+          "component": "Button",
+          "id": "bulk_action_destroy_button"
+        },
+        {
+          "component": "Text",
+          "id": "bulk_action_destroy_text",
+          "text": "Destroy"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "records": {
+                  "path": "/records"
+                },
+                "selected": true
+              },
+              "name": "bulk_select"
+            }
+          },
+          "child": "bulk_select_page_text",
+          "component": "Button",
+          "id": "bulk_select_page_button"
+        },
+        {
+          "component": "Text",
+          "id": "bulk_select_page_text",
+          "text": "Select page"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "records": {
+                  "path": "/records"
+                },
+                "selected": false
+              },
+              "name": "bulk_select"
+            }
+          },
+          "child": "bulk_clear_text",
+          "component": "Button",
+          "id": "bulk_clear_button"
+        },
+        {
+          "component": "Text",
+          "id": "bulk_clear_text",
+          "text": "Clear"
+        },
+        {
+          "child": "query_controls_body",
+          "component": "Card",
+          "id": "query_controls"
+        },
+        {
+          "align": "end",
+          "children": [
+            "query_search_input",
+            "query_apply_button"
+          ],
+          "component": "Row",
+          "id": "query_controls_body"
+        },
+        {
+          "component": "TextField",
+          "id": "query_search_input",
+          "label": "Search",
+          "value": {
+            "path": "/query/search"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "page": 1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_apply_text",
+          "component": "Button",
+          "id": "query_apply_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_apply_text",
+          "text": "Apply"
+        },
+        {
+          "children": {
+            "componentId": "query_pagination_row",
+            "path": "/query/_pagination_visible"
+          },
+          "component": "List",
+          "id": "query_pagination"
+        },
+        {
+          "children": [
+            "query_prev_slot",
+            "query_page_text",
+            "query_next_slot"
+          ],
+          "component": "Row",
+          "id": "query_pagination_row"
+        },
+        {
+          "children": {
+            "componentId": "query_prev_button",
+            "path": "/query/_previous_visible"
+          },
+          "component": "List",
+          "id": "query_prev_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "pageDelta": -1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_prev_text",
+          "component": "Button",
+          "id": "query_prev_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_prev_text",
+          "text": "Previous"
+        },
+        {
+          "component": "Text",
+          "id": "query_page_text",
+          "text": {
+            "path": "/query/_range_text"
+          }
+        },
+        {
+          "children": {
+            "componentId": "query_next_button",
+            "path": "/query/_next_visible"
+          },
+          "component": "List",
+          "id": "query_next_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "pageDelta": 1,
+                "query": {
+                  "path": "/query"
+                }
+              },
+              "name": "query"
+            }
+          },
+          "child": "query_next_text",
+          "component": "Button",
+          "id": "query_next_button"
+        },
+        {
+          "component": "Text",
+          "id": "query_next_text",
+          "text": "Next"
+        },
+        {
+          "child": "record_row_content",
+          "component": "Card",
+          "id": "record_row"
+        },
+        {
+          "children": [
+            "record_row_selected",
+            "table_cell_title",
+            "table_cell_status",
+            "table_cell_score",
+            "row_action_approve_slot",
+            "row_action_flag_button"
+          ],
+          "component": "Row",
+          "id": "record_row_content"
+        },
+        {
+          "children": [
+            "table_cell_title_label",
+            "table_cell_title_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_title"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_title_label",
+          "text": "Title",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_title_value",
+          "text": {
+            "path": "title"
+          }
+        },
+        {
+          "children": [
+            "table_cell_status_label",
+            "table_cell_status_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_status"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_status_label",
+          "text": "Status",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_status_value",
+          "text": {
+            "path": "status"
+          }
+        },
+        {
+          "children": [
+            "table_cell_score_label",
+            "table_cell_score_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_score"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_score_label",
+          "text": "Score",
+          "variant": "caption"
+        },
+        {
+          "component": "Text",
+          "id": "table_cell_score_value",
+          "text": {
+            "path": "score"
+          }
+        },
+        {
+          "component": "CheckBox",
+          "id": "record_row_selected",
+          "label": "Select",
+          "value": {
+            "path": "_selected"
+          }
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "approve",
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "invoke"
+            }
+          },
+          "child": "row_action_approve_text",
+          "component": "Button",
+          "id": "row_action_approve_button"
+        },
+        {
+          "component": "Text",
+          "id": "row_action_approve_text",
+          "text": "Approve"
+        },
+        {
+          "children": {
+            "componentId": "row_action_approve_button",
+            "path": "_visible_approve"
+          },
+          "component": "List",
+          "id": "row_action_approve_slot"
+        },
+        {
+          "action": {
+            "event": {
+              "context": {
+                "action": "flag",
+                "component": "table",
+                "contexts": {
+                  "path": "/context"
+                },
+                "query": {
+                  "path": "/query"
+                },
+                "recordId": {
+                  "path": "id"
+                }
+              },
+              "name": "invoke"
+            }
+          },
+          "child": "row_action_flag_text",
+          "component": "Button",
+          "id": "row_action_flag_button"
+        },
+        {
+          "component": "Text",
+          "id": "row_action_flag_text",
+          "text": "Flag"
+        },
+        {
+          "children": {
+            "componentId": "empty_state_text",
+            "path": "/_empty_visible"
+          },
+          "component": "List",
+          "id": "empty_state"
+        },
+        {
+          "component": "Text",
+          "id": "empty_state_text",
+          "text": {
+            "path": "_empty_message"
+          }
+        },
+        {
+          "component": "Text",
+          "id": "status_text",
+          "text": {
+            "path": "/ui/feedback/message"
+          }
+        },
+        {
+          "children": [
+            "action_result_text"
+          ],
+          "component": "Column",
+          "id": "action_result_panel"
+        },
+        {
+          "component": "Text",
+          "id": "action_result_text",
+          "text": {
+            "path": "/ui/action_result_text"
+          }
+        }
+      ],
+      "surfaceId": "bulk_tasks"
+    },
+    "version": "v0.9.1"
+  },
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "_empty_message": "No Bulk task records yet.",
+        "_empty_visible": [],
+        "bulk": {
+          "table": {
+            "result": {
+              "errors": [],
+              "failed": 0,
+              "ok": 0,
+              "refused": 0,
+              "skipped": 0
+            }
+          }
+        },
+        "context": {
+          "project": {
+            "label": "Apollo",
+            "search": "",
+            "value": "PROJECT_APOLLO"
+          }
+        },
+        "errors": {},
+        "form": {},
+        "options": {
+          "project": [
+            {
+              "label": "Apollo",
+              "value": "PROJECT_APOLLO"
+            }
+          ]
+        },
+        "query": {
+          "_next_visible": [],
+          "_pagination_visible": [],
+          "_previous_visible": [],
+          "_range_text": "1–3 of 3",
+          "filters": {},
+          "hasMore": false,
+          "page": 1,
+          "pageSize": 5,
+          "search": "",
+          "sort": {
+            "dir": "asc",
+            "field": "title"
+          },
+          "totalCount": 3
+        },
+        "records": [
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_ALPHA"
+              }
+            ],
+            "id": "TASK_ALPHA",
+            "score": 1,
+            "status": "Open",
+            "title": "alpha"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_BRAVO"
+              }
+            ],
+            "id": "TASK_BRAVO",
+            "score": -1,
+            "status": "Open",
+            "title": "bravo"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_CHARLIE"
+              }
+            ],
+            "id": "TASK_CHARLIE",
+            "score": 2,
+            "status": "Open",
+            "title": "charlie"
+          }
+        ],
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          }
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

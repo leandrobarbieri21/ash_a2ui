@@ -237,6 +237,7 @@ defmodule AshA2ui.ActionHandler do
   """
 
   import Ash.Expr
+  import AshA2ui.Gettext, only: [msg: 1]
 
   require Ash.Query
   require Logger
@@ -252,6 +253,8 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.Encoder.V0_9_1
   alias AshA2ui.Encoder.V1_0
   alias AshA2ui.Experience
+  alias AshA2ui.L10n
+  alias AshA2ui.Label
   alias AshA2ui.QueryRunner
   alias AshA2ui.ResolvedView
 
@@ -265,8 +268,9 @@ defmodule AshA2ui.ActionHandler do
   @writes ~w(submit_form invoke bulk_invoke prompt edit_cell nested_add nested_remove
              start_create start_edit wizard_next wizard_back)
 
-  @pinned_refusal "This view shows an earlier moment, so nothing on it can be changed. " <>
-                    "Return to now to make changes."
+  @pinned_refusal msg(
+                    "This view shows an earlier moment, so nothing on it can be changed. Return to now to make changes."
+                  )
 
   @doc """
   Handles an A2UI client `action` envelope for the surface declared on
@@ -289,6 +293,10 @@ defmodule AshA2ui.ActionHandler do
       reports, exports) run at that instant; every action that writes, or
       opens a form that would, is refused with feedback, because the write
       would land on the present while the reader looks at the past.
+    * `:locale` / `:gettext_backend` / `:gettext_fn` — translate the
+      feedback, status lines and any re-rendered chrome (see
+      `AshA2ui.Info.build_surface/2`). Pass the same values the surface was
+      built with.
   """
   @spec handle(module | Spark.Dsl.t(), action_message :: map, opts :: keyword) ::
           {:ok, [map]} | {:error, [map]}
@@ -299,7 +307,7 @@ defmodule AshA2ui.ActionHandler do
     case parse(action_message) do
       {:ok, name, _context, action_id} when name in @writes ->
         if AshA2ui.AsOf.pinned?(opts) do
-          {:error, [status(view, @pinned_refusal, "READ_ONLY_AS_OF")]}
+          {:error, [status(view, t(view, @pinned_refusal), "READ_ONLY_AS_OF")]}
           |> put_feedback(view)
           |> attach_action_response(view, action_id)
         else
@@ -380,7 +388,7 @@ defmodule AshA2ui.ActionHandler do
   # programmatic consumers get the exact per-action result without scraping
   # the data model. v0.9.1 surfaces (and v1.0 actions without an actionId)
   # are byte-identical to before.
-  defp attach_action_response({tag, messages}, %{spec_version: :v1_0}, action_id)
+  defp attach_action_response({tag, messages}, %{spec_version: :v1_0} = view, action_id)
        when is_binary(action_id) and action_id != "" do
     response =
       case {tag, find_response_write(messages)} do
@@ -394,7 +402,12 @@ defmodule AshA2ui.ActionHandler do
           %{"error" => %{"code" => code, "message" => message}}
 
         {:error, _no_structured_write} ->
-          %{"error" => %{"code" => "ACTION_FAILED", "message" => "The action failed."}}
+          %{
+            "error" => %{
+              "code" => "ACTION_FAILED",
+              "message" => t(view, msg("The action failed."))
+            }
+          }
       end
 
     message = %{"version" => "v1.0", "actionId" => action_id, "actionResponse" => response}
@@ -917,7 +930,7 @@ defmodule AshA2ui.ActionHandler do
          ]}
 
       :not_found ->
-        {:error, [status(view, "Option #{inspect(value)} was not found.")]}
+        {:error, [status(view, t(view, msg("The selected option was not found.")))]}
 
       {:error, error} ->
         {:error, error_messages(view, error)}
@@ -1199,7 +1212,7 @@ defmodule AshA2ui.ActionHandler do
             {:ok, [update_data_model(view, "/form/#{argument}", rows ++ [row])]}
 
           :not_found ->
-            {:error, [status(view, "Option #{inspect(value)} was not found.")]}
+            {:error, [status(view, t(view, msg("The selected option was not found.")))]}
 
           {:error, error} ->
             {:error, error_messages(view, error)}
@@ -1284,7 +1297,7 @@ defmodule AshA2ui.ActionHandler do
   defp select_context(ctx, value, %{view: view} = env) do
     case ContextRunner.select(view, ctx, value, env.selected, env.ash_opts) do
       {:ok, change} -> context_change_messages(change, env)
-      :not_found -> {:error, [status(view, "Option #{inspect(value)} was not found.")]}
+      :not_found -> {:error, [status(view, t(view, msg("The selected option was not found.")))]}
       {:error, error} -> {:error, error_messages(view, error)}
     end
   end
@@ -1396,7 +1409,7 @@ defmodule AshA2ui.ActionHandler do
   defp create(%{view: view} = env, values) do
     env = Map.put(env, :invoked, form_action(view, nil))
     result = with {:ok, changeset} <- form_changeset(env, nil, values), do: Ash.create(changeset)
-    after_write(result, env, "Created successfully.")
+    after_write(result, env, t(view, msg("Created successfully.")))
   end
 
   defp update(%{view: view} = env, record_id, values) do
@@ -1405,7 +1418,7 @@ defmodule AshA2ui.ActionHandler do
     result =
       with {:ok, changeset} <- form_changeset(env, record_id, values), do: Ash.update(changeset)
 
-    after_write(result, env, "Updated successfully.")
+    after_write(result, env, t(view, msg("Updated successfully.")))
   end
 
   # The one changeset path for a form write. submit_form (create/update)
@@ -1638,12 +1651,21 @@ defmodule AshA2ui.ActionHandler do
 
   # The success status of a single-row invoke: "<label>: done." when the
   # action entity declares a `label` (the name its button shows, as the bulk
-  # status line uses), else the action's name as before.
+  # status line uses), else "<humanized name> completed.".
   defp completed_text(view, action_name) do
     case Map.get(view.actions, action_name) do
-      %{label: label} when is_binary(label) -> label <> ": done."
-      _no_label -> "Action #{inspect(to_string(action_name))} completed."
+      %{label: label} when is_binary(label) ->
+        t(view, msg("%{action}: done."), action: Label.translate(view.l10n, label))
+
+      _no_label ->
+        t(view, msg("%{action} completed."), action: ResolvedView.action_label(view, action_name))
     end
+  end
+
+  defp unavailable_text(view, action_name) do
+    t(view, msg("%{action} is not available for this record."),
+      action: ResolvedView.action_label(view, action_name)
+    )
   end
 
   # Handler-side visible_when enforcement (mandatory — rendering hides
@@ -1672,8 +1694,7 @@ defmodule AshA2ui.ActionHandler do
         if Conditions.visible?(view.resource, conditions, record) do
           :ok
         else
-          {:error,
-           [status(view, "Action #{inspect(to_string(name))} is not available for this record.")]}
+          {:error, [status(view, unavailable_text(view, name))]}
         end
 
       {:error, error} ->
@@ -1804,10 +1825,7 @@ defmodule AshA2ui.ActionHandler do
         else
           {:error,
            [
-             status(
-               view,
-               "Action #{inspect(to_string(setting.name))} is not available for this record."
-             )
+             status(view, unavailable_text(view, setting.name))
            ]}
         end
 
@@ -1979,7 +1997,7 @@ defmodule AshA2ui.ActionHandler do
   defp bulk_invoke(context, %{view: view} = env) do
     with {:ok, action_name} <- Bulk.allowed_action(view, context),
          {:ok, table} <- Bulk.target_table(view, context, action_name, "bulk_invoke"),
-         {:ok, ids} <- Bulk.selection(table, context) do
+         {:ok, ids} <- Bulk.selection(table, context, view.l10n) do
       setting = Map.get(view.actions, action_name)
       env = env |> Map.put(:invoked, action_name) |> Map.put(:setting, setting)
 
@@ -2089,7 +2107,8 @@ defmodule AshA2ui.ActionHandler do
         action_name,
         selected,
         result,
-        ResolvedView.action_label(view, action_name)
+        ResolvedView.action_label(view, action_name),
+        view.l10n
       )
 
     result_write = update_data_model(view, Bulk.result_path(table), result)
@@ -2145,7 +2164,7 @@ defmodule AshA2ui.ActionHandler do
           nil
       end)
 
-    case Bulk.capped_selection_text(table, count, selected) do
+    case Bulk.capped_selection_text(table, count, selected, view.l10n) do
       nil -> []
       text -> notice(view, text)
     end
@@ -2393,7 +2412,7 @@ defmodule AshA2ui.ActionHandler do
   defp report_status(%{spec_version: :v1_0} = view, count) do
     update_data_model(view, "/ui/response", %{
       "status" => "ok",
-      "message" => report_status_text(count),
+      "message" => report_status_text(view, count),
       "result" => %{"count" => count},
       "resultText" => ""
     })
@@ -2403,12 +2422,14 @@ defmodule AshA2ui.ActionHandler do
     update_data_model(
       view,
       "/ui/feedback",
-      Experience.feedback("success", report_status_text(count))
+      Experience.feedback("success", report_status_text(view, count))
     )
   end
 
-  defp report_status_text(1), do: "Report complete: 1 row."
-  defp report_status_text(count), do: "Report complete: #{count} rows."
+  defp report_status_text(view, 1), do: t(view, msg("Report complete: 1 row."))
+
+  defp report_status_text(view, count),
+    do: t(view, msg("Report complete: %{count} rows."), count: count)
 
   # --- export (CSV file export, v1.0-only — see AshA2ui.Export) ----------------
 
@@ -2463,7 +2484,7 @@ defmodule AshA2ui.ActionHandler do
       end
 
     case columns do
-      [] -> {:error, [status(view, "Select at least one column to export.")]}
+      [] -> {:error, [status(view, t(view, msg("Select at least one column to export.")))]}
       columns -> {:ok, columns}
     end
   end
@@ -2537,7 +2558,11 @@ defmodule AshA2ui.ActionHandler do
     response =
       update_data_model(view, "/ui/response", %{
         "status" => "ok",
-        "message" => "Exported #{filename} (#{length(cells)} rows).",
+        "message" =>
+          t(view, msg("Exported %{filename} (%{count} rows)."),
+            filename: filename,
+            count: length(cells)
+          ),
         "result" => %{"filename" => filename, "rows" => length(cells)},
         "resultText" => ""
       })
@@ -2548,7 +2573,7 @@ defmodule AshA2ui.ActionHandler do
   defp export_header(view, column) do
     case view.fields[column] do
       %{label: label} when is_binary(label) -> label
-      _undeclared -> humanize(to_string(column))
+      _undeclared -> Label.resolve(view.l10n, nil, column)
     end
   end
 
@@ -2635,7 +2660,10 @@ defmodule AshA2ui.ActionHandler do
 
     case result do
       {:ok, _record} ->
-        success(env, "Updated #{humanize(to_string(field))}.")
+        success(
+          env,
+          t(view, msg("Updated %{field}."), field: Label.resolve(view.l10n, nil, field))
+        )
 
       {:error, error} ->
         {:error,
@@ -2730,7 +2758,7 @@ defmodule AshA2ui.ActionHandler do
 
     messages =
       [update_data_model(view, "/errors", %{}) | field_messages] ++
-        [status(view, error_status(field_messages, []), "VALIDATION_FAILED")]
+        [status(view, error_status(view, field_messages, []), "VALIDATION_FAILED")]
 
     {:error, messages ++ wizard_moves(view, Map.get(context, "recordId"), index)}
   end
@@ -3092,7 +3120,7 @@ defmodule AshA2ui.ActionHandler do
         view,
         table.query_path,
         state
-        |> Experience.with_pagination_sentinels(length(rows))
+        |> Experience.with_pagination_sentinels(length(rows), view.l10n)
         |> Experience.with_admin_pagination_booleans(length(rows))
       )
     ] ++ lane_total_messages(view, table, rows, state)
@@ -3115,18 +3143,12 @@ defmodule AshA2ui.ActionHandler do
     |> Enum.map(fn {key, value} -> {to_string(key), json_value(value)} end)
     |> Enum.sort_by(fn {key, _value} -> key end)
     |> Enum.map_join("\n", fn {key, value} ->
-      "#{humanize(key)}: #{display_value(value)}"
+      "#{Label.humanize(key)}: #{display_value(value)}"
     end)
   end
 
   defp display_value(value) when is_binary(value), do: value
   defp display_value(value), do: Jason.encode!(value)
-
-  defp humanize(key) do
-    key
-    |> String.replace("_", " ")
-    |> String.capitalize()
-  end
 
   # --- Ash invocation helpers ------------------------------------------------
 
@@ -3246,7 +3268,13 @@ defmodule AshA2ui.ActionHandler do
     error = error_class(error)
 
     if match?(%Ash.Error.Forbidden{}, error) do
-      [status(view, "You are not authorized to perform this action.", "UNAUTHORIZED")]
+      [
+        status(
+          view,
+          t(view, msg("You are not authorized to perform this action.")),
+          "UNAUTHORIZED"
+        )
+      ]
     else
       field_errors = field_errors(error)
 
@@ -3258,12 +3286,22 @@ defmodule AshA2ui.ActionHandler do
       unshown =
         for {[field | _rest] = segments, text} <- field_errors,
             not shown_field?(shown, field),
-            do: "#{error_field_label(view, segments)}: #{text}"
+            do:
+              t(view, msg("%{field}: %{message}"),
+                field: error_field_label(view, segments),
+                message: text
+              )
 
       code = if field_messages == [], do: "ACTION_FAILED", else: "VALIDATION_FAILED"
 
       field_messages ++
-        [status(view, error_status(field_messages, general_messages(error) ++ unshown), code)]
+        [
+          status(
+            view,
+            error_status(view, field_messages, general_messages(view, error) ++ unshown),
+            code
+          )
+        ]
     end
   end
 
@@ -3279,7 +3317,7 @@ defmodule AshA2ui.ActionHandler do
   defp error_field_label(view, [field | _rest]) do
     case Enum.find(view.fields, fn {name, _field} -> to_string(name) == to_string(field) end) do
       {_name, %{label: label}} when is_binary(label) -> label
-      _undeclared -> field |> to_string() |> String.replace("_", " ") |> String.capitalize()
+      _undeclared -> Label.resolve(view.l10n, nil, field)
     end
   end
 
@@ -3349,13 +3387,13 @@ defmodule AshA2ui.ActionHandler do
     end)
   end
 
-  defp error_status(_field_messages, [_ | _] = sentences),
+  defp error_status(_view, _field_messages, [_ | _] = sentences),
     do: sentences |> Enum.uniq() |> Enum.map_join(" ", &sentence/1)
 
-  defp error_status([], []), do: "The action failed."
+  defp error_status(view, [], []), do: t(view, msg("The action failed."))
 
-  defp error_status(_field_messages, []),
-    do: "Validation failed. Please review the field errors."
+  defp error_status(view, _field_messages, []),
+    do: t(view, msg("Validation failed. Please review the field errors."))
 
   # Messages end in a full stop when they do not end in punctuation already,
   # so several read as sentences side by side.
@@ -3372,6 +3410,15 @@ defmodule AshA2ui.ActionHandler do
   # `Exception.format/2` text, "** (Module) ..."), a data-layer error, a
   # Framework-class error, an arbitrary term — can carry row values or
   # internals: it is logged server-side and reads as "The action failed."
+  defp general_messages(view, error) do
+    error
+    |> general_messages()
+    |> Enum.map(fn
+      :concealed -> t(view, msg("The action failed."))
+      message -> message
+    end)
+  end
+
   defp general_messages(%{errors: errors}) when is_list(errors),
     do: Enum.flat_map(errors, &general_messages/1)
 
@@ -3401,7 +3448,7 @@ defmodule AshA2ui.ActionHandler do
         concealed_detail(error)
     end)
 
-    ["The action failed."]
+    [:concealed]
   end
 
   defp concealed_detail(%UnknownError{error: message}), do: message
@@ -3582,4 +3629,8 @@ defmodule AshA2ui.ActionHandler do
     do: Atom.to_string(value)
 
   defp json_value(value), do: value
+
+  # A library-owned string for the reader, translated with the surface's
+  # translator (see AshA2ui.L10n) exactly once, where the message is made.
+  defp t(%{l10n: l10n}, msgid, bindings \\ []), do: L10n.t(l10n, msgid, bindings)
 end

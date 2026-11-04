@@ -45,9 +45,10 @@ defmodule AshA2ui.Wizard do
   `/ui/panel/primary_label` (which reads "Next" until the last step).
   """
 
-  alias AshA2ui.Experience
+  import AshA2ui.Gettext, only: [msg: 1]
 
-  @next_label "Next"
+  alias AshA2ui.Experience
+  alias AshA2ui.L10n
 
   @doc "The form component's (normalized) steps, or `[]` without a stepped form."
   @spec steps(AshA2ui.ResolvedView.t() | map) :: [AshA2ui.Step.t()]
@@ -77,9 +78,9 @@ defmodule AshA2ui.Wizard do
     stepped?(view) and index < last_index(view)
   end
 
-  @doc ~s(The primary label before the last step: "#{@next_label}".)
-  @spec next_label() :: String.t()
-  def next_label, do: @next_label
+  @doc ~s(The primary label before the last step: "Next", translated with `l10n`.)
+  @spec next_label(L10n.t()) :: String.t()
+  def next_label(l10n \\ nil), do: L10n.t(l10n, msg("Next"))
 
   @doc """
   Parses a client-carried step index: an integer (or an integer string) is
@@ -308,7 +309,7 @@ defmodule AshA2ui.Wizard do
     end
   end
 
-  defp nav_components(_view) do
+  defp nav_components(view) do
     [
       %{
         "id" => "form_wizard_nav",
@@ -337,7 +338,11 @@ defmodule AshA2ui.Wizard do
           }
         }
       },
-      %{"id" => "form_wizard_back_text", "component" => "Text", "text" => "Back"},
+      %{
+        "id" => "form_wizard_back_text",
+        "component" => "Text",
+        "text" => L10n.t(view.l10n, msg("Back"))
+      },
       %{
         "id" => "form_wizard_next_slot",
         "component" => "List",

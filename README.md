@@ -536,6 +536,47 @@ Feed the response to any A2UI renderer. Mutations can be posted back as
 `action` envelopes to a matching endpoint that calls
 `AshA2ui.ActionHandler.handle/3`.
 
+## Localizing ash_a2ui
+
+The text ash_a2ui writes itself (buttons, pagination, empty states, panel
+titles, action feedback) and the labels it derives from field names ship as
+a gettext catalog, `priv/gettext/ash_a2ui.pot`. Nothing is translated unless
+you pass a translator, so existing output does not change.
+
+1. Copy the catalog into your app: `mix ash_a2ui.gen.gettext`. To keep one
+   domain, merge it into an existing one instead:
+   `mix ash_a2ui.gen.gettext --domain default`.
+2. `mix gettext.merge priv/gettext --locale fr`, then fill in the
+   `msgstr`s.
+3. Pass the backend and the reader's locale to every call:
+
+   ```elixir
+   l10n = [gettext_backend: {MyAppWeb.Gettext, "ash_a2ui"}, locale: "fr"]
+
+   AshA2ui.Info.build_surface(MyApp.UI.TicketUI, [actor: user] ++ l10n)
+   AshA2ui.ActionHandler.handle(MyApp.UI.TicketUI, envelope, [actor: user] ++ l10n)
+   ```
+
+   or, in a LiveView:
+
+   ```elixir
+   use AshA2ui.LiveRenderer,
+     ui: MyApp.UI.TicketUI,
+     actor_fn: & &1.assigns.current_user,
+     locale_fn: & &1.assigns.locale,
+     gettext_backend: {MyAppWeb.Gettext, "ash_a2ui"}
+   ```
+
+`locale:` is always explicit: ash_a2ui never reads the ambient Gettext
+locale. For a translation layer that is not Gettext, pass
+`gettext_fn: {Module, :function}` instead. Ids, paths, enum and option
+values, action and field names and record data are never translated, and a
+missing translation falls back to the English text. ash_a2ui does not depend
+on `:gettext`; your app does. The
+[localization usage rules](usage-rules/localization.md) have the details.
+Ash's own error messages are translated separately, with
+`mix ash.gen.gettext`.
+
 ## Positioning: is this the right tool?
 
 Honest comparison — each of these is the better choice in its own lane:

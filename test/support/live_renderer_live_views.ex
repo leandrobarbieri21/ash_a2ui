@@ -119,6 +119,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     def actor(_socket), do: :stub_actor
     def tenant(_socket), do: :stub_tenant
+    def pseudo_locale(_socket), do: "pseudo"
 
     def surface(ui, opts) do
       Fixtures.notify({:surface_fn, ui, opts})
@@ -311,5 +312,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ui: AshA2ui.Test.MinimalUI,
       open_surface: &Stubs.open_surface/2,
       surface_fn: &Stubs.surface/2
+  end
+
+  defmodule AshA2ui.Test.LocalizedLive do
+    @moduledoc false
+
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.MinimalUI,
+      locale_fn: &Stubs.pseudo_locale/1,
+      gettext_fn: {AshA2ui.Test.PseudoLocale, :translate},
+      surface_fn: &Stubs.surface/2,
+      action_fn: &Stubs.action/3
   end
 end

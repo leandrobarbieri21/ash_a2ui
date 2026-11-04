@@ -240,6 +240,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   @behaviour AshA2ui.Encoder
 
   alias Ash.Resource.Info, as: ResourceInfo
+  import AshA2ui.Gettext, only: [msg: 1]
+
+  alias AshA2ui.L10n
+  alias AshA2ui.Label
   alias AshA2ui.ResolvedView
 
   @version "v0.9.1"
@@ -711,7 +715,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
-    diagram_sections = Enum.map(view.diagrams, &admin_diagram_component/1)
+    diagram_sections = Enum.map(view.diagrams, &admin_diagram_component(view, &1))
 
     detail_children =
       Enum.flat_map(view.components, fn
@@ -876,7 +880,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
       [] ->
         if record_controls?(view, table),
-          do: admin_row_envelope("View", "view_record", table)
+          do: admin_row_envelope(t(view, msg("View")), "view_record", table)
     end
   end
 
@@ -1101,11 +1105,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     controls? = record_controls?(view, table)
 
     view_entries =
-      if controls?, do: [admin_row_envelope("View", "view_record", table)], else: []
+      if controls?, do: [admin_row_envelope(t(view, msg("View")), "view_record", table)], else: []
 
     edit_entries =
       if controls? and view.update_action,
-        do: [admin_row_envelope("Edit", "start_edit", table)],
+        do: [admin_row_envelope(t(view, msg("Edit")), "start_edit", table)],
         else: []
 
     declared_entries =
@@ -1148,7 +1152,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     [
       %{
-        "label" => context_select_label(name),
+        "label" => context_select_label(view, name),
         "action" => "context_select",
         "context" =>
           %{
@@ -1195,7 +1199,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     Map.put(entry, "prompt", %{
       "content" => "row_action#{sfx}_#{action}_prompt",
       "title" => setting.prompt_title || ResolvedView.action_label(view, action),
-      "confirmLabel" => "Confirm",
+      "confirmLabel" => t(view, msg("Confirm")),
       "open" => %{
         "action" => "prompt",
         "context" => %{
@@ -1369,7 +1373,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     field_displays ++
       [form_section | List.flatten(inputs) ++ errors ++ group_components(view, form)] ++
-      [action_bar | cancel_components()]
+      [action_bar | cancel_components(view)]
   end
 
   defp admin_field_display(view, field) do
@@ -1453,7 +1457,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => humanize(detail.name),
+        "text" => Label.resolve(view.l10n, nil, detail.name),
         "variant" => "h3"
       }
       | fields
@@ -1628,8 +1632,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
         _not_a_section ->
           if ResolvedView.multi_table?(view),
-            do: humanize(table.name),
-            else: humanize_resource(view.resource)
+            do: Label.resolve(view.l10n, nil, table.name),
+            else: Label.translate(view.l10n, Label.resource_name(view.resource))
       end
 
     [
@@ -1656,7 +1660,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         table,
         sfx,
         fn context -> context |> put_query_binding(view) |> put_contexts_binding(view) end,
-        &ResolvedView.action_label(view, &1)
+        &ResolvedView.action_label(view, &1),
+        view.l10n
       )
     else
       []
@@ -1779,7 +1784,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           %{
             "id" => "#{board}_heading",
             "component" => "Text",
-            "text" => humanize(template),
+            "text" => Label.resolve(view.l10n, nil, template),
             "variant" => "h2"
           },
           %{
@@ -1825,7 +1830,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{board}_heading",
         "component" => "Text",
-        "text" => humanize(template),
+        "text" => Label.resolve(view.l10n, nil, template),
         "variant" => "h2"
       },
       %{
@@ -1994,9 +1999,21 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     sizes = granularity_buttons(base, table, view)
 
     buttons =
-      calendar_button("#{base}_prev", "Previous", table, %{"windowDelta" => -1}, view) ++
-        calendar_button("#{base}_next", "Next", table, %{"windowDelta" => 1}, view) ++
-        calendar_button("#{base}_today", "Today", table, %{"anchor" => "today"}, view) ++
+      calendar_button(
+        "#{base}_prev",
+        t(view, msg("Previous")),
+        table,
+        %{"windowDelta" => -1},
+        view
+      ) ++
+        calendar_button("#{base}_next", t(view, msg("Next")), table, %{"windowDelta" => 1}, view) ++
+        calendar_button(
+          "#{base}_today",
+          t(view, msg("Today")),
+          table,
+          %{"anchor" => "today"},
+          view
+        ) ++
         sizes
 
     days =
@@ -2025,7 +2042,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         ] ++
           day_button(base, table, view) ++
-          calendar_button("#{base}_all", "All days", table, %{"date" => ""}, view)
+          calendar_button("#{base}_all", t(view, msg("All days")), table, %{"date" => ""}, view)
       else
         []
       end
@@ -2051,7 +2068,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         Enum.flat_map(sizes, fn size ->
           calendar_button(
             "#{base}_#{size}",
-            granularity_label(size),
+            granularity_label(view, size),
             table,
             %{"granularity" => to_string(size)},
             view
@@ -2060,9 +2077,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
-  defp granularity_label(:month), do: "Month"
-  defp granularity_label(:week), do: "Week"
-  defp granularity_label(:day), do: "Day"
+  defp granularity_label(view, :month), do: t(view, msg("Month"))
+  defp granularity_label(view, :week), do: t(view, msg("Week"))
+  defp granularity_label(view, :day), do: t(view, msg("Day"))
 
   # A day of the window, templated over its mark (`date`, `label`).
   defp day_button(base, table, view) do
@@ -2164,13 +2181,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The admin catalog's liveDiagram (catalog 1.4): the mermaid source as a
   # static prop, the markers (keyed by node id) and the node list bound to
   # /diagram/<name>. The renderer loads mermaid only when it appears.
-  defp admin_diagram_component(diagram) do
+  defp admin_diagram_component(view, diagram) do
     path = AshA2ui.Diagram.data_path(diagram.name)
 
     %{
       "id" => diagram_id(diagram),
       "component" => "liveDiagram",
-      "label" => AshA2ui.Diagram.label(diagram),
+      "label" => AshA2ui.Diagram.label(diagram, view.l10n),
       "source" => diagram.rendered_source,
       "markers" => %{"path" => "#{path}/markers"},
       "nodes" => %{"path" => "#{path}/nodes"},
@@ -2200,7 +2217,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => AshA2ui.Diagram.label(diagram),
+        "text" => AshA2ui.Diagram.label(diagram, view.l10n),
         "variant" => "h2"
       },
       %{"id" => "#{base}_error", "component" => "Text", "text" => %{"path" => "#{path}/error"}},
@@ -2311,10 +2328,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp query_control_card(view, table, sfx) do
     query = table.query
-    search = (query.search_fields != [] && [search_input(table, sfx)]) || []
-    presets = (preset_picker?(query) && [preset_picker(query, table, sfx)]) || []
+    search = (query.search_fields != [] && [search_input(view, table, sfx)]) || []
+    presets = (preset_picker?(query) && [preset_picker(view, query, table, sfx)]) || []
     filters = Enum.flat_map(filter_pickers(query), &filter_picker(view, table, &1, sfx))
-    ranges = Enum.flat_map(query.range_filters, &range_inputs(table, &1, sfx))
+    ranges = Enum.flat_map(query.range_filters, &range_inputs(view, table, &1, sfx))
 
     # Query controls render as a Card (`query<sfx>_controls`, the id root
     # children reference) over a `_body` Row — section chrome on every
@@ -2349,11 +2366,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The search placeholder rides only on the admin catalog's TextField (the
   # basic TextField takes no placeholder); the label stays, as the input's
   # accessible name.
-  defp search_input(table, sfx) do
+  defp search_input(view, table, sfx) do
     %{
       "id" => "query#{sfx}_search_input",
       "component" => "TextField",
-      "label" => "Search",
+      "label" => t(view, msg("Search")),
       "value" => %{"path" => "#{table.query_path}/search"}
     }
     |> maybe_put(
@@ -2370,21 +2387,24 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # (`preset_picker false`); the presets apply either way.
   defp preset_picker?(query), do: query.presets != [] and query.preset_picker != false
 
-  defp preset_picker(query, table, sfx) do
+  defp preset_picker(view, query, table, sfx) do
     preset_options =
-      Enum.map(query.presets, &%{"label" => humanize(&1.name), "value" => to_string(&1.name)})
+      Enum.map(
+        query.presets,
+        &%{"label" => Label.resolve(view.l10n, nil, &1.name), "value" => to_string(&1.name)}
+      )
 
     options =
       if query.default_preset do
         preset_options
       else
-        [%{"label" => "All", "value" => ""} | preset_options]
+        [%{"label" => t(view, msg("All")), "value" => ""} | preset_options]
       end
 
     %{
       "id" => "query#{sfx}_preset_picker",
       "component" => "ChoicePicker",
-      "label" => "View",
+      "label" => t(view, msg("View")),
       "variant" => "mutuallyExclusive",
       "value" => %{"path" => "#{table.query_path}/preset"},
       "options" => options
@@ -2410,8 +2430,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     if path? and not admin? do
       []
     else
-      all = if multi?, do: [], else: [%{"label" => "All", "value" => ""}]
-      options = if path?, do: [], else: filter_options(view.resource, query, name, admin?)
+      all = if multi?, do: [], else: [%{"label" => t(view, msg("All")), "value" => ""}]
+      options = if path?, do: [], else: filter_options(view, query, name, admin?)
 
       [
         %{
@@ -2451,17 +2471,22 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # `filter_labels`, else the field's declared label, else the humanized
   # name (the field label defaults to the same humanized name).
   defp filter_label(view, query, name) do
-    Keyword.get(query.filter_labels, name) ||
-      case view.fields[name] do
-        %{label: label} when is_binary(label) -> label
-        _none -> humanize(name)
-      end
+    case {Keyword.get(query.filter_labels, name), view.fields[name]} do
+      {label, _field} when is_binary(label) -> Label.translate(view.l10n, label)
+      {_none, %{label: label}} when is_binary(label) -> label
+      _none -> Label.resolve(view.l10n, nil, name)
+    end
   end
 
-  defp filter_options(resource, query, field, admin?) do
+  defp filter_options(view, query, field, admin?) do
+    resource = view.resource
+
     options =
       if attribute_type(resource, field) == Ash.Type.Boolean do
-        [%{"label" => "True", "value" => "true"}, %{"label" => "False", "value" => "false"}]
+        [
+          %{"label" => t(view, msg("True")), "value" => "true"},
+          %{"label" => t(view, msg("False")), "value" => "false"}
+        ]
       else
         choice_options(resource, field)
       end
@@ -2532,18 +2557,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     query.group_labels
     |> Keyword.get(field, [])
     |> Keyword.get(group) ||
-      Map.get(choice_labels(resource, field), to_string(group)) || humanize(group)
+      Map.get(choice_labels(resource, field), to_string(group)) || Label.humanize(group)
   end
 
   # Each range_filters field emits a from/to TextField pair bound to the
   # frozen /query/ranges/<field>/from|to paths; the shared Apply button
   # submits them with the rest of the query state.
-  defp range_inputs(table, field, sfx) do
-    Enum.map(["from", "to"], fn side ->
+  defp range_inputs(view, table, field, sfx) do
+    label = Label.resolve(view.l10n, nil, field)
+
+    Enum.map([{"from", msg("%{field} from")}, {"to", msg("%{field} to")}], fn {side, template} ->
       %{
         "id" => "query#{sfx}_range_#{field}_#{side}",
         "component" => "TextField",
-        "label" => "#{humanize(field)} #{side}",
+        "label" => t(view, template, field: label),
         "value" => %{"path" => "#{table.query_path}/ranges/#{field}/#{side}"}
       }
     end)
@@ -2552,7 +2579,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp apply_button(view, table, sfx) do
     [
       query_button("query#{sfx}_apply", table, %{"page" => 1}, view),
-      %{"id" => "query#{sfx}_apply_text", "component" => "Text", "text" => "Apply"}
+      %{"id" => "query#{sfx}_apply_text", "component" => "Text", "text" => t(view, msg("Apply"))}
     ]
   end
 
@@ -2595,7 +2622,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
       },
       query_button("query#{sfx}_prev", table, %{"pageDelta" => -1}, view),
-      %{"id" => "query#{sfx}_prev_text", "component" => "Text", "text" => "Previous"},
+      %{
+        "id" => "query#{sfx}_prev_text",
+        "component" => "Text",
+        "text" => t(view, msg("Previous"))
+      },
       %{
         "id" => "query#{sfx}_page_text",
         "component" => "Text",
@@ -2610,7 +2641,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
       },
       query_button("query#{sfx}_next", table, %{"pageDelta" => 1}, view),
-      %{"id" => "query#{sfx}_next_text", "component" => "Text", "text" => "Next"}
+      %{"id" => "query#{sfx}_next_text", "component" => "Text", "text" => t(view, msg("Next"))}
     ]
   end
 
@@ -2675,7 +2706,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     # (no-ops otherwise).
     row_components =
       row_components
-      |> AshA2ui.Bulk.with_row_checkbox(table, sfx)
+      |> AshA2ui.Bulk.with_row_checkbox(table, sfx, view.l10n)
       |> with_calendar_when(table, sfx)
 
     row_components ++
@@ -2694,11 +2725,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp view_edit_controls(view, table, sfx) do
     {view_id, view_components} =
-      record_control(table, "view#{sfx}_button", "view_record", "View")
+      record_control(table, "view#{sfx}_button", "view_record", t(view, msg("View")))
 
     {edit_ids, edit_components} =
       if view.update_action do
-        {id, components} = record_control(table, "edit#{sfx}_button", "start_edit", "Edit")
+        {id, components} =
+          record_control(table, "edit#{sfx}_button", "start_edit", t(view, msg("Edit")))
+
         {[id], components}
       else
         {[], []}
@@ -2935,7 +2968,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "row_context#{sfx}_text",
         "component" => "Text",
-        "text" => context_select_label(name)
+        "text" => context_select_label(view, name)
       }
     ]
 
@@ -2946,7 +2979,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # the row's record the context's selection (filling the detail panels and
   # related tables bound to it) — "Select <context>", not "View", which is
   # the task panel's own row control.
-  defp context_select_label(name), do: "Select #{String.downcase(humanize(name))}"
+  defp context_select_label(view, name),
+    do:
+      t(view, msg("Select %{context}"),
+        context: String.downcase(Label.resolve(view.l10n, nil, name))
+      )
 
   # A cell is a labeled pair: a caption Text with the humanized field name
   # and a body Text bound to the field value — so generated rows read
@@ -2977,7 +3014,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         %{
           "id" => "#{base}_label",
           "component" => "Text",
-          "text" => humanize(field_name),
+          "text" => Label.resolve(view.l10n, nil, field_name),
           "variant" => "caption"
         }
         | value_components
@@ -3077,7 +3114,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         }
       },
-      %{"id" => "#{base}_save_text", "component" => "Text", "text" => "Save"},
+      %{"id" => "#{base}_save_text", "component" => "Text", "text" => t(view, msg("Save"))},
       %{
         "id" => "#{base}_error",
         "component" => "Text",
@@ -3234,7 +3271,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             }
           }
         },
-        %{"id" => "#{base}_confirm_text", "component" => "Text", "text" => "Confirm"}
+        %{
+          "id" => "#{base}_confirm_text",
+          "component" => "Text",
+          "text" => t(view, msg("Confirm"))
+        }
       ]
   end
 
@@ -3249,7 +3290,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     components =
       Enum.flat_map(fields, fn field ->
-        prompt_input(action, base, field) ++
+        prompt_input(view, action, base, field) ++
           [
             %{
               "id" => "#{base}_prompt_error_#{field.name}",
@@ -3269,7 +3310,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       else: "#{base}_prompt_input_#{field.name}"
   end
 
-  defp prompt_input(action, base, field) do
+  defp prompt_input(view, action, base, field) do
     props = %{
       "id" => "#{base}_prompt_input_#{field.name}",
       "label" => field.label,
@@ -3278,7 +3319,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     case field.widget do
       :select ->
-        prompt_select_input(action, base, field, props)
+        prompt_select_input(view, action, base, field, props)
 
       :choice_picker ->
         options =
@@ -3308,10 +3349,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # A relationship prompt field: the per-row option list when scoped, the
   # searchable composite with option_search, else a ChoicePicker over the
   # surface-wide options.
-  defp prompt_select_input(action, base, field, props) do
+  defp prompt_select_input(view, action, base, field, props) do
     cond do
-      scoped_prompt_field?(field) -> scoped_prompt_select_components(action, base, field)
-      searchable_prompt_field?(field) -> prompt_select_components(action, base, field)
+      scoped_prompt_field?(field) -> scoped_prompt_select_components(view, action, base, field)
+      searchable_prompt_field?(field) -> prompt_select_components(view, action, base, field)
       true -> [choice_picker(props, Map.get(field, :options, []))]
     end
   end
@@ -3327,7 +3368,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # (label, selected label, search controls, result list) over prompt-scoped
   # state — the selection writes /prompt/values/<action>/<field> server-side
   # (option_select with "prompt"), never the form.
-  defp prompt_select_components(action, base, field) do
+  defp prompt_select_components(view, action, base, field) do
     id = "#{base}_prompt_select_#{field.name}"
     state = "/prompt/select/#{action}/#{field.name}"
 
@@ -3345,7 +3386,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => ["#{id}_search_input", "#{id}_search_button"]
       }
     ] ++
-      search_controls(id, to_string(field.name), "#{state}/search") ++
+      search_controls(view, id, to_string(field.name), "#{state}/search") ++
       option_list(id, "/options/#{field.name}", %{
         "name" => "option_select",
         "context" => %{
@@ -3364,7 +3405,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # option_select — and, when searchable, its option_search — carries the
   # row the prompt is open on (`/prompt/record/<action>`, written by the
   # pre-fill), which the server re-reads before evaluating the scope.
-  defp scoped_prompt_select_components(action, base, field) do
+  defp scoped_prompt_select_components(view, action, base, field) do
     id = "#{base}_prompt_select_#{field.name}"
     state = "/prompt/select/#{action}/#{field.name}"
     record = %{"path" => "/prompt/record/#{action}"}
@@ -3379,7 +3420,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             "children" => ["#{id}_search_input", "#{id}_search_button"]
           }
           | id
-            |> search_controls(to_string(field.name), "#{state}/search")
+            |> then(&search_controls(view, &1, to_string(field.name), "#{state}/search"))
             |> Enum.map(&scope_search_event(&1, "#{id}_search_button", action, record))
         ]
       else
@@ -3674,12 +3715,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       }
     ] ++
       submit_button(view, %{"path" => "/ui/panel/primary_label"}) ++
-      cancel_components()
+      cancel_components(view)
   end
 
   # The Cancel button (basic form and the admin ActionBar secondary):
   # dispatches the existing cancel_record_task envelope.
-  defp cancel_components do
+  defp cancel_components(view) do
     [
       %{
         "id" => "form_cancel_button",
@@ -3687,7 +3728,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "child" => "form_cancel_text",
         "action" => %{"event" => %{"name" => "cancel_record_task", "context" => %{}}}
       },
-      %{"id" => "form_cancel_text", "component" => "Text", "text" => "Cancel"}
+      %{"id" => "form_cancel_text", "component" => "Text", "text" => t(view, msg("Cancel"))}
     ]
   end
 
@@ -3757,7 +3798,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => ["#{base}_search_input", "#{base}_search_button"]
       }
     ] ++
-      search_controls(base, to_string(field_name)) ++
+      search_controls(view, base, to_string(field_name)) ++
       option_list(base, "/options/#{field_name}", %{
         "name" => "option_select",
         "context" => %{
@@ -3770,14 +3811,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The shared search input + button pair: the button's `option_search`
   # context carries the current search text via a data binding and the
   # select/picker name as "field".
-  defp search_controls(base, name, search_path \\ nil) do
+  defp search_controls(view, base, name, search_path \\ nil) do
     search_path = search_path || "/select/#{name}/search"
 
     [
       %{
         "id" => "#{base}_search_input",
         "component" => "TextField",
-        "label" => "Search",
+        "label" => t(view, msg("Search")),
         "value" => %{"path" => search_path}
       },
       %{
@@ -3794,7 +3835,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         }
       },
-      %{"id" => "#{base}_search_text", "component" => "Text", "text" => "Search"}
+      %{"id" => "#{base}_search_text", "component" => "Text", "text" => t(view, msg("Search"))}
     ]
   end
 
@@ -3896,7 +3937,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         }
       },
-      %{"id" => "#{base}_clear_text", "component" => "Text", "text" => "Clear"}
+      %{"id" => "#{base}_clear_text", "component" => "Text", "text" => t(view, msg("Clear"))}
     ]
 
     controls =
@@ -3910,7 +3951,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           %{
             "id" => "#{base}_search_input",
             "component" => "TextField",
-            "label" => "Search",
+            "label" => t(view, msg("Search")),
             "value" => %{"path" => "/context/#{name}/search"}
           },
           %{
@@ -3929,7 +3970,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
               }
             }
           },
-          %{"id" => "#{base}_search_text", "component" => "Text", "text" => "Search"}
+          %{
+            "id" => "#{base}_search_text",
+            "component" => "Text",
+            "text" => t(view, msg("Search"))
+          }
         ]
       else
         []
@@ -4001,7 +4046,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => humanize(detail.name),
+        "text" => Label.resolve(view.l10n, nil, detail.name),
         "variant" => "h3"
       }
       | field_rows
@@ -4011,7 +4056,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp detail_field_label(view, field) do
     case view.fields[field] do
       %{label: label} when is_binary(label) -> label
-      _undeclared -> humanize(field)
+      _undeclared -> Label.resolve(view.l10n, nil, field)
     end
   end
 
@@ -4084,7 +4129,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => humanize(report.name),
+        "text" => Label.resolve(view.l10n, nil, report.name),
         "variant" => "h3"
       },
       %{
@@ -4101,7 +4146,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         }
       },
-      %{"id" => "#{base}_run_text", "component" => "Text", "text" => "Run"},
+      %{"id" => "#{base}_run_text", "component" => "Text", "text" => t(view, msg("Run"))},
       %{
         "id" => "#{base}_list",
         "component" => "List",
@@ -4123,7 +4168,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp report_field_label(view, field) do
     case view.fields[field] do
       %{label: label} when is_binary(label) -> label
-      _undeclared -> humanize(field)
+      _undeclared -> Label.resolve(view.l10n, nil, field)
     end
   end
 
@@ -4186,7 +4231,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "child" => "#{base}_button_text",
         "action" => %{"event" => %{"name" => "export", "context" => context}}
       },
-      %{"id" => "#{base}_button_text", "component" => "Text", "text" => "Export CSV"}
+      %{
+        "id" => "#{base}_button_text",
+        "component" => "Text",
+        "text" => t(view, msg("Export CSV"))
+      }
     ] ++ checkboxes
   end
 
@@ -4215,8 +4264,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       :create_inline ->
         [nested_section(base, ["#{base}_heading", "#{base}_rows", "#{base}_add_button"])] ++
           header ++
-          nested_rows(base, nested, create_inline_row(view, nested, base)) ++
-          nested_add_button(base, nested, %{
+          nested_rows(view, base, nested, create_inline_row(view, nested, base)) ++
+          nested_add_button(view, base, nested, %{
             "argument" => to_string(nested.argument),
             "rows" => %{"path" => "/form/#{nested.argument}"}
           })
@@ -4225,7 +4274,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         picker = pick_existing_picker(view, nested, base, options)
 
         [nested_section(base, ["#{base}_heading", "#{base}_rows" | picker.children])] ++
-          header ++ nested_rows(base, nested, pick_existing_row(base)) ++ picker.components
+          header ++ nested_rows(view, base, nested, pick_existing_row(base)) ++ picker.components
     end
   end
 
@@ -4233,7 +4282,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     %{"id" => base, "component" => "Column", "children" => children}
   end
 
-  defp nested_rows(base, nested, {row_children, row_components}) do
+  defp nested_rows(view, base, nested, {row_children, row_components}) do
     [
       %{
         "id" => "#{base}_rows",
@@ -4241,20 +4290,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => %{"componentId" => "#{base}_row", "path" => "/form/#{nested.argument}"}
       },
       %{"id" => "#{base}_row", "component" => "Row", "children" => row_children}
-    ] ++ row_components ++ nested_remove_button(base, nested)
+    ] ++ row_components ++ nested_remove_button(view, base, nested)
   end
 
   # create_inline rows: one widget-mapped input per nested field bound to the
   # template-relative field path (conforming renderers resolve it to the
   # index-addressed /form/<argument>/<index>/<field> for two-way binding),
   # plus a per-field error Text bound to the row's "_error_<field>" mirror.
-  defp create_inline_row(_view, nested, base) do
+  defp create_inline_row(view, nested, base) do
     children =
       Enum.flat_map(nested.fields, fn field ->
         ["#{base}_input_#{field}", "#{base}_row_error_#{field}"]
       end) ++ ["#{base}_remove_button"]
 
-    inputs = Enum.map(nested.fields, &nested_input(nested, base, &1))
+    inputs = Enum.map(nested.fields, &nested_input(view, nested, base, &1))
 
     errors =
       Enum.map(nested.fields, fn field ->
@@ -4287,7 +4336,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # template-relative option "value"; without one a ChoicePicker of the
   # loaded options (inline, limit-capped — the v0.9.1 constraint) bound to
   # /select/<argument>/picked plus an Add button carrying that binding.
-  defp pick_existing_picker(_view, %{search_fields: [_ | _]} = nested, base, _options) do
+  defp pick_existing_picker(view, %{search_fields: [_ | _]} = nested, base, _options) do
     name = to_string(nested.argument)
 
     %{
@@ -4300,7 +4349,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             "children" => ["#{base}_search_input", "#{base}_search_button"]
           }
         ] ++
-          search_controls(base, name) ++
+          search_controls(view, base, name) ++
           option_list(base, "/options/#{nested.argument}", %{
             "name" => "nested_add",
             "context" => %{
@@ -4312,11 +4361,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     }
   end
 
-  defp pick_existing_picker(_view, nested, base, options) do
+  defp pick_existing_picker(view, nested, base, options) do
     picker = %{
       "id" => "#{base}_picker",
       "component" => "ChoicePicker",
-      "label" => "Add",
+      "label" => t(view, msg("Add")),
       "variant" => "mutuallyExclusive",
       "value" => %{"path" => "/select/#{nested.argument}/picked"},
       "options" => Map.fetch!(options, nested.argument)
@@ -4326,7 +4375,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       children: ["#{base}_picker", "#{base}_add_button"],
       components:
         [picker] ++
-          nested_add_button(base, nested, %{
+          nested_add_button(view, base, nested, %{
             "argument" => to_string(nested.argument),
             "value" => %{"path" => "/select/#{nested.argument}/picked"},
             "rows" => %{"path" => "/form/#{nested.argument}"}
@@ -4334,7 +4383,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     }
   end
 
-  defp nested_add_button(base, _nested, context) do
+  defp nested_add_button(view, base, _nested, context) do
     [
       %{
         "id" => "#{base}_add_button",
@@ -4342,11 +4391,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "child" => "#{base}_add_text",
         "action" => %{"event" => %{"name" => "nested_add", "context" => context}}
       },
-      %{"id" => "#{base}_add_text", "component" => "Text", "text" => "Add"}
+      %{"id" => "#{base}_add_text", "component" => "Text", "text" => t(view, msg("Add"))}
     ]
   end
 
-  defp nested_remove_button(base, nested) do
+  defp nested_remove_button(view, base, nested) do
     [
       %{
         "id" => "#{base}_remove_button",
@@ -4363,15 +4412,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           }
         }
       },
-      %{"id" => "#{base}_remove_text", "component" => "Text", "text" => "Remove"}
+      %{"id" => "#{base}_remove_text", "component" => "Text", "text" => t(view, msg("Remove"))}
     ]
   end
 
   # Nested inputs widget-map against the *destination* resource's attribute
   # types (the parent surface's field entities don't apply inside rows).
-  defp nested_input(nested, base, field) do
+  defp nested_input(view, nested, base, field) do
     binding = %{"path" => to_string(field)}
-    label = humanize(field)
+    label = Label.resolve(view.l10n, nil, field)
     id = "#{base}_input_#{field}"
     base_props = %{"id" => id, "label" => label, "value" => binding}
 
@@ -4636,7 +4685,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         Map.update!(
           value,
           "query",
-          &adorned_query_state(&1, value |> rows_at(view, single) |> length())
+          &adorned_query_state(view, &1, value |> rows_at(view, single) |> length())
         )
     end
   end
@@ -4644,9 +4693,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The pagination sentinels plus — when the admin catalog is selected —
   # the plain boolean pagination props the semantic Pagination component
   # binds (a no-op under the basic catalog).
-  defp adorned_query_state(state, count) do
+  defp adorned_query_state(view, state, count) do
     state
-    |> AshA2ui.Experience.with_pagination_sentinels(count)
+    |> AshA2ui.Experience.with_pagination_sentinels(count, view.l10n)
     |> AshA2ui.Experience.with_admin_pagination_booleans(count)
   end
 
@@ -4654,7 +4703,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     table = Enum.find(query_tables, &(to_string(&1.name) == name))
     count = value |> rows_at(view, table) |> length()
 
-    {name, adorned_query_state(state, count)}
+    {name, adorned_query_state(view, state, count)}
   end
 
   defp rows_at(value, view, table) do
@@ -4859,18 +4908,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp unsupported_type(_value), do: "unsupported type: tuple"
 
-  defp humanize_resource(resource) do
-    resource
-    |> Module.split()
-    |> List.last()
-    |> Macro.underscore()
-    |> humanize()
-  end
-
-  defp humanize(name) do
-    name
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
-  end
+  # A library-owned string for the reader, translated with the surface's
+  # translator (see AshA2ui.L10n). Every chrome literal passes through here
+  # exactly once, where it is emitted.
+  defp t(%{l10n: l10n}, msgid, bindings \\ []), do: L10n.t(l10n, msgid, bindings)
 end

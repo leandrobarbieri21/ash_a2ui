@@ -11,6 +11,7 @@ defmodule AshA2ui.TypeMapper do
   """
 
   alias Ash.Resource.Info, as: ResourceInfo
+  alias AshA2ui.Label
 
   @text_field_types [Ash.Type.String, Ash.Type.CiString] ++
                       [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
@@ -94,7 +95,7 @@ defmodule AshA2ui.TypeMapper do
     else
       constraints
       |> one_of()
-      |> Enum.map(&{&1, humanize(&1)})
+      |> Enum.map(&{&1, Label.humanize(&1)})
     end
   end
 
@@ -104,15 +105,8 @@ defmodule AshA2ui.TypeMapper do
   # `Ash.Type.Enum.label/1` is nil unless the enum declared explicit labels.
   defp enum_label(type, value) do
     case type.label(value) do
-      nil -> humanize(value)
+      nil -> Label.humanize(value)
       label -> to_string(label)
     end
-  end
-
-  defp humanize(value) do
-    value
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
   end
 end

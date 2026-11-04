@@ -27,6 +27,7 @@ defmodule AshA2ui.Canvas.Graph.Builder do
   alias AshA2ui.Canvas.Graph.Edge
   alias AshA2ui.Canvas.Graph.Node
   alias AshA2ui.Canvas.Registry
+  alias AshA2ui.Label
 
   @doc "Builds the graph for `registry`."
   @spec build(module()) :: Graph.t()
@@ -44,7 +45,7 @@ defmodule AshA2ui.Canvas.Graph.Builder do
     app_node = %Node{
       id: app_id,
       kind: :application,
-      label: Registry.label(registry, :application) || humanize(short_name_of(app_id)),
+      label: Registry.label(registry, :application) || Label.humanize(short_name_of(app_id)),
       metadata: %{}
     }
 
@@ -58,7 +59,7 @@ defmodule AshA2ui.Canvas.Graph.Builder do
         %Node{
           id: "domain:" <> short,
           kind: :domain,
-          label: Registry.label(registry, domain) || humanize(short),
+          label: Registry.label(registry, domain) || Label.humanize(short),
           metadata: %{}
         }
       end)
@@ -98,7 +99,7 @@ defmodule AshA2ui.Canvas.Graph.Builder do
         %Node{
           id: Map.fetch!(resource_ids, resource),
           kind: :resource,
-          label: Registry.label(registry, resource) || humanize(short),
+          label: Registry.label(registry, resource) || Label.humanize(short),
           metadata: resource_metadata(resource_id(resource_ids, resource), resource)
         }
       end)
@@ -228,11 +229,4 @@ defmodule AshA2ui.Canvas.Graph.Builder do
     do: %Edge{kind: :contains, from: from, to: to, name: nil}
 
   defp short_name_of("application:" <> short), do: short
-
-  defp humanize(name) do
-    name
-    |> to_string()
-    |> String.replace("_", " ")
-    |> String.capitalize()
-  end
 end
