@@ -37,7 +37,12 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     {"pseudo-locale", AshA2ui.Test.PseudoLocale},
     {"domain pseudo-locale", AshA2ui.Test.DomainPseudoLocale}
   ]
-  @display_keys ~w(text label title message primary_label _range_text _empty_message)
+  @display_keys ~w(text label title message body placeholder description moreNoun confirmLabel
+                   primary_label _range_text _empty_message _primary_label)
+  # Row keys whose value is a label chosen by the record's value: an
+  # enumerated value's label, a badge, an icon label, a detail line.
+  @row_label_prefixes ~w(_badge_ _icon_label_ _detail_ _empty_message)
+  @choice_cells ~w(status priority severity stage status_text)
 
   setup do
     on_exit(fn -> Application.delete_env(:ash_a2ui, :catalog) end)
@@ -62,7 +67,7 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
         where = "#{@scenario_name} at #{inspect(path)}"
         key = path |> Enum.filter(&is_binary/1) |> List.last()
 
-        assert key in @display_keys, "#{where}: #{inspect(key)} is not display text"
+        assert display_key?(key), "#{where}: #{inspect(key)} is not display text"
         assert strip(translated) == plain, "#{where}: #{inspect(translated)} changed wording"
         refute double_wrapped?(translated), "#{where}: #{inspect(translated)} translated twice"
       end
@@ -73,6 +78,11 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     end
   end
 
+  defp display_key?(key),
+    do:
+      key in @display_keys or key in @choice_cells or
+        String.starts_with?(key, @row_label_prefixes)
+
   # Every host label the runtime translated is in the extracted catalog for
   # the scenario's surface; an initial build shows the whole catalog.
   defp assert_metadata_extracted(name, pseudo) do
@@ -81,16 +91,27 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
       |> Regex.scan(pseudo, capture: :all_but_first)
       |> MapSet.new(fn [msgid] -> {nil, msgid} end)
 
-    surface = if String.starts_with?(name, "bulk_"), do: BulkTasksUI, else: Task
+    surface =
+      cond do
+        String.starts_with?(name, "bulk_") -> BulkTasksUI
+        String.starts_with?(name, "hub_") -> AshA2ui.Test.HubUI
+        String.starts_with?(name, "board_") -> AshA2ui.Test.BoardTaskUI
+        String.starts_with?(name, "enum_") -> AshA2ui.Test.EnumRecord
+        true -> Task
+      end
+
     extracted = surface |> Metadata.surface_messages() |> MapSet.new()
 
-    assert MapSet.subset?(shown, extracted),
-           "#{name}: not extracted: #{inspect(MapSet.difference(shown, extracted))}"
+    # A surface also collects the labels a record or a query state selects
+    # (an enum's every label, empty states), so a build shows a subset. A
+    # context heading is shown in lower case.
+    msgids = MapSet.new(extracted, fn {_context, msgid} -> msgid end)
+    folded = MapSet.new(msgids, &String.downcase/1)
 
-    if String.contains?(name, "_build_") do
-      assert shown == extracted,
-             "#{name}: extracted but not shown: #{inspect(MapSet.difference(extracted, shown))}"
-    end
+    missing =
+      Enum.reject(shown, fn {_context, msgid} -> msgid in msgids or msgid in folded end)
+
+    assert missing == [], "#{name}: not extracted: #{inspect(missing)}"
   end
 
   test "a gettext backend translates in the given locale, falling back per string" do

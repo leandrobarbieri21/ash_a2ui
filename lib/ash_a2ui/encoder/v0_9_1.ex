@@ -923,7 +923,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         %{}
 
       entry ->
-        AshA2ui.PrimaryAction.row_data(table.component.primary_action, record, entry["label"])
+        AshA2ui.PrimaryAction.row_data(
+          table.component.primary_action,
+          record,
+          entry["label"],
+          view.l10n
+        )
     end
   end
 
@@ -960,7 +965,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_column_badge(layout, field)
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field, columns[field])
-      |> put_column_cells(columns[field])
+      |> put_column_cells(columns[field], view.l10n)
     end)
   end
 
@@ -1011,9 +1016,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # detail line are the server-computed `_icon_*` / `_detail_*` row keys
   # (`AshA2ui.Column.row_data/2`). The fields a column reads from are
   # folded into it and left out as columns of their own.
-  defp put_column_cells(column, nil), do: column
+  defp put_column_cells(column, nil, _l10n), do: column
 
-  defp put_column_cells(column, cells) do
+  defp put_column_cells(column, cells, l10n) do
     name = cells.name
 
     column
@@ -1021,9 +1026,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> maybe_put("icon", cells.icon && icon_binding(name, cells))
     |> maybe_put("more", cells.more && more_binding(name, cells))
     |> maybe_put("detail", cells.detail && detail_binding(name, cells))
-    |> maybe_put("help", AshA2ui.Column.help(cells))
+    |> maybe_put("help", AshA2ui.Column.help(cells, l10n))
     |> maybe_put("width", Map.get(cells, :width))
-    |> maybe_put("moreNoun", Map.get(cells, :more_noun))
+    |> maybe_put("moreNoun", translate_declared(l10n, Map.get(cells, :more_noun)))
   end
 
   defp more_binding(name, cells) do
@@ -1198,7 +1203,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp put_admin_prompt(entry, view, table, action, %{prompt_fields: [_ | _]} = setting, sfx) do
     Map.put(entry, "prompt", %{
       "content" => "row_action#{sfx}_#{action}_prompt",
-      "title" => setting.prompt_title || ResolvedView.action_label(view, action),
+      "title" => prompt_title(view, action, setting),
       "confirmLabel" => t(view, msg("Confirm")),
       "open" => %{
         "action" => "prompt",
@@ -1250,7 +1255,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       case query.no_results_state && Keyword.get(query.no_results_state, :clear_action) do
         label when is_binary(label) ->
           %{
-            "label" => label,
+            "label" => Label.translate(view.l10n, label),
             "action" => %{
               "name" => "query",
               "context" =>
@@ -2193,7 +2198,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       "nodes" => %{"path" => "#{path}/nodes"},
       "error" => %{"path" => "#{path}/error"}
     }
-    |> maybe_put("description", diagram.description)
+    |> maybe_put("description", translate_declared(view.l10n, diagram.description))
   end
 
   # The basic composition (and any basic renderer's view of a diagram): a
@@ -2243,13 +2248,19 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "component" => "List",
         "children" => %{"componentId" => "#{base}_marker", "path" => "markers"}
       }
-    ] ++ description_components(diagram, base) ++ marker_components(view, diagram, base)
+    ] ++ description_components(view, diagram, base) ++ marker_components(view, diagram, base)
   end
 
-  defp description_components(%{description: nil}, _base), do: []
+  defp description_components(_view, %{description: nil}, _base), do: []
 
-  defp description_components(diagram, base) do
-    [%{"id" => "#{base}_description", "component" => "Text", "text" => diagram.description}]
+  defp description_components(view, diagram, base) do
+    [
+      %{
+        "id" => "#{base}_description",
+        "component" => "Text",
+        "text" => Label.translate(view.l10n, diagram.description)
+      }
+    ]
   end
 
   defp marker_components(view, diagram, base) do
@@ -2375,7 +2386,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     }
     |> maybe_put(
       "placeholder",
-      if(AshA2ui.Experience.admin?(), do: table.query.search_placeholder)
+      if(AshA2ui.Experience.admin?(),
+        do: translate_declared(view.l10n, table.query.search_placeholder)
+      )
     )
   end
 
@@ -2488,12 +2501,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           %{"label" => t(view, msg("False")), "value" => "false"}
         ]
       else
-        choice_options(resource, field)
+        choice_options(view, resource, field)
       end
 
     case {Keyword.get(query.filter_groups, field), admin?} do
       {groups, true} when is_list(groups) and groups != [] ->
-        group_options(resource, query, field, groups, options)
+        group_options(view, query, field, groups, options)
 
       _ungrouped ->
         options
@@ -2504,7 +2517,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # placed where its first leaf would be, followed by its leaves in the
   # group's order, each carrying `"parent"`. Ungrouped options keep their
   # place.
-  defp group_options(resource, query, field, groups, options) do
+  defp group_options(view, query, field, groups, options) do
     by_value = Map.new(options, &{&1["value"], &1})
 
     parent_of =
@@ -2521,7 +2534,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             {[option | acc], seen}
 
           group ->
-            emit_group({acc, seen}, group, {resource, query, field, groups, by_value})
+            emit_group({acc, seen}, group, {view, query, field, groups, by_value})
         end
       end)
 
@@ -2538,14 +2551,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
-  defp group_with_leaves({resource, query, field, groups, by_value}, group) do
+  defp group_with_leaves({view, query, field, groups, by_value}, group) do
     leaves =
       groups
       |> Keyword.fetch!(group)
       |> Enum.map(&Map.put(by_value[to_string(&1)], "parent", to_string(group)))
 
     group_option = %{
-      "label" => group_label(resource, query, field, group),
+      "label" => group_label(view, query, field, group),
       "value" => to_string(group),
       "group" => true
     }
@@ -2553,11 +2566,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     Enum.reverse(leaves) ++ [group_option]
   end
 
-  defp group_label(resource, query, field, group) do
-    query.group_labels
-    |> Keyword.get(field, [])
-    |> Keyword.get(group) ||
-      Map.get(choice_labels(resource, field), to_string(group)) || Label.humanize(group)
+  defp group_label(view, query, field, group) do
+    declared = query.group_labels |> Keyword.get(field, []) |> Keyword.get(group)
+
+    (declared && Label.translate(view.l10n, declared)) ||
+      Map.get(choice_labels(view, view.resource, field), to_string(group)) ||
+      Label.resolve(view.l10n, nil, group)
   end
 
   # Each range_filters field emits a from/to TextField pair bound to the
@@ -3227,7 +3241,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # paths cannot reach the shared prompt state), a per-field error Text, and
   # the confirm Button whose invoke context carries the "values" binding.
   defp prompt_components(view, table, action, base, setting) do
-    title = setting.prompt_title || ResolvedView.action_label(view, action)
+    title = prompt_title(view, action, setting)
     {field_children, field_components} = prompt_field_components(view, action, base)
 
     [
@@ -4435,7 +4449,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         base_props
         |> Map.put("component", "ChoicePicker")
         |> Map.put("variant", "mutuallyExclusive")
-        |> Map.put("options", choice_options(nested.destination, field))
+        |> Map.put("options", choice_options(view, nested.destination, field))
 
       :date_time_input ->
         base_props
@@ -4505,13 +4519,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     if Map.has_key?(view.selects, field_name) do
       Map.fetch!(options, field_name)
     else
-      choice_options(view.resource, field_name)
+      choice_options(view, view.resource, field_name)
     end
   end
 
-  defp choice_options(resource, field_name) do
+  defp choice_options(view, resource, field_name) do
     resource
-    |> AshA2ui.TypeMapper.choices(field_name)
+    |> AshA2ui.TypeMapper.choices(field_name, view.l10n)
     |> Enum.map(fn {value, label} -> %{"label" => label, "value" => to_string(value)} end)
   end
 
@@ -4562,24 +4576,28 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           "query",
           Map.new(query_tables, fn table ->
             rows = value["records"][to_string(table.name)] || []
-            {to_string(table.name), Map.get(states, table.name) || default_state(table, rows)}
+
+            {to_string(table.name),
+             Map.get(states, table.name) || default_state(view, table, rows)}
           end)
         )
 
       true ->
         state =
-          Keyword.get(opts, :query_state) || default_state(hd(query_tables), value["records"])
+          Keyword.get(opts, :query_state) ||
+            default_state(view, hd(query_tables), value["records"])
 
         Map.put(value, "query", state)
     end
   end
 
-  defp default_state(table, records) do
+  defp default_state(view, table, records) do
     AshA2ui.QueryRunner.state(
       table.query,
       AshA2ui.QueryRunner.default_params(table),
       length(records),
-      false
+      false,
+      view.l10n
     )
   end
 
@@ -4776,8 +4794,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     row
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
-    |> Map.merge(AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record))
-    |> Map.merge(AshA2ui.Column.row_data((table && table.component.columns) || [], record))
+    |> Map.merge(
+      AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record, view.l10n)
+    )
+    |> Map.merge(
+      AshA2ui.Column.row_data((table && table.component.columns) || [], record, view.l10n)
+    )
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     |> Map.merge(AshA2ui.Bulk.row_data(table))
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))
@@ -4821,7 +4843,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
           :not_virtual ->
             # The record's own resource: a related table's rows are not the surface's.
-            record |> Map.get(name) |> json_safe() |> humanize_choice(record.__struct__, name)
+            record
+            |> Map.get(name)
+            |> json_safe()
+            |> humanize_choice(view, record.__struct__, name)
         end
     end
   end
@@ -4840,18 +4865,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # The cell shows the label, so a client that keys its own words by value (a
   # translated label, a status detail line) gets the value too: rows carry it
   # at the reserved `_values/<field>` key, for rewritten fields only.
-  defp humanize_choice(value, resource, name) when is_binary(value) do
-    case choice_labels(resource, name) do
+  defp humanize_choice(value, view, resource, name) when is_binary(value) do
+    case choice_labels(view, resource, name) do
       %{^value => label} -> {:choice, value, label}
       _ -> {:value, value}
     end
   end
 
-  defp humanize_choice(value, _resource, _name), do: {:value, value}
+  defp humanize_choice(value, _view, _resource, _name), do: {:value, value}
 
-  defp choice_labels(resource, name) do
+  defp choice_labels(view, resource, name) do
     resource
-    |> AshA2ui.TypeMapper.choices(name)
+    |> AshA2ui.TypeMapper.choices(name, view.l10n)
     |> Map.new(fn {value, label} -> {to_string(value), label} end)
   end
 
@@ -4912,4 +4937,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # translator (see AshA2ui.L10n). Every chrome literal passes through here
   # exactly once, where it is emitted.
   defp t(%{l10n: l10n}, msgid, bindings \\ []), do: L10n.t(l10n, msgid, bindings)
+
+  # A declared display string, translated in the metadata domain; `nil`
+  # stays `nil`.
+  defp translate_declared(_l10n, nil), do: nil
+  defp translate_declared(l10n, text), do: Label.translate(l10n, text)
+
+  defp prompt_title(view, action, setting),
+    do:
+      translate_declared(view.l10n, setting.prompt_title) ||
+        ResolvedView.action_label(view, action)
 end

@@ -45,13 +45,25 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
+    import AshA2ui.Gettext, only: [msg: 1]
+
+    alias AshA2ui.L10n
+
     attr(:presences, :list,
       default: [],
       doc: "rows from `AshA2ui.Presence.list/2`: %{key: String.t(), label: String.t()}"
     )
 
     attr(:max_visible, :integer, default: 5)
-    attr(:surface_label, :string, default: "People viewing this surface")
+
+    attr(:surface_label, :string,
+      default: nil,
+      doc: ~s(The bar's accessible name; "People viewing this surface".)
+    )
+
+    attr(:locale, :string, default: nil, doc: "The locale for the bar's own text.")
+    attr(:gettext_backend, :any, default: nil, doc: "`{backend, domain}`; see `AshA2ui.L10n`.")
+    attr(:gettext_fn, :any, default: nil, doc: "`{module, function}`; see `AshA2ui.L10n`.")
 
     @doc """
     The avatar stack: overlapping initials circles plus the "+N" overflow
@@ -61,17 +73,40 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       presences = assigns[:presences] || []
       max_visible = assigns[:max_visible] || 5
 
+      l10n =
+        L10n.new(
+          Enum.reject(
+            [
+              locale: assigns[:locale],
+              gettext_backend: assigns[:gettext_backend],
+              gettext_fn: assigns[:gettext_fn]
+            ],
+            &is_nil(elem(&1, 1))
+          )
+        )
+
+      surface_label =
+        assigns[:surface_label] || L10n.t(l10n, msg("People viewing this surface"))
+
+      overflow = max(0, length(presences) - max_visible)
+
       assigns =
         assign(assigns,
           visible: Enum.take(presences, max_visible),
-          overflow: max(0, length(presences) - max_visible)
+          overflow: overflow,
+          surface_label: surface_label,
+          overflow_label:
+            L10n.t(l10n, msg("%{count} more people viewing this surface"), count: overflow),
+          overflow_title:
+            L10n.t(l10n, msg("%{label}: +%{count}"), label: surface_label, count: overflow),
+          l10n: l10n
         )
 
       ~H"""
       <div class="a2ui-presence-bar" role="group" aria-label={@surface_label} style="display:inline-flex;align-items:center;">
         <span :for={{presence, index} <- Enum.with_index(@visible)}
           role="img"
-          aria-label={"#{presence.label} is viewing this surface"}
+          aria-label={viewing_label(@l10n, presence.label)}
           title={presence.label}
           style={"display:inline-flex;align-items:center;justify-content:center;
                   width:2rem;height:2rem;border-radius:9999px;
@@ -86,8 +121,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         </span>
         <span :if={@overflow > 0}
           role="img"
-          aria-label={"#{@overflow} more people viewing this surface"}
-          title={"#{@surface_label}: +#{@overflow}"}
+          aria-label={@overflow_label}
+          title={@overflow_title}
           style="display:inline-flex;align-items:center;justify-content:center;
                  height:2rem;border-radius:9999px;padding:0 0.5rem;
                  border:2px solid var(--a2ui-color-border, currentColor);
@@ -101,6 +136,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       </div>
       """
     end
+
+    defp viewing_label(l10n, name),
+      do: L10n.t(l10n, msg("%{name} is viewing this surface"), name: name)
 
     @doc """
     The nav active-state attributes: `%{"aria-current" => "page"}` when

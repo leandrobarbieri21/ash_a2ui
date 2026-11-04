@@ -12,8 +12,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: a2ui_metadata\n"
 
+#: test/support/diagram_flow.ex
+#: test/support/hub_ui.ex
 #: test/support/kitchen_sink.ex
 #: test/support/kitchen_sink_v1_ui.ex
+#: test/support/promotion.ex
 #: test/support/referral.ex
 msgid "Active"
 msgstr ""
@@ -46,11 +49,22 @@ msgstr ""
 msgid "Approve"
 msgstr ""
 
+#: test/support/bulk_cards_ui.ex
 #: test/support/bulk_presets_ui.ex
+#: test/support/bulk_tasks_ui.ex
+#: test/support/linked_filters_ui.ex
+#: test/support/live_filters_ui.ex
+#: test/support/referral.ex
+#: test/support/sort_only_ui.ex
+#: test/support/submission.ex
+#: test/support/tabbed_presets_ui.ex
 msgid "Approved"
 msgstr ""
 
+#: test/support/board_task_ui.ex
 #: test/support/bulk_presets_ui.ex
+#: test/support/kitchen_sink.ex
+#: test/support/kitchen_sink_v1_ui.ex
 msgid "Archived"
 msgstr ""
 
@@ -61,6 +75,10 @@ msgstr ""
 #: test/support/adoption.ex
 #: test/support/adoption_ui.ex
 msgid "Assign"
+msgstr ""
+
+#: test/support/adoption.ex
+msgid "Assign a clerk"
 msgstr ""
 
 #: test/support/adoption_ui.ex
@@ -87,6 +105,10 @@ msgstr ""
 msgid "Birthday"
 msgstr ""
 
+#: test/support/canvas.ex
+msgid "Blog"
+msgstr ""
+
 #: test/support/adoption.ex
 #: test/support/adoption_ui.ex
 #: test/support/board_task_ui.ex
@@ -111,6 +133,10 @@ msgstr ""
 msgid "Bucket word"
 msgstr ""
 
+#: test/support/paginated.ex
+msgid "Bug"
+msgstr ""
+
 #: test/support/bulk_presets_ui.ex
 #: test/support/bulk_tasks_ui.ex
 #: test/support/linked_filters_ui.ex
@@ -120,32 +146,16 @@ msgstr ""
 msgid "Bulk task"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-msgid "By severity low"
+#: test/support/calendar_event.ex
+msgid "Cancelled"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-msgid "By severity medium"
+#: test/support/canvas.ex
+msgid "Canvas Test App"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-msgid "By severity very high"
-msgstr ""
-
-#: test/support/board_task_ui.ex
-msgid "By status archived"
-msgstr ""
-
-#: test/support/board_task_ui.ex
-msgid "By status claimed"
-msgstr ""
-
-#: test/support/board_task_ui.ex
-msgid "By status completed"
-msgstr ""
-
-#: test/support/board_task_ui.ex
-msgid "By status open"
+#: test/support/canvas.ex
+msgid "Catalog"
 msgstr ""
 
 #: test/support/paginated.ex
@@ -166,6 +176,16 @@ msgstr ""
 msgid "Claim"
 msgstr ""
 
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/board_task_ui.ex
+msgid "Claimed"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Clear search and filters"
+msgstr ""
+
 #: test/support/adoption_ui.ex
 msgid "Clerk"
 msgstr ""
@@ -179,6 +199,8 @@ msgstr ""
 msgid "Clinic"
 msgstr ""
 
+#: test/support/links.ex
+#: test/support/paginated.ex
 #: test/support/referral.ex
 msgid "Closed"
 msgstr ""
@@ -196,7 +218,14 @@ msgid "Comment count"
 msgstr ""
 
 #: test/support/board_task_ui.ex
+#: test/support/canvas.ex
 msgid "Complete"
+msgstr ""
+
+#: test/support/appointments_ui.ex
+#: test/support/board_task_ui.ex
+#: test/support/word_report_ui.ex
+msgid "Completed"
 msgstr ""
 
 #: test/support/calendar_event.ex
@@ -220,10 +249,18 @@ msgstr ""
 msgid "Contract status"
 msgstr ""
 
+#: test/support/hub_ui.ex
+msgid "Contracts you add show here."
+msgstr ""
+
 #: test/support/kitchen_sink.ex
 #: test/support/kitchen_sink_v1_ui.ex
 #: test/support/review_item.ex
 msgid "Count"
+msgstr ""
+
+#: test/support/canvas.ex
+msgid "Create"
 msgstr ""
 
 #: test/support/kitchen_sink.ex
@@ -231,8 +268,20 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
+#: test/support/board_task_ui.ex
+msgid "Critical"
+msgstr ""
+
 #: test/support/referral.ex
 msgid "Decline"
+msgstr ""
+
+#: test/support/referral.ex
+msgid "Decline referral"
+msgstr ""
+
+#: test/support/referral.ex
+msgid "Declined"
 msgstr ""
 
 #: test/support/prompt_scope.ex
@@ -246,6 +295,7 @@ msgstr ""
 #: test/support/action_handler_fixtures.ex
 #: test/support/article.ex
 #: test/support/bulk_tasks_ui.ex
+#: test/support/canvas.ex
 #: test/support/enrollment.ex
 #: test/support/experience_ui.ex
 #: test/support/kitchen_sink.ex
@@ -265,12 +315,36 @@ msgstr ""
 msgid "Display title"
 msgstr ""
 
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/column_task.ex
+#: test/support/diagram_flow.ex
+#: test/support/review_item.ex
+msgid "Done"
+msgstr ""
+
 #: test/support/review_item.ex
 msgid "Done items"
 msgstr ""
 
+#: test/support/article.ex
+#: test/support/hub_ui.ex
+#: test/support/kitchen_sink.ex
+#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/submission.ex
+msgid "Draft"
+msgstr ""
+
 #: test/support/column_task.ex
 msgid "Due on"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "Due soon"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "Due {date}"
 msgstr ""
 
 #: test/support/appointments_ui.ex
@@ -284,6 +358,10 @@ msgstr ""
 
 #: test/support/calendar_event.ex
 msgid "Ends on"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Ends soon"
 msgstr ""
 
 #: test/support/enrollment.ex
@@ -310,15 +388,36 @@ msgstr ""
 msgid "Everything"
 msgstr ""
 
+#: test/support/diagram_flow.ex
+msgid "Executing"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Expired"
+msgstr ""
+
 #: test/support/promotion.ex
 msgid "Expires"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Expiring soon"
 msgstr ""
 
 #: test/support/adoption.ex
 msgid "Explode"
 msgstr ""
 
+#: test/support/diagram_flow.ex
+msgid "Failed"
+msgstr ""
+
+#: test/support/paginated.ex
+msgid "Feature"
+msgstr ""
+
 #: test/support/adoption.ex
+#: test/support/submission.ex
 msgid "Finish"
 msgstr ""
 
@@ -342,8 +441,28 @@ msgstr ""
 msgid "Generate secret"
 msgstr ""
 
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/board_task_ui.ex
+#: test/support/column_task.ex
+msgid "High"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "High priority"
+msgstr ""
+
 #: test/support/hub_ui.ex
 msgid "Hub contract"
+msgstr ""
+
+#: test/support/enum_types.ex
+msgctxt "enum:Elixir.AshA2ui.Test.Stage"
+msgid "In Progress"
+msgstr ""
+
+#: test/support/promotion.ex
+msgid "Inactive"
 msgstr ""
 
 #: test/support/bulk_cards_ui.ex
@@ -394,6 +513,25 @@ msgstr ""
 msgid "Login"
 msgstr ""
 
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/board_task_ui.ex
+#: test/support/column_task.ex
+msgid "Low"
+msgstr ""
+
+#: test/support/board_task_ui.ex
+#: test/support/enum_types.ex
+msgctxt "enum:Elixir.AshA2ui.Test.Severity"
+msgid "Low"
+msgstr ""
+
+#: test/support/board_task_ui.ex
+#: test/support/enum_types.ex
+msgctxt "enum:Elixir.AshA2ui.Test.Severity"
+msgid "Medium"
+msgstr ""
+
 #: test/support/word_report_ui.ex
 msgid "Min length"
 msgstr ""
@@ -427,11 +565,27 @@ msgid "Name (standalone)"
 msgstr ""
 
 #: test/support/review_item.ex
+msgid "New"
+msgstr ""
+
+#: test/support/review_item.ex
 msgid "New items"
 msgstr ""
 
 #: test/support/bucket_words_ui.ex
 msgid "New words"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "No archived contracts"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "No contracts yet"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "No results"
 msgstr ""
 
 #: test/support/experience_ui.ex
@@ -440,6 +594,16 @@ msgstr ""
 
 #: test/support/diagram_flow.ex
 msgid "Node"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "None"
+msgstr ""
+
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/column_task.ex
+msgid "Normal"
 msgstr ""
 
 #: test/support/adoption.ex
@@ -464,12 +628,41 @@ msgstr ""
 msgid "Offline"
 msgstr ""
 
+#: test/support/adoption.ex
+#: test/support/adoption_ui.ex
+#: test/support/board_task_ui.ex
+#: test/support/bulk_cards_ui.ex
+#: test/support/bulk_presets_ui.ex
+#: test/support/bulk_tasks_ui.ex
+#: test/support/column_task.ex
+#: test/support/hub_ui.ex
+#: test/support/linked_filters_ui.ex
+#: test/support/links.ex
+#: test/support/live_filters_ui.ex
+#: test/support/paginated.ex
+#: test/support/sort_only_ui.ex
+#: test/support/tabbed_presets_ui.ex
+msgid "Open"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "Overdue"
+msgstr ""
+
+#: test/support/column_task.ex
+msgid "Overdue since {date}"
+msgstr ""
+
 #: test/support/appointments_ui.ex
 msgid "Owner"
 msgstr ""
 
 #: test/support/appointments_ui.ex
 msgid "Owner card"
+msgstr ""
+
+#: test/support/canvas.ex
+msgid "Page"
 msgstr ""
 
 #: test/support/paginated.ex
@@ -520,6 +713,10 @@ msgstr ""
 msgid "Post"
 msgstr ""
 
+#: test/support/canvas.ex
+msgid "Posts"
+msgstr ""
+
 #: test/support/kitchen_sink.ex
 #: test/support/kitchen_sink_v1_ui.ex
 msgid "Price"
@@ -540,12 +737,20 @@ msgstr ""
 msgid "Priority"
 msgstr ""
 
+#: test/support/canvas.ex
+msgid "Product"
+msgstr ""
+
 #: test/support/bulk_tasks_ui.ex
 msgid "Project"
 msgstr ""
 
 #: test/support/promotion.ex
 msgid "Promotion"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Property"
 msgstr ""
 
 #: test/support/hub_ui.ex
@@ -561,8 +766,22 @@ msgstr ""
 msgid "Protected"
 msgstr ""
 
+#: test/support/canvas.ex
+msgid "Publish summary"
+msgstr ""
+
+#: test/support/article.ex
+#: test/support/kitchen_sink.ex
+#: test/support/kitchen_sink_v1_ui.ex
+msgid "Published"
+msgstr ""
+
 #: test/support/ticket.ex
 msgid "Rating"
+msgstr ""
+
+#: test/support/canvas.ex
+msgid "Read"
 msgstr ""
 
 #: test/support/experience_ui.ex
@@ -583,6 +802,24 @@ msgstr ""
 msgid "Reject"
 msgstr ""
 
+#: test/support/bulk_cards_ui.ex
+#: test/support/bulk_presets_ui.ex
+#: test/support/bulk_tasks_ui.ex
+#: test/support/linked_filters_ui.ex
+#: test/support/live_filters_ui.ex
+#: test/support/sort_only_ui.ex
+#: test/support/tabbed_presets_ui.ex
+msgid "Rejected"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Renewal scheduled"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Renews soon"
+msgstr ""
+
 #: test/support/bucket_words_ui.ex
 #: test/support/editable_words_ui.ex
 #: test/support/word_report_ui.ex
@@ -593,12 +830,21 @@ msgstr ""
 msgid "Reprioritize"
 msgstr ""
 
+#: test/support/submission.ex
+msgid "Review"
+msgstr ""
+
 #: test/support/review_item.ex
 msgid "Review item"
 msgstr ""
 
 #: test/support/enrollment.ex
 msgid "Role"
+msgstr ""
+
+#: test/support/appointments_ui.ex
+#: test/support/word_report_ui.ex
+msgid "Scheduled"
 msgstr ""
 
 #: test/support/kitchen_sink.ex
@@ -624,6 +870,10 @@ msgstr ""
 msgid "Score"
 msgstr ""
 
+#: test/support/hub_ui.ex
+msgid "Search contracts or vendors"
+msgstr ""
+
 #: test/support/board_task_ui.ex
 #: test/support/enum_types.ex
 msgid "Severity"
@@ -647,6 +897,10 @@ msgstr ""
 
 #: test/support/bulk_presets_ui.ex
 msgid "Stamp"
+msgstr ""
+
+#: test/support/canvas.ex
+msgid "Start"
 msgstr ""
 
 #: test/support/calendar_event.ex
@@ -716,6 +970,10 @@ msgstr ""
 msgid "Submission"
 msgstr ""
 
+#: test/support/submission.ex
+msgid "Submitted"
+msgstr ""
+
 #: test/support/links.ex
 msgid "Table"
 msgstr ""
@@ -733,6 +991,7 @@ msgstr ""
 msgid "Take it"
 msgstr ""
 
+#: test/support/canvas.ex
 #: test/support/experience_ui.ex
 #: test/support/prompt_scope.ex
 msgid "Task"
@@ -777,6 +1036,15 @@ msgstr ""
 msgid "Title"
 msgstr ""
 
+#: test/support/enum_types.ex
+msgctxt "enum:Elixir.AshA2ui.Test.Stage"
+msgid "To Do"
+msgstr ""
+
+#: test/support/board_task_ui.ex
+msgid "To do"
+msgstr ""
+
 #: test/support/action_handler_fixtures.ex
 msgid "Touch"
 msgstr ""
@@ -789,6 +1057,11 @@ msgstr ""
 msgid "Trial days"
 msgstr ""
 
+#: test/support/hub_ui.ex
+msgid "Try other words or filters."
+msgstr ""
+
+#: test/support/canvas.ex
 #: test/support/kitchen_sink.ex
 #: test/support/kitchen_sink_v1_ui.ex
 msgid "Update"
@@ -807,12 +1080,22 @@ msgstr ""
 msgid "Verified"
 msgstr ""
 
+#: test/support/board_task_ui.ex
+#: test/support/enum_types.ex
+msgctxt "enum:Elixir.AshA2ui.Test.Severity"
+msgid "Very high"
+msgstr ""
+
 #: test/support/diagram_flow.ex
 msgid "Visit"
 msgstr ""
 
 #: test/support/diagram_flow.ex
 msgid "Visits in flight"
+msgstr ""
+
+#: test/support/diagram_flow.ex
+msgid "Waiting"
 msgstr ""
 
 #: test/support/calendar_event.ex
@@ -823,8 +1106,20 @@ msgstr ""
 msgid "What"
 msgstr ""
 
+#: test/support/diagram_flow.ex
+msgid "Where every visit is right now."
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "Where the work happens.\n\n**Portfolio** — every property of the account."
+msgstr ""
+
 #: test/support/enrollment.ex
 msgid "Who"
+msgstr ""
+
+#: test/support/enrollment.ex
+msgid "Who is enrolling?"
 msgstr ""
 
 #: test/support/action_handler_fixtures.ex
@@ -839,4 +1134,8 @@ msgstr ""
 
 #: test/support/experience_ui.ex
 msgid "legacy user"
+msgstr ""
+
+#: test/support/hub_ui.ex
+msgid "properties"
 msgstr ""

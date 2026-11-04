@@ -98,7 +98,7 @@ defmodule AshA2ui.Test.HubUI do
         more_values :property_names
         more_noun "properties"
         help_title "Property"
-        help "Where the work happens.\n\n**Portfolio** — every property of the PMC."
+        help "Where the work happens.\n\n**Portfolio** — every property of the account."
       end
 
       column :status_text do

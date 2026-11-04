@@ -1,0 +1,99 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/",
+      "surfaceId": "hub",
+      "value": {
+        "_empty_message": "No Hub contract records yet.",
+        "_empty_visible": [
+          {
+            "id": "on"
+          }
+        ],
+        "context": {
+          "contract": {
+            "label": "",
+            "search": "",
+            "value": ""
+          }
+        },
+        "errors": {},
+        "form": {},
+        "options": {},
+        "query": {
+          "_next_visible": [],
+          "_pagination_visible": [],
+          "_previous_visible": [],
+          "_range_text": "",
+          "appliedPageSize": 2,
+          "autoApply": {
+            "debounceMs": 300
+          },
+          "emptyState": {
+            "clear": true,
+            "icon": "search",
+            "message": "Try other words or filters.",
+            "title": "No results"
+          },
+          "facets": {
+            "property": {},
+            "status": {
+              "active": 0,
+              "draft": 0,
+              "expired": 0,
+              "expiring": 0,
+              "expiring_soon": 0,
+              "renewal_scheduled": 0
+            },
+            "vendor": {},
+            "verified": {
+              "false": 0,
+              "true": 0
+            }
+          },
+          "filters": {
+            "property": [],
+            "status": [],
+            "vendor": [],
+            "verified": ""
+          },
+          "hasMore": false,
+          "options": {
+            "property": [],
+            "vendor": []
+          },
+          "page": 1,
+          "pageSize": 2,
+          "preset": "all",
+          "search": "zzz",
+          "sort": {
+            "dir": "asc",
+            "field": "name"
+          },
+          "totalCount": 0
+        },
+        "records": [],
+        "ui": {
+          "action_result": {},
+          "action_result_text": "",
+          "feedback": {
+            "kind": null,
+            "message": ""
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          }
+        }
+      }
+    },
+    "version": "v0.9.1"
+  }
+]

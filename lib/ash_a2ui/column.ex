@@ -91,12 +91,19 @@ defmodule AshA2ui.Column do
   `%{"title" => title, "body" => body}`, `nil` without `help`. The body is
   the declared text, trimmed; paragraphs stay separated by blank lines.
   """
-  @spec help(t()) :: %{String.t() => String.t()} | nil
-  def help(%{help: help} = column) when is_binary(help) do
-    %{"title" => Map.get(column, :help_title) || "", "body" => String.trim(help)}
+  @spec help(t(), AshA2ui.L10n.t()) :: %{String.t() => String.t()} | nil
+  def help(column, l10n \\ nil)
+
+  def help(%{help: help} = column, l10n) when is_binary(help) do
+    title = Map.get(column, :help_title)
+
+    %{
+      "title" => (title && Label.translate(l10n, title)) || "",
+      "body" => Label.translate(l10n, String.trim(help))
+    }
   end
 
-  def help(_column), do: nil
+  def help(_column, _l10n), do: nil
 
   @doc """
   The fields of a table's columns that ride in each row without being
@@ -122,15 +129,17 @@ defmodule AshA2ui.Column do
   `serialize_row`) so initial renders and refreshes serialize rows
   identically.
   """
-  @spec row_data([t()], Ash.Resource.record()) :: %{String.t() => String.t() | [String.t()]}
-  def row_data(columns, record) do
+  @spec row_data([t()], Ash.Resource.record(), AshA2ui.L10n.t()) ::
+          %{String.t() => String.t() | [String.t()]}
+  def row_data(columns, record, l10n \\ nil) do
     columns
-    |> Enum.flat_map(&column_data(&1, record))
+    |> Enum.flat_map(&column_data(&1, record, l10n))
     |> Map.new()
   end
 
-  defp column_data(column, record) do
-    icon_data(column, record) ++ detail_data(column, record) ++ more_values_data(column, record)
+  defp column_data(column, record, l10n) do
+    icon_data(column, record, l10n) ++
+      detail_data(column, record, l10n) ++ more_values_data(column, record)
   end
 
   # `more_values`: every value behind the "+N more" tag, as strings.
@@ -147,31 +156,34 @@ defmodule AshA2ui.Column do
 
   defp more_values_data(_column, _record), do: []
 
-  defp icon_data(%{icon: nil}, _record), do: []
+  defp icon_data(%{icon: nil}, _record, _l10n), do: []
 
-  defp icon_data(column, record) do
+  defp icon_data(column, record, l10n) do
     value = Map.get(record, column.icon)
     name = lookup(column.icon_names, value)
 
     [
       {"_icon_#{column.name}", (name && to_string(name)) || ""},
       {"_icon_tone_#{column.name}", to_string(lookup(column.icon_tones, value) || :neutral)},
-      {"_icon_label_#{column.name}", icon_label(column, value, name)}
+      {"_icon_label_#{column.name}", icon_label(column, value, name, l10n)}
     ]
   end
 
-  defp icon_label(_column, _value, nil), do: ""
+  defp icon_label(_column, _value, nil, _l10n), do: ""
 
-  defp icon_label(column, value, _name),
-    do: lookup(column.icon_labels, value) || Label.humanize(value)
+  defp icon_label(column, value, _name, l10n),
+    do: Label.translate(l10n, lookup(column.icon_labels, value) || Label.humanize(value))
 
-  defp detail_data(%{detail: nil}, _record), do: []
+  defp detail_data(%{detail: nil}, _record, _l10n), do: []
 
-  defp detail_data(column, record) do
+  defp detail_data(column, record, l10n) do
     value = Map.get(record, column.detail)
     text = lookup(column.detail_text, value)
 
-    [{"_detail_#{column.name}", text || ""} | detail_icon_data(column, value)] ++
+    [
+      {"_detail_#{column.name}", (text && Label.translate(l10n, text)) || ""}
+      | detail_icon_data(column, value)
+    ] ++
       detail_help_data(column, record)
   end
 

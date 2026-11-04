@@ -367,7 +367,8 @@ defmodule AshA2ui.Info do
               table.query,
               query_params(resolved_view, table, opts),
               0,
-              false
+              false,
+              resolved_view.l10n
             )
 
         {[], state}
@@ -381,7 +382,13 @@ defmodule AshA2ui.Info do
     if table.query do
       params = query_params(resolved_view, table, opts)
 
-      case AshA2ui.QueryRunner.run(table, params, read_opts(resolved_view, opts), scope) do
+      case AshA2ui.QueryRunner.run(
+             table,
+             params,
+             read_opts(resolved_view, opts),
+             scope,
+             resolved_view.l10n
+           ) do
         {:ok, records, query_state} -> {records, query_state}
         {:error, error} -> raise Ash.Error.to_error_class(error)
       end

@@ -1089,7 +1089,7 @@ defmodule AshA2ui.ResolvedView do
 
   defp prompt_field(resource, ash_action, declared, name, select, l10n) do
     {type, constraints} = prompt_input_type(resource, ash_action, name)
-    choices = AshA2ui.TypeMapper.type_choices(type, constraints)
+    choices = AshA2ui.TypeMapper.type_choices(type, constraints, l10n)
 
     widget =
       cond do

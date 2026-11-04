@@ -176,7 +176,7 @@
           },
           {
             "help": {
-              "body": "Where the work happens.\n\n**Portfolio** — every property of the PMC.",
+              "body": "Where the work happens.\n\n**Portfolio** — every property of the account.",
               "title": "Property"
             },
             "label": "Property name",

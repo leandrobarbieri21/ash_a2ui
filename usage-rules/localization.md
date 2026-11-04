@@ -78,7 +78,15 @@ Both are translated only when the host passes a translator and a locale.
 
 - Translated: declared and derived display labels (fields, columns,
   actions, contexts, groups, steps, prompt fields), surface and record
-  titles, the library's chrome and feedback templates.
+  titles, the other declared display text (column `help_title`, `help` and
+  `more_noun`, step and diagram `description`, `search_placeholder`,
+  `empty_state` and `no_results_state` text, `prompt_title`, `group_labels`,
+  `icon_labels`, `detail_text`, `badge_text`, primary action labels, board
+  lane and swimlane headings), the labels of enum and `one_of` choices,
+  canvas registry labels, and the library's chrome and feedback templates
+  (the presence bar's included). All of it is host text except the chrome,
+  so it is looked up in the metadata domain; an enum's labels carry the
+  msgctxt `enum:<module>`.
 - Never translated: ids, data-model paths, enum and option values, action
   and field names, and record data. Labels derived from records (option
   labels, context labels) are the record's own text.
@@ -86,10 +94,15 @@ Both are translated only when the host passes a translator and a locale.
   translated label inside ("Create %{resource}") gets the translated label
   as a binding.
 - A missing translation falls back to the English msgid, string by string.
-- Not yet translated: enum and choice labels, declared help text,
-  descriptions, placeholders and empty-state text, the presence bar, and
-  Ash's own error messages (translate those with `mix ash.gen.gettext`, as
-  the Ash docs describe).
+- Not translated: section headings read from records, and Ash's own error
+  messages (translate those with `mix ash.gen.gettext`, as the Ash docs
+  describe).
+- Canvas: `AshA2ui.Canvas.build_graph/2` and `AshA2ui.Canvas.resolve/2`
+  take the same `gettext_backend`, `gettext_fn`, `locale` and
+  `metadata_domain` options. The extractor collects every
+  `AshA2ui.Canvas.Registry` module of the app.
+- `AshA2ui.PresenceBar.bar/1`: pass the same `locale`, `gettext_backend` or
+  `gettext_fn` attributes.
 
 ## Maintaining the catalog (library contributors)
 

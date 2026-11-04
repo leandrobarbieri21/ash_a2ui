@@ -29,9 +29,14 @@ defmodule AshA2ui.Canvas.Graph.Builder do
   alias AshA2ui.Canvas.Registry
   alias AshA2ui.Label
 
-  @doc "Builds the graph for `registry`."
-  @spec build(module()) :: Graph.t()
-  def build(registry) do
+  @doc """
+  Builds the graph for `registry`. `opts` take the translator options of an
+  A2UI surface (`:gettext_fn`, `:gettext_backend`, `:locale`,
+  `:metadata_domain`), which translate the node labels.
+  """
+  @spec build(module(), keyword()) :: Graph.t()
+  def build(registry, opts \\ []) do
+    l10n = AshA2ui.L10n.new(opts)
     domains = Registry.domains(registry)
     app_id = Registry.application_id(registry)
 
@@ -45,7 +50,11 @@ defmodule AshA2ui.Canvas.Graph.Builder do
     app_node = %Node{
       id: app_id,
       kind: :application,
-      label: Registry.label(registry, :application) || Label.humanize(short_name_of(app_id)),
+      label:
+        Label.translate(
+          l10n,
+          Registry.label(registry, :application) || Label.humanize(short_name_of(app_id))
+        ),
       metadata: %{}
     }
 
@@ -59,14 +68,14 @@ defmodule AshA2ui.Canvas.Graph.Builder do
         %Node{
           id: "domain:" <> short,
           kind: :domain,
-          label: Registry.label(registry, domain) || Label.humanize(short),
+          label: Label.translate(l10n, Registry.label(registry, domain) || Label.humanize(short)),
           metadata: %{}
         }
       end)
 
     {resource_nodes, resource_edges} =
       domain_entries
-      |> Enum.map(&domain_section(registry, &1, resource_ids))
+      |> Enum.map(&domain_section(registry, &1, resource_ids, l10n))
       |> Enum.unzip()
 
     edges =
@@ -85,7 +94,7 @@ defmodule AshA2ui.Canvas.Graph.Builder do
 
   # One domain's contribution: its resource nodes, the containment edges to
   # them, and its registered relationship edges.
-  defp domain_section(registry, {domain_short_name, domain}, resource_ids) do
+  defp domain_section(registry, {domain_short_name, domain}, resource_ids, l10n) do
     domain_id = "domain:" <> domain_short_name
 
     resources =
@@ -99,7 +108,8 @@ defmodule AshA2ui.Canvas.Graph.Builder do
         %Node{
           id: Map.fetch!(resource_ids, resource),
           kind: :resource,
-          label: Registry.label(registry, resource) || Label.humanize(short),
+          label:
+            Label.translate(l10n, Registry.label(registry, resource) || Label.humanize(short)),
           metadata: resource_metadata(resource_id(resource_ids, resource), resource)
         }
       end)

@@ -72,11 +72,16 @@ defmodule AshA2ui.TypeMapper do
 
   This is the one labelling rule behind ChoicePicker options, choice text
   in rows and board lane headings, so all three agree for the same value.
+
+  With an `l10n` (see `AshA2ui.L10n`) each label is translated, once, in the
+  metadata domain: an enum's under the msgctxt `"enum:" <> module` (so
+  homographs translate separately), a `one_of` value's without one. The
+  values are never translated.
   """
-  @spec choices(module | map, atom) :: [{atom | String.t(), String.t()}]
-  def choices(resource, name) do
+  @spec choices(module | map, atom, AshA2ui.L10n.t()) :: [{atom | String.t(), String.t()}]
+  def choices(resource, name, l10n \\ nil) do
     case ResourceInfo.attribute(resource, name) || ResourceInfo.calculation(resource, name) do
-      %{type: type} = field -> type_choices(type, field.constraints)
+      %{type: type} = field -> type_choices(type, field.constraints, l10n)
       nil -> []
     end
   end
@@ -86,16 +91,18 @@ defmodule AshA2ui.TypeMapper do
   argument's, say), labelled exactly like `choices/2`: an `Ash.Type.Enum`'s
   values, else a `one_of` constraint's. `[]` when the type enumerates none.
   """
-  @spec type_choices(module | atom, keyword) :: [{atom | String.t(), String.t()}]
-  def type_choices(type, constraints) do
+  @spec type_choices(module | atom, keyword, AshA2ui.L10n.t()) ::
+          [{atom | String.t(), String.t()}]
+  def type_choices(type, constraints, l10n \\ nil) do
     type = Ash.Type.get_type(type)
 
     if enum_type?(type) do
-      Enum.map(type.values(), &{&1, enum_label(type, &1)})
+      context = "enum:" <> Atom.to_string(type)
+      Enum.map(type.values(), &{&1, Label.translate(l10n, enum_label(type, &1), context)})
     else
       constraints
       |> one_of()
-      |> Enum.map(&{&1, Label.humanize(&1)})
+      |> Enum.map(&{&1, Label.resolve(l10n, nil, &1)})
     end
   end
 

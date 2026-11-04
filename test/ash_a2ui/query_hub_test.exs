@@ -291,7 +291,8 @@ defmodule AshA2ui.QueryHubTest do
 
       assert property["help"] == %{
                "title" => "Property",
-               "body" => "Where the work happens.\n\n**Portfolio** — every property of the PMC."
+               "body" =>
+                 "Where the work happens.\n\n**Portfolio** — every property of the account."
              }
 
       assert %{

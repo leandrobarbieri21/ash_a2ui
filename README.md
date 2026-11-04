@@ -543,9 +543,10 @@ Text is translated in the domain of whoever owns it:
 - **The library's own text** (buttons, pagination, empty states, panel
   titles, action feedback) ships as a gettext catalog,
   `priv/gettext/ash_a2ui.pot`.
-- **Your display labels** (declared labels, and the labels ash_a2ui derives
-  from field, action and component names: headings, columns, fields,
-  actions, contexts, groups, steps and query presets) are yours. They are
+- **Your display text** (declared labels, help, descriptions, placeholders,
+  empty states, enum and choice labels, board lane headings, canvas
+  registry labels, and the labels ash_a2ui derives from field, action and
+  component names) is yours. They are
   looked up in the `a2ui_metadata` domain, and
   `mix ash_a2ui.gettext.extract_metadata` writes them to your
   `priv/gettext/a2ui_metadata.pot`.
@@ -558,7 +559,7 @@ not change.
    `mix ash_a2ui.gen.gettext --domain default`.
 2. Extract your labels: `mix ash_a2ui.gettext.extract_metadata`. It renders
    every surface of your app with the code that runs at request time (no
-   data is read), so its msgids are exactly the labels a reader sees. Add
+   data is read), so its msgids are the text a reader sees. Add
    `mix ash_a2ui.gettext.extract_metadata --check-up-to-date` to CI.
 3. `mix gettext.merge priv/gettext --locale fr`, then fill in the
    `msgstr`s of both domains.

@@ -1304,13 +1304,13 @@ defmodule AshA2ui.ActionHandler do
 
   # require_context unmet: an honest empty result without touching Ash.
   defp require_unmet_messages(view, table, params) do
-    state = QueryRunner.state(table.query, params, 0, false)
+    state = QueryRunner.state(table.query, params, 0, false, view.l10n)
 
     records_messages(view, table, []) ++ query_state_messages(view, table, state, [])
   end
 
   defp run_scoped_query(view, table, params, scope, ash_opts) do
-    case QueryRunner.run(table, params, ash_opts, scope) do
+    case QueryRunner.run(table, params, ash_opts, scope, view.l10n) do
       {:ok, records, query_state} ->
         rows = rows(view, table, records, ash_opts)
 
@@ -3049,7 +3049,13 @@ defmodule AshA2ui.ActionHandler do
 
   defp empty_table_messages(view, table, params) do
     state =
-      QueryRunner.state(table.query, params || QueryRunner.default_params(table), 0, false)
+      QueryRunner.state(
+        table.query,
+        params || QueryRunner.default_params(table),
+        0,
+        false,
+        view.l10n
+      )
 
     records_messages(view, table, []) ++ query_state_messages(view, table, state, [])
   end
@@ -3067,7 +3073,7 @@ defmodule AshA2ui.ActionHandler do
   defp scoped_table_refresh(view, table, params, ash_opts, scope) do
     params = params || QueryRunner.default_params(table)
 
-    case QueryRunner.run(table, params, ash_opts, scope) do
+    case QueryRunner.run(table, params, ash_opts, scope, view.l10n) do
       {:ok, records, query_state} ->
         rows = rows(view, table, records, ash_opts)
 

@@ -237,7 +237,13 @@ defmodule AshA2ui.Wizard do
       case step.description do
         text when is_binary(text) and text != "" ->
           {["#{base}_description"],
-           [%{"id" => "#{base}_description", "component" => "Text", "text" => text}]}
+           [
+             %{
+               "id" => "#{base}_description",
+               "component" => "Text",
+               "text" => AshA2ui.Label.translate(view.l10n, text)
+             }
+           ]}
 
         _none ->
           {[], []}

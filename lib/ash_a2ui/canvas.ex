@@ -53,6 +53,9 @@ defmodule AshA2ui.Canvas do
       through an authorized read under this actor/tenant.
     * `:authorize?` — whether the record read authorizes. Defaults to
       `true`, like every authorized path in this library.
+    * `:gettext_fn`, `:gettext_backend`, `:locale`, `:metadata_domain` — the
+      translator options of an A2UI surface (`AshA2ui.L10n`); they translate
+      the object's and its capabilities' labels, never a record's label.
 
   Returns `{:ok, object}` or `{:error, :unknown_object}` for malformed,
   unknown, or unregistered refs (and for record reads that fail — a record
@@ -70,6 +73,6 @@ defmodule AshA2ui.Canvas do
   canonicalized semantic content — registration order and module definition
   order do not affect it.
   """
-  @spec build_graph(module()) :: Graph.t()
-  def build_graph(registry), do: Graph.Builder.build(registry)
+  @spec build_graph(module(), keyword()) :: Graph.t()
+  def build_graph(registry, opts \\ []), do: Graph.Builder.build(registry, opts)
 end

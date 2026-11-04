@@ -227,10 +227,11 @@ defmodule AshA2ui.Experience do
   """
   @spec empty_message(ResolvedView.t(), ResolvedView.table()) :: String.t()
   def empty_message(view, table) do
-    # A board lane is headed by its value already; its empty state names
-    # the records ("No Task records yet."), not the runtime lane name.
+    # A section (a board lane or a sectioned table) is headed by its value
+    # already; its empty state names the records ("No Task records yet."),
+    # not the runtime section name ("By status archived").
     resource =
-      if AshA2ui.Board.lane?(table),
+      if Map.get(table, :section),
         do: resource_label(view),
         else: collection_label(view, table)
 

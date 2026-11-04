@@ -15,20 +15,28 @@ defmodule AshA2ui.Gettext.Metadata do
   here. Library strings (`AshA2ui.Gettext.msg/1`) are in the shipped
   `ash_a2ui.pot` and are not collected.
 
+  Labels that only a record selects (an enum's choice labels, the `icon_labels`,
+  `detail_text`, `badge_text` and primary action `labels` of a row, a query's
+  empty states) are collected from their declarations, every value once.
+  A canvas registry (`AshA2ui.Canvas.Registry`) is collected by building its
+  graph and resolving each resource.
+
   No data layer is touched: section headings and option labels read from
   records are record data, not metadata.
   """
 
   alias AshA2ui.L10n
+  alias AshA2ui.Label
   alias AshA2ui.ResolvedView
+  alias AshA2ui.TypeMapper
 
   @typedoc "A collected message: its `msgctxt` (or `nil`) and its msgid."
   @type key :: {String.t() | nil, String.t()}
 
   @doc """
   Every surface of `otp_app`: its modules that are Ash resources using the
-  `AshA2ui` extension, and its `AshA2ui.Standalone` UI modules, sorted by
-  name.
+  `AshA2ui` extension, its `AshA2ui.Standalone` UI modules and its
+  `AshA2ui.Canvas.Registry` modules, sorted by name.
   """
   @spec surfaces(atom) :: [module]
   def surfaces(otp_app) do
@@ -39,10 +47,15 @@ defmodule AshA2ui.Gettext.Metadata do
   end
 
   defp surface?(module) do
-    Code.ensure_loaded?(module) and function_exported?(module, :spark_dsl_config, 0) and
-      (Spark.Dsl.is?(module, AshA2ui.Standalone) or
-         (Spark.Dsl.is?(module, Ash.Resource) and AshA2ui in Spark.extensions(module)))
+    Code.ensure_loaded?(module) and
+      (registry?(module) or
+         (function_exported?(module, :spark_dsl_config, 0) and
+            (Spark.Dsl.is?(module, AshA2ui.Standalone) or
+               (Spark.Dsl.is?(module, Ash.Resource) and AshA2ui in Spark.extensions(module)))))
   end
+
+  defp registry?(module),
+    do: AshA2ui.Canvas.Registry in Keyword.get(module.module_info(:attributes), :behaviour, [])
 
   @doc """
   The metadata messages `surfaces` show, each mapped to the sorted source
@@ -64,15 +77,96 @@ defmodule AshA2ui.Gettext.Metadata do
   """
   @spec surface_messages(module) :: [key]
   def surface_messages(surface) do
-    view =
-      surface
-      |> ResolvedView.resolve(gettext_fn: {__MODULE__, :record})
-      |> AshA2ui.Sections.expand_static()
+    if registry?(surface) do
+      collect_registry(surface)
+    else
+      view =
+        surface
+        |> ResolvedView.resolve(gettext_fn: {__MODULE__, :record})
+        |> AshA2ui.Sections.expand_static()
 
-    AshA2ui.Info.encoder(view).encode_surface(view, no_records(view), [])
+      AshA2ui.Info.encoder(view).encode_surface(view, no_records(view), [])
+      Enum.each(view.tables, &collect_table(&1, view.l10n))
+    end
 
     drain([]) |> Enum.reverse() |> Enum.uniq()
   end
+
+  defp collect_registry(registry) do
+    opts = [gettext_fn: {__MODULE__, :record}]
+
+    for %{kind: :resource, id: id} <-
+          registry |> AshA2ui.Canvas.build_graph(opts) |> Map.fetch!(:nodes) |> Map.values() do
+      AshA2ui.Canvas.resolve(id, [registry: registry] ++ opts)
+    end
+  end
+
+  # The labels a table shows only once a record selects them, or only the
+  # admin catalog shows: collected from the declarations.
+  defp collect_table(table, l10n) do
+    %{component: component, resource: resource} = table
+
+    for name <- component.fields || [], do: TypeMapper.choices(resource, name, l10n)
+
+    texts =
+      Enum.flat_map(component.columns, &column_texts/1) ++
+        layout_texts(component.row_layout, resource) ++
+        primary_texts(component.primary_action) ++ query_texts(table.query)
+
+    Enum.each(texts, &Label.translate(l10n, &1))
+  end
+
+  defp column_texts(column) do
+    help = [column.help_title, column.help && String.trim(column.help), column.more_noun]
+
+    unlabeled =
+      for {value, _icon} <- column.icon_names,
+          not Keyword.has_key?(column.icon_labels, value),
+          do: Label.humanize(value)
+
+    Enum.reject(help, &is_nil/1) ++
+      Keyword.values(column.icon_labels) ++ Keyword.values(column.detail_text) ++ unlabeled
+  end
+
+  defp layout_texts(nil, _resource), do: []
+
+  defp layout_texts(layout, resource) do
+    values = (layout.badge && TypeMapper.choices(resource, layout.badge)) || []
+
+    unlabeled =
+      for {value, _label} <- values,
+          not Keyword.has_key?(layout.badge_text, value),
+          do: Label.humanize(value)
+
+    Keyword.values(layout.badge_text) ++ unlabeled
+  end
+
+  defp primary_texts(nil), do: []
+
+  defp primary_texts(action),
+    do: Enum.reject([action.label | Keyword.values(action.labels)], &is_nil/1)
+
+  defp query_texts(nil), do: []
+
+  defp query_texts(query) do
+    states = [
+      query.empty_state,
+      query.no_results_state | Enum.map(query.presets, & &1.empty_state)
+    ]
+
+    state_texts =
+      for state <- states,
+          state,
+          key <- [:title, :message],
+          text = Keyword.get(state, key),
+          text != "",
+          do: text
+
+    Enum.reject([query.search_placeholder, clear_action(query)], &is_nil/1) ++ state_texts
+  end
+
+  defp clear_action(%{no_results_state: nil}), do: nil
+  defp clear_action(%{no_results_state: state}), do: Keyword.get(state, :clear_action)
 
   defp no_records(view) do
     if ResolvedView.multi_table?(view), do: Map.new(view.tables, &{&1.name, []}), else: []

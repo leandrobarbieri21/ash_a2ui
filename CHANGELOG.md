@@ -10,6 +10,18 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **More host display text is translated, in the metadata domain.** Column
+  help, `more_noun`, step and diagram descriptions, search placeholders,
+  empty and no-results states, prompt titles, group, icon, detail, badge and
+  primary action labels, board lane headings, enum and `one_of` choice
+  labels (an enum's under the msgctxt `enum:<module>`) and canvas registry
+  labels go through the translator, once, and
+  `mix ash_a2ui.gettext.extract_metadata` collects them. The presence bar's
+  text is library text. Without a translator the output is unchanged.
+- **Fix:** the empty state of a sectioned table names its records ("No Task
+  records yet."), no longer the runtime table name ("No By status archived
+  records yet.").
+
 - **`filter_order` on a query.** The filter pickers follow the listed
   names (entries of `filters` or `path_filters`); unlisted filters keep
   their declared order after them. Unset, `filters` come first, then the

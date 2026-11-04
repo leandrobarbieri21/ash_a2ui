@@ -48,14 +48,17 @@ defmodule AshA2ui.PrimaryAction do
   Shared by the initial render and every refresh (`serialize_row`), so a
   refreshed row reads the same as the row it replaces.
   """
-  @spec row_data(t() | nil, Ash.Resource.record(), String.t()) :: %{String.t() => String.t()}
-  def row_data(nil, _record, _default_label), do: %{}
+  @spec row_data(t() | nil, Ash.Resource.record(), String.t(), AshA2ui.L10n.t()) ::
+          %{String.t() => String.t()}
+  def row_data(action, record, default_label, l10n \\ nil)
+  def row_data(nil, _record, _default_label, _l10n), do: %{}
 
-  def row_data(%__MODULE__{} = action, record, default_label) do
+  def row_data(%__MODULE__{} = action, record, default_label, l10n) do
     value = action.label_from && Map.get(record, action.label_from)
+    declared = entry(action.labels, value) || action.label
 
     %{
-      "_primary_label" => entry(action.labels, value) || action.label || default_label,
+      "_primary_label" => (declared && AshA2ui.Label.translate(l10n, declared)) || default_label,
       "_primary_variant" => to_string(entry(action.variants, value) || action.variant)
     }
   end

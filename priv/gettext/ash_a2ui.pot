@@ -32,6 +32,10 @@ msgstr ""
 msgid "%{count} failed"
 msgstr ""
 
+#: lib/ash_a2ui/presence_bar.ex
+msgid "%{count} more people viewing this surface"
+msgstr ""
+
 #: lib/ash_a2ui/bulk.ex
 msgid "%{count} refused"
 msgstr ""
@@ -54,6 +58,14 @@ msgstr ""
 
 #: lib/ash_a2ui/experience.ex
 msgid "%{first}–%{last} of %{total}"
+msgstr ""
+
+#: lib/ash_a2ui/presence_bar.ex
+msgid "%{label}: +%{count}"
+msgstr ""
+
+#: lib/ash_a2ui/presence_bar.ex
+msgid "%{name} is viewing this surface"
 msgstr ""
 
 #: lib/ash_a2ui/diagram.ex
@@ -168,6 +180,10 @@ msgstr ""
 
 #: lib/ash_a2ui/time_scrubber.ex
 msgid "Now"
+msgstr ""
+
+#: lib/ash_a2ui/presence_bar.ex
+msgid "People viewing this surface"
 msgstr ""
 
 #: lib/ash_a2ui/encoder/v0_9_1.ex

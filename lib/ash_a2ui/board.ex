@@ -89,10 +89,11 @@ defmodule AshA2ui.Board do
   Raises `ArgumentError` when `scope_by` has no enumerable values (the
   verifier rejects that at compile time where the resource is resolvable).
   """
-  @spec lanes(module, map) :: [lane]
-  def lanes(resource, config) do
+  @spec lanes(module, map, AshA2ui.L10n.t()) :: [lane]
+  def lanes(resource, config, l10n \\ nil) do
     enumerate(resource, :scope_by, config.scope_by, Map.get(config, :values),
-      labels: Map.get(config, :labels, [])
+      labels: Map.get(config, :labels, []),
+      l10n: l10n
     )
   end
 
@@ -108,28 +109,30 @@ defmodule AshA2ui.Board do
   values (the verifier rejects that at compile time where the resource is
   resolvable).
   """
-  @spec swimlanes(module, map | nil) :: [swimlane]
-  def swimlanes(_resource, nil), do: []
+  @spec swimlanes(module, map | nil, AshA2ui.L10n.t()) :: [swimlane]
+  def swimlanes(resource, swimlanes, l10n \\ nil)
+  def swimlanes(_resource, nil, _l10n), do: []
 
-  def swimlanes(resource, swimlanes) do
+  def swimlanes(resource, swimlanes, l10n) do
     tones = Map.get(swimlanes, :tones, [])
 
     resource
     |> enumerate(:swimlanes_by, swimlanes.scope_by, Map.get(swimlanes, :values),
-      labels: Map.get(swimlanes, :labels, [])
+      labels: Map.get(swimlanes, :labels, []),
+      l10n: l10n
     )
     |> Enum.map(&Map.put(&1, :tone, swimlane_tone(&1.value, tones)))
   end
 
   defp enumerate(resource, option, attribute, values, opts) do
-    case AshA2ui.TypeMapper.choices(resource, attribute) do
+    case AshA2ui.TypeMapper.choices(resource, attribute, opts[:l10n]) do
       [_ | _] = choices ->
         all = Enum.map(choices, &elem(&1, 0))
 
         values
         |> chosen_values(all)
         |> Enum.map(fn value ->
-          %{value: value, label: lane_label(value, opts[:labels], choices)}
+          %{value: value, label: lane_label(value, opts[:labels], choices, opts[:l10n])}
         end)
 
       [] ->
@@ -335,11 +338,11 @@ defmodule AshA2ui.Board do
 
   # Headings: a `labels` override, else the shared choice label
   # (`AshA2ui.TypeMapper.choices/2`, the ChoicePicker's labels).
-  defp lane_label(value, nil, choices), do: lane_label(value, [], choices)
+  defp lane_label(value, nil, choices, l10n), do: lane_label(value, [], choices, l10n)
 
-  defp lane_label(value, labels, choices) do
+  defp lane_label(value, labels, choices, l10n) do
     case Enum.find(labels, fn {key, _label} -> to_string(key) == to_string(value) end) do
-      {_key, label} -> to_string(label)
+      {_key, label} -> AshA2ui.Label.translate(l10n, to_string(label))
       nil -> choices |> List.keyfind(value, 0) |> elem(1)
     end
   end

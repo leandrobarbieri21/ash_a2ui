@@ -89,7 +89,7 @@ defmodule AshA2ui.Sections do
   @spec expand(ResolvedView.t(), keyword) :: {:ok, ResolvedView.t()} | {:error, term}
   def expand(%ResolvedView{} = view, opts \\ []) do
     if Enum.any?(view.tables, &Map.get(&1, :sections)) do
-      do_expand(view, &read_sections(&1, opts))
+      do_expand(view, &read_sections(&1, opts, view.l10n))
     else
       {:ok, view}
     end
@@ -106,7 +106,7 @@ defmodule AshA2ui.Sections do
   def expand_static(%ResolvedView{} = view) do
     {:ok, expanded} =
       do_expand(view, fn
-        %{source: nil} = config -> read_sections(config, [])
+        %{source: nil} = config -> read_sections(config, [], view.l10n)
         _source_backed -> {:ok, []}
       end)
 
@@ -144,7 +144,7 @@ defmodule AshA2ui.Sections do
   defp do_expand(view, read) do
     view.tables
     |> Enum.reduce_while({:ok, []}, fn table, {:ok, acc} ->
-      case table_replacement(table, read) do
+      case table_replacement(table, read, view.l10n) do
         {:ok, replacement} -> {:cont, {:ok, acc ++ [replacement]}}
         {:error, error} -> {:halt, {:error, error}}
       end
@@ -158,7 +158,7 @@ defmodule AshA2ui.Sections do
   # One `{template_component, concrete_tables}` replacement pair per table:
   # sectionless tables map onto themselves, sectioned templates onto their
   # per-section expansion (failing over the source read's error).
-  defp table_replacement(table, read) do
+  defp table_replacement(table, read, l10n) do
     case Map.get(table, :sections) do
       nil ->
         {:ok, {table.component, [table]}}
@@ -166,7 +166,7 @@ defmodule AshA2ui.Sections do
       config ->
         case read.(config) do
           {:ok, section_records} ->
-            {:ok, {table.component, expand_table(table, config, section_records)}}
+            {:ok, {table.component, expand_table(table, config, section_records, l10n)}}
 
           {:error, error} ->
             {:error, error}
@@ -183,10 +183,10 @@ defmodule AshA2ui.Sections do
   # swimlane rows past it are dropped, as trailing lanes are on a lane-only
   # board. The verifier rejects such a limit where it can resolve the
   # resource, so this only guards boards it could not check.
-  defp expand_table(table, %{swimlanes: %{}} = config, lanes) do
+  defp expand_table(table, %{swimlanes: %{}} = config, lanes, l10n) do
     swimlanes =
       config.resource
-      |> AshA2ui.Board.swimlanes(config.swimlanes)
+      |> AshA2ui.Board.swimlanes(config.swimlanes, l10n)
       |> Enum.take(div(config.limit, max(length(lanes), 1)))
 
     for swimlane <- swimlanes, lane <- lanes do
@@ -219,7 +219,7 @@ defmodule AshA2ui.Sections do
     end
   end
 
-  defp expand_table(table, config, section_records) do
+  defp expand_table(table, config, section_records, _l10n) do
     Enum.map(section_records, fn record ->
       value = Map.get(record, config.value)
       name = section_name(table.name, value)
@@ -300,11 +300,11 @@ defmodule AshA2ui.Sections do
 
   # Source-less sections (boards): the lanes are the enumerated values of
   # `scope_by`, synthesized as `%{value, label}` records — no read.
-  defp read_sections(%{source: nil} = config, _opts) do
-    {:ok, config.resource |> AshA2ui.Board.lanes(config) |> Enum.take(config.limit)}
+  defp read_sections(%{source: nil} = config, _opts, l10n) do
+    {:ok, config.resource |> AshA2ui.Board.lanes(config, l10n) |> Enum.take(config.limit)}
   end
 
-  defp read_sections(config, opts) do
+  defp read_sections(config, opts, _l10n) do
     domain =
       ResourceInfo.domain(config.source) || opts[:domain] ||
         raise(ArgumentError, "no domain configured for #{inspect(config.source)}")

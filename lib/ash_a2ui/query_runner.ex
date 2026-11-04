@@ -236,8 +236,9 @@ defmodule AshA2ui.QueryRunner do
   Builds the frozen `/query` data-model state map (see the moduledoc) for
   `params` with the given `total_count` (integer or `nil`) and `has_more`.
   """
-  @spec state(AshA2ui.Query.t(), params, non_neg_integer | nil, boolean) :: map
-  def state(query, params, total_count, has_more) do
+  @spec state(AshA2ui.Query.t(), params, non_neg_integer | nil, boolean, AshA2ui.L10n.t()) ::
+          map
+  def state(query, params, total_count, has_more, l10n \\ nil) do
     effective_sort = effective_sort(query, params)
 
     %{
@@ -256,7 +257,7 @@ defmodule AshA2ui.QueryRunner do
     |> put_controls_hidden(query, params)
     |> put_facets_state(query)
     |> put_options_state(query)
-    |> put_empty_state(query, params)
+    |> put_empty_state(query, params, l10n)
     |> put_applied_page_size(query, params)
   end
 
@@ -284,9 +285,9 @@ defmodule AshA2ui.QueryRunner do
   # state to show when nothing matches — no_results_state while search,
   # filters or ranges are active, else the selected preset's empty_state,
   # else the query's. `clear` says whether the clear action applies.
-  defp put_empty_state(state, %{empty_state: nil}, _params), do: state
+  defp put_empty_state(state, %{empty_state: nil}, _params, _l10n), do: state
 
-  defp put_empty_state(state, query, params) do
+  defp put_empty_state(state, query, params, l10n) do
     active? = params.search != "" or params.filters != [] or params.ranges != []
     preset = preset_entity(query, params.preset)
 
@@ -303,12 +304,15 @@ defmodule AshA2ui.QueryRunner do
       end
 
     Map.put(state, "emptyState", %{
-      "title" => Keyword.get(chosen, :title, ""),
-      "message" => Keyword.get(chosen, :message, ""),
+      "title" => translate_empty(l10n, Keyword.get(chosen, :title, "")),
+      "message" => translate_empty(l10n, Keyword.get(chosen, :message, "")),
       "icon" => to_string(Keyword.get(chosen, :icon, "")),
       "clear" => clear?
     })
   end
+
+  defp translate_empty(_l10n, ""), do: ""
+  defp translate_empty(l10n, text), do: AshA2ui.Label.translate(l10n, text)
 
   # An empty-state message may name the read's size before search and
   # filters ("There are {total} contracts on this account."): `{total}` is
@@ -414,9 +418,15 @@ defmodule AshA2ui.QueryRunner do
   `AshA2ui.ResolvedView.t/0` itself, or one resolved table of a
   multi-table view (`AshA2ui.ResolvedView.table/0`).
   """
-  @spec run(ResolvedView.t() | ResolvedView.table(), params, keyword, [{atom, term}]) ::
+  @spec run(
+          ResolvedView.t() | ResolvedView.table(),
+          params,
+          keyword,
+          [{atom, term}],
+          AshA2ui.L10n.t()
+        ) ::
           {:ok, [Ash.Resource.record()], map} | {:error, term}
-  def run(view, params, ash_opts, scope \\ []) do
+  def run(view, params, ash_opts, scope \\ [], l10n \\ nil) do
     query = view.query
     calendar = Map.get(view, :calendar)
     params = with_window(params, view)
@@ -450,7 +460,7 @@ defmodule AshA2ui.QueryRunner do
 
       state =
         query
-        |> state(params, total_count(windowed), has_more)
+        |> state(params, total_count(windowed), has_more, l10n)
         |> put_marks(marks)
         |> put_path_options(options)
         |> put_facets(facets(base, query, params, calendar, options))

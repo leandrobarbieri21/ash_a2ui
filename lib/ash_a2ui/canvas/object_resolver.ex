@@ -148,8 +148,11 @@ defmodule AshA2ui.Canvas.ObjectResolver do
     object = %Object{
       ref: ref,
       label:
-        Registry.label(registry, :application) ||
-          Registry.application_id(registry) |> tail_segment() |> Label.humanize(),
+        Label.translate(
+          l10n(opts),
+          Registry.label(registry, :application) ||
+            Registry.application_id(registry) |> tail_segment() |> Label.humanize()
+        ),
       description: nil,
       projections: [:browse],
       capabilities: [],
@@ -165,8 +168,11 @@ defmodule AshA2ui.Canvas.ObjectResolver do
     object = %Object{
       ref: ref,
       label:
-        Registry.label(registry, domain) ||
-          domain |> Ash.Domain.Info.short_name() |> Atom.to_string() |> Label.humanize(),
+        Label.translate(
+          l10n(opts),
+          Registry.label(registry, domain) ||
+            domain |> Ash.Domain.Info.short_name() |> Atom.to_string() |> Label.humanize()
+        ),
       description: nil,
       projections: [:browse],
       capabilities: [],
@@ -181,10 +187,14 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
     object = %Object{
       ref: ref,
-      label: Registry.label(registry, resource) || Label.humanize(resource_short(resource)),
+      label:
+        Label.translate(
+          l10n(opts),
+          Registry.label(registry, resource) || Label.humanize(resource_short(resource))
+        ),
       description: nil,
       projections: host_projections(registry, resource, resource_projections(resource)),
-      capabilities: resource_capabilities(ref, resource),
+      capabilities: resource_capabilities(ref, resource, l10n(opts)),
       provenance: %{domain: domain, resource: resource}
     }
 
@@ -235,13 +245,13 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
   # Resource level: presence only. Execution still routes through the
   # library's authorized action paths.
-  defp resource_capabilities(ref, resource) do
+  defp resource_capabilities(ref, resource, l10n) do
     resource
     |> ResourceInfo.actions()
     |> Enum.sort_by(&to_string(&1.name))
     |> Enum.map(fn action ->
       {verb, consequence} = classify(action.type)
-      capability(ref, verb, action.name, consequence, true)
+      capability(ref, verb, action.name, consequence, true, l10n)
     end)
   end
 
@@ -284,23 +294,27 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
     view_capability =
       read &&
-        capability(ref, :view, read.name, :read, can_read?.(read.name))
+        capability(ref, :view, read.name, :read, can_read?.(read.name), l10n(opts))
 
     edit_capability =
       update &&
-        capability(ref, :edit, update.name, :mutation, can_update?.(update.name))
+        capability(ref, :edit, update.name, :mutation, can_update?.(update.name), l10n(opts))
 
     act_capabilities =
       resource
       |> ResourceInfo.actions()
       |> Enum.filter(&(&1.type == :action))
       |> Enum.sort_by(&to_string(&1.name))
-      |> Enum.map(&capability(ref, :act, &1.name, :mutation, can_act?.(&1.name)))
+      |> Enum.map(&capability(ref, :act, &1.name, :mutation, can_act?.(&1.name), l10n(opts)))
 
     List.wrap(view_capability) ++ List.wrap(edit_capability) ++ act_capabilities
   end
 
-  defp capability(ref, verb, action_name, consequence, authorized?) do
+  # The surface translator (`AshA2ui.L10n`) built from the same options an
+  # A2UI surface takes; `nil` without one.
+  defp l10n(opts), do: AshA2ui.L10n.new(opts)
+
+  defp capability(ref, verb, action_name, consequence, authorized?, l10n) do
     confirmation = if consequence == :destructive, do: :required, else: :none
 
     %Capability{
@@ -308,7 +322,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
       verb: verb,
       action_name: to_string(action_name),
       object_ref: ref.id,
-      label: Label.humanize(action_name),
+      label: Label.resolve(l10n, nil, action_name),
       consequence: consequence,
       confirmation: confirmation,
       authorized?: authorized?

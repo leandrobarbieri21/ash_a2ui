@@ -37,21 +37,22 @@ defmodule AshA2ui.RowLayout do
   Shared by the encoder and `AshA2ui.ActionHandler` so initial renders and
   query/action refreshes serialize rows identically.
   """
-  @spec badge_data(t() | nil, Ash.Resource.record()) :: %{String.t() => String.t()}
-  def badge_data(layout, record)
+  @spec badge_data(t() | nil, Ash.Resource.record(), AshA2ui.L10n.t()) ::
+          %{String.t() => String.t()}
+  def badge_data(layout, record, l10n \\ nil)
 
-  def badge_data(nil, _record), do: %{}
-  def badge_data(%__MODULE__{badge: nil}, _record), do: %{}
+  def badge_data(nil, _record, _l10n), do: %{}
+  def badge_data(%__MODULE__{badge: nil}, _record, _l10n), do: %{}
 
-  def badge_data(%__MODULE__{badge: badge, badge_tones: []} = layout, record) do
-    %{"_badge_#{badge}" => badge_text(layout, Map.get(record, badge))}
+  def badge_data(%__MODULE__{badge: badge, badge_tones: []} = layout, record, l10n) do
+    %{"_badge_#{badge}" => badge_text(layout, Map.get(record, badge), l10n)}
   end
 
-  def badge_data(%__MODULE__{badge: badge} = layout, record) do
+  def badge_data(%__MODULE__{badge: badge} = layout, record, l10n) do
     value = Map.get(record, badge)
 
     %{
-      "_badge_#{badge}" => badge_text(layout, value),
+      "_badge_#{badge}" => badge_text(layout, value, l10n),
       "_badge_tone_#{badge}" => badge_tone(layout, value)
     }
   end
@@ -69,11 +70,11 @@ defmodule AshA2ui.RowLayout do
     to_string(tone || :neutral)
   end
 
-  defp badge_text(_layout, nil), do: ""
+  defp badge_text(_layout, nil, _l10n), do: ""
 
-  defp badge_text(layout, value) do
+  defp badge_text(layout, value, l10n) do
     declared = is_atom(value) && Keyword.get(layout.badge_text, value)
 
-    declared || AshA2ui.Label.humanize(value)
+    AshA2ui.Label.translate(l10n, declared || AshA2ui.Label.humanize(value))
   end
 end

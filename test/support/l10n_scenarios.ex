@@ -9,9 +9,14 @@ defmodule AshA2ui.Test.L10nScenarios do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Info
+  alias AshA2ui.Test.BoardTask
+  alias AshA2ui.Test.BoardTaskUI
   alias AshA2ui.Test.BulkHelpers
   alias AshA2ui.Test.BulkTasksUI
+  alias AshA2ui.Test.EnumRecord
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.HubContract
+  alias AshA2ui.Test.HubUI
 
   # The scenarios, each `{name, catalog, fun}` where `fun.(extra_opts)` returns the
   # messages. `extra_opts` is how the localization tests re-run the same
@@ -32,7 +37,11 @@ defmodule AshA2ui.Test.L10nScenarios do
       {"bulk_invoke", &bulk_invoke(spec, &1)},
       {"bulk_select_page", &bulk_select_page(spec, &1)},
       {"task_build", &task_build(spec, &1)},
-      {"task_actions", &task_actions(spec, &1)}
+      {"task_actions", &task_actions(spec, &1)},
+      {"hub_build", &hub_build(spec, &1)},
+      {"hub_no_results", &hub_no_results(spec, &1)},
+      {"board_build", &board_build(spec, &1)},
+      {"enum_build", &enum_build(spec, &1)}
     ]
   end
 
@@ -52,7 +61,8 @@ defmodule AshA2ui.Test.L10nScenarios do
                       spec <- ~w(v0_9_1 v1_0),
                       name <-
                         ~w(bulk_build bulk_refresh bulk_options bulk_invoke bulk_select_page
-                           task_build task_actions),
+                           task_build task_actions hub_build hub_no_results board_build
+                           enum_build),
                       do: "#{name}_#{spec}_#{catalog}"
 
   def scenario_names, do: @scenario_names
@@ -150,6 +160,39 @@ defmodule AshA2ui.Test.L10nScenarios do
       )
 
     {messages, subs}
+  end
+
+  # Host display metadata of every kind on one query hub: placeholder,
+  # empty states, group and choice labels, column help, a detail line and
+  # row labels, over a record whose status is an enumerated value.
+  defp hub_build(spec, extra) do
+    contract =
+      Ash.create!(HubContract, %{name: "alpha", status: :expiring_soon}, authorize?: false)
+
+    opts = [authorize?: false, spec_version: spec] ++ extra
+    {Info.build_surface(HubUI, opts), [{contract.id, "CONTRACT_ALPHA"}]}
+  end
+
+  # The state a search with no matches shows: the no-results empty state and
+  # its clear action.
+  defp hub_no_results(spec, extra) do
+    query_state = %{"search" => "zzz", "page" => 1}
+    opts = [authorize?: false, spec_version: spec, query_state: query_state] ++ extra
+    {[Info.build_data_model(HubUI, opts)], []}
+  end
+
+  # A board whose lanes are an enumerated attribute's values, one heading
+  # overridden, and a card whose badge is an enumerated value.
+  defp board_build(spec, extra) do
+    card = Ash.create!(BoardTask, %{name: "card", status: :open, priority: :high})
+    {Info.build_surface(BoardTaskUI, [spec_version: spec] ++ extra), [{card.id, "CARD"}]}
+  end
+
+  # An `Ash.Type.Enum` with explicit labels and one without, in the form
+  # pickers and the cells.
+  defp enum_build(spec, extra) do
+    record = Ash.create!(EnumRecord, %{name: "rec", severity: :very_high, stage: :in_progress})
+    {Info.build_surface(EnumRecord, [spec_version: spec] ++ extra), [{record.id, "RECORD"}]}
   end
 
   defp task_seed do
