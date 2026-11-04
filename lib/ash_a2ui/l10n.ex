@@ -34,8 +34,9 @@ defmodule AshA2ui.L10n do
 
     * `:gettext_backend` — `{backend, domain}`, e.g.
       `{MyAppWeb.Gettext, "ash_a2ui"}`. `domain` is the library domain.
-      Messages are looked up with `Gettext.dgettext/4`, or
-      `Gettext.dpgettext/5` when they carry a context, inside
+      Messages are looked up with `Gettext.dgettext/4`,
+      `Gettext.dpgettext/5` when they carry a context, or
+      `Gettext.dngettext/6` when they are plural, inside
       `Gettext.with_locale/3`, so `:locale` is required with it.
     * `:gettext_fn` — `{module, function}`, for a translation layer that is
       not Gettext. Returns the translated, interpolated string. Called in
@@ -51,7 +52,12 @@ defmodule AshA2ui.L10n do
           `module.function(msgid, bindings, locale)` when `:locale` is
           given. This shape receives both owners' messages without their
           domain or context (as before the split).
-      `bindings` is a keyword list.
+      `bindings` is a keyword list. A plural message (`tn/5`) is called the
+      same way, with the singular msgid, `count` among the bindings, and
+      `:plural` (the plural msgid) and `:count` added to `meta`: the function
+      picks the form. The arity-2 and -3 shapes receive the msgid already
+      chosen by `count` (singular for `1`, plural otherwise), as English
+      plural rules do.
     * `:metadata_domain` — the domain host display metadata is looked up
       in. Defaults to `"a2ui_metadata"`, with either translator.
     * `:locale` — the locale to translate into, as a string (`"fr"`,
@@ -72,11 +78,14 @@ defmodule AshA2ui.L10n do
 
   defstruct [:translate, :locale, :domain, :metadata_domain]
 
+  @typedoc "`nil` for a singular message, else its plural msgid and the count."
+  @type plural :: nil | {String.t(), non_neg_integer}
+
   @typedoc "A translator built by `new/1`, or `nil` for none."
   @type t ::
           nil
           | %__MODULE__{
-              translate: (String.t(), String.t() | nil, String.t(), keyword -> term),
+              translate: (String.t(), String.t() | nil, String.t(), keyword, plural -> term),
               locale: String.t() | nil,
               domain: String.t(),
               metadata_domain: String.t()
@@ -140,19 +149,22 @@ defmodule AshA2ui.L10n do
        when is_atom(module) and is_atom(function) do
     cond do
       Code.ensure_loaded?(module) and function_exported?(module, function, 4) ->
-        fn domain, context, msgid, bindings ->
-          apply(module, function, [msgid, bindings, locale, meta(domain, context)])
+        fn domain, context, msgid, bindings, plural ->
+          apply(module, function, [msgid, bindings, locale, meta(domain, context, plural)])
         end
 
       is_nil(locale) ->
         ensure_exported!(module, function, 2)
-        fn _domain, _context, msgid, bindings -> apply(module, function, [msgid, bindings]) end
+
+        fn _domain, _context, msgid, bindings, plural ->
+          apply(module, function, [pick(msgid, plural), bindings])
+        end
 
       true ->
         ensure_exported!(module, function, 3)
 
-        fn _domain, _context, msgid, bindings ->
-          apply(module, function, [msgid, bindings, locale])
+        fn _domain, _context, msgid, bindings, plural ->
+          apply(module, function, [pick(msgid, plural), bindings, locale])
         end
     end
   end
@@ -161,8 +173,19 @@ defmodule AshA2ui.L10n do
     raise ArgumentError, ":gettext_fn must be a {module, function} tuple, got: #{inspect(other)}"
   end
 
-  defp meta(domain, nil), do: [domain: domain]
-  defp meta(domain, context), do: [domain: domain, context: context]
+  defp meta(domain, context, plural) do
+    [domain: domain] ++
+      if(context, do: [context: context], else: []) ++
+      case plural do
+        nil -> []
+        {msgid_plural, count} -> [plural: msgid_plural, count: count]
+      end
+  end
+
+  # English plural rule, for the translators that do not pick a form.
+  defp pick(msgid, nil), do: msgid
+  defp pick(msgid, {_plural, 1}), do: msgid
+  defp pick(_msgid, {plural, _count}), do: plural
 
   defp backend_translator({backend, domain}, locale)
        when is_atom(backend) and is_binary(domain) do
@@ -178,9 +201,9 @@ defmodule AshA2ui.L10n do
       raise ArgumentError, ":gettext_backend needs the :gettext dependency"
     end
 
-    translate = fn domain, context, msgid, bindings ->
+    translate = fn domain, context, msgid, bindings, plural ->
       gettext.with_locale(backend, locale, fn ->
-        lookup(gettext, backend, domain, context, msgid, Map.new(bindings))
+        lookup(gettext, backend, domain, context, msgid, plural, Map.new(bindings))
       end)
     end
 
@@ -192,11 +215,14 @@ defmodule AshA2ui.L10n do
           ":gettext_backend must be a {backend, domain} tuple, got: #{inspect(other)}"
   end
 
-  defp lookup(gettext, backend, domain, nil, msgid, bindings),
+  defp lookup(gettext, backend, domain, nil, msgid, nil, bindings),
     do: gettext.dgettext(backend, domain, msgid, bindings)
 
-  defp lookup(gettext, backend, domain, context, msgid, bindings),
+  defp lookup(gettext, backend, domain, context, msgid, nil, bindings),
     do: gettext.dpgettext(backend, domain, context, msgid, bindings)
+
+  defp lookup(gettext, backend, domain, nil, msgid, {plural, count}, bindings),
+    do: gettext.dngettext(backend, domain, msgid, plural, count, bindings)
 
   defp ensure_exported!(module, function, arity) do
     if not (Code.ensure_loaded?(module) and function_exported?(module, function, arity)) do
@@ -219,7 +245,41 @@ defmodule AshA2ui.L10n do
   def t(nil, msgid, bindings) when is_binary(msgid), do: interpolate(msgid, bindings)
 
   def t(%__MODULE__{domain: domain} = l10n, msgid, bindings) when is_binary(msgid),
-    do: translate(l10n, domain, nil, msgid, bindings)
+    do: translate(l10n, domain, nil, msgid, bindings, nil)
+
+  @doc """
+  Translates the plural library string `msgid` / `msgid_plural` for `count`
+  with `l10n`, in the library domain. `count` is bound as `%{count}`, as
+  Gettext's `ngettext` does. Without a translator the form is chosen as in
+  English: `msgid` for `1`, `msgid_plural` otherwise.
+
+      iex> AshA2ui.L10n.tn(nil, "%{count} row", "%{count} rows", 1, [])
+      "1 row"
+
+      iex> AshA2ui.L10n.tn(nil, "%{count} row", "%{count} rows", 2, [])
+      "2 rows"
+  """
+  @spec tn(t, String.t(), String.t(), non_neg_integer, keyword) :: String.t()
+  def tn(l10n, msgid, msgid_plural, count, bindings)
+      when is_binary(msgid) and is_binary(msgid_plural) and is_integer(count) and count >= 0 do
+    bindings = Keyword.put(bindings, :count, count)
+    plural = {msgid_plural, count}
+
+    case l10n do
+      nil -> interpolate(pick(msgid, plural), bindings)
+      %__MODULE__{domain: domain} -> translate(l10n, domain, nil, msgid, bindings, plural)
+    end
+  end
+
+  @doc """
+  `tn/5` for a `AshA2ui.Gettext.msg_plural/2` pair.
+
+      iex> AshA2ui.L10n.tn(nil, {"%{count} row", "%{count} rows"}, 3)
+      "3 rows"
+  """
+  @spec tn(t, {String.t(), String.t()}, non_neg_integer, keyword) :: String.t()
+  def tn(l10n, {msgid, msgid_plural}, count, bindings \\ []),
+    do: tn(l10n, msgid, msgid_plural, count, bindings)
 
   @doc """
   Translates the host display string `msgid` (a label) with `l10n`, in the
@@ -236,12 +296,12 @@ defmodule AshA2ui.L10n do
 
   def metadata(%__MODULE__{metadata_domain: domain} = l10n, msgid, context)
       when is_binary(msgid),
-      do: translate(l10n, domain, context, msgid, [])
+      do: translate(l10n, domain, context, msgid, [], nil)
 
-  defp translate(%__MODULE__{translate: translate}, domain, context, msgid, bindings) do
-    case translate.(domain, context, msgid, bindings) do
+  defp translate(%__MODULE__{translate: translate}, domain, context, msgid, bindings, plural) do
+    case translate.(domain, context, msgid, bindings, plural) do
       translated when is_binary(translated) and translated != "" -> translated
-      _missing -> interpolate(msgid, bindings)
+      _missing -> interpolate(pick(msgid, plural), bindings)
     end
   end
 

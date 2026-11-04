@@ -3,9 +3,10 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
   Extracts ash_a2ui's library-owned strings into a `.pot` (Portable Object
   Template) file.
 
-  Scans `lib/**/*.ex` for `AshA2ui.Gettext.msg/1` calls with a string
-  literal and writes each unique msgid once, with the files it appears in as
-  gettext source references.
+  Scans `lib/**/*.ex` for `AshA2ui.Gettext.msg/1` and `msg_plural/2` calls
+  with string literals and writes each unique msgid once (with its
+  `msgid_plural` and two `msgstr` forms for a plural), with the files it
+  appears in as gettext source references.
 
   ## Usage
 
@@ -72,16 +73,16 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
       root
       |> extract_messages()
       |> Enum.sort_by(fn {msgid, _files} -> msgid end)
-      |> Enum.map_join("\n", fn {msgid, files} -> pot_entry(msgid, files) end)
+      |> Enum.map_join("\n", fn {msgid, {plural, files}} -> pot_entry(msgid, plural, files) end)
 
     pot_header() <> entries
   end
 
   @doc """
-  Every marked msgid under `root`, mapped to the sorted, unique list of
-  files (relative to `root`) it appears in.
+  Every marked msgid under `root`, mapped to its `msgid_plural` (or `nil`)
+  and the unique list of files (relative to `root`) it appears in.
   """
-  @spec extract_messages(Path.t()) :: %{String.t() => [String.t()]}
+  @spec extract_messages(Path.t()) :: %{String.t() => {String.t() | nil, [String.t()]}}
   def extract_messages(root \\ File.cwd!()) do
     root
     |> Path.join("lib/**/*.ex")
@@ -94,9 +95,13 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
       |> File.read!()
       |> Code.string_to_quoted!(file: file)
       |> msgids()
-      |> Enum.reduce(acc, fn msgid, acc ->
-        Map.update(acc, msgid, [file], &Enum.uniq(&1 ++ [file]))
-      end)
+      |> Enum.reduce(acc, &add_message(&2, &1, file))
+    end)
+  end
+
+  defp add_message(acc, {msgid, plural}, file) do
+    Map.update(acc, msgid, {plural, [file]}, fn {plural, files} ->
+      {plural, Enum.uniq(files ++ [file])}
     end)
   end
 
@@ -104,11 +109,24 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
     {_, found} =
       Macro.prewalk(ast, [], fn
         {:msg, _meta, [msgid]} = node, acc when is_binary(msgid) ->
-          {node, [msgid | acc]}
+          {node, [{msgid, nil} | acc]}
 
-        {{:., _, [{:__aliases__, _, [:AshA2ui, :Gettext]}, :msg]}, _meta, [msgid]} = node, acc
-        when is_binary(msgid) ->
-          {node, [msgid | acc]}
+        {:msg_plural, _meta, [msgid, plural]} = node, acc
+        when is_binary(msgid) and is_binary(plural) ->
+          {node, [{msgid, plural} | acc]}
+
+        {{:., _, [{:__aliases__, _, [:AshA2ui, :Gettext]}, name]}, _meta, args} = node, acc
+        when name in [:msg, :msg_plural] ->
+          case args do
+            [msgid] when is_binary(msgid) ->
+              {node, [{msgid, nil} | acc]}
+
+            [msgid, plural] when is_binary(msgid) and is_binary(plural) ->
+              {node, [{msgid, plural} | acc]}
+
+            _dynamic ->
+              {node, acc}
+          end
 
         node, acc ->
           {node, acc}
@@ -140,11 +158,23 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
     """
   end
 
-  defp pot_entry(msgid, files) do
+  defp pot_entry(msgid, nil, files) do
     """
-    #{Enum.map_join(files, "\n", &"#: #{&1}")}
+    #{references(files)}
     msgid #{inspect(msgid)}
     msgstr ""
     """
   end
+
+  defp pot_entry(msgid, plural, files) do
+    """
+    #{references(files)}
+    msgid #{inspect(msgid)}
+    msgid_plural #{inspect(plural)}
+    msgstr[0] ""
+    msgstr[1] ""
+    """
+  end
+
+  defp references(files), do: Enum.map_join(files, "\n", &"#: #{&1}")
 end

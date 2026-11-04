@@ -21,4 +21,13 @@ defmodule AshA2ui.Gettext do
   defmacro msg(msgid) do
     quote do: unquote(msgid)
   end
+
+  @doc """
+  Marks the plural library string `singular` / `plural` as translatable and
+  returns the pair, for `AshA2ui.L10n.tn/4`. The extractor writes it as a
+  `msgid` with a `msgid_plural`. Both must be string literals.
+  """
+  defmacro msg_plural(singular, plural) do
+    quote do: {unquote(singular), unquote(plural)}
+  end
 end

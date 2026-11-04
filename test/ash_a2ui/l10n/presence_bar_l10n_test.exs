@@ -36,5 +36,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       assert html =~ "⟦⟦People viewing this surface⟧: +1⟧"
       refute html =~ "⟪"
     end
+
+    test "the overflow count is a plural message" do
+      three = @presences ++ [%{key: "c", label: "Linus"}]
+
+      for {max_visible, count} <- [{2, 1}, {1, 2}] do
+        html =
+          render_component(
+            &AshA2ui.PresenceBar.bar/1,
+            [presences: three, max_visible: max_visible] ++ @pseudo
+          )
+
+        assert html =~ "⟦#{count} more people viewing this surface⟧"
+      end
+    end
   end
 end

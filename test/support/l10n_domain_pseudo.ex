@@ -7,6 +7,7 @@ defmodule AshA2ui.Test.DomainPseudoLocale do
   alias AshA2ui.L10n
 
   def translate(msgid, bindings, "pseudo", meta) do
+    msgid = if meta[:plural] && meta[:count] != 1, do: meta[:plural], else: msgid
     text = L10n.interpolate(msgid, bindings)
 
     case meta[:domain] do

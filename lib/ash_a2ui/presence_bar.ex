@@ -45,7 +45,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     use Phoenix.Component
 
-    import AshA2ui.Gettext, only: [msg: 1]
+    import AshA2ui.Gettext, only: [msg: 1, msg_plural: 2]
 
     alias AshA2ui.L10n
 
@@ -96,7 +96,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           overflow: overflow,
           surface_label: surface_label,
           overflow_label:
-            L10n.t(l10n, msg("%{count} more people viewing this surface"), count: overflow),
+            L10n.tn(
+              l10n,
+              msg_plural(
+                "%{count} more people viewing this surface",
+                "%{count} more people viewing this surface"
+              ),
+              overflow
+            ),
           overflow_title:
             L10n.t(l10n, msg("%{label}: +%{count}"), label: surface_label, count: overflow),
           l10n: l10n

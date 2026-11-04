@@ -22,12 +22,21 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
     test "carries every marked string once, with file references" do
       messages = Extract.extract_messages()
 
-      assert messages["Save changes"] == ["lib/ash_a2ui/experience.ex"]
-      assert "lib/ash_a2ui/encoder/v0_9_1.ex" in messages["Cancel"]
+      assert messages["Save changes"] == {nil, ["lib/ash_a2ui/experience.ex"]}
+      assert "lib/ash_a2ui/encoder/v0_9_1.ex" in elem(messages["Cancel"], 1)
       assert Map.has_key?(messages, "%{first}–%{last} of %{total}")
 
       pot = File.read!(@shipped)
       assert length(Regex.scan(~r/^msgid "Next"$/m, pot)) == 1
+    end
+
+    test "writes a plural message as msgid_plural with two msgstr forms" do
+      assert File.read!(@shipped) =~ """
+             msgid "Report complete: %{count} row."
+             msgid_plural "Report complete: %{count} rows."
+             msgstr[0] ""
+             msgstr[1] ""
+             """
     end
   end
 

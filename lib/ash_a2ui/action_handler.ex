@@ -237,7 +237,7 @@ defmodule AshA2ui.ActionHandler do
   """
 
   import Ash.Expr
-  import AshA2ui.Gettext, only: [msg: 1]
+  import AshA2ui.Gettext, only: [msg: 1, msg_plural: 2]
 
   require Ash.Query
   require Logger
@@ -2426,10 +2426,13 @@ defmodule AshA2ui.ActionHandler do
     )
   end
 
-  defp report_status_text(view, 1), do: t(view, msg("Report complete: 1 row."))
-
   defp report_status_text(view, count),
-    do: t(view, msg("Report complete: %{count} rows."), count: count)
+    do:
+      L10n.tn(
+        view.l10n,
+        msg_plural("Report complete: %{count} row.", "Report complete: %{count} rows."),
+        count
+      )
 
   # --- export (CSV file export, v1.0-only — see AshA2ui.Export) ----------------
 
@@ -2559,9 +2562,14 @@ defmodule AshA2ui.ActionHandler do
       update_data_model(view, "/ui/response", %{
         "status" => "ok",
         "message" =>
-          t(view, msg("Exported %{filename} (%{count} rows)."),
-            filename: filename,
-            count: length(cells)
+          L10n.tn(
+            view.l10n,
+            msg_plural(
+              "Exported %{filename} (%{count} rows).",
+              "Exported %{filename} (%{count} rows)."
+            ),
+            length(cells),
+            filename: filename
           ),
         "result" => %{"filename" => filename, "rows" => length(cells)},
         "resultText" => ""

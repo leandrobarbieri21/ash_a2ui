@@ -22,7 +22,9 @@ msgstr ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "%{action}: %{ok} of %{selected} selected records done"
-msgstr ""
+msgid_plural "%{action}: %{ok} of %{selected} selected records done"
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/action_handler.ex
 msgid "%{action}: done."
@@ -30,19 +32,27 @@ msgstr ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "%{count} failed"
-msgstr ""
+msgid_plural "%{count} failed"
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/presence_bar.ex
 msgid "%{count} more people viewing this surface"
-msgstr ""
+msgid_plural "%{count} more people viewing this surface"
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "%{count} refused"
-msgstr ""
+msgid_plural "%{count} refused"
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "%{count} skipped"
-msgstr ""
+msgid_plural "%{count} skipped"
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/encoder/v0_9_1.ex
 msgid "%{field} from"
@@ -143,7 +153,9 @@ msgstr ""
 
 #: lib/ash_a2ui/action_handler.ex
 msgid "Exported %{filename} (%{count} rows)."
-msgstr ""
+msgid_plural "Exported %{filename} (%{count} rows)."
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/diagram.ex
 msgid "Failed"
@@ -195,12 +207,10 @@ msgid "Remove"
 msgstr ""
 
 #: lib/ash_a2ui/action_handler.ex
-msgid "Report complete: %{count} rows."
-msgstr ""
-
-#: lib/ash_a2ui/action_handler.ex
-msgid "Report complete: 1 row."
-msgstr ""
+msgid "Report complete: %{count} row."
+msgid_plural "Report complete: %{count} rows."
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/time_scrubber.ex
 msgid "Return to now"
@@ -244,7 +254,9 @@ msgstr ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "Selected the first %{cap} of %{count} records: a bulk action runs on at most %{cap} records."
-msgstr ""
+msgid_plural "Selected the first %{cap} of %{count} records: a bulk action runs on at most %{cap} records."
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/experience.ex
 msgid "Showing %{first}–%{last}"
@@ -276,7 +288,9 @@ msgstr ""
 
 #: lib/ash_a2ui/bulk.ex
 msgid "Too many records selected (%{count}): a bulk action runs on at most %{cap} records, one page."
-msgstr ""
+msgid_plural "Too many records selected (%{count}): a bulk action runs on at most %{cap} records, one page."
+msgstr[0] ""
+msgstr[1] ""
 
 #: lib/ash_a2ui/encoder/v0_9_1.ex
 msgid "True"

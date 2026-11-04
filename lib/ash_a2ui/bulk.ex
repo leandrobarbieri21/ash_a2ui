@@ -40,7 +40,7 @@ defmodule AshA2ui.Bulk do
   """
 
   import Ash.Expr
-  import AshA2ui.Gettext, only: [msg: 1]
+  import AshA2ui.Gettext, only: [msg: 1, msg_plural: 2]
 
   require Ash.Query
 
@@ -183,12 +183,13 @@ defmodule AshA2ui.Bulk do
 
           length(ids) > cap ->
             {:error,
-             L10n.t(
+             L10n.tn(
                l10n,
-               msg(
+               msg_plural(
+                 "Too many records selected (%{count}): a bulk action runs on at most %{cap} records, one page.",
                  "Too many records selected (%{count}): a bulk action runs on at most %{cap} records, one page."
                ),
-               count: length(ids),
+               length(ids),
                cap: cap
              )}
 
@@ -253,13 +254,14 @@ defmodule AshA2ui.Bulk do
     cap = cap(table)
 
     if count > cap do
-      L10n.t(
+      L10n.tn(
         l10n,
-        msg(
+        msg_plural(
+          "Selected the first %{cap} of %{count} records: a bulk action runs on at most %{cap} records.",
           "Selected the first %{cap} of %{count} records: a bulk action runs on at most %{cap} records."
         ),
-        cap: cap,
-        count: count
+        count,
+        cap: cap
       )
     end
   end
@@ -344,15 +346,21 @@ defmodule AshA2ui.Bulk do
   def status_text(action, selected, result, label \\ nil, l10n \\ nil) do
     others =
       for {key, template} <- [
-            {"refused", msg("%{count} refused")},
-            {"skipped", msg("%{count} skipped")},
-            {"failed", msg("%{count} failed")}
+            {"refused", msg_plural("%{count} refused", "%{count} refused")},
+            {"skipped", msg_plural("%{count} skipped", "%{count} skipped")},
+            {"failed", msg_plural("%{count} failed", "%{count} failed")}
           ],
           result[key] > 0,
-          do: L10n.t(l10n, template, count: result[key])
+          do: L10n.tn(l10n, template, result[key])
 
     base =
-      L10n.t(l10n, msg("%{action}: %{ok} of %{selected} selected records done"),
+      L10n.tn(
+        l10n,
+        msg_plural(
+          "%{action}: %{ok} of %{selected} selected records done",
+          "%{action}: %{ok} of %{selected} selected records done"
+        ),
+        selected,
         action: label || Label.resolve(l10n, nil, action),
         ok: result["ok"],
         selected: selected

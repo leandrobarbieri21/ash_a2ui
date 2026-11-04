@@ -29,3 +29,8 @@ msgstr "Revenir au présent"
 
 msgid "As of %{instant}"
 msgstr "Au %{instant}"
+
+msgid "Report complete: %{count} row."
+msgid_plural "Report complete: %{count} rows."
+msgstr[0] "Rapport terminé : %{count} ligne."
+msgstr[1] "Rapport terminé : %{count} lignes."

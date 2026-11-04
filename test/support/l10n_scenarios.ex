@@ -35,6 +35,8 @@ defmodule AshA2ui.Test.L10nScenarios do
       {"bulk_refresh", &bulk_refresh(spec, &1)},
       {"bulk_options", &bulk_options(spec, &1)},
       {"bulk_invoke", &bulk_invoke(spec, &1)},
+      {"bulk_invoke_one", &bulk_invoke(spec, 1, &1)},
+      {"bulk_invoke_two", &bulk_invoke(spec, 2, &1)},
       {"bulk_select_page", &bulk_select_page(spec, &1)},
       {"task_build", &task_build(spec, &1)},
       {"task_actions", &task_actions(spec, &1)},
@@ -60,7 +62,8 @@ defmodule AshA2ui.Test.L10nScenarios do
   @scenario_names for catalog <- ~w(basic admin),
                       spec <- ~w(v0_9_1 v1_0),
                       name <-
-                        ~w(bulk_build bulk_refresh bulk_options bulk_invoke bulk_select_page
+                        ~w(bulk_build bulk_refresh bulk_options bulk_invoke bulk_invoke_one
+                           bulk_invoke_two bulk_select_page
                            task_build task_actions hub_build hub_no_results board_build
                            enum_build),
                       do: "#{name}_#{spec}_#{catalog}"
@@ -126,8 +129,12 @@ defmodule AshA2ui.Test.L10nScenarios do
     {messages, subs}
   end
 
-  defp bulk_invoke(spec, extra) do
-    {project, tasks, subs} = bulk_seed()
+  defp bulk_invoke(spec, extra), do: bulk_invoke(spec, 3, extra)
+
+  # Approves the first `count` tasks: the status line's counts of 1 and 2.
+  defp bulk_invoke(spec, count, extra) do
+    {project, all_tasks, subs} = bulk_seed()
+    tasks = Enum.take(all_tasks, count)
 
     {_outcome, messages} =
       ActionHandler.handle(

@@ -10,6 +10,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Count strings are plural messages.** `AshA2ui.Gettext.msg_plural/2` marks
+  a singular/plural pair and `AshA2ui.L10n.tn/5` translates it (`dngettext`
+  for `:gettext_backend`). A `:gettext_fn` of arity 4 gets the singular msgid
+  with `:plural` and `:count` in `meta`; arity 2 and 3 get the English form
+  picked by count. Report, export, bulk status and selection, and presence
+  overflow counts use it, and `ash_a2ui.pot` carries their `msgid_plural`.
+  English output is unchanged.
+
 - **More host display text is translated, in the metadata domain.** Column
   help, `more_noun`, step and diagram descriptions, search placeholders,
   empty and no-results states, prompt titles, group, icon, detail, badge and

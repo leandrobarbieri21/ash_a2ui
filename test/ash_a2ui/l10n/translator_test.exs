@@ -123,6 +123,47 @@ defmodule AshA2ui.L10n.TranslatorTest do
     end
   end
 
+  describe "tn/5" do
+    @row {"%{count} row", "%{count} rows"}
+
+    test "without a translator, picks the English form and binds count" do
+      assert L10n.tn(nil, @row, 1) == "1 row"
+      assert L10n.tn(nil, @row, 2) == "2 rows"
+      assert L10n.tn(nil, "%{n}: %{count} row", "%{n}: %{count} rows", 2, n: "A") == "A: 2 rows"
+    end
+
+    test "the arity-2 and -3 shapes receive the form picked by count" do
+      three = L10n.new(gettext_fn: {PseudoLocale, :translate}, locale: "pseudo")
+      assert L10n.tn(three, @row, 1) == "⟦1 row⟧"
+      assert L10n.tn(three, @row, 2) == "⟦2 rows⟧"
+    end
+
+    test "the arity-4 shape gets the singular msgid, with :plural and :count in meta" do
+      l10n = L10n.new(gettext_fn: {DomainAware, :translate}, locale: "fr")
+
+      assert L10n.tn(l10n, @row, 2) ==
+               inspect(
+                 {"%{count} row", [count: 2], "fr",
+                  [domain: "ash_a2ui", plural: "%{count} rows", count: 2]}
+               )
+    end
+
+    test "falls back to the picked form when the translator has none" do
+      missing = L10n.new(gettext_fn: {PseudoLocale, :translate}, locale: "de")
+      assert L10n.tn(missing, @row, 1) == "1 row"
+      assert L10n.tn(missing, @row, 5) == "5 rows"
+    end
+
+    test "the backend uses dngettext, with the locale's plural rule" do
+      l10n = L10n.new(gettext_backend: {Backend, "ash_a2ui"}, locale: "fr")
+      row = {"Report complete: %{count} row.", "Report complete: %{count} rows."}
+
+      assert L10n.tn(l10n, row, 1) == "Rapport terminé : 1 ligne."
+      assert L10n.tn(l10n, row, 2) == "Rapport terminé : 2 lignes."
+      assert L10n.tn(l10n, @row, 2) == "2 rows"
+    end
+  end
+
   describe "t/3 with :gettext_backend" do
     test "translates in the given locale and interpolates" do
       l10n = L10n.new(gettext_backend: {Backend, "ash_a2ui"}, locale: "fr")
