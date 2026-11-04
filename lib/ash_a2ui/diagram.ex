@@ -217,7 +217,7 @@ defmodule AshA2ui.Diagram do
   `opts` — for transports that push marker moves without a full data-model
   refresh. `opts` takes `build_surface/2`'s `:actor`, `:tenant`,
   `:context_state` and localization options (`:locale`, `:gettext_backend`,
-  `:gettext_fn`).
+  `:gettext_fn`, `:metadata_domain`).
   """
   @spec refresh_messages(module | Spark.Dsl.t(), keyword) :: [map]
   def refresh_messages(resource_or_ui_module, opts \\ []) do

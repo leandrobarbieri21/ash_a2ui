@@ -538,17 +538,31 @@ Feed the response to any A2UI renderer. Mutations can be posted back as
 
 ## Localizing ash_a2ui
 
-The text ash_a2ui writes itself (buttons, pagination, empty states, panel
-titles, action feedback) and the labels it derives from field names ship as
-a gettext catalog, `priv/gettext/ash_a2ui.pot`. Nothing is translated unless
-you pass a translator, so existing output does not change.
+Text is translated in the domain of whoever owns it:
 
-1. Copy the catalog into your app: `mix ash_a2ui.gen.gettext`. To keep one
-   domain, merge it into an existing one instead:
+- **The library's own text** (buttons, pagination, empty states, panel
+  titles, action feedback) ships as a gettext catalog,
+  `priv/gettext/ash_a2ui.pot`.
+- **Your display labels** (declared labels, and the labels ash_a2ui derives
+  from field, action and component names: headings, columns, fields,
+  actions, contexts, groups, steps and query presets) are yours. They are
+  looked up in the `a2ui_metadata` domain, and
+  `mix ash_a2ui.gettext.extract_metadata` writes them to your
+  `priv/gettext/a2ui_metadata.pot`.
+
+Nothing is translated unless you pass a translator, so existing output does
+not change.
+
+1. Copy the library catalog into your app: `mix ash_a2ui.gen.gettext`. To
+   keep one domain, merge it into an existing one instead:
    `mix ash_a2ui.gen.gettext --domain default`.
-2. `mix gettext.merge priv/gettext --locale fr`, then fill in the
-   `msgstr`s.
-3. Pass the backend and the reader's locale to every call:
+2. Extract your labels: `mix ash_a2ui.gettext.extract_metadata`. It renders
+   every surface of your app with the code that runs at request time (no
+   data is read), so its msgids are exactly the labels a reader sees. Add
+   `mix ash_a2ui.gettext.extract_metadata --check-up-to-date` to CI.
+3. `mix gettext.merge priv/gettext --locale fr`, then fill in the
+   `msgstr`s of both domains.
+4. Pass the backend and the reader's locale to every call:
 
    ```elixir
    l10n = [gettext_backend: {MyAppWeb.Gettext, "ash_a2ui"}, locale: "fr"]
@@ -568,8 +582,13 @@ you pass a translator, so existing output does not change.
    ```
 
 `locale:` is always explicit: ash_a2ui never reads the ambient Gettext
-locale. For a translation layer that is not Gettext, pass
-`gettext_fn: {Module, :function}` instead. Ids, paths, enum and option
+locale. The `{backend, domain}` domain is the library's; labels use
+`metadata_domain:` (default `"a2ui_metadata"`). For a translation layer that
+is not Gettext, pass `gettext_fn: {Module, :function}` instead: when
+`function/4` is exported it is called as
+`function(msgid, bindings, locale, meta)`, and `meta[:domain]` (`"ash_a2ui"`
+or the metadata domain) and `meta[:context]` (a `msgctxt`, for values whose
+labels are homographs) tell the messages apart. Ids, paths, enum and option
 values, action and field names and record data are never translated, and a
 missing translation falls back to the English text. ash_a2ui does not depend
 on `:gettext`; your app does. The

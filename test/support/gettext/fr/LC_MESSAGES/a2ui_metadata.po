@@ -1,0 +1,17 @@
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Name"
+msgstr "Nom"
+
+msgid "Title"
+msgstr "Titre"
+
+msgid "Open"
+msgstr "Ouvrir"
+
+msgctxt "enum:Elixir.MyApp.Status"
+msgid "Open"
+msgstr "Ouvert"

@@ -150,14 +150,21 @@ defmodule AshA2ui.Info do
       emitted. Admin catalog: the `entityPage` carries
       `headerVisible: false` (catalog 1.6) and the renderer skips its
       header. Defaults to `true` (the output is unchanged).
-    * `:locale` — the locale to translate the library's own strings into
-      (`"fr"`). Always explicit: ash_a2ui never reads the ambient Gettext
+    * `:locale` — the locale to translate the library's own strings and
+      the host's labels into (`"fr"`). Always explicit: ash_a2ui never reads the ambient Gettext
       locale. Needed with `:gettext_backend`; passed to `:gettext_fn` as a
       third argument when given.
     * `:gettext_backend` — `{backend, domain}`, e.g.
-      `{MyAppWeb.Gettext, "ash_a2ui"}`: translate through Gettext.
+      `{MyAppWeb.Gettext, "ash_a2ui"}`: translate through Gettext. `domain`
+      is the library's domain; labels use `:metadata_domain`.
     * `:gettext_fn` — `{module, function}`: translate through
-      `module.function(msgid, bindings)` (or `/3` with `:locale`).
+      `module.function(msgid, bindings, locale, meta)` when `function/4`
+      is exported (`meta[:domain]` tells library strings from host
+      labels), else `module.function(msgid, bindings)` (or `/3` with
+      `:locale`). See `AshA2ui.L10n`.
+    * `:metadata_domain` — the domain the host's display labels are looked
+      up in, with either translator. Defaults to `"a2ui_metadata"`; the
+      catalog is written by `mix ash_a2ui.gettext.extract_metadata`.
 
       Only display text is translated: declared and derived labels, titles,
       the library's chrome (buttons, pagination, empty states) and feedback

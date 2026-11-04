@@ -29,6 +29,3 @@ msgstr "Revenir au présent"
 
 msgid "As of %{instant}"
 msgstr "Au %{instant}"
-
-msgid "Title"
-msgstr "Titre"

@@ -2,10 +2,16 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
   # async: false — the gen task tests swap the global Mix shell.
   use ExUnit.Case, async: false
 
+  alias AshA2ui.Gettext.Metadata
   alias Mix.Tasks.AshA2ui.Gen.Gettext, as: Gen
   alias Mix.Tasks.AshA2ui.Gettext.Extract
+  alias Mix.Tasks.AshA2ui.Gettext.ExtractMetadata
 
   @shipped "priv/gettext/ash_a2ui.pot"
+  # The metadata template of the test/support fixture surfaces. Re-record
+  # (only on purpose) with
+  # `RECORD_L10N_GOLDEN=1 mix test test/mix/tasks/ash_a2ui_gettext_test.exs`.
+  @metadata_golden "test/ash_a2ui/l10n/golden/a2ui_metadata.pot"
 
   describe "the shipped catalog" do
     test "is up to date with the marked strings in lib/" do
@@ -77,6 +83,109 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
       assert_raise Mix.Error, ~r/Invalid domain/, fn ->
         Gen.run(["--domain", "Bad-Domain", "--source", source, "--output-dir", dir])
       end
+    end
+  end
+
+  describe "mix ash_a2ui.gettext.extract_metadata" do
+    setup do
+      dir =
+        Path.join(
+          System.tmp_dir!(),
+          "ash_a2ui_extract_metadata_#{System.unique_integer([:positive])}"
+        )
+
+      File.mkdir_p!(dir)
+      on_exit(fn -> File.rm_rf!(dir) end)
+      Mix.shell(Mix.Shell.Process)
+      on_exit(fn -> Mix.shell(Mix.Shell.IO) end)
+      %{output: Path.join(dir, "a2ui_metadata.pot")}
+    end
+
+    test "walks the app's extension resources and standalone UI modules" do
+      surfaces = Metadata.surfaces(:ash_a2ui)
+
+      assert AshA2ui.Test.Minimal in surfaces
+      assert AshA2ui.Test.Experience.Task in surfaces
+      assert AshA2ui.Test.MinimalUI in surfaces
+      assert AshA2ui.Test.BulkTasksUI in surfaces
+      refute AshA2ui.Test.BulkProject in surfaces
+      assert surfaces == Enum.sort(Enum.uniq(surfaces))
+    end
+
+    test "writes the fixtures' labels, stable against the golden", %{output: output} do
+      ExtractMetadata.run(["--output", output])
+      pot = File.read!(output)
+
+      if System.get_env("RECORD_L10N_GOLDEN"), do: File.write!(@metadata_golden, pot)
+
+      assert pot == File.read!(@metadata_golden), "the metadata template changed"
+      assert pot =~ ~s("Domain: a2ui_metadata\\n")
+      # A humanized resource heading, a declared column label, an action.
+      assert pot =~ ~s(#: test/support/bulk_tasks_ui.ex\n)
+      assert length(Regex.scan(~r/^msgid "Bulk task"$/m, pot)) == 1
+      # Library strings are in ash_a2ui.pot, not here.
+      refute pot =~ ~s(msgid "Save changes")
+    end
+
+    test "is idempotent", %{output: output} do
+      ExtractMetadata.run(["--output", output])
+      once = File.read!(output)
+      ExtractMetadata.run(["--output", output])
+
+      assert File.read!(output) == once
+
+      assert Metadata.pot(Metadata.messages(Metadata.surfaces(:ash_a2ui)), "a2ui_metadata") ==
+               once
+    end
+
+    test "--check-up-to-date passes when current and fails when stale", %{output: output} do
+      assert_raise Mix.Error, ~r/out of date/, fn ->
+        ExtractMetadata.run(["--output", output, "--check-up-to-date"])
+      end
+
+      ExtractMetadata.run(["--output", output])
+      ExtractMetadata.run(["--output", output, "--check-up-to-date"])
+      assert_received {:mix_shell, :info, [message]} when is_binary(message)
+
+      File.write!(output, File.read!(output) <> "\nmsgid \"Gone\"\nmsgstr \"\"\n")
+
+      assert_raise Mix.Error, ~r/out of date/, fn ->
+        ExtractMetadata.run(["--output", output, "--check-up-to-date"])
+      end
+    end
+
+    test "names the domain after the output file" do
+      dir = Path.join(System.tmp_dir!(), "ash_a2ui_labels_#{System.unique_integer([:positive])}")
+      on_exit(fn -> File.rm_rf!(dir) end)
+      output = Path.join(dir, "labels.pot")
+
+      ExtractMetadata.run(["--output", output])
+      assert File.read!(output) =~ ~s("Domain: labels\\n")
+    end
+
+    test "writes msgctxt, so homographs are separate entries, and escapes PO strings" do
+      messages = %{
+        {nil, "Open"} => ["lib/a.ex"],
+        {"enum:Elixir.MyApp.Status", "Open"} => ["lib/a.ex", "lib/b.ex"],
+        {nil, ~s(Say "hi"\\now)} => ["lib/b.ex"]
+      }
+
+      assert Metadata.pot(messages, "a2ui_metadata") =~
+               """
+               #: lib/a.ex
+               msgid "Open"
+               msgstr ""
+
+               #: lib/a.ex
+               #: lib/b.ex
+               msgctxt "enum:Elixir.MyApp.Status"
+               msgid "Open"
+               msgstr ""
+
+               #: lib/b.ex
+               msgid "Say \\"hi\\"\\\\now"
+               msgstr ""
+               """
     end
   end
 end

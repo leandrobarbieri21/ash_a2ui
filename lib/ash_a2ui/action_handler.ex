@@ -293,8 +293,8 @@ defmodule AshA2ui.ActionHandler do
       reports, exports) run at that instant; every action that writes, or
       opens a form that would, is refused with feedback, because the write
       would land on the present while the reader looks at the past.
-    * `:locale` / `:gettext_backend` / `:gettext_fn` — translate the
-      feedback, status lines and any re-rendered chrome (see
+    * `:locale` / `:gettext_backend` / `:gettext_fn` / `:metadata_domain` —
+      translate the feedback, status lines and any re-rendered chrome (see
       `AshA2ui.Info.build_surface/2`). Pass the same values the surface was
       built with.
   """

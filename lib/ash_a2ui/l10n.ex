@@ -2,12 +2,29 @@ defmodule AshA2ui.L10n do
   @moduledoc """
   Message templates for the text ash_a2ui writes for a reader: feedback,
   status lines and chrome built from parts (`"Exported %{filename} (%{count}
-  rows)."`).
+  rows)."`), and the host's display metadata (labels).
 
   A template's `%{key}` placeholders are filled from a keyword list of
   bindings, the way Gettext interpolates. Each placeholder is replaced
   once, in a single pass, so a value that itself contains `%{...}` is never
   interpolated again. A placeholder with no binding is left as written.
+
+  ## Two domains, by owner
+
+  Text is looked up in the domain of whoever owns it:
+
+    * **Library strings** (`AshA2ui.Gettext.msg/1`: buttons, pagination,
+      feedback templates) are ash_a2ui's own. They ship in
+      `priv/gettext/ash_a2ui.pot` and are translated with `t/3`.
+    * **Host display metadata** (declared labels, and labels humanized from
+      field, action and component names) belongs to the application. It is
+      in no shipped catalog: `mix ash_a2ui.gettext.extract_metadata` writes
+      it to the host's `priv/gettext/a2ui_metadata.pot`. It is translated
+      with `metadata/3`, in the `:metadata_domain`.
+
+  A metadata message may carry a context (`msgctxt`), so a homograph
+  translates separately: an enum value's label is looked up under
+  `"enum:" <> Atom.to_string(EnumModule)`, e.g. `"enum:Elixir.MyApp.Status"`.
 
   ## Translators
 
@@ -16,15 +33,27 @@ defmodule AshA2ui.L10n do
   `AshA2ui.ActionHandler.handle/3` accept:
 
     * `:gettext_backend` — `{backend, domain}`, e.g.
-      `{MyAppWeb.Gettext, "ash_a2ui"}`. Messages are looked up with
-      `Gettext.dgettext/4` inside `Gettext.with_locale/3`, so `:locale` is
-      required with it.
-    * `:gettext_fn` — `{module, function}`. Called as
-      `module.function(msgid, bindings)`, or as
-      `module.function(msgid, bindings, locale)` when `:locale` is given.
-      `bindings` is a keyword list; the function returns the translated,
-      interpolated string. Use it for a translation layer that is not
-      Gettext.
+      `{MyAppWeb.Gettext, "ash_a2ui"}`. `domain` is the library domain.
+      Messages are looked up with `Gettext.dgettext/4`, or
+      `Gettext.dpgettext/5` when they carry a context, inside
+      `Gettext.with_locale/3`, so `:locale` is required with it.
+    * `:gettext_fn` — `{module, function}`, for a translation layer that is
+      not Gettext. Returns the translated, interpolated string. Called in
+      one of two shapes:
+        * when `function/4` is exported, as
+          `module.function(msgid, bindings, locale, meta)` for every
+          message. `locale` is the `:locale` option, or `nil`. `meta` is a
+          keyword list: `:domain` (`"ash_a2ui"` for library strings, the
+          `:metadata_domain` for host metadata), and `:context` when the
+          message has a `msgctxt`. One function tells the owners apart by
+          `meta[:domain]`.
+        * otherwise as `module.function(msgid, bindings)`, or
+          `module.function(msgid, bindings, locale)` when `:locale` is
+          given. This shape receives both owners' messages without their
+          domain or context (as before the split).
+      `bindings` is a keyword list.
+    * `:metadata_domain` — the domain host display metadata is looked up
+      in. Defaults to `"a2ui_metadata"`, with either translator.
     * `:locale` — the locale to translate into, as a string (`"fr"`,
       `"fr_CA"`). ash_a2ui never reads the process's ambient Gettext
       locale: pass the one the request resolved.
@@ -38,16 +67,30 @@ defmodule AshA2ui.L10n do
 
   @placeholder ~r/%\{(\w+)\}/
 
-  defstruct [:translate, :locale]
+  @library_domain "ash_a2ui"
+  @default_metadata_domain "a2ui_metadata"
+
+  defstruct [:translate, :locale, :domain, :metadata_domain]
 
   @typedoc "A translator built by `new/1`, or `nil` for none."
-  @type t :: nil | %__MODULE__{translate: (String.t(), keyword -> term), locale: String.t() | nil}
+  @type t ::
+          nil
+          | %__MODULE__{
+              translate: (String.t(), String.t() | nil, String.t(), keyword -> term),
+              locale: String.t() | nil,
+              domain: String.t(),
+              metadata_domain: String.t()
+            }
 
-  @option_keys [:gettext_fn, :gettext_backend, :locale]
+  @option_keys [:gettext_fn, :gettext_backend, :metadata_domain, :locale]
 
   @doc "The option keys `new/1` reads."
   @spec option_keys() :: [atom]
   def option_keys, do: @option_keys
+
+  @doc "The domain host display metadata is looked up in by default."
+  @spec default_metadata_domain() :: String.t()
+  def default_metadata_domain, do: @default_metadata_domain
 
   @doc """
   Builds a translator from `opts` (see the moduledoc), or `nil` when no
@@ -62,41 +105,64 @@ defmodule AshA2ui.L10n do
   """
   @spec new(keyword) :: t
   def new(opts) do
-    locale = Keyword.get(opts, :locale)
+    locale = optional_string!(opts, :locale)
+    metadata_domain = optional_string!(opts, :metadata_domain) || @default_metadata_domain
 
-    if not (is_nil(locale) or (is_binary(locale) and locale != "")) do
-      raise ArgumentError, ":locale must be a non-empty string, got: #{inspect(locale)}"
-    end
-
-    case {Keyword.get(opts, :gettext_fn), Keyword.get(opts, :gettext_backend)} do
-      {nil, nil} ->
+    case translator(opts[:gettext_fn], opts[:gettext_backend], locale) do
+      nil ->
         nil
 
-      {fun, nil} ->
-        %__MODULE__{translate: function_translator(fun, locale), locale: locale}
-
-      {nil, backend} ->
-        %__MODULE__{translate: backend_translator(backend, locale), locale: locale}
-
-      _both ->
-        raise ArgumentError, "pass either :gettext_fn or :gettext_backend, not both"
+      {translate, domain} ->
+        %__MODULE__{
+          translate: translate,
+          locale: locale,
+          domain: domain,
+          metadata_domain: metadata_domain
+        }
     end
   end
 
-  defp function_translator({module, function}, nil) when is_atom(module) and is_atom(function) do
-    ensure_exported!(module, function, 2)
-    fn msgid, bindings -> apply(module, function, [msgid, bindings]) end
+  defp optional_string!(opts, key) do
+    case Keyword.get(opts, key) do
+      value when is_nil(value) or (is_binary(value) and value != "") -> value
+      other -> raise ArgumentError, ":#{key} must be a non-empty string, got: #{inspect(other)}"
+    end
   end
+
+  defp translator(nil, nil, _locale), do: nil
+  defp translator(fun, nil, locale), do: {function_translator(fun, locale), @library_domain}
+  defp translator(nil, backend, locale), do: backend_translator(backend, locale)
+
+  defp translator(_fun, _backend, _locale),
+    do: raise(ArgumentError, "pass either :gettext_fn or :gettext_backend, not both")
 
   defp function_translator({module, function}, locale)
        when is_atom(module) and is_atom(function) do
-    ensure_exported!(module, function, 3)
-    fn msgid, bindings -> apply(module, function, [msgid, bindings, locale]) end
+    cond do
+      Code.ensure_loaded?(module) and function_exported?(module, function, 4) ->
+        fn domain, context, msgid, bindings ->
+          apply(module, function, [msgid, bindings, locale, meta(domain, context)])
+        end
+
+      is_nil(locale) ->
+        ensure_exported!(module, function, 2)
+        fn _domain, _context, msgid, bindings -> apply(module, function, [msgid, bindings]) end
+
+      true ->
+        ensure_exported!(module, function, 3)
+
+        fn _domain, _context, msgid, bindings ->
+          apply(module, function, [msgid, bindings, locale])
+        end
+    end
   end
 
   defp function_translator(other, _locale) do
     raise ArgumentError, ":gettext_fn must be a {module, function} tuple, got: #{inspect(other)}"
   end
+
+  defp meta(domain, nil), do: [domain: domain]
+  defp meta(domain, context), do: [domain: domain, context: context]
 
   defp backend_translator({backend, domain}, locale)
        when is_atom(backend) and is_binary(domain) do
@@ -112,17 +178,25 @@ defmodule AshA2ui.L10n do
       raise ArgumentError, ":gettext_backend needs the :gettext dependency"
     end
 
-    fn msgid, bindings ->
+    translate = fn domain, context, msgid, bindings ->
       gettext.with_locale(backend, locale, fn ->
-        gettext.dgettext(backend, domain, msgid, Map.new(bindings))
+        lookup(gettext, backend, domain, context, msgid, Map.new(bindings))
       end)
     end
+
+    {translate, domain}
   end
 
   defp backend_translator(other, _locale) do
     raise ArgumentError,
           ":gettext_backend must be a {backend, domain} tuple, got: #{inspect(other)}"
   end
+
+  defp lookup(gettext, backend, domain, nil, msgid, bindings),
+    do: gettext.dgettext(backend, domain, msgid, bindings)
+
+  defp lookup(gettext, backend, domain, context, msgid, bindings),
+    do: gettext.dpgettext(backend, domain, context, msgid, bindings)
 
   defp ensure_exported!(module, function, arity) do
     if not (Code.ensure_loaded?(module) and function_exported?(module, function, arity)) do
@@ -132,10 +206,10 @@ defmodule AshA2ui.L10n do
   end
 
   @doc """
-  Translates `msgid` with `l10n` and fills its placeholders from `bindings`.
-  Without a translator (`nil`) the msgid is only interpolated. A
-  translation that comes back `nil`, empty or not a string falls back to
-  the interpolated msgid.
+  Translates the library string `msgid` with `l10n`, in the library domain,
+  and fills its placeholders from `bindings`. Without a translator (`nil`)
+  the msgid is only interpolated. A translation that comes back `nil`,
+  empty or not a string falls back to the interpolated msgid.
 
       iex> AshA2ui.L10n.t(nil, "Updated %{field}.", field: "Name")
       "Updated Name."
@@ -144,8 +218,28 @@ defmodule AshA2ui.L10n do
   def t(l10n, msgid, bindings \\ [])
   def t(nil, msgid, bindings) when is_binary(msgid), do: interpolate(msgid, bindings)
 
-  def t(%__MODULE__{translate: translate}, msgid, bindings) when is_binary(msgid) do
-    case translate.(msgid, bindings) do
+  def t(%__MODULE__{domain: domain} = l10n, msgid, bindings) when is_binary(msgid),
+    do: translate(l10n, domain, nil, msgid, bindings)
+
+  @doc """
+  Translates the host display string `msgid` (a label) with `l10n`, in the
+  metadata domain, under the `msgctxt` `context` when it is not `nil`.
+  Display metadata carries no placeholders. Without a translator, or
+  without a translation, `msgid` is returned unchanged.
+
+      iex> AshA2ui.L10n.metadata(nil, "Due date")
+      "Due date"
+  """
+  @spec metadata(t, String.t(), String.t() | nil) :: String.t()
+  def metadata(l10n, msgid, context \\ nil)
+  def metadata(nil, msgid, _context) when is_binary(msgid), do: msgid
+
+  def metadata(%__MODULE__{metadata_domain: domain} = l10n, msgid, context)
+      when is_binary(msgid),
+      do: translate(l10n, domain, context, msgid, [])
+
+  defp translate(%__MODULE__{translate: translate}, domain, context, msgid, bindings) do
+    case translate.(domain, context, msgid, bindings) do
       translated when is_binary(translated) and translated != "" -> translated
       _missing -> interpolate(msgid, bindings)
     end

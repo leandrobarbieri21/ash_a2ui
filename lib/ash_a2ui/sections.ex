@@ -89,10 +89,28 @@ defmodule AshA2ui.Sections do
   @spec expand(ResolvedView.t(), keyword) :: {:ok, ResolvedView.t()} | {:error, term}
   def expand(%ResolvedView{} = view, opts \\ []) do
     if Enum.any?(view.tables, &Map.get(&1, :sections)) do
-      do_expand(view, opts)
+      do_expand(view, &read_sections(&1, opts))
     else
       {:ok, view}
     end
+  end
+
+  @doc """
+  Expands the view's sectioned tables without reading: a source-less set
+  expands to its enumerated values, exactly as `expand/2` does, and a
+  source-backed set to no sections (its headings are record data). For
+  tooling that walks a surface's shape without a data layer, such as
+  `mix ash_a2ui.gettext.extract_metadata`.
+  """
+  @spec expand_static(ResolvedView.t()) :: ResolvedView.t()
+  def expand_static(%ResolvedView{} = view) do
+    {:ok, expanded} =
+      do_expand(view, fn
+        %{source: nil} = config -> read_sections(config, [])
+        _source_backed -> {:ok, []}
+      end)
+
+    expanded
   end
 
   @doc """
@@ -123,10 +141,10 @@ defmodule AshA2ui.Sections do
   @spec sanitize(term) :: String.t()
   def sanitize(value), do: String.replace(section_string(value), ~r/[^a-zA-Z0-9]+/, "_")
 
-  defp do_expand(view, opts) do
+  defp do_expand(view, read) do
     view.tables
     |> Enum.reduce_while({:ok, []}, fn table, {:ok, acc} ->
-      case table_replacement(table, opts) do
+      case table_replacement(table, read) do
         {:ok, replacement} -> {:cont, {:ok, acc ++ [replacement]}}
         {:error, error} -> {:halt, {:error, error}}
       end
@@ -140,13 +158,13 @@ defmodule AshA2ui.Sections do
   # One `{template_component, concrete_tables}` replacement pair per table:
   # sectionless tables map onto themselves, sectioned templates onto their
   # per-section expansion (failing over the source read's error).
-  defp table_replacement(table, opts) do
+  defp table_replacement(table, read) do
     case Map.get(table, :sections) do
       nil ->
         {:ok, {table.component, [table]}}
 
       config ->
-        case read_sections(config, opts) do
+        case read.(config) do
           {:ok, section_records} ->
             {:ok, {table.component, expand_table(table, config, section_records)}}
 
