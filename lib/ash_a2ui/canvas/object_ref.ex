@@ -83,12 +83,25 @@ defmodule AshA2ui.Canvas.ObjectRef do
 
   # `:safe` is the load-bearing flag: binary_to_term refuses to create atoms
   # that do not already exist, so a decoded ref can never mint a module or
-  # atom name from client input.
+  # atom name from client input. `:safe` still decodes functions, so a term
+  # holding one is refused too (as `Plug.Crypto.non_executable_binary_to_term/2`
+  # does): a primary key is data.
+  # sobelow_skip ["Misc.BinToTerm"]
   defp safe_binary_to_term(binary) do
-    {:ok, :erlang.binary_to_term(binary, [:safe])}
+    term = :erlang.binary_to_term(binary, [:safe])
+    if executable?(term), do: :error, else: {:ok, term}
   rescue
     _invalid -> :error
   end
+
+  defp executable?(term) when is_function(term), do: true
+  defp executable?([head | tail]), do: executable?(head) or executable?(tail)
+  defp executable?(term) when is_tuple(term), do: term |> Tuple.to_list() |> executable?()
+
+  defp executable?(term) when is_map(term),
+    do: Enum.any?(term, fn {key, value} -> executable?(key) or executable?(value) end)
+
+  defp executable?(_term), do: false
 
   defp dotted(ref, kind, path) do
     case String.split(path, ".", parts: 2) do

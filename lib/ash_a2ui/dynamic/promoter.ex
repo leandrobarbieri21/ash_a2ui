@@ -383,10 +383,10 @@ defmodule AshA2ui.Dynamic.Promoter do
   # tuple literal — the delegate exists (the parser validated it during the
   # resolve that preceded promotion), so rendering the function name as an
   # atom literal is safe.
+  # sobelow_skip ["DOS.StringToAtom"]
   defp render(:via, %{"mfa" => mfa, "args" => args}) do
     {:ok, {module, function, _arity}} = Parser.split_mfa_string(mfa)
 
-    # sobelow_skip ["DOS.StringToAtom"]
     "{#{inspect(String.to_atom("Elixir." <> module))}, :#{function}, #{inspect(args)}}"
   end
 

@@ -52,6 +52,24 @@ defmodule AshA2ui.Canvas.CapabilitySecurityTest do
   end
 
   @tag ac: "A2UI-103/AC-2"
+  test "a record ref's key decodes as data, never as a function" do
+    forge = fn term -> term |> :erlang.term_to_binary() |> Base.url_encode64(padding: false) end
+
+    assert ObjectRef.decode_pk(forge.("post-1")) == {:ok, "post-1"}
+
+    assert ObjectRef.decode_pk(forge.(%{id: 1, slug: ["a", {:b, "c"}]})) ==
+             {:ok, %{id: 1, slug: ["a", {:b, "c"}]}}
+
+    for executable <- [
+          fn -> :ran end,
+          %{id: fn -> :ran end},
+          [1 | fn -> :ran end],
+          {:ok, [&IO.puts/1]}
+        ] do
+      assert ObjectRef.decode_pk(forge.(executable)) == {:error, :unknown_object}
+    end
+  end
+
   test "forged capability envelopes are not inputs" do
     page =
       Canvas.Test.Page
