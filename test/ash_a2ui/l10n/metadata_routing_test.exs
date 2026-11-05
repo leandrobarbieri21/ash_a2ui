@@ -35,9 +35,9 @@ defmodule AshA2ui.L10n.MetadataRoutingTest do
     assert_received {:looked_up, "To Do",
                      [domain: "a2ui_metadata", context: "enum:Elixir.AshA2ui.Test.Stage"]}
 
-    # A `one_of` value has no enum module, so no msgctxt.
+    # A `one_of` value's msgctxt names its field.
     TypeMapper.choices(AshA2ui.Test.HubContract, :status, l10n)
-    assert_received {:looked_up, "Expired", [domain: "a2ui_metadata"]}
+    assert_received {:looked_up, "Expired", [domain: "a2ui_metadata", context: "one_of:status"]}
   end
 
   describe "pseudo-locale builds on both protocols" do

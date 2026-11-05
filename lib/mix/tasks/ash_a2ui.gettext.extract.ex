@@ -151,7 +151,6 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
     ## Run `mix ash_a2ui.gettext.extract` to refresh this file.
     ## Run `mix ash_a2ui.gen.gettext` in your app to copy this file.
     ## Run `mix gettext.merge priv/gettext --locale LOCALE` to merge into a .po file.
-
     msgid ""
     msgstr ""
     "Content-Type: text/plain; charset=UTF-8\\n"

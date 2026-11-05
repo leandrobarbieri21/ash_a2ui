@@ -2455,18 +2455,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           "value" => %{"path" => "#{table.query_path}/filters/#{name}"},
           "options" => all ++ options
         }
-        |> put_admin_filter_hints(admin?, table, name)
+        |> put_admin_filter_hints(admin?, view, table, name)
       ]
     end
   end
 
-  defp put_admin_filter_hints(picker, false, _table, _name), do: picker
+  defp put_admin_filter_hints(picker, false, _view, _table, _name), do: picker
 
-  defp put_admin_filter_hints(picker, true, table, name) do
+  defp put_admin_filter_hints(picker, true, view, table, name) do
     query = table.query
 
     picker
-    |> maybe_put("hint", Keyword.get(query.filter_hints, name))
+    |> maybe_put("hint", filter_hint(view, query, name))
     |> maybe_put(
       "counts",
       if(name in AshA2ui.Query.faceted_filters(query),
@@ -2479,6 +2479,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         do: %{"path" => "#{table.query_path}/options/#{name}"}
       )
     )
+  end
+
+  defp filter_hint(view, query, name) do
+    case Keyword.get(query.filter_hints, name) do
+      nil -> nil
+      hint -> Label.translate(view.l10n, hint)
+    end
   end
 
   # `filter_labels`, else the field's declared label, else the humanized

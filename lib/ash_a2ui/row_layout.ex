@@ -45,14 +45,14 @@ defmodule AshA2ui.RowLayout do
   def badge_data(%__MODULE__{badge: nil}, _record, _l10n), do: %{}
 
   def badge_data(%__MODULE__{badge: badge, badge_tones: []} = layout, record, l10n) do
-    %{"_badge_#{badge}" => badge_text(layout, Map.get(record, badge), l10n)}
+    %{"_badge_#{badge}" => badge_text(layout, record, l10n)}
   end
 
   def badge_data(%__MODULE__{badge: badge} = layout, record, l10n) do
     value = Map.get(record, badge)
 
     %{
-      "_badge_#{badge}" => badge_text(layout, value, l10n),
+      "_badge_#{badge}" => badge_text(layout, record, l10n),
       "_badge_tone_#{badge}" => badge_tone(layout, value)
     }
   end
@@ -70,11 +70,36 @@ defmodule AshA2ui.RowLayout do
     to_string(tone || :neutral)
   end
 
-  defp badge_text(_layout, nil, _l10n), do: ""
+  defp badge_text(layout, record, l10n) do
+    badge_text(layout, record, Map.get(record, layout.badge), l10n)
+  end
 
-  defp badge_text(layout, value, l10n) do
+  defp badge_text(_layout, _record, nil, _l10n), do: ""
+
+  # Display metadata is translated; a record's own value is not. A declared
+  # text, the label of an enumerated value (under its msgctxt, as the pickers
+  # and lane headings label it) and an atom value such as a boolean are
+  # metadata. Any other value is record data and is only humanized.
+  defp badge_text(layout, record, value, l10n) do
     declared = is_atom(value) && Keyword.get(layout.badge_text, value)
 
-    AshA2ui.Label.translate(l10n, declared || AshA2ui.Label.humanize(value))
+    cond do
+      declared ->
+        AshA2ui.Label.translate(l10n, declared)
+
+      context = choice_context(record, layout.badge) ->
+        AshA2ui.Label.translate(l10n, AshA2ui.Label.humanize(value), context)
+
+      is_atom(value) ->
+        AshA2ui.Label.translate(l10n, AshA2ui.Label.humanize(value))
+
+      true ->
+        AshA2ui.Label.humanize(value)
+    end
   end
+
+  defp choice_context(%{__struct__: resource}, badge),
+    do: AshA2ui.TypeMapper.choice_context(resource, badge)
+
+  defp choice_context(_plain_map, _badge), do: nil
 end

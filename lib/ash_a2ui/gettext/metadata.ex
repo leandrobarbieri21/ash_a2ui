@@ -112,9 +112,14 @@ defmodule AshA2ui.Gettext.Metadata do
     texts =
       Enum.flat_map(component.columns, &column_texts/1) ++
         layout_texts(component.row_layout, resource) ++
-        primary_texts(component.primary_action) ++ query_texts(table.query)
+        primary_texts(component.primary_action) ++
+        query_texts(table.query) ++
+        edited_texts(component)
 
-    Enum.each(texts, &Label.translate(l10n, &1))
+    Enum.each(texts, fn
+      {context, text} -> Label.translate(l10n, text, context)
+      text -> Label.translate(l10n, text)
+    end)
   end
 
   defp column_texts(column) do
@@ -133,14 +138,21 @@ defmodule AshA2ui.Gettext.Metadata do
 
   defp layout_texts(layout, resource) do
     values = (layout.badge && TypeMapper.choices(resource, layout.badge)) || []
+    context = layout.badge && TypeMapper.choice_context(resource, layout.badge)
 
     unlabeled =
       for {value, _label} <- values,
           not Keyword.has_key?(layout.badge_text, value),
-          do: Label.humanize(value)
+          do: {context, Label.humanize(value)}
 
     Keyword.values(layout.badge_text) ++ unlabeled
   end
+
+  # "Updated <field>." names the edited field by its humanized name.
+  defp edited_texts(%{editable: %{fields: fields}}) when is_list(fields),
+    do: Enum.map(fields, &Label.humanize/1)
+
+  defp edited_texts(_component), do: []
 
   defp primary_texts(nil), do: []
 
@@ -163,7 +175,8 @@ defmodule AshA2ui.Gettext.Metadata do
           text != "",
           do: text
 
-    Enum.reject([query.search_placeholder, clear_action(query)], &is_nil/1) ++ state_texts
+    Enum.reject([query.search_placeholder, clear_action(query)], &is_nil/1) ++
+      Keyword.values(query.filter_hints) ++ state_texts
   end
 
   defp clear_action(%{no_results_state: nil}), do: nil
@@ -230,7 +243,6 @@ defmodule AshA2ui.Gettext.Metadata do
     ##
     ## Run `mix ash_a2ui.gettext.extract_metadata` to refresh this file.
     ## Run `mix gettext.merge priv/gettext --locale LOCALE` to merge into a .po file.
-
     msgid ""
     msgstr ""
     "Content-Type: text/plain; charset=UTF-8\\n"

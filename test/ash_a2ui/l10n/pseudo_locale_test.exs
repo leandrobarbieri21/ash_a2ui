@@ -38,7 +38,7 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     {"domain pseudo-locale", AshA2ui.Test.DomainPseudoLocale}
   ]
   @display_keys ~w(text label title message body placeholder description moreNoun confirmLabel
-                   primary_label _range_text _empty_message _primary_label)
+                   primary_label _range_text _empty_message _primary_label hint)
   # Row keys whose value is a label chosen by the record's value: an
   # enumerated value's label, a badge, an icon label, a detail line.
   @row_label_prefixes ~w(_badge_ _icon_label_ _detail_ _empty_message)
@@ -67,8 +67,15 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
         where = "#{@scenario_name} at #{inspect(path)}"
         key = path |> Enum.filter(&is_binary/1) |> List.last()
 
-        assert display_key?(key), "#{where}: #{inspect(key)} is not display text"
-        assert strip(translated) == plain, "#{where}: #{inspect(translated)} changed wording"
+        # A required field's error is Ash's own msgid ("is required"), which
+        # replaces the English sentence ("attribute name is required").
+        if strip(translated) == "is required" do
+          assert plain =~ "is required"
+        else
+          assert display_key?(key), "#{where}: #{inspect(key)} is not display text"
+          assert strip(translated) == plain, "#{where}: #{inspect(translated)} changed wording"
+        end
+
         refute double_wrapped?(translated), "#{where}: #{inspect(translated)} translated twice"
       end
 

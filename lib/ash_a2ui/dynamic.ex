@@ -102,7 +102,7 @@ defmodule AshA2ui.Dynamic do
   alias AshA2ui.Transformers.InferFields
   alias Spark.Dsl.Extension
 
-  @resolve_opts [:allowlist, :surface_id, :spec_version, :via_allowlist]
+  @resolve_opts [:allowlist, :surface_id, :spec_version, :via_allowlist, :imported?]
 
   # The cell cap of a composed board; see max_composed_cells/0.
   @max_composed_cells 12
@@ -132,6 +132,11 @@ defmodule AshA2ui.Dynamic do
       `:allowlist`. The parser still independently validates that each
       delegate's module is loaded and exports the function at the applied
       arity.
+    * `:imported?` — `true` for a spec produced by
+      `AshA2ui.Dynamic.Importer.import/1`. Its labels are the declared
+      surface's own, which the host's catalog translates, so none is shown
+      as written (default `false`: the spec's text is its author's, shown
+      as written, see `build_surface/2`).
 
   Returns `{:ok, surface}` or `{:error, [%AshA2ui.Dynamic.Error{}]}`.
   """
@@ -164,7 +169,8 @@ defmodule AshA2ui.Dynamic do
          resource: resource,
          title: title,
          spec: spec,
-         dsl_state: dsl_state
+         dsl_state: dsl_state,
+         imported?: Keyword.get(opts, :imported?, false)
        }}
     end
   end
@@ -178,6 +184,12 @@ defmodule AshA2ui.Dynamic do
   Takes the same options (`:actor`, `:tenant`, `:authorize?`, `:domain`,
   `:query_state`, `:context_state`, and the localization options of
   `AshA2ui.L10n`); reads are authorized by default.
+
+  The text the spec's author wrote (titles, labels, `prompt_title`, and the
+  `labels`, `icon_labels`, `swimlane_labels`, `detail_text` and `badge_text`
+  maps) is shown as written, not translated. It is matched by its string, so
+  another label with exactly the same text is shown as written too. A spec
+  resolved with `imported?: true` has no such text.
   """
   @spec build_surface(Surface.t(), keyword) :: [map]
   def build_surface(%Surface{} = surface, opts \\ []) do
@@ -209,10 +221,14 @@ defmodule AshA2ui.Dynamic do
 
   # The text the spec's author wrote is not in any catalog: the translators
   # return it as written, and still translate every other label and string.
+  # A spec imported from a declared surface carries the host's own labels,
+  # which its catalog holds: nothing in it is verbatim.
+  defp verbatim(%Surface{imported?: true}, opts), do: opts
+
   defp verbatim(%Surface{spec: spec}, opts),
     do: Keyword.put(opts, :verbatim, MapSet.new(authored_text(spec)))
 
-  @text_maps ["labels", "icon_labels", "swimlane_labels", "detail_text"]
+  @text_maps ["labels", "icon_labels", "swimlane_labels", "detail_text", "badge_text"]
 
   defp authored_text(%{} = node) do
     Enum.flat_map(node, fn

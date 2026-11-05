@@ -3517,6 +3517,17 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
+  # A missing required field has no message of its own: Ash's catalog has
+  # the msgid "is required" for it. Without a translation the error's own
+  # sentence is shown, as without a translator.
+  defp error_text(l10n, %Ash.Error.Changes.Required{} = error), do: required_text(l10n, error)
+
+  defp error_text(
+         l10n,
+         %Ash.Error.Changes.InvalidAttribute{required?: true, message: nil} = error
+       ),
+       do: required_text(l10n, error)
+
   # The message is the error's template: translated in the errors domain
   # under its own msgid (Ash's), with its `vars` as bindings.
   defp error_text(l10n, %{message: message} = error) when is_binary(message) do
@@ -3529,6 +3540,13 @@ defmodule AshA2ui.ActionHandler do
     do: last_line(Exception.message(error))
 
   defp error_text(_l10n, error), do: inspect(error)
+
+  defp required_text(l10n, error) do
+    case L10n.error(l10n, "is required", []) do
+      "is required" -> last_line(Exception.message(error))
+      translated -> translated
+    end
+  end
 
   defp vars_bindings(vars) when is_map(vars) or is_list(vars) do
     for {key, value} <- vars, is_atom(key), do: {key, var_string(value)}

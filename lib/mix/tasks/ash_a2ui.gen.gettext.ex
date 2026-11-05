@@ -93,7 +93,7 @@ defmodule Mix.Tasks.AshA2ui.Gen.Gettext do
       |> File.read!()
       |> String.split("\n\n")
       |> Enum.filter(&String.contains?(&1, "msgid \""))
-      |> Enum.reject(&(&1 |> String.trim() |> String.starts_with?("msgid \"\"")))
+      |> Enum.reject(&(&1 =~ ~r/^msgid ""$/m))
       |> Enum.map_join("\n\n", &String.trim/1)
 
     @marker <> "\n" <> entries <> "\n\n"
@@ -120,7 +120,6 @@ defmodule Mix.Tasks.AshA2ui.Gen.Gettext do
     ## This file is a PO Template file.
     ##
     ## Run `mix gettext.merge priv/gettext --locale LOCALE` to merge into a .po file.
-
     msgid ""
     msgstr ""
     "Content-Type: text/plain; charset=UTF-8\\n"

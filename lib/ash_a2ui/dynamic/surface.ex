@@ -28,13 +28,14 @@ defmodule AshA2ui.Dynamic.Surface do
   allowlists, authorized reads, `authorize?: true` Ash calls).
   """
 
-  defstruct [:surface_id, :resource, :title, :spec, :dsl_state]
+  defstruct [:surface_id, :resource, :title, :spec, :dsl_state, imported?: false]
 
   @type t :: %__MODULE__{
           surface_id: String.t(),
           resource: module,
           title: String.t() | nil,
           spec: map,
-          dsl_state: map
+          dsl_state: map,
+          imported?: boolean
         }
 end

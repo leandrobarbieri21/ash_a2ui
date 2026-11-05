@@ -587,15 +587,17 @@ locale. The `{backend, domain}` domain is the library's; labels use
 `metadata_domain:` (default `"a2ui_metadata"`). For a translation layer that
 is not Gettext, pass `gettext_fn: {Module, :function}` instead: when
 `function/4` is exported it is called as
-`function(msgid, bindings, locale, meta)`, and `meta[:domain]` (`"ash_a2ui"`
-or the metadata domain) and `meta[:context]` (a `msgctxt`, for values whose
-labels are homographs) tell the messages apart. Ids, paths, enum and option
+`function(msgid, bindings, locale, meta)`, and `meta[:domain]` (`"ash_a2ui"`,
+the metadata domain, or Ash's errors domain) and `meta[:context]` (a
+`msgctxt`: `"enum:<module>"` or `"one_of:<field>"` for a value's label,
+`"select_context"` for a context's row button) tell the messages apart. Ids, paths, enum and option
 values, action and field names and record data are never translated, and a
 missing translation falls back to the English text. ash_a2ui does not depend
 on `:gettext`; your app does. The
 [localization usage rules](usage-rules/localization.md) have the details.
-Ash's own error messages are translated separately, with
-`mix ash.gen.gettext`.
+Ash's own field error messages are looked up by their own msgid in the
+`errors` domain (`errors_domain:` to change it), where
+`mix ash.gen.gettext --domain errors` merges Ash's catalog.
 
 ## Positioning: is this the right tool?
 

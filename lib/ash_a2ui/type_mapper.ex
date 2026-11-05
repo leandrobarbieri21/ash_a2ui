@@ -74,15 +74,31 @@ defmodule AshA2ui.TypeMapper do
   in rows and board lane headings, so all three agree for the same value.
 
   With an `l10n` (see `AshA2ui.L10n`) each label is translated, once, in the
-  metadata domain: an enum's under the msgctxt `"enum:" <> module` (so
-  homographs translate separately), a `one_of` value's without one. The
+  metadata domain, under a msgctxt so that a value's label and an action's
+  label of the same word translate separately: an enum's under
+  `"enum:" <> module`, a `one_of` value's under `"one_of:" <> name`. The
   values are never translated.
   """
   @spec choices(module | map, atom, AshA2ui.L10n.t()) :: [{atom | String.t(), String.t()}]
   def choices(resource, name, l10n \\ nil) do
     case ResourceInfo.attribute(resource, name) || ResourceInfo.calculation(resource, name) do
-      %{type: type} = field -> type_choices(type, field.constraints, l10n)
+      %{type: type} = field -> type_choices(type, field.constraints, l10n, name)
       nil -> []
+    end
+  end
+
+  @doc """
+  The msgctxt the labels of the enumerated field `name` of `resource` are
+  translated under (see `choices/3`), or `nil` when it enumerates nothing.
+  """
+  @spec choice_context(module | map, atom) :: String.t() | nil
+  def choice_context(resource, name) do
+    case ResourceInfo.attribute(resource, name) || ResourceInfo.calculation(resource, name) do
+      %{type: type, constraints: constraints} ->
+        context(Ash.Type.get_type(type), constraints, name)
+
+      nil ->
+        nil
     end
   end
 
@@ -90,19 +106,30 @@ defmodule AshA2ui.TypeMapper do
   The enumerated choices of an Ash type and its constraints (an action
   argument's, say), labelled exactly like `choices/2`: an `Ash.Type.Enum`'s
   values, else a `one_of` constraint's. `[]` when the type enumerates none.
+  `name` is the argument's name, for the msgctxt of a `one_of` value's label.
   """
-  @spec type_choices(module | atom, keyword, AshA2ui.L10n.t()) ::
+  @spec type_choices(module | atom, keyword, AshA2ui.L10n.t(), atom | nil) ::
           [{atom | String.t(), String.t()}]
-  def type_choices(type, constraints, l10n \\ nil) do
+  def type_choices(type, constraints, l10n \\ nil, name \\ nil) do
     type = Ash.Type.get_type(type)
 
+    context = context(type, constraints, name)
+
     if enum_type?(type) do
-      context = "enum:" <> Atom.to_string(type)
       Enum.map(type.values(), &{&1, Label.translate(l10n, enum_label(type, &1), context)})
     else
       constraints
       |> one_of()
-      |> Enum.map(&{&1, Label.resolve(l10n, nil, &1)})
+      |> Enum.map(&{&1, Label.resolve(l10n, nil, &1, context)})
+    end
+  end
+
+  defp context(type, constraints, name) do
+    cond do
+      enum_type?(type) -> "enum:" <> Atom.to_string(type)
+      one_of(constraints) == [] -> nil
+      is_nil(name) -> "one_of"
+      true -> "one_of:" <> to_string(name)
     end
   end
 

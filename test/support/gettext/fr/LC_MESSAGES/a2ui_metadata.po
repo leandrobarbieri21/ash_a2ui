@@ -15,3 +15,13 @@ msgstr "Ouvrir"
 msgctxt "enum:Elixir.MyApp.Status"
 msgid "Open"
 msgstr "Ouvert"
+
+msgid "Name (standalone)"
+msgstr "Nom (autonome)"
+
+msgid "Statuses update nightly."
+msgstr "Les statuts sont mis à jour chaque nuit."
+
+msgctxt "one_of:status"
+msgid "Open"
+msgstr "Ouvert"

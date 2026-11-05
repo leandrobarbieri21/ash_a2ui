@@ -5,19 +5,22 @@
 ##
 ## Run `mix ash_a2ui.gettext.extract_metadata` to refresh this file.
 ## Run `mix gettext.merge priv/gettext --locale LOCALE` to merge into a .po file.
-
 msgid ""
 msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: a2ui_metadata\n"
 
-#: test/support/diagram_flow.ex:114
-#: test/support/hub_ui.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
 #: test/support/promotion.ex:1
 #: test/support/referral.ex:1
+msgid "Active"
+msgstr ""
+
+#: test/support/diagram_flow.ex:114
+#: test/support/hub_ui.ex:1
+msgctxt "one_of:status"
 msgid "Active"
 msgstr ""
 
@@ -53,6 +56,15 @@ msgstr ""
 msgid "Approve"
 msgstr ""
 
+#: test/support/bulk_presets_ui.ex:1
+msgid "Approved"
+msgstr ""
+
+#: test/support/submission.ex:1
+msgctxt "one_of:state"
+msgid "Approved"
+msgstr ""
+
 #: test/support/bulk_cards_ui.ex:1
 #: test/support/bulk_presets_ui.ex:1
 #: test/support/bulk_tasks_ui.ex:1
@@ -60,9 +72,13 @@ msgstr ""
 #: test/support/live_filters_ui.ex:1
 #: test/support/referral.ex:1
 #: test/support/sort_only_ui.ex:1
-#: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+msgctxt "one_of:status"
 msgid "Approved"
+msgstr ""
+
+#: test/support/bulk_presets_ui.ex:1
+msgid "Archived"
 msgstr ""
 
 #: test/support/board_task_ui.ex:1
@@ -70,9 +86,9 @@ msgstr ""
 #: test/support/board_task_ui.ex:189
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
-#: test/support/bulk_presets_ui.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
+msgctxt "one_of:status"
 msgid "Archived"
 msgstr ""
 
@@ -134,6 +150,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:189
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
+#: test/support/l10n_review_fixtures.ex:2
 msgid "Board task"
 msgstr ""
 
@@ -143,7 +160,12 @@ msgid "Body"
 msgstr ""
 
 #: test/support/calendar_event.ex:182
+msgid "Booked"
+msgstr ""
+
+#: test/support/calendar_event.ex:182
 #: test/support/calendar_event.ex:80
+msgctxt "one_of:status"
 msgid "Booked"
 msgstr ""
 
@@ -154,6 +176,7 @@ msgid "Bucket word"
 msgstr ""
 
 #: test/support/paginated.ex:1
+msgctxt "one_of:category"
 msgid "Bug"
 msgstr ""
 
@@ -168,6 +191,7 @@ msgstr ""
 
 #: test/support/calendar_event.ex:182
 #: test/support/calendar_event.ex:80
+msgctxt "one_of:status"
 msgid "Cancelled"
 msgstr ""
 
@@ -215,6 +239,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:189
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
+msgctxt "one_of:status"
 msgid "Claimed"
 msgstr ""
 
@@ -237,10 +262,15 @@ msgid "Clinic"
 msgstr ""
 
 #: test/support/links.ex:135
+#: test/support/referral.ex:1
+msgid "Closed"
+msgstr ""
+
+#: test/support/links.ex:135
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/paginated.ex:1
-#: test/support/referral.ex:1
+msgctxt "one_of:status"
 msgid "Closed"
 msgstr ""
 
@@ -269,6 +299,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
 #: test/support/word_report_ui.ex:82
+msgctxt "one_of:status"
 msgid "Completed"
 msgstr ""
 
@@ -281,7 +312,12 @@ msgid "Confirm"
 msgstr ""
 
 #: test/support/calendar_event.ex:182
+msgid "Confirmed"
+msgstr ""
+
+#: test/support/calendar_event.ex:182
 #: test/support/calendar_event.ex:80
+msgctxt "one_of:status"
 msgid "Confirmed"
 msgstr ""
 
@@ -329,6 +365,7 @@ msgid "Decline referral"
 msgstr ""
 
 #: test/support/referral.ex:1
+msgctxt "one_of:status"
 msgid "Declined"
 msgstr ""
 
@@ -369,6 +406,11 @@ msgstr ""
 msgid "Display title"
 msgstr ""
 
+#: test/support/review_item.ex:1
+msgctxt "one_of:state"
+msgid "Done"
+msgstr ""
+
 #: test/support/adoption.ex:243
 #: test/support/adoption.ex:356
 #: test/support/adoption.ex:394
@@ -378,7 +420,7 @@ msgstr ""
 #: test/support/adoption_ui.ex:77
 #: test/support/column_task.ex:1
 #: test/support/diagram_flow.ex:114
-#: test/support/review_item.ex:1
+msgctxt "one_of:status"
 msgid "Done"
 msgstr ""
 
@@ -386,11 +428,16 @@ msgstr ""
 msgid "Done items"
 msgstr ""
 
+#: test/support/submission.ex:1
+msgctxt "one_of:state"
+msgid "Draft"
+msgstr ""
+
 #: test/support/article.ex:1
 #: test/support/hub_ui.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
-#: test/support/submission.ex:1
+msgctxt "one_of:status"
 msgid "Draft"
 msgstr ""
 
@@ -399,6 +446,7 @@ msgid "Due on"
 msgstr ""
 
 #: test/support/column_task.ex:1
+msgctxt "one_of:status_detail"
 msgid "Due soon"
 msgstr ""
 
@@ -454,10 +502,12 @@ msgid "Everything"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114
+msgctxt "one_of:status"
 msgid "Executing"
 msgstr ""
 
 #: test/support/hub_ui.ex:1
+msgctxt "one_of:status"
 msgid "Expired"
 msgstr ""
 
@@ -466,6 +516,7 @@ msgid "Expires"
 msgstr ""
 
 #: test/support/hub_ui.ex:1
+msgctxt "one_of:status"
 msgid "Expiring soon"
 msgstr ""
 
@@ -474,10 +525,12 @@ msgid "Explode"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114
+msgctxt "one_of:status"
 msgid "Failed"
 msgstr ""
 
 #: test/support/paginated.ex:1
+msgctxt "one_of:category"
 msgid "Feature"
 msgstr ""
 
@@ -514,6 +567,8 @@ msgstr ""
 #: test/support/board_task_ui.ex:133
 #: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
+#: test/support/l10n_review_fixtures.ex:2
+msgctxt "one_of:priority"
 msgid "High"
 msgstr ""
 
@@ -591,12 +646,6 @@ msgstr ""
 msgid "Login"
 msgstr ""
 
-#: test/support/adoption.ex:243
-#: test/support/adoption.ex:394
-#: test/support/adoption_ui.ex:77
-#: test/support/board_task_ui.ex:1
-#: test/support/board_task_ui.ex:133
-#: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
 msgid "Low"
 msgstr ""
@@ -606,6 +655,18 @@ msgstr ""
 #: test/support/board_task_ui.ex:189
 #: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Severity"
+msgid "Low"
+msgstr ""
+
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:52
+#: test/support/column_task.ex:1
+#: test/support/l10n_review_fixtures.ex:2
+msgctxt "one_of:priority"
 msgid "Low"
 msgstr ""
 
@@ -649,6 +710,7 @@ msgstr ""
 #: test/support/hub_ui.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/l10n_review_fixtures.ex:2
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/minimal.ex:1
@@ -665,6 +727,7 @@ msgid "Name (standalone)"
 msgstr ""
 
 #: test/support/review_item.ex:1
+msgctxt "one_of:state"
 msgid "New"
 msgstr ""
 
@@ -697,6 +760,7 @@ msgid "Node"
 msgstr ""
 
 #: test/support/column_task.ex:1
+msgctxt "one_of:status_detail"
 msgid "None"
 msgstr ""
 
@@ -704,6 +768,7 @@ msgstr ""
 #: test/support/adoption.ex:394
 #: test/support/adoption_ui.ex:77
 #: test/support/column_task.ex:1
+msgctxt "one_of:priority"
 msgid "Normal"
 msgstr ""
 
@@ -735,6 +800,11 @@ msgstr ""
 msgid "Offline"
 msgstr ""
 
+#: test/support/hub_ui.ex:1
+#: test/support/links.ex:135
+msgid "Open"
+msgstr ""
+
 #: test/support/adoption.ex:243
 #: test/support/adoption.ex:356
 #: test/support/adoption.ex:394
@@ -751,7 +821,6 @@ msgstr ""
 #: test/support/bulk_presets_ui.ex:1
 #: test/support/bulk_tasks_ui.ex:1
 #: test/support/column_task.ex:1
-#: test/support/hub_ui.ex:1
 #: test/support/linked_filters_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:267
@@ -760,10 +829,12 @@ msgstr ""
 #: test/support/paginated.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+msgctxt "one_of:status"
 msgid "Open"
 msgstr ""
 
 #: test/support/column_task.ex:1
+msgctxt "one_of:status_detail"
 msgid "Overdue"
 msgstr ""
 
@@ -806,6 +877,11 @@ msgid "Patient"
 msgstr ""
 
 #: test/support/referral.ex:1
+msgid "Pending"
+msgstr ""
+
+#: test/support/referral.ex:1
+msgctxt "one_of:status"
 msgid "Pending"
 msgstr ""
 
@@ -862,6 +938,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:133
 #: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
+#: test/support/l10n_review_fixtures.ex:2
 msgid "Priority"
 msgstr ""
 
@@ -901,6 +978,7 @@ msgstr ""
 #: test/support/article.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
+msgctxt "one_of:status"
 msgid "Published"
 msgstr ""
 
@@ -937,10 +1015,12 @@ msgstr ""
 #: test/support/live_filters_ui.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+msgctxt "one_of:status"
 msgid "Rejected"
 msgstr ""
 
 #: test/support/hub_ui.ex:1
+msgctxt "one_of:status"
 msgid "Renewal scheduled"
 msgstr ""
 
@@ -976,6 +1056,7 @@ msgstr ""
 
 #: test/support/appointments_ui.ex:1
 #: test/support/word_report_ui.ex:82
+msgctxt "one_of:status"
 msgid "Scheduled"
 msgstr ""
 
@@ -1129,6 +1210,10 @@ msgstr ""
 msgid "Status label"
 msgstr ""
 
+#: test/support/hub_ui.ex:1
+msgid "Statuses update nightly."
+msgstr ""
+
 #: test/support/enrollment.ex:151
 #: test/support/links.ex:135
 #: test/support/links.ex:206
@@ -1146,6 +1231,7 @@ msgid "Submission"
 msgstr ""
 
 #: test/support/submission.ex:1
+msgctxt "one_of:state"
 msgid "Submitted"
 msgstr ""
 
@@ -1300,6 +1386,7 @@ msgid "Visits in flight"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114
+msgctxt "one_of:status"
 msgid "Waiting"
 msgstr ""
 

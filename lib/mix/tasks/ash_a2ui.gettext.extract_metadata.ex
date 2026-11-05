@@ -5,8 +5,11 @@ defmodule Mix.Tasks.AshA2ui.Gettext.ExtractMetadata do
 
   Display metadata is the text your surfaces show that you own: declared
   labels and the labels ash_a2ui humanizes from field, action and component
-  names (headings, columns, fields, actions, contexts, groups, steps and
-  query presets). ash_a2ui's own strings ship separately, in the catalog
+  names: headings, columns, fields, actions, contexts, groups and steps;
+  enum and `one_of` choice labels (under a `msgctxt`), column help, row
+  icon, detail and badge text, descriptions, placeholders and filter hints,
+  empty states, query presets, board lane headings and canvas registry
+  labels. ash_a2ui's own strings ship separately, in the catalog
   `mix ash_a2ui.gen.gettext` copies.
 
   The task resolves and renders every surface of the current application
