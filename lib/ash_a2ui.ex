@@ -994,7 +994,9 @@ defmodule AshA2ui do
         doc: """
         A table field holding how many values the cell's field has (a
         `count` aggregate beside a `first` one): when it is 2 or more the
-        grid adds a "+N more" tag, N being the count minus one.
+        grid adds a "+N more" tag, N being the count minus one. Rows carry
+        the tag's text, translated and pluralized, at `_more_text_<column>`
+        (the binding's `textPath`).
         """
       ],
       detail: [
@@ -1062,7 +1064,9 @@ defmodule AshA2ui do
         type: :string,
         doc: """
         The plural noun for that list's caption ("3 properties"). The column
-        carries `\"moreNoun\"`.
+        carries `\"moreNoun\"`, and each row its caption, translated, at
+        `_more_caption_<column>` (the binding's `captionPath`). The caption
+        shows only for two values or more, so the noun is always plural.
         """
       ],
       sort_by: [

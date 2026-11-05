@@ -512,7 +512,9 @@ defmodule AshA2ui.Dynamic.Parser do
     end
   end
 
-  # An option that is a name when present and absent when not.
+  # An option that is a name when present and absent when not. `key` is the
+  # option's name, a literal in this module, never spec input.
+  # sobelow_skip ["DOS.StringToAtom"]
   defp optional_name(entry, key, path) do
     case Map.fetch(entry, key) do
       {:ok, value} ->
@@ -715,18 +717,17 @@ defmodule AshA2ui.Dynamic.Parser do
 
   def split_mfa_string(_mfa), do: :error
 
+  # Bounded by the regex and byte size before each atom is created; the
+  # existence check below then requires the atoms to already exist.
+  # sobelow_skip ["DOS.StringToAtom"]
   defp via_mfa(mfa, via_path) when is_binary(mfa) do
     case split_mfa_string(mfa) do
       {:ok, {module, function, arity}} ->
-        # Bounded by the regex and byte size before the atom is created; the
-        # existence check below then requires the atom to already exist.
-        # sobelow_skip ["DOS.StringToAtom"]
         module_atom =
           if byte_size(module) <= @max_via_module_bytes,
             do: String.to_atom("Elixir." <> module),
             else: nil
 
-        # sobelow_skip ["DOS.StringToAtom"]
         function_atom =
           if byte_size(function) <= @max_name_bytes,
             do: String.to_atom(function),
@@ -1097,11 +1098,11 @@ defmodule AshA2ui.Dynamic.Parser do
     ArgumentError -> :error
   end
 
+  # Bounded by the spec limits; see the moduledoc.
+  # sobelow_skip ["DOS.StringToAtom"]
   defp convert_name(_option, value, _path)
        when is_binary(value) and byte_size(value) <= @max_name_bytes do
     if value =~ @name_regex do
-      # Bounded by the spec limits; see the moduledoc.
-      # sobelow_skip ["DOS.StringToAtom"]
       {:ok, String.to_atom(value)}
     else
       :error

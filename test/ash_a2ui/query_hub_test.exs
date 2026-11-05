@@ -320,7 +320,10 @@ defmodule AshA2ui.QueryHubTest do
 
       assert property["more"] == %{
                "path" => "line_count",
-               "valuesPath" => "_more_values_property_name"
+               "valuesPath" => "_more_values_property_name",
+               "textPath" => "_more_text_property_name",
+               "captionPath" => "_more_caption_property_name",
+               "labelPath" => "_more_label_property_name"
              }
 
       assert components["data_grid"]["rowClick"]["width"] == 96

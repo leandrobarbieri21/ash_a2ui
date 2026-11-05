@@ -627,6 +627,7 @@ defmodule AshA2ui.QueryRunner do
   end
 
   # Bounded: one atom per option index, reused across filters and runs.
+  # sobelow_skip ["DOS.StringToAtom"]
   defp facet_key(index), do: String.to_atom("a2ui_facet_#{index}")
 
   defp group_counts(query, name, leaf_counts) do
