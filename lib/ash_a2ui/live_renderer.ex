@@ -78,7 +78,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         `:ash_a2ui_locale` and passed to every surface, data-model and
         action call as `:locale`; ash_a2ui never reads the ambient Gettext
         locale. Defaults to `nil` (no locale).
-      * `:gettext_backend` / `:gettext_fn` / `:metadata_domain` (optional)
+      * `:gettext_backend` / `:gettext_fn` / `:metadata_domain` / `:errors_domain` (optional)
         — the translator for the library's own strings and the host's
         display labels, passed to every call (see
         `AshA2ui.Info.build_surface/2` and `AshA2ui.L10n`), e.g.
@@ -280,7 +280,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         open_surface_url: Keyword.get(opts, :open_surface_url),
         header: Keyword.get(opts, :header, true),
         locale_fn: Keyword.get(opts, :locale_fn) || fn _socket -> nil end,
-        l10n: Keyword.take(opts, [:gettext_backend, :gettext_fn, :metadata_domain]),
+        l10n:
+          Keyword.take(opts, [:gettext_backend, :gettext_fn, :metadata_domain, :errors_domain]),
         surface_fn: Keyword.get(opts, :surface_fn, &AshA2ui.Info.build_surface/2),
         data_model_fn: Keyword.get(opts, :data_model_fn, &AshA2ui.Info.build_data_model/2),
         action_fn: Keyword.get(opts, :action_fn, &AshA2ui.ActionHandler.handle/3)

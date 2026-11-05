@@ -165,6 +165,8 @@ defmodule AshA2ui.Info do
     * `:metadata_domain` — the domain the host's display labels are looked
       up in, with either translator. Defaults to `"a2ui_metadata"`; the
       catalog is written by `mix ash_a2ui.gettext.extract_metadata`.
+    * `:errors_domain` — the domain Ash's error messages are looked up in
+      (`ActionHandler` feedback). Defaults to `"errors"`; see `AshA2ui.L10n`.
 
       Only display text is translated: declared and derived labels, titles,
       the library's chrome (buttons, pagination, empty states) and feedback

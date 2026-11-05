@@ -293,7 +293,7 @@ defmodule AshA2ui.ActionHandler do
       reports, exports) run at that instant; every action that writes, or
       opens a form that would, is refused with feedback, because the write
       would land on the present while the reader looks at the past.
-    * `:locale` / `:gettext_backend` / `:gettext_fn` / `:metadata_domain` —
+    * `:locale` / `:gettext_backend` / `:gettext_fn` / `:metadata_domain` / `:errors_domain` —
       translate the feedback, status lines and any re-rendered chrome (see
       `AshA2ui.Info.build_surface/2`). Pass the same values the surface was
       built with.
@@ -2086,14 +2086,23 @@ defmodule AshA2ui.ActionHandler do
   defp bulk_error_text(_view, text) when is_binary(text), do: text
 
   defp bulk_error_text(view, error) do
-    case field_errors(error) do
+    case field_errors(view.l10n, error) do
       [] ->
         view |> error_messages(error) |> feedback_message()
 
       fields ->
-        Enum.map_join(fields, "; ", fn {segments, text} ->
-          Enum.map_join(segments, ".", &to_string/1) <> ": " <> text
-        end)
+        view.l10n
+        |> L10n.join(
+          for(
+            {segments, text} <- fields,
+            do:
+              t(view, msg("%{field}: %{message}"),
+                field: Enum.map_join(segments, ".", &to_string/1),
+                message: text
+              )
+          ),
+          msg("%{first}; %{rest}")
+        )
     end
   end
 
@@ -2682,7 +2691,7 @@ defmodule AshA2ui.ActionHandler do
 
   defp cell_error_mirrors(view, table, field, record_id, value, error, env) do
     text =
-      Enum.find_value(field_errors(error), fn
+      Enum.find_value(field_errors(view.l10n, error), fn
         {[^field], text} -> text
         _other_field -> nil
       end)
@@ -2739,7 +2748,8 @@ defmodule AshA2ui.ActionHandler do
       reached = AshA2ui.Wizard.reached_fields(view, index)
 
       errors =
-        Enum.filter(field_errors(%{errors: changeset.errors}), fn {[field | _rest], _text} ->
+        Enum.filter(field_errors(view.l10n, %{errors: changeset.errors}), fn {[field | _rest],
+                                                                              _text} ->
           MapSet.member?(reached, field)
         end)
 
@@ -2819,7 +2829,7 @@ defmodule AshA2ui.ActionHandler do
   # panel label — the write already ran against the context's recordId).
   defp wizard_submit_failure(%{submitted: submitted, view: view}, error) do
     if AshA2ui.Wizard.stepped?(view) do
-      fields = for {[field | _rest], _text} <- field_errors(error), do: field
+      fields = for {[field | _rest], _text} <- field_errors(view.l10n, error), do: field
 
       index =
         AshA2ui.Wizard.earliest_owning_index(view, fields) || AshA2ui.Wizard.last_index(view)
@@ -3290,7 +3300,7 @@ defmodule AshA2ui.ActionHandler do
         )
       ]
     else
-      field_errors = field_errors(error)
+      field_errors = field_errors(view.l10n, error)
 
       field_messages =
         for {segments, text} <- field_errors do
@@ -3364,7 +3374,7 @@ defmodule AshA2ui.ActionHandler do
        when is_map(submitted) do
     indexed =
       error
-      |> field_errors()
+      |> then(&field_errors(view.l10n, &1))
       |> Enum.filter(&match?({[_argument, index, _field], _text} when is_integer(index), &1))
       |> Enum.group_by(fn {[argument, _index, _field], _text} -> to_string(argument) end)
 
@@ -3426,35 +3436,35 @@ defmodule AshA2ui.ActionHandler do
   # internals: it is logged server-side and reads as "The action failed."
   defp general_messages(view, error) do
     error
-    |> general_messages()
+    |> leaf_messages(view.l10n)
     |> Enum.map(fn
       :concealed -> t(view, msg("The action failed."))
       message -> message
     end)
   end
 
-  defp general_messages(%{errors: errors}) when is_list(errors),
-    do: Enum.flat_map(errors, &general_messages/1)
+  defp leaf_messages(%{errors: errors}, l10n) when is_list(errors),
+    do: Enum.flat_map(errors, &leaf_messages(&1, l10n))
 
-  defp general_messages(%{field: field}) when not is_nil(field), do: []
-  defp general_messages(%{fields: [_ | _]}), do: []
-  defp general_messages(message) when is_binary(message), do: [message]
+  defp leaf_messages(%{field: field}, _l10n) when not is_nil(field), do: []
+  defp leaf_messages(%{fields: [_ | _]}, _l10n), do: []
+  defp leaf_messages(message, _l10n) when is_binary(message), do: [message]
 
-  defp general_messages(%UnknownError{error: message} = error)
+  defp leaf_messages(%UnknownError{error: message} = error, _l10n)
        when is_binary(message) do
     if String.starts_with?(message, ["** (", "unknown error: "]),
       do: concealed_message(error),
       else: [message]
   end
 
-  defp general_messages(%{class: :invalid} = error) when is_exception(error) do
-    case error_text(error) do
+  defp leaf_messages(%{class: :invalid} = error, l10n) when is_exception(error) do
+    case error_text(l10n, error) do
       "" -> []
       text -> [text]
     end
   end
 
-  defp general_messages(error), do: concealed_message(error)
+  defp leaf_messages(error, _l10n), do: concealed_message(error)
 
   defp concealed_message(error) do
     Logger.error(fn ->
@@ -3476,26 +3486,29 @@ defmodule AshA2ui.ActionHandler do
   # e.g. `[:notes, 0]`) with the field appended — so a top-level error maps
   # to `/errors/<field>` exactly as before, and a nested-row error to
   # `/errors/<argument>/<index>/<field>`.
-  defp field_errors(error) do
+  defp field_errors(l10n, error) do
     error
-    |> collect_field_errors()
+    |> collect_field_errors(l10n)
     |> Enum.group_by(fn {segments, _text} -> segments end, fn {_segments, text} -> text end)
-    |> Enum.map(fn {segments, texts} -> {segments, Enum.join(Enum.uniq(texts), "; ")} end)
+    |> Enum.map(fn {segments, texts} ->
+      {segments, L10n.join(l10n, Enum.uniq(texts), msg("%{first}; %{rest}"))}
+    end)
   end
 
-  defp collect_field_errors(%{errors: errors}) when is_list(errors) do
-    Enum.flat_map(errors, &collect_field_errors/1)
+  defp collect_field_errors(%{errors: errors}, l10n) when is_list(errors) do
+    Enum.flat_map(errors, &collect_field_errors(&1, l10n))
   end
 
-  defp collect_field_errors(%{field: field} = error) when not is_nil(field) do
-    [{error_path(error) ++ [field], error_text(error)}]
+  defp collect_field_errors(%{field: field} = error, l10n) when not is_nil(field) do
+    [{error_path(error) ++ [field], error_text(l10n, error)}]
   end
 
-  defp collect_field_errors(%{fields: fields} = error) when is_list(fields) and fields != [] do
-    Enum.map(fields, &{error_path(error) ++ [&1], error_text(error)})
+  defp collect_field_errors(%{fields: fields} = error, l10n)
+       when is_list(fields) and fields != [] do
+    Enum.map(fields, &{error_path(error) ++ [&1], error_text(l10n, error)})
   end
 
-  defp collect_field_errors(_error), do: []
+  defp collect_field_errors(_error, _l10n), do: []
 
   defp error_path(error) do
     case Map.get(error, :path) do
@@ -3504,24 +3517,24 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp error_text(%{message: message} = error) when is_binary(message) do
-    interpolate(message, Map.get(error, :vars))
+  # The message is the error's template: translated in the errors domain
+  # under its own msgid (Ash's), with its `vars` as bindings.
+  defp error_text(l10n, %{message: message} = error) when is_binary(message) do
+    L10n.error(l10n, message, vars_bindings(Map.get(error, :vars)))
   end
 
   # Splode prepends a "Bread Crumbs:" preamble to Exception.message/1; the
   # human-readable message is the last non-empty line.
-  defp error_text(error) when is_exception(error), do: last_line(Exception.message(error))
-  defp error_text(error), do: inspect(error)
+  defp error_text(_l10n, error) when is_exception(error),
+    do: last_line(Exception.message(error))
 
-  defp interpolate(message, vars) do
-    Enum.reduce(vars_list(vars), message, fn {key, value}, acc ->
-      String.replace(acc, "%{#{key}}", var_string(value))
-    end)
+  defp error_text(_l10n, error), do: inspect(error)
+
+  defp vars_bindings(vars) when is_map(vars) or is_list(vars) do
+    for {key, value} <- vars, is_atom(key), do: {key, var_string(value)}
   end
 
-  defp vars_list(vars) when is_map(vars), do: Map.to_list(vars)
-  defp vars_list(vars) when is_list(vars), do: vars
-  defp vars_list(_vars), do: []
+  defp vars_bindings(_vars), do: []
 
   defp var_string(value) when is_binary(value), do: value
   defp var_string(value), do: inspect(value)

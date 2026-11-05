@@ -12,1130 +12,1345 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: a2ui_metadata\n"
 
-#: test/support/diagram_flow.ex
-#: test/support/hub_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/promotion.ex
-#: test/support/referral.ex
+#: test/support/diagram_flow.ex:114
+#: test/support/hub_ui.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/promotion.ex:1
+#: test/support/referral.ex:1
 msgid "Active"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:121
 msgid "All"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:135
+#: test/support/links.ex:230
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Amount"
 msgstr ""
 
-#: test/support/adoption.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
 msgid "Annotate"
 msgstr ""
 
-#: test/support/appointments_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/appointments_ui.ex:1
+#: test/support/word_report_ui.ex:82
 msgid "Appointment"
 msgstr ""
 
-#: test/support/appointments_ui.ex
+#: test/support/appointments_ui.ex:1
 msgid "Appointment detail"
 msgstr ""
 
-#: test/support/bucket_words_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/referral.ex
-#: test/support/review_item.ex
+#: test/support/bucket_words_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/referral.ex:1
+#: test/support/review_item.ex:1
 msgid "Approve"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/live_filters_ui.ex
-#: test/support/referral.ex
-#: test/support/sort_only_ui.ex
-#: test/support/submission.ex
-#: test/support/tabbed_presets_ui.ex
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/live_filters_ui.ex:1
+#: test/support/referral.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/submission.ex:1
+#: test/support/tabbed_presets_ui.ex:1
 msgid "Approved"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Archived"
 msgstr ""
 
-#: test/support/article.ex
+#: test/support/article.ex:1
 msgid "Article"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/adoption_ui.ex:6
 msgid "Assign"
 msgstr ""
 
-#: test/support/adoption.ex
+#: test/support/adoption.ex:243
 msgid "Assign a clerk"
 msgstr ""
 
-#: test/support/adoption_ui.ex
+#: test/support/adoption_ui.ex:31
 msgid "Assign clerk"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Assignee name"
 msgstr ""
 
-#: test/support/post.ex
+#: test/support/post.ex:1
 msgid "Author email"
 msgstr ""
 
-#: test/support/enrollment.ex
-#: test/support/post.ex
-#: test/support/ticket.ex
-#: test/support/ticket_search_ui.ex
+#: test/support/enrollment.ex:151
+#: test/support/post.ex:1
+#: test/support/ticket.ex:1
+#: test/support/ticket_search_ui.ex:1
 msgid "Author id"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Birthday"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Blog"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
 msgid "Board"
 msgstr ""
 
-#: test/support/board_task_ui.ex
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
 msgid "Board task"
 msgstr ""
 
-#: test/support/links.ex
-#: test/support/ticket.ex
+#: test/support/links.ex:135
+#: test/support/ticket.ex:1
 msgid "Body"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:80
 msgid "Booked"
 msgstr ""
 
-#: test/support/editable_words_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/editable_words_ui.ex:1
+#: test/support/editable_words_ui.ex:26
+#: test/support/word_report_ui.ex:51
 msgid "Bucket word"
 msgstr ""
 
-#: test/support/paginated.ex
+#: test/support/paginated.ex:1
 msgid "Bug"
 msgstr ""
 
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/live_filters_ui.ex
-#: test/support/sort_only_ui.ex
-#: test/support/tabbed_presets_ui.ex
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/live_filters_ui.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/tabbed_presets_ui.ex:1
 msgid "Bulk task"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:80
 msgid "Cancelled"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Canvas Test App"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Catalog"
 msgstr ""
 
-#: test/support/paginated.ex
+#: test/support/paginated.ex:1
 msgid "Category"
 msgstr ""
 
-#: test/support/time_travel.ex
+#: test/support/time_travel.ex:47
 msgid "Change tier"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:152
 msgid "Check in"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:295
+#: test/support/adoption.ex:315
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
 msgid "Claim"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
 msgid "Claimed"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Clear search and filters"
 msgstr ""
 
-#: test/support/adoption_ui.ex
+#: test/support/adoption_ui.ex:6
 msgid "Clerk"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/adoption_ui.ex:31
 msgid "Clerk id"
 msgstr ""
 
-#: test/support/appointments_ui.ex
+#: test/support/appointments_ui.ex:1
 msgid "Clinic"
 msgstr ""
 
-#: test/support/links.ex
-#: test/support/paginated.ex
-#: test/support/referral.ex
+#: test/support/links.ex:135
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+#: test/support/paginated.ex:1
+#: test/support/referral.ex:1
 msgid "Closed"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Code"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Column task"
 msgstr ""
 
-#: test/support/article.ex
+#: test/support/article.ex:1
 msgid "Comment count"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/canvas.ex
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/canvas.ex:172
 msgid "Complete"
 msgstr ""
 
-#: test/support/appointments_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/appointments_ui.ex:1
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
+#: test/support/word_report_ui.ex:82
 msgid "Completed"
 msgstr ""
 
-#: test/support/calendar_event.ex
-#: test/support/enrollment.ex
+#: test/support/calendar_event.ex:80
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:151
+#: test/support/enrollment.ex:79
 msgid "Confirm"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:80
 msgid "Confirmed"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Contact email"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Contract"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Contract status"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Contracts you add show here."
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/review_item.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/review_item.ex:1
 msgid "Count"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Create"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Created"
 msgstr ""
 
-#: test/support/board_task_ui.ex
+#: test/support/board_task_ui.ex:133
 msgid "Critical"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Decline"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Decline referral"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Declined"
 msgstr ""
 
-#: test/support/prompt_scope.ex
+#: test/support/prompt_scope.ex:132
+#: test/support/prompt_scope.ex:161
+#: test/support/prompt_scope.ex:190
+#: test/support/prompt_scope.ex:220
 msgid "Delegate"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Deleted"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
-#: test/support/article.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/canvas.ex
-#: test/support/enrollment.ex
-#: test/support/experience_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/paginated.ex
-#: test/support/post.ex
-#: test/support/promotion.ex
-#: test/support/review_item.ex
+#: test/support/action_handler_fixtures.ex:194
+#: test/support/action_handler_fixtures.ex:22
+#: test/support/action_handler_fixtures.ex:67
+#: test/support/article.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/canvas.ex:172
+#: test/support/enrollment.ex:112
+#: test/support/experience_ui.ex:10
+#: test/support/experience_ui.ex:136
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/paginated.ex:1
+#: test/support/post.ex:1
+#: test/support/promotion.ex:1
+#: test/support/review_item.ex:1
 msgid "Destroy"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Details"
 msgstr ""
 
-#: test/support/article.ex
+#: test/support/article.ex:1
 msgid "Display title"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/column_task.ex
-#: test/support/diagram_flow.ex
-#: test/support/review_item.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
+#: test/support/column_task.ex:1
+#: test/support/diagram_flow.ex:114
+#: test/support/review_item.ex:1
 msgid "Done"
 msgstr ""
 
-#: test/support/review_item.ex
+#: test/support/review_item.ex:1
 msgid "Done items"
 msgstr ""
 
-#: test/support/article.ex
-#: test/support/hub_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/submission.ex
+#: test/support/article.ex:1
+#: test/support/hub_ui.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/submission.ex:1
 msgid "Draft"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Due on"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Due soon"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Due {date}"
 msgstr ""
 
-#: test/support/appointments_ui.ex
-#: test/support/enrollment.ex
+#: test/support/appointments_ui.ex:1
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:79
 msgid "Email"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:151
 msgid "Ends at"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:80
 msgid "Ends on"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Ends soon"
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
 msgid "Enrollment"
 msgstr ""
 
-#: test/support/enum_types.ex
+#: test/support/enum_types.ex:15
 msgid "Enum record"
 msgstr ""
 
-#: test/support/adoption.ex
+#: test/support/adoption.ex:243
 msgid "Escalate"
 msgstr ""
 
-#: test/support/experience_ui.ex
+#: test/support/experience_ui.ex:190
 msgid "Estate user"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:151
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:218
+#: test/support/calendar_event.ex:80
 msgid "Event"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
+#: test/support/bulk_cards_ui.ex:1
 msgid "Everything"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Executing"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Expired"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Expires"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Expiring soon"
 msgstr ""
 
-#: test/support/adoption.ex
+#: test/support/adoption.ex:295
 msgid "Explode"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Failed"
 msgstr ""
 
-#: test/support/paginated.ex
+#: test/support/paginated.ex:1
 msgid "Feature"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/submission.ex
+#: test/support/adoption.ex:243
+#: test/support/submission.ex:1
 msgid "Finish"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "First tag"
 msgstr ""
 
-#: test/support/bulk_tasks_ui.ex
+#: test/support/bulk_tasks_ui.ex:1
 msgid "Flag"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:138
+#: test/support/diagram_flow.ex:161
 msgid "Flow"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:67
 msgid "Gadget"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:67
 msgid "Generate secret"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/column_task.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:52
+#: test/support/column_task.ex:1
 msgid "High"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "High priority"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Hub contract"
 msgstr ""
 
-#: test/support/enum_types.ex
+#: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Stage"
 msgid "In Progress"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Inactive"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
+#: test/support/bulk_cards_ui.ex:1
 msgid "Inbox"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Inserted at"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Is active"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:295
+#: test/support/adoption.ex:315
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
 msgid "Job"
 msgstr ""
 
-#: test/support/adoption_ui.ex
+#: test/support/adoption_ui.ex:77
 msgid "Job card"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Kitchen sink"
 msgstr ""
 
-#: test/support/word_report_ui.ex
+#: test/support/word_report_ui.ex:1
+#: test/support/word_report_ui.ex:23
 msgid "Length"
 msgstr ""
 
-#: test/support/word_report_ui.ex
+#: test/support/word_report_ui.ex:1
+#: test/support/word_report_ui.ex:23
 msgid "Lengths"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Line count"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption_ui.ex:31
 msgid "Lock"
 msgstr ""
 
-#: test/support/experience_ui.ex
+#: test/support/experience_ui.ex:190
 msgid "Login"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/column_task.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:52
+#: test/support/column_task.ex:1
 msgid "Low"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/enum_types.ex
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Severity"
 msgid "Low"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/enum_types.ex
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Severity"
 msgid "Medium"
 msgstr ""
 
-#: test/support/word_report_ui.ex
+#: test/support/word_report_ui.ex:1
+#: test/support/word_report_ui.ex:23
 msgid "Min length"
 msgstr ""
 
-#: test/support/minimal.ex
-#: test/support/minimal_ui.ex
+#: test/support/minimal.ex:1
+#: test/support/minimal_ui.ex:1
 msgid "Minimal"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
-#: test/support/appointments_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/enrollment.ex
-#: test/support/enum_types.ex
-#: test/support/experience_ui.ex
-#: test/support/hub_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/links.ex
-#: test/support/minimal.ex
-#: test/support/minimal_ui.ex
-#: test/support/paginated.ex
-#: test/support/promotion.ex
-#: test/support/review_item.ex
-#: test/support/time_travel.ex
+#: test/support/action_handler_fixtures.ex:152
+#: test/support/action_handler_fixtures.ex:194
+#: test/support/action_handler_fixtures.ex:22
+#: test/support/action_handler_fixtures.ex:67
+#: test/support/appointments_ui.ex:1
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:79
+#: test/support/enum_types.ex:15
+#: test/support/experience_ui.ex:10
+#: test/support/experience_ui.ex:101
+#: test/support/experience_ui.ex:136
+#: test/support/experience_ui.ex:61
+#: test/support/hub_ui.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+#: test/support/minimal.ex:1
+#: test/support/minimal_ui.ex:1
+#: test/support/paginated.ex:1
+#: test/support/promotion.ex:1
+#: test/support/review_item.ex:1
+#: test/support/time_travel.ex:47
 msgid "Name"
 msgstr ""
 
-#: test/support/minimal_ui.ex
+#: test/support/minimal_ui.ex:1
 msgid "Name (standalone)"
 msgstr ""
 
-#: test/support/review_item.ex
+#: test/support/review_item.ex:1
 msgid "New"
 msgstr ""
 
-#: test/support/review_item.ex
+#: test/support/review_item.ex:1
 msgid "New items"
 msgstr ""
 
-#: test/support/bucket_words_ui.ex
+#: test/support/bucket_words_ui.ex:1
 msgid "New words"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "No archived contracts"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "No contracts yet"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "No results"
 msgstr ""
 
-#: test/support/experience_ui.ex
+#: test/support/experience_ui.ex:61
 msgid "No update"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Node"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "None"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/column_task.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/column_task.ex:1
 msgid "Normal"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/links.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/links.ex:135
+#: test/support/links.ex:206
+#: test/support/links.ex:230
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Note"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:135
 msgid "Note detail"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Note title"
 msgstr ""
 
-#: test/support/referral.ex
-#: test/support/ticket.ex
+#: test/support/referral.ex:1
+#: test/support/ticket.ex:1
 msgid "Notes"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:138
 msgid "Offline"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/column_task.ex
-#: test/support/hub_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/links.ex
-#: test/support/live_filters_ui.ex
-#: test/support/paginated.ex
-#: test/support/sort_only_ui.ex
-#: test/support/tabbed_presets_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/column_task.ex:1
+#: test/support/hub_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/links.ex:135
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+#: test/support/live_filters_ui.ex:1
+#: test/support/paginated.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/tabbed_presets_ui.ex:1
 msgid "Open"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Overdue"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Overdue since {date}"
 msgstr ""
 
-#: test/support/appointments_ui.ex
+#: test/support/appointments_ui.ex:1
 msgid "Owner"
 msgstr ""
 
-#: test/support/appointments_ui.ex
+#: test/support/appointments_ui.ex:1
 msgid "Owner card"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Page"
 msgstr ""
 
-#: test/support/paginated.ex
+#: test/support/paginated.ex:1
 msgid "Paginated"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
 msgid "Participant links"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:135
+#: test/support/links.ex:267
 msgid "Participants"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Participations"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Patient"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Pending"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:135
+#: test/support/links.ex:230
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Person"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
 msgid "Person detail"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:135
 msgid "Person id"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:230
 msgid "Person name"
 msgstr ""
 
-#: test/support/time_travel.ex
+#: test/support/time_travel.ex:47
 msgid "Plan"
 msgstr ""
 
-#: test/support/post.ex
+#: test/support/post.ex:1
 msgid "Post"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Posts"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Price"
 msgstr ""
 
-#: test/support/prompt_scope.ex
+#: test/support/prompt_scope.ex:132
+#: test/support/prompt_scope.ex:190
 msgid "Principal"
 msgstr ""
 
-#: test/support/prompt_scope.ex
+#: test/support/prompt_scope.ex:161
+#: test/support/prompt_scope.ex:220
 msgid "Principal id"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/board_task_ui.ex
-#: test/support/column_task.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:77
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:52
+#: test/support/column_task.ex:1
 msgid "Priority"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Product"
 msgstr ""
 
-#: test/support/bulk_tasks_ui.ex
+#: test/support/bulk_tasks_ui.ex:1
 msgid "Project"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Promotion"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Property"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Property name"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Property names"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
-#: test/support/experience_ui.ex
+#: test/support/action_handler_fixtures.ex:22
+#: test/support/experience_ui.ex:136
 msgid "Protected"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Publish summary"
 msgstr ""
 
-#: test/support/article.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/article.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Published"
 msgstr ""
 
-#: test/support/ticket.ex
+#: test/support/ticket.ex:1
 msgid "Rating"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Read"
 msgstr ""
 
-#: test/support/experience_ui.ex
+#: test/support/experience_ui.ex:101
 msgid "Read only"
 msgstr ""
 
-#: test/support/prompt_scope.ex
+#: test/support/prompt_scope.ex:161
 msgid "Reassign"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Referral"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
 msgid "Reject"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/live_filters_ui.ex
-#: test/support/sort_only_ui.ex
-#: test/support/tabbed_presets_ui.ex
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/live_filters_ui.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/tabbed_presets_ui.ex:1
 msgid "Rejected"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Renewal scheduled"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Renews soon"
 msgstr ""
 
-#: test/support/bucket_words_ui.ex
-#: test/support/editable_words_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/bucket_words_ui.ex:1
+#: test/support/bucket_words_ui.ex:60
+#: test/support/editable_words_ui.ex:1
+#: test/support/editable_words_ui.ex:26
+#: test/support/word_report_ui.ex:51
 msgid "Replacement"
 msgstr ""
 
-#: test/support/adoption.ex
+#: test/support/adoption.ex:243
 msgid "Reprioritize"
 msgstr ""
 
-#: test/support/submission.ex
+#: test/support/submission.ex:1
 msgid "Review"
 msgstr ""
 
-#: test/support/review_item.ex
+#: test/support/review_item.ex:1
 msgid "Review item"
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:79
 msgid "Role"
 msgstr ""
 
-#: test/support/appointments_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/appointments_ui.ex:1
+#: test/support/word_report_ui.ex:82
 msgid "Scheduled"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Scheduled at"
 msgstr ""
 
-#: test/support/appointments_ui.ex
+#: test/support/appointments_ui.ex:1
 msgid "Scheduled for"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Scheduling"
 msgstr ""
 
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/live_filters_ui.ex
-#: test/support/sort_only_ui.ex
-#: test/support/tabbed_presets_ui.ex
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/live_filters_ui.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/tabbed_presets_ui.ex:1
 msgid "Score"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Search contracts or vendors"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/enum_types.ex
+#: test/support/appointments_ui.ex:1
+msgctxt "select_context"
+msgid "Select appointment"
+msgstr ""
+
+#: test/support/hub_ui.ex:1
+msgctxt "select_context"
+msgid "Select contract"
+msgstr ""
+
+#: test/support/adoption_ui.ex:77
+msgctxt "select_context"
+msgid "Select job"
+msgstr ""
+
+#: test/support/links.ex:135
+msgctxt "select_context"
+msgid "Select note"
+msgstr ""
+
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+msgctxt "select_context"
+msgid "Select person"
+msgstr ""
+
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/enum_types.ex:15
 msgid "Severity"
 msgstr ""
 
-#: test/support/article.ex
+#: test/support/article.ex:1
 msgid "Shout title"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Slug"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Soft delete"
 msgstr ""
 
-#: test/support/enum_types.ex
+#: test/support/enum_types.ex:15
 msgid "Stage"
 msgstr ""
 
-#: test/support/bulk_presets_ui.ex
+#: test/support/bulk_presets_ui.ex:1
 msgid "Stamp"
 msgstr ""
 
-#: test/support/canvas.ex
+#: test/support/canvas.ex:172
 msgid "Start"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:121
+#: test/support/calendar_event.ex:151
 msgid "Starts at"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:218
+#: test/support/calendar_event.ex:80
 msgid "Starts on"
 msgstr ""
 
-#: test/support/review_item.ex
-#: test/support/submission.ex
-#: test/support/word_report_ui.ex
+#: test/support/review_item.ex:1
+#: test/support/submission.ex:1
+#: test/support/word_report_ui.ex:1
+#: test/support/word_report_ui.ex:23
 msgid "State"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/appointments_ui.ex
-#: test/support/article.ex
-#: test/support/board_task_ui.ex
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/calendar_event.ex
-#: test/support/column_task.ex
-#: test/support/diagram_flow.ex
-#: test/support/hub_ui.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/links.ex
-#: test/support/live_filters_ui.ex
-#: test/support/paginated.ex
-#: test/support/referral.ex
-#: test/support/sort_only_ui.ex
-#: test/support/tabbed_presets_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/action_handler_fixtures.ex:152
+#: test/support/adoption.ex:243
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
+#: test/support/appointments_ui.ex:1
+#: test/support/article.ex:1
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/board_task_ui.ex:52
+#: test/support/board_task_ui.ex:88
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:80
+#: test/support/column_task.ex:1
+#: test/support/diagram_flow.ex:114
+#: test/support/hub_ui.ex:1
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/links.ex:135
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+#: test/support/live_filters_ui.ex:1
+#: test/support/paginated.ex:1
+#: test/support/referral.ex:1
+#: test/support/sort_only_ui.ex:1
+#: test/support/tabbed_presets_ui.ex:1
+#: test/support/word_report_ui.ex:82
 msgid "Status"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Status detail"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Status help"
 msgstr ""
 
-#: test/support/referral.ex
+#: test/support/referral.ex:1
 msgid "Status label"
 msgstr ""
 
-#: test/support/enrollment.ex
-#: test/support/links.ex
-#: test/support/ticket.ex
-#: test/support/ticket_search_ui.ex
+#: test/support/enrollment.ex:151
+#: test/support/links.ex:135
+#: test/support/links.ex:206
+#: test/support/ticket.ex:1
+#: test/support/ticket_search_ui.ex:1
 msgid "Subject"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:206
 msgid "Subject label"
 msgstr ""
 
-#: test/support/submission.ex
+#: test/support/submission.ex:1
 msgid "Submission"
 msgstr ""
 
-#: test/support/submission.ex
+#: test/support/submission.ex:1
 msgid "Submitted"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Table"
 msgstr ""
 
-#: test/support/column_task.ex
+#: test/support/column_task.ex:1
 msgid "Tag count"
 msgstr ""
 
-#: test/support/ticket.ex
-#: test/support/ticket_search_ui.ex
+#: test/support/ticket.ex:1
+#: test/support/ticket_search_ui.ex:1
 msgid "Tags"
 msgstr ""
 
-#: test/support/adoption_ui.ex
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
 msgid "Take it"
 msgstr ""
 
-#: test/support/canvas.ex
-#: test/support/experience_ui.ex
-#: test/support/prompt_scope.ex
+#: test/support/canvas.ex:172
+#: test/support/experience_ui.ex:10
+#: test/support/prompt_scope.ex:132
+#: test/support/prompt_scope.ex:161
+#: test/support/prompt_scope.ex:190
+#: test/support/prompt_scope.ex:220
 msgid "Task"
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:79
 msgid "Team"
 msgstr ""
 
-#: test/support/links.ex
+#: test/support/links.ex:267
+#: test/support/links.ex:333
 msgid "Their notes"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
-#: test/support/ticket.ex
-#: test/support/ticket_search_ui.ex
+#: test/support/action_handler_fixtures.ex:152
+#: test/support/ticket.ex:1
+#: test/support/ticket_search_ui.ex:1
 msgid "Ticket"
 msgstr ""
 
-#: test/support/time_travel.ex
+#: test/support/time_travel.ex:47
 msgid "Tier"
 msgstr ""
 
-#: test/support/adoption.ex
-#: test/support/adoption_ui.ex
-#: test/support/appointments_ui.ex
-#: test/support/article.ex
-#: test/support/bulk_cards_ui.ex
-#: test/support/bulk_presets_ui.ex
-#: test/support/bulk_tasks_ui.ex
-#: test/support/calendar_event.ex
-#: test/support/column_task.ex
-#: test/support/linked_filters_ui.ex
-#: test/support/links.ex
-#: test/support/live_filters_ui.ex
-#: test/support/post.ex
-#: test/support/prompt_scope.ex
-#: test/support/sort_only_ui.ex
-#: test/support/submission.ex
-#: test/support/tabbed_presets_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/adoption.ex:243
+#: test/support/adoption.ex:295
+#: test/support/adoption.ex:315
+#: test/support/adoption.ex:335
+#: test/support/adoption.ex:356
+#: test/support/adoption.ex:394
+#: test/support/adoption_ui.ex:31
+#: test/support/adoption_ui.ex:57
+#: test/support/adoption_ui.ex:6
+#: test/support/adoption_ui.ex:77
+#: test/support/appointments_ui.ex:1
+#: test/support/article.ex:1
+#: test/support/bulk_cards_ui.ex:1
+#: test/support/bulk_presets_ui.ex:1
+#: test/support/bulk_tasks_ui.ex:1
+#: test/support/calendar_event.ex:121
+#: test/support/calendar_event.ex:151
+#: test/support/calendar_event.ex:182
+#: test/support/calendar_event.ex:218
+#: test/support/calendar_event.ex:80
+#: test/support/column_task.ex:1
+#: test/support/linked_filters_ui.ex:1
+#: test/support/links.ex:135
+#: test/support/links.ex:206
+#: test/support/links.ex:230
+#: test/support/links.ex:267
+#: test/support/links.ex:333
+#: test/support/live_filters_ui.ex:1
+#: test/support/post.ex:1
+#: test/support/prompt_scope.ex:132
+#: test/support/prompt_scope.ex:161
+#: test/support/prompt_scope.ex:190
+#: test/support/prompt_scope.ex:220
+#: test/support/sort_only_ui.ex:1
+#: test/support/submission.ex:1
+#: test/support/tabbed_presets_ui.ex:1
+#: test/support/word_report_ui.ex:82
 msgid "Title"
 msgstr ""
 
-#: test/support/enum_types.ex
+#: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Stage"
 msgid "To Do"
 msgstr ""
 
-#: test/support/board_task_ui.ex
+#: test/support/board_task_ui.ex:1
+#: test/support/board_task_ui.ex:133
 msgid "To do"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:194
 msgid "Touch"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:194
 msgid "Touched"
 msgstr ""
 
-#: test/support/promotion.ex
+#: test/support/promotion.ex:1
 msgid "Trial days"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Try other words or filters."
 msgstr ""
 
-#: test/support/canvas.ex
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/canvas.ex:172
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Update"
 msgstr ""
 
-#: test/support/kitchen_sink.ex
-#: test/support/kitchen_sink_v1_ui.ex
+#: test/support/kitchen_sink.ex:1
+#: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Updated at"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Vendor"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Verified"
 msgstr ""
 
-#: test/support/board_task_ui.ex
-#: test/support/enum_types.ex
+#: test/support/board_task_ui.ex:111
+#: test/support/board_task_ui.ex:133
+#: test/support/board_task_ui.ex:189
+#: test/support/enum_types.ex:15
 msgctxt "enum:Elixir.AshA2ui.Test.Severity"
 msgid "Very high"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Visit"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Visits in flight"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Waiting"
 msgstr ""
 
-#: test/support/calendar_event.ex
+#: test/support/calendar_event.ex:121
 msgid "Week"
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:151
+#: test/support/enrollment.ex:79
 msgid "What"
 msgstr ""
 
-#: test/support/diagram_flow.ex
+#: test/support/diagram_flow.ex:114
 msgid "Where every visit is right now."
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "Where the work happens.\n\n**Portfolio** — every property of the account."
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
+#: test/support/enrollment.ex:112
+#: test/support/enrollment.ex:151
+#: test/support/enrollment.ex:79
 msgid "Who"
 msgstr ""
 
-#: test/support/enrollment.ex
+#: test/support/enrollment.ex:1
 msgid "Who is enrolling?"
 msgstr ""
 
-#: test/support/action_handler_fixtures.ex
+#: test/support/action_handler_fixtures.ex:194
 msgid "Widget"
 msgstr ""
 
-#: test/support/bucket_words_ui.ex
-#: test/support/editable_words_ui.ex
-#: test/support/word_report_ui.ex
+#: test/support/bucket_words_ui.ex:1
+#: test/support/bucket_words_ui.ex:60
+#: test/support/editable_words_ui.ex:1
+#: test/support/editable_words_ui.ex:26
+#: test/support/word_report_ui.ex:1
+#: test/support/word_report_ui.ex:23
+#: test/support/word_report_ui.ex:51
 msgid "Word"
 msgstr ""
 
-#: test/support/experience_ui.ex
+#: test/support/experience_ui.ex:190
 msgid "legacy user"
 msgstr ""
 
-#: test/support/hub_ui.ex
+#: test/support/hub_ui.ex:1
 msgid "properties"
 msgstr ""

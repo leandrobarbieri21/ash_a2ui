@@ -103,13 +103,10 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     extracted = surface |> Metadata.surface_messages() |> MapSet.new()
 
     # A surface also collects the labels a record or a query state selects
-    # (an enum's every label, empty states), so a build shows a subset. A
-    # context heading is shown in lower case.
+    # (an enum's every label, empty states), so a build shows a subset.
     msgids = MapSet.new(extracted, fn {_context, msgid} -> msgid end)
-    folded = MapSet.new(msgids, &String.downcase/1)
 
-    missing =
-      Enum.reject(shown, fn {_context, msgid} -> msgid in msgids or msgid in folded end)
+    missing = Enum.reject(shown, fn {_context, msgid} -> msgid in msgids end)
 
     assert missing == [], "#{name}: not extracted: #{inspect(missing)}"
   end
@@ -165,9 +162,9 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     )
   end
 
-  defp strip(string), do: String.replace(string, ["⟦", "⟧", "⟪", "⟫"], "")
+  defp strip(string), do: String.replace(string, ["⟦", "⟧", "⟪", "⟫", "⟨", "⟩"], "")
 
-  # Parses the ⟦⟧ and ⟪⟫ groups into a tree and looks for a group whose
+  # Parses the ⟦⟧, ⟪⟫ and ⟨⟩ groups into a tree and looks for a group whose
   # whole content is one other group.
   defp double_wrapped?(string) do
     {nodes, ""} = parse(string, [])
@@ -181,6 +178,7 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
   defp parse("", acc), do: {Enum.reverse(acc), ""}
   defp parse("⟧" <> rest, acc), do: {Enum.reverse(acc), "⟧" <> rest}
   defp parse("⟫" <> rest, acc), do: {Enum.reverse(acc), "⟫" <> rest}
+  defp parse("⟩" <> rest, acc), do: {Enum.reverse(acc), "⟩" <> rest}
 
   defp parse("⟦" <> rest, acc) do
     {children, "⟧" <> rest} = parse(rest, [])
@@ -189,6 +187,11 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
 
   defp parse("⟪" <> rest, acc) do
     {children, "⟫" <> rest} = parse(rest, [])
+    parse(rest, [{:group, children} | acc])
+  end
+
+  defp parse("⟨" <> rest, acc) do
+    {children, "⟩" <> rest} = parse(rest, [])
     parse(rest, [{:group, children} | acc])
   end
 

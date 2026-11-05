@@ -1,0 +1,7 @@
+msgid ""
+msgstr ""
+"Language: fr\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "must be greater than or equal to %{greater_than_or_equal_to}"
+msgstr "doit être supérieur ou égal à %{greater_than_or_equal_to}"

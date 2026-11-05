@@ -2995,8 +2995,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # the task panel's own row control.
   defp context_select_label(view, name),
     do:
-      t(view, msg("Select %{context}"),
-        context: String.downcase(Label.resolve(view.l10n, nil, name))
+      Label.translate(
+        view.l10n,
+        "Select " <> String.downcase(Label.humanize(name)),
+        "select_context"
       )
 
   # A cell is a labeled pair: a caption Text with the humanized field name

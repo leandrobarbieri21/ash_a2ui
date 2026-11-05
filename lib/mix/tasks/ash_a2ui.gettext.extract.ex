@@ -80,7 +80,8 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
 
   @doc """
   Every marked msgid under `root`, mapped to its `msgid_plural` (or `nil`)
-  and the unique list of files (relative to `root`) it appears in.
+  and the unique `file:line` references (files relative to `root`) it
+  appears at, in source order.
   """
   @spec extract_messages(Path.t()) :: %{String.t() => {String.t() | nil, [String.t()]}}
   def extract_messages(root \\ File.cwd!()) do
@@ -99,30 +100,32 @@ defmodule Mix.Tasks.AshA2ui.Gettext.Extract do
     end)
   end
 
-  defp add_message(acc, {msgid, plural}, file) do
-    Map.update(acc, msgid, {plural, [file]}, fn {plural, files} ->
-      {plural, Enum.uniq(files ++ [file])}
+  defp add_message(acc, {msgid, plural, line}, file) do
+    reference = "#{file}:#{line}"
+
+    Map.update(acc, msgid, {plural, [reference]}, fn {plural, references} ->
+      {plural, Enum.uniq(references ++ [reference])}
     end)
   end
 
   defp msgids(ast) do
     {_, found} =
       Macro.prewalk(ast, [], fn
-        {:msg, _meta, [msgid]} = node, acc when is_binary(msgid) ->
-          {node, [{msgid, nil} | acc]}
+        {:msg, meta, [msgid]} = node, acc when is_binary(msgid) ->
+          {node, [{msgid, nil, meta[:line]} | acc]}
 
-        {:msg_plural, _meta, [msgid, plural]} = node, acc
+        {:msg_plural, meta, [msgid, plural]} = node, acc
         when is_binary(msgid) and is_binary(plural) ->
-          {node, [{msgid, plural} | acc]}
+          {node, [{msgid, plural, meta[:line]} | acc]}
 
-        {{:., _, [{:__aliases__, _, [:AshA2ui, :Gettext]}, name]}, _meta, args} = node, acc
+        {{:., _, [{:__aliases__, _, [:AshA2ui, :Gettext]}, name]}, meta, args} = node, acc
         when name in [:msg, :msg_plural] ->
           case args do
             [msgid] when is_binary(msgid) ->
-              {node, [{msgid, nil} | acc]}
+              {node, [{msgid, nil, meta[:line]} | acc]}
 
             [msgid, plural] when is_binary(msgid) and is_binary(plural) ->
-              {node, [{msgid, plural} | acc]}
+              {node, [{msgid, plural, meta[:line]} | acc]}
 
             _dynamic ->
               {node, acc}

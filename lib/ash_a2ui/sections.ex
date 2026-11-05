@@ -189,6 +189,11 @@ defmodule AshA2ui.Sections do
       |> AshA2ui.Board.swimlanes(config.swimlanes, l10n)
       |> Enum.take(div(config.limit, max(length(lanes), 1)))
 
+    plain_lanes = plain_labels(AshA2ui.Board.lanes(config.resource, config), l10n)
+
+    plain_swimlanes =
+      plain_labels(AshA2ui.Board.swimlanes(config.resource, config.swimlanes), l10n)
+
     for swimlane <- swimlanes, lane <- lanes do
       name = AshA2ui.Board.cell_name(table.name, lane.value, swimlane.value)
       label = section_string(lane.label)
@@ -200,7 +205,11 @@ defmodule AshA2ui.Sections do
         component: %{table.component | as: name},
         records_path: "/records/#{name}",
         query_path: table.query && "/query/#{name}",
-        export: section_export(table, "#{label} #{swimlane.label}"),
+        export:
+          section_export(
+            table,
+            "#{plain_lanes[lane.value] || label} #{plain_swimlanes[swimlane.value] || swimlane.label}"
+          ),
         section: %{
           value: lane.value,
           label: label,
@@ -219,7 +228,12 @@ defmodule AshA2ui.Sections do
     end
   end
 
-  defp expand_table(table, config, section_records, _l10n) do
+  defp expand_table(table, config, section_records, l10n) do
+    plain_lanes =
+      if config.source == nil,
+        do: plain_labels(AshA2ui.Board.lanes(config.resource, config), l10n),
+        else: %{}
+
     Enum.map(section_records, fn record ->
       value = Map.get(record, config.value)
       name = section_name(table.name, value)
@@ -232,7 +246,7 @@ defmodule AshA2ui.Sections do
         component: %{table.component | as: name},
         records_path: "/records/#{name}",
         query_path: table.query && "/query/#{name}",
-        export: section_export(table, label),
+        export: section_export(table, plain_lanes[value] || label),
         section: %{
           value: value,
           label: label,
@@ -242,6 +256,11 @@ defmodule AshA2ui.Sections do
       })
     end)
   end
+
+  # Lane headings are translated for display, but a filename stays an
+  # identifier: `%{value => untranslated heading}`, only when translating.
+  defp plain_labels(_lanes, nil), do: %{}
+  defp plain_labels(lanes, _l10n), do: Map.new(lanes, &{&1.value, section_string(&1.label)})
 
   # Each expanded table's export downloads its own section: the template's
   # declared filename gains a sanitized section-label suffix (or, when

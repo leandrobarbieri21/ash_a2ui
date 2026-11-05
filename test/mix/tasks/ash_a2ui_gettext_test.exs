@@ -22,8 +22,14 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
     test "carries every marked string once, with file references" do
       messages = Extract.extract_messages()
 
-      assert messages["Save changes"] == {nil, ["lib/ash_a2ui/experience.ex"]}
-      assert "lib/ash_a2ui/encoder/v0_9_1.ex" in elem(messages["Cancel"], 1)
+      assert {nil, [reference]} = messages["Save changes"]
+      assert reference =~ ~r{^lib/ash_a2ui/experience\.ex:\d+$}
+
+      assert Enum.any?(
+               elem(messages["Cancel"], 1),
+               &(&1 =~ ~r{^lib/ash_a2ui/encoder/v0_9_1\.ex:\d+$})
+             )
+
       assert Map.has_key?(messages, "%{first}–%{last} of %{total}")
 
       pot = File.read!(@shipped)
@@ -130,7 +136,7 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
       assert pot == File.read!(@metadata_golden), "the metadata template changed"
       assert pot =~ ~s("Domain: a2ui_metadata\\n")
       # A humanized resource heading, a declared column label, an action.
-      assert pot =~ ~s(#: test/support/bulk_tasks_ui.ex\n)
+      assert pot =~ ~r{^#: test/support/bulk_tasks_ui\.ex:\d+$}m
       assert length(Regex.scan(~r/^msgid "Bulk task"$/m, pot)) == 1
       # Library strings are in ash_a2ui.pot, not here.
       refute pot =~ ~s(msgid "Save changes")

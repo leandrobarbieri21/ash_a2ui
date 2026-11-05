@@ -59,7 +59,8 @@ defmodule AshA2ui.Gettext.Metadata do
 
   @doc """
   The metadata messages `surfaces` show, each mapped to the sorted source
-  files (relative to the working directory) of the surfaces showing it.
+  `file:line` references (the file relative to the working directory, the
+  line the surface's module starts at) of the surfaces showing it.
   """
   @spec messages([module]) :: %{key => [String.t()]}
   def messages(surfaces) do
@@ -193,10 +194,16 @@ defmodule AshA2ui.Gettext.Metadata do
   end
 
   defp source(module) do
-    module.module_info(:compile)
-    |> Keyword.fetch!(:source)
-    |> to_string()
-    |> Path.relative_to_cwd()
+    file =
+      module.module_info(:compile)
+      |> Keyword.fetch!(:source)
+      |> to_string()
+      |> Path.relative_to_cwd()
+
+    case Code.fetch_docs(module) do
+      {:docs_v1, anno, _, _, _, _, _} -> "#{file}:#{:erl_anno.line(anno)}"
+      _no_docs -> file
+    end
   end
 
   @doc """

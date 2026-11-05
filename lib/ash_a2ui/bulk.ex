@@ -367,8 +367,14 @@ defmodule AshA2ui.Bulk do
       )
 
     case others do
-      [] -> base <> "."
-      others -> base <> "; " <> Enum.join(others, ", ") <> "."
+      [] ->
+        L10n.t(l10n, msg("%{status}."), status: base)
+
+      others ->
+        L10n.t(l10n, msg("%{status}; %{others}."),
+          status: base,
+          others: L10n.join(l10n, others, msg("%{first}, %{rest}"))
+        )
     end
   end
 

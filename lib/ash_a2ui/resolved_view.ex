@@ -313,7 +313,8 @@ defmodule AshA2ui.ResolvedView do
     :locale,
     :gettext_fn,
     :gettext_backend,
-    :metadata_domain
+    :metadata_domain,
+    :errors_domain
   ]
 
   @doc """
@@ -332,7 +333,7 @@ defmodule AshA2ui.ResolvedView do
       declared `spec_version` for this resolve. Transports whose renderer
       only speaks one protocol version (see the External Transports topic)
       use this to pin the wire version without touching the DSL.
-    * `:locale` / `:gettext_fn` / `:gettext_backend` / `:metadata_domain` —
+    * `:locale` / `:gettext_fn` / `:gettext_backend` / `:metadata_domain` / `:errors_domain` —
       the translator (see `AshA2ui.L10n`). Display labels are translated
       here, once, in the metadata domain, and
       the translator is kept on the struct (`l10n`) for the encoder's chrome.

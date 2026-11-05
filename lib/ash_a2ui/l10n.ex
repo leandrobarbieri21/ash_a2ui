@@ -60,6 +60,11 @@ defmodule AshA2ui.L10n do
       plural rules do.
     * `:metadata_domain` — the domain host display metadata is looked up
       in. Defaults to `"a2ui_metadata"`, with either translator.
+    * `:errors_domain` — the domain an Ash error's message is looked up in,
+      by its own msgid (the error's message template, e.g. `"must be more
+      than or equal to %{min}"`) with the error's `vars` as bindings.
+      Defaults to `"errors"`, where `mix ash.gen.gettext` puts Ash's
+      catalog. Only the field errors shown to the reader are translated.
     * `:locale` — the locale to translate into, as a string (`"fr"`,
       `"fr_CA"`). ash_a2ui never reads the process's ambient Gettext
       locale: pass the one the request resolved.
@@ -75,8 +80,9 @@ defmodule AshA2ui.L10n do
 
   @library_domain "ash_a2ui"
   @default_metadata_domain "a2ui_metadata"
+  @default_errors_domain "errors"
 
-  defstruct [:translate, :locale, :domain, :metadata_domain]
+  defstruct [:translate, :locale, :domain, :metadata_domain, :errors_domain]
 
   @typedoc "`nil` for a singular message, else its plural msgid and the count."
   @type plural :: nil | {String.t(), non_neg_integer}
@@ -88,10 +94,11 @@ defmodule AshA2ui.L10n do
               translate: (String.t(), String.t() | nil, String.t(), keyword, plural -> term),
               locale: String.t() | nil,
               domain: String.t(),
-              metadata_domain: String.t()
+              metadata_domain: String.t(),
+              errors_domain: String.t()
             }
 
-  @option_keys [:gettext_fn, :gettext_backend, :metadata_domain, :locale]
+  @option_keys [:gettext_fn, :gettext_backend, :metadata_domain, :errors_domain, :locale]
 
   @doc "The option keys `new/1` reads."
   @spec option_keys() :: [atom]
@@ -116,6 +123,7 @@ defmodule AshA2ui.L10n do
   def new(opts) do
     locale = optional_string!(opts, :locale)
     metadata_domain = optional_string!(opts, :metadata_domain) || @default_metadata_domain
+    errors_domain = optional_string!(opts, :errors_domain) || @default_errors_domain
 
     case translator(opts[:gettext_fn], opts[:gettext_backend], locale) do
       nil ->
@@ -126,7 +134,8 @@ defmodule AshA2ui.L10n do
           translate: translate,
           locale: locale,
           domain: domain,
-          metadata_domain: metadata_domain
+          metadata_domain: metadata_domain,
+          errors_domain: errors_domain
         }
     end
   end
@@ -297,6 +306,36 @@ defmodule AshA2ui.L10n do
   def metadata(%__MODULE__{metadata_domain: domain} = l10n, msgid, context)
       when is_binary(msgid),
       do: translate(l10n, domain, context, msgid, [], nil)
+
+  @doc """
+  Translates the message template `msgid` of an Ash (Splode) error with
+  `l10n`, in the errors domain, filling `bindings` (the error's `vars`).
+  Without a translator, or without a translation, the interpolated `msgid`
+  is returned.
+
+      iex> AshA2ui.L10n.error(nil, "must be more than %{min}", min: "3")
+      "must be more than 3"
+  """
+  @spec error(t, String.t(), keyword) :: String.t()
+  def error(nil, msgid, bindings) when is_binary(msgid), do: interpolate(msgid, bindings)
+
+  def error(%__MODULE__{errors_domain: domain} = l10n, msgid, bindings) when is_binary(msgid),
+    do: translate(l10n, domain, nil, msgid, bindings, nil)
+
+  @doc """
+  Joins `parts` with `template`, a message with `%{first}` and `%{rest}`
+  placeholders (`msg("%{first}; %{rest}")`), so the separator is the
+  catalog's to translate. One part is returned as is; none is `""`.
+
+      iex> AshA2ui.L10n.join(nil, ["a", "b", "c"], "%{first}, %{rest}")
+      "a, b, c"
+  """
+  @spec join(t, [String.t()], String.t()) :: String.t()
+  def join(_l10n, [], _template), do: ""
+  def join(_l10n, [only], _template), do: only
+
+  def join(l10n, [first | rest], template),
+    do: t(l10n, template, first: first, rest: join(l10n, rest, template))
 
   defp translate(%__MODULE__{translate: translate}, domain, context, msgid, bindings, plural) do
     case translate.(domain, context, msgid, bindings, plural) do

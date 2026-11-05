@@ -10,6 +10,14 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **Assembled messages are catalog templates.** The bulk status line's
+  `; ` and `, ` joins, a context's "Select <context>" row label (now a host
+  display message, not a lower-cased label) and the per-record bulk failure
+  line are templates. Ash error messages are translated in the errors domain
+  (`:errors_domain`, default `"errors"`) by their own msgid with the error's
+  vars. A section's CSV filename uses the untranslated lane heading. `.pot`
+  references carry line numbers. English output is unchanged.
+
 - **Count strings are plural messages.** `AshA2ui.Gettext.msg_plural/2` marks
   a singular/plural pair and `AshA2ui.L10n.tn/5` translates it (`dngettext`
   for `:gettext_backend`). A `:gettext_fn` of arity 4 gets the singular msgid
