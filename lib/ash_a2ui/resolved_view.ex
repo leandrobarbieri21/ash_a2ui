@@ -314,7 +314,8 @@ defmodule AshA2ui.ResolvedView do
     :gettext_fn,
     :gettext_backend,
     :metadata_domain,
-    :errors_domain
+    :errors_domain,
+    :verbatim
   ]
 
   @doc """

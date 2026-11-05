@@ -74,6 +74,11 @@ defmodule AshA2ui.Dynamic do
 
   ## LLM integration
 
+  Pass `locale:` to `spec_schema/2` so the agent writes the spec's text in the
+  user's language. That text is shown as written (it is in no catalog); chrome
+  and humanized labels are still translated. `AshA2ui.Dynamic.Error` messages
+  stay English: they are for agents and developers, not readers.
+
   `spec_schema/1` returns a JSON Schema for the spec, ready to hand to an
   LLM as a tool parameter schema. `describe_resources/1` returns a compact
   JSON-able description of each allowlisted resource (fields, actions,
@@ -171,11 +176,12 @@ defmodule AshA2ui.Dynamic do
   with `spec_version: "1.0"`) a single inline `createSurface` message.
 
   Takes the same options (`:actor`, `:tenant`, `:authorize?`, `:domain`,
-  `:query_state`, `:context_state`); reads are authorized by default.
+  `:query_state`, `:context_state`, and the localization options of
+  `AshA2ui.L10n`); reads are authorized by default.
   """
   @spec build_surface(Surface.t(), keyword) :: [map]
   def build_surface(%Surface{} = surface, opts \\ []) do
-    AshA2ui.Info.build_surface(surface.dsl_state, opts)
+    AshA2ui.Info.build_surface(surface.dsl_state, verbatim(surface, opts))
   end
 
   @doc """
@@ -184,7 +190,7 @@ defmodule AshA2ui.Dynamic do
   """
   @spec build_data_model(Surface.t(), keyword) :: map
   def build_data_model(%Surface{} = surface, opts \\ []) do
-    AshA2ui.Info.build_data_model(surface.dsl_state, opts)
+    AshA2ui.Info.build_data_model(surface.dsl_state, verbatim(surface, opts))
   end
 
   @doc """
@@ -198,8 +204,26 @@ defmodule AshA2ui.Dynamic do
   """
   @spec handle_action(Surface.t(), map, keyword) :: {:ok, [map]} | {:error, [map]}
   def handle_action(%Surface{} = surface, action_message, opts \\ []) do
-    AshA2ui.ActionHandler.handle(surface.dsl_state, action_message, opts)
+    AshA2ui.ActionHandler.handle(surface.dsl_state, action_message, verbatim(surface, opts))
   end
+
+  # The text the spec's author wrote is not in any catalog: the translators
+  # return it as written, and still translate every other label and string.
+  defp verbatim(%Surface{spec: spec}, opts),
+    do: Keyword.put(opts, :verbatim, MapSet.new(authored_text(spec)))
+
+  @text_maps ["labels", "icon_labels", "swimlane_labels", "detail_text"]
+
+  defp authored_text(%{} = node) do
+    Enum.flat_map(node, fn
+      {key, value} when key in ["title", "label", "prompt_title"] and is_binary(value) -> [value]
+      {key, %{} = map} when key in @text_maps -> map |> Map.values() |> Enum.filter(&is_binary/1)
+      {_key, value} -> authored_text(value)
+    end)
+  end
+
+  defp authored_text(list) when is_list(list), do: Enum.flat_map(list, &authored_text/1)
+  defp authored_text(_leaf), do: []
 
   # --- the spec-as-artifact lifecycle ---------------------------------------------
 
@@ -452,9 +476,42 @@ defmodule AshA2ui.Dynamic do
   The JSON Schema (draft-07-compatible object schema) of the surface spec,
   ready to use as an LLM tool parameter schema. `allowlist` constrains the
   `resource` (and context `resource`) enums to the host's allowlisted names.
+
+  With `locale:` (e.g. `"fr"`), the schema description also tells the agent
+  to write the spec's text in that language. The agent's text is shown as
+  written, in every locale: `build_surface/2`, `build_data_model/2` and
+  `handle_action/3` pass it through the translators untouched (the
+  surface's `title`, and `label`, `prompt_title`, `labels`, `icon_labels`,
+  `swimlane_labels` and `detail_text` values). The labels the spec does not
+  write, and the chrome, are translated as on a declared surface.
   """
   @spec spec_schema(%{String.t() => module}) :: map
-  def spec_schema(allowlist) do
+  def spec_schema(allowlist, opts \\ []) do
+    allowlist |> base_spec_schema() |> localize_schema(Keyword.get(opts, :locale))
+  end
+
+  defp localize_schema(schema, nil), do: schema
+
+  defp localize_schema(schema, locale) do
+    Map.update!(schema, "description", &(&1 <> " " <> locale_instruction(locale)))
+  end
+
+  @doc """
+  The sentence that tells the composing agent which language to write the
+  spec's text in. `spec_schema/2` appends it for `locale:`; use it directly
+  in a system prompt.
+
+      iex> AshA2ui.Dynamic.locale_instruction("fr")
+      "Write every human-readable text (titles, labels, prompts) in the language with locale code \\"fr\\". Keep resource, field and action names and enum values exactly as listed."
+  """
+  @spec locale_instruction(String.t()) :: String.t()
+  def locale_instruction(locale) when is_binary(locale) and locale != "" do
+    "Write every human-readable text (titles, labels, prompts) in the language with " <>
+      "locale code #{inspect(locale)}. Keep resource, field and action names and enum " <>
+      "values exactly as listed."
+  end
+
+  defp base_spec_schema(allowlist) do
     resource_names = allowlist |> Map.keys() |> Enum.sort()
     name = %{"type" => "string", "pattern" => "^[a-zA-Z][a-zA-Z0-9_]*$", "maxLength" => 64}
     name_list = %{"type" => "array", "items" => name, "maxItems" => 64}

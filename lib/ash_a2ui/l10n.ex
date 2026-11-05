@@ -65,6 +65,9 @@ defmodule AshA2ui.L10n do
       than or equal to %{min}"`) with the error's `vars` as bindings.
       Defaults to `"errors"`, where `mix ash.gen.gettext` puts Ash's
       catalog. Only the field errors shown to the reader are translated.
+    * `:verbatim` — a `MapSet` of display strings the metadata translator
+      returns as written: text authored by a person or agent for this one
+      surface (see `AshA2ui.Dynamic`), which no catalog holds.
     * `:locale` — the locale to translate into, as a string (`"fr"`,
       `"fr_CA"`). ash_a2ui never reads the process's ambient Gettext
       locale: pass the one the request resolved.
@@ -82,7 +85,7 @@ defmodule AshA2ui.L10n do
   @default_metadata_domain "a2ui_metadata"
   @default_errors_domain "errors"
 
-  defstruct [:translate, :locale, :domain, :metadata_domain, :errors_domain]
+  defstruct [:translate, :locale, :domain, :metadata_domain, :errors_domain, verbatim: nil]
 
   @typedoc "`nil` for a singular message, else its plural msgid and the count."
   @type plural :: nil | {String.t(), non_neg_integer}
@@ -95,10 +98,18 @@ defmodule AshA2ui.L10n do
               locale: String.t() | nil,
               domain: String.t(),
               metadata_domain: String.t(),
-              errors_domain: String.t()
+              errors_domain: String.t(),
+              verbatim: nil | MapSet.t(String.t())
             }
 
-  @option_keys [:gettext_fn, :gettext_backend, :metadata_domain, :errors_domain, :locale]
+  @option_keys [
+    :gettext_fn,
+    :gettext_backend,
+    :metadata_domain,
+    :errors_domain,
+    :locale,
+    :verbatim
+  ]
 
   @doc "The option keys `new/1` reads."
   @spec option_keys() :: [atom]
@@ -135,7 +146,8 @@ defmodule AshA2ui.L10n do
           locale: locale,
           domain: domain,
           metadata_domain: metadata_domain,
-          errors_domain: errors_domain
+          errors_domain: errors_domain,
+          verbatim: opts[:verbatim]
         }
     end
   end
@@ -303,9 +315,12 @@ defmodule AshA2ui.L10n do
   def metadata(l10n, msgid, context \\ nil)
   def metadata(nil, msgid, _context) when is_binary(msgid), do: msgid
 
-  def metadata(%__MODULE__{metadata_domain: domain} = l10n, msgid, context)
-      when is_binary(msgid),
-      do: translate(l10n, domain, context, msgid, [], nil)
+  def metadata(%__MODULE__{metadata_domain: domain, verbatim: verbatim} = l10n, msgid, context)
+      when is_binary(msgid) do
+    if verbatim && MapSet.member?(verbatim, msgid),
+      do: msgid,
+      else: translate(l10n, domain, context, msgid, [], nil)
+  end
 
   @doc """
   Translates the message template `msgid` of an Ash (Splode) error with

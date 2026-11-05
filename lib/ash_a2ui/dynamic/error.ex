@@ -10,6 +10,9 @@ defmodule AshA2ui.Dynamic.Error do
   * `message` — the same explanation the compile-time verifier would print,
     listing what is available where that helps self-correction.
 
+  Messages are English in every locale: they are written for agents and
+  developers, never shown to a reader, and are not translated.
+
   The struct is JSON-encodable (`Jason.Encoder` over `path` + `message`), so
   hosts can feed the error list straight back to an LLM tool loop.
   """
