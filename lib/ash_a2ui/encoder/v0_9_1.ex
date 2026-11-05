@@ -1032,8 +1032,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   defp more_binding(name, cells) do
-    %{"path" => to_string(cells.more)}
-    |> maybe_put("valuesPath", if(Map.get(cells, :more_values), do: "_more_values_#{name}"))
+    values? = not is_nil(Map.get(cells, :more_values))
+
+    %{"path" => to_string(cells.more), "textPath" => "_more_text_#{name}"}
+    |> maybe_put("valuesPath", if(values?, do: "_more_values_#{name}"))
+    |> maybe_put("captionPath", if(values?, do: "_more_caption_#{name}"))
+    |> maybe_put("labelPath", if(values?, do: "_more_label_#{name}"))
   end
 
   defp icon_binding(name, cells) do

@@ -10,6 +10,9 @@ defmodule AshA2ui.Column do
   them inside the column rather than as columns of their own.
   """
 
+  import AshA2ui.Gettext, only: [msg: 1, msg_plural: 2]
+
+  alias AshA2ui.L10n
   alias AshA2ui.Label
 
   defstruct [
@@ -125,6 +128,14 @@ defmodule AshA2ui.Column do
   by the same value). A nil or unmatched value serializes as `""`: no
   icon, no detail line.
 
+  A column with a `more` count adds the "+N more" tag's text, already
+  pluralized for the reader: `"_more_text_<column>"` ("+2 more", `""`
+  below a count of 2, as the renderer's `moreCount`), and with
+  `more_values` the list's caption, `"_more_caption_<column>"` ("3
+  properties", from `more_noun`; `""` for fewer than two values), and the
+  tag's accessible label, `"_more_label_<column>"` ("+2 more, show all 3
+  properties"; the tag's text when there is no caption).
+
   Shared by the encoder and `AshA2ui.ActionHandler` (through
   `serialize_row`) so initial renders and refreshes serialize rows
   identically.
@@ -139,22 +150,86 @@ defmodule AshA2ui.Column do
 
   defp column_data(column, record, l10n) do
     icon_data(column, record, l10n) ++
-      detail_data(column, record, l10n) ++ more_values_data(column, record)
+      detail_data(column, record, l10n) ++
+      more_values_data(column, record) ++ more_text_data(column, record, l10n)
   end
 
   # `more_values`: every value behind the "+N more" tag, as strings.
-  defp more_values_data(%{more_values: field} = column, record) when not is_nil(field) do
-    values =
-      record
-      |> Map.get(field)
-      |> List.wrap()
-      |> Enum.reject(&is_nil/1)
-      |> Enum.map(&to_string/1)
-
-    [{"_more_values_#{column.name}", values}]
-  end
+  defp more_values_data(%{more_values: field} = column, record) when not is_nil(field),
+    do: [{"_more_values_#{column.name}", more_values(record, field)}]
 
   defp more_values_data(_column, _record), do: []
+
+  defp more_values(record, field) do
+    record
+    |> Map.get(field)
+    |> List.wrap()
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&to_string/1)
+  end
+
+  # The tag's words are written here, not in the renderer, because a count
+  # needs its plural form, and only the server knows the reader's locale.
+  defp more_text_data(%{more: nil}, _record, _l10n), do: []
+
+  defp more_text_data(column, record, l10n) do
+    shown = more_shown(Map.get(record, column.more))
+
+    text =
+      if shown > 0,
+        do: L10n.tn(l10n, msg_plural("+%{count} more", "+%{count} more"), shown),
+        else: ""
+
+    caption = more_caption(column, record, l10n)
+
+    label =
+      cond do
+        text == "" -> ""
+        caption == "" -> text
+        true -> L10n.t(l10n, msg("%{more}, show all %{list}"), more: text, list: caption)
+      end
+
+    [
+      {"_more_text_#{column.name}", text},
+      {"_more_caption_#{column.name}", caption},
+      {"_more_label_#{column.name}", label}
+    ]
+  end
+
+  # The values after the first: a count of 2 or more shows N - 1.
+  defp more_shown(count) when is_integer(count) and count >= 2, do: count - 1
+
+  defp more_shown(count) when is_binary(count) do
+    case Integer.parse(count) do
+      {n, ""} -> more_shown(n)
+      _other -> 0
+    end
+  end
+
+  defp more_shown(_count), do: 0
+
+  # The list's caption, for the list `more_values` holds: shown only with
+  # two values or more, so the noun is always the declared plural.
+  defp more_caption(%{more_values: nil}, _record, _l10n), do: ""
+
+  defp more_caption(column, record, l10n) do
+    case length(more_values(record, column.more_values)) do
+      count when count < 2 ->
+        ""
+
+      count ->
+        case Map.get(column, :more_noun) do
+          nil ->
+            L10n.tn(l10n, msg_plural("%{count} item", "%{count} items"), count)
+
+          noun ->
+            L10n.t(l10n, msg("%{count} %{noun}"),
+              count: count,
+              noun: Label.translate(l10n, noun)
+            )
+        end
+    end
+  end
 
   defp icon_data(%{icon: nil}, _record, _l10n), do: []
 

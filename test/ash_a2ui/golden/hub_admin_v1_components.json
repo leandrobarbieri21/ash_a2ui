@@ -181,7 +181,10 @@
             },
             "label": "Property name",
             "more": {
+              "captionPath": "_more_caption_property_name",
+              "labelPath": "_more_label_property_name",
               "path": "line_count",
+              "textPath": "_more_text_property_name",
               "valuesPath": "_more_values_property_name"
             },
             "moreNoun": "properties",

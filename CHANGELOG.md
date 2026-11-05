@@ -10,6 +10,15 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **A column's "+N more" tag is written by the server.** A column with
+  `more` adds `_more_text_<column>` to each row ("+2 more", a plural
+  message); with `more_values`, `_more_caption_<column>` ("3 properties",
+  from `more_noun`, or "3 items") and `_more_label_<column>` ("+2 more,
+  show all 3 properties", for the tag's accessible name). The column's
+  `more` binding carries `textPath`, and with `more_values` `captionPath`
+  and `labelPath`. Renderers draw these instead of assembling English; the
+  bundled admin catalog does. `moreNoun` is still sent.
+
 - **Display text has an owner.** Library strings are looked up in the
   `ash_a2ui` domain; the host's display metadata in `:metadata_domain`
   (default `"a2ui_metadata"`), written by `mix ash_a2ui.gettext.extract_metadata`.

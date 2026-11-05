@@ -1732,9 +1732,15 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         // 1.10: all the values behind the tag, listed in its title.
         const moreValues =
           typeof column.more?.valuesPath === "string" ? getByPath(row, column.more.valuesPath) : null;
-        const moreTitle = Array.isArray(moreValues)
-          ? `${moreValues.length} ${str(column.moreNoun) || "values"}: ${moreValues.join(", ")}`
-          : "";
+        // The tag's text and the list's caption arrive translated and
+        // pluralized per row (textPath, captionPath); the English forms are
+        // for a payload from before them.
+        const rowText = (path) => (typeof path === "string" ? str(getByPath(row, path)) : "");
+        const moreText = rowText(column.more?.textPath) || `+${more} more`;
+        const moreCaption =
+          rowText(column.more?.captionPath) ||
+          (Array.isArray(moreValues) ? `${moreValues.length} ${str(column.moreNoun) || "values"}` : "");
+        const moreTitle = Array.isArray(moreValues) ? `${moreCaption}: ${moreValues.join(", ")}` : "";
         const subtitle = at(column.subtitle);
         const detail = column.detail
           ? detailText(at(column.detail), column.detail.datePath ? getByPath(row, column.detail.datePath) : null)
@@ -1777,7 +1783,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             <span>${value}</span>
             ${more > 0
               ? html`<span class="am-badge" data-tone="neutral" title=${moreTitle || nothing}
-                  >+${more} more</span
+                  >${moreText}</span
                 >`
               : nothing}
           </span>

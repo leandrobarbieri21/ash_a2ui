@@ -51,7 +51,11 @@ defmodule AshA2ui.ColumnCellsTest do
                  "iconTonePath" => "_detail_icon_tone_status"
                }
              },
-             %{"label" => "First tag", "path" => "first_tag", "more" => %{"path" => "tag_count"}}
+             %{
+               "label" => "First tag",
+               "path" => "first_tag",
+               "more" => %{"path" => "tag_count", "textPath" => "_more_text_first_tag"}
+             }
            ]
   end
 
@@ -84,6 +88,7 @@ defmodule AshA2ui.ColumnCellsTest do
              "_detail_icon_tone_status" => "danger",
              "assignee_name" => "Sam Okafor",
              "tag_count" => 3,
+             "_more_text_first_tag" => "+2 more",
              "due_on" => "2026-11-01"
            } = rows["Fix the roof"]
 
@@ -96,6 +101,94 @@ defmodule AshA2ui.ColumnCellsTest do
              "_detail_icon_status" => "",
              "_detail_icon_tone_status" => "neutral"
            } = rows["Order filters"]
+  end
+
+  describe "the \"+N more\" tag's words" do
+    defmodule FrenchTag do
+      @moduledoc false
+      # A translator with French plural forms (1 is singular, 2 and up plural).
+      @library %{
+        "+%{count} more" => {"+%{count} autre", "+%{count} autres"},
+        "%{count} item" => {"%{count} élément", "%{count} éléments"},
+        "%{count} %{noun}" => "%{count} %{noun}",
+        "%{more}, show all %{list}" => "%{more}, afficher les %{list}"
+      }
+      @labels %{"properties" => "propriétés"}
+
+      def translate(msgid, bindings, _locale, meta) do
+        template =
+          case {meta[:domain], Map.get(@library, msgid), meta[:count]} do
+            {"ash_a2ui", {one, _many}, count} when count in [0, 1] -> one
+            {"ash_a2ui", {_one, many}, _count} -> many
+            {"ash_a2ui", text, _count} -> text
+            {_metadata, _none, _count} -> Map.get(@labels, msgid)
+          end
+
+        template && AshA2ui.L10n.interpolate(template, bindings)
+      end
+    end
+
+    @column %AshA2ui.Column{
+      name: :property_name,
+      more: :line_count,
+      more_values: :property_names,
+      more_noun: "properties"
+    }
+
+    defp tag(column, record, l10n \\ nil) do
+      data = AshA2ui.Column.row_data([column], record, l10n)
+
+      Map.take(
+        data,
+        ~w(_more_text_property_name _more_caption_property_name _more_label_property_name)
+      )
+    end
+
+    test "rows carry the tag's text, the list's caption and the tag's label" do
+      record = %{
+        line_count: 3,
+        property_names: ["Harbourfront Tower", "Elm Court", "Maple Plaza"]
+      }
+
+      assert tag(@column, record) == %{
+               "_more_text_property_name" => "+2 more",
+               "_more_caption_property_name" => "3 properties",
+               "_more_label_property_name" => "+2 more, show all 3 properties"
+             }
+    end
+
+    test "the count picks its plural form in the reader's language" do
+      l10n = AshA2ui.L10n.new(gettext_fn: {FrenchTag, :translate}, locale: "fr")
+      two = %{line_count: 2, property_names: ["Elm Court", "Maple Plaza"]}
+      three = %{line_count: 3, property_names: ["Harbourfront Tower", "Elm Court", "Maple Plaza"]}
+
+      assert tag(@column, two, l10n) == %{
+               "_more_text_property_name" => "+1 autre",
+               "_more_caption_property_name" => "2 propriétés",
+               "_more_label_property_name" => "+1 autre, afficher les 2 propriétés"
+             }
+
+      assert tag(@column, three, l10n)["_more_text_property_name"] == "+2 autres"
+
+      unnamed = %{@column | more_noun: nil}
+      assert tag(unnamed, three, l10n)["_more_caption_property_name"] == "3 éléments"
+    end
+
+    test "below two values there is no tag; without a list, no caption" do
+      assert tag(@column, %{line_count: 1, property_names: ["Elm Court"]}) == %{
+               "_more_text_property_name" => "",
+               "_more_caption_property_name" => "",
+               "_more_label_property_name" => ""
+             }
+
+      count_only = %{@column | more_values: nil}
+
+      assert tag(count_only, %{line_count: "4"}) == %{
+               "_more_text_property_name" => "+3 more",
+               "_more_caption_property_name" => "",
+               "_more_label_property_name" => "+3 more"
+             }
+    end
   end
 
   test "a table without columns emits no cell hints and no row keys" do
