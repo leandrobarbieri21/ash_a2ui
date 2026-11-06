@@ -33,7 +33,7 @@ defmodule AshA2ui.QueryHubTest do
       authorize?: false
     )
 
-    Ash.create!(HubRole, %{role: :pmc, party_name: "Acme PMC", contract_id: contract.id},
+    Ash.create!(HubRole, %{role: :owner, party_name: "Acme Owner", contract_id: contract.id},
       authorize?: false
     )
 
@@ -388,7 +388,7 @@ defmodule AshA2ui.QueryHubTest do
       {names, _state} = run!(%{"filters" => %{"vendor" => ["Air Co"]}})
       assert names == ["HVAC"]
 
-      {names, _state} = run!(%{"filters" => %{"vendor" => ["Acme PMC"]}})
+      {names, _state} = run!(%{"filters" => %{"vendor" => ["Acme Owner"]}})
       assert names == []
     end
 

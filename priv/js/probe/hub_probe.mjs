@@ -48,7 +48,7 @@ const arg = (name, fallback) => {
 const nodeModules = arg("node-modules", join(repoPrivJs, "../../../clinic-demo/assets/node_modules"));
 const port = Number(arg("port", "4198"));
 const executablePath = process.env.CHROME || "/usr/bin/google-chrome";
-const playwrightModule = `${process.env.PLAYWRIGHT_NODE_MODULES ?? "/home/lukegalea/vendorpm/quality-assurance/node_modules"}/playwright/index.mjs`;
+const playwrightModule = `${process.env.PLAYWRIGHT_NODE_MODULES ?? `${process.cwd()}/node_modules`}/playwright/index.mjs`;
 const {chromium} = await import(playwrightModule);
 
 const results = [];

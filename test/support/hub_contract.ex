@@ -3,7 +3,7 @@ defmodule AshA2ui.Test.HubContract do
   Fixture resource for the hub filter bar: a contract with a status (with
   groups of leaves), a verified flag, lines naming properties (a to-many
   path filter), parties of two roles (the vendor's name is a `first`
-  aggregate filtered to the vendor role, so the PMC party never matches),
+  aggregate filtered to the vendor role, so the owner party never matches),
   a module calculation shown in the status column and sorted by the
   stored status, and a `secret` flag the read policy hides.
   """

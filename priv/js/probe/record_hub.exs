@@ -32,7 +32,7 @@ for {name, status, properties, vendor, help} <- contracts do
     authorize?: false
   )
 
-  Ash.create!(HubRole, %{role: :pmc, party_name: "Acme PMC", contract_id: contract.id},
+  Ash.create!(HubRole, %{role: :owner, party_name: "Acme Owner", contract_id: contract.id},
     authorize?: false
   )
 end

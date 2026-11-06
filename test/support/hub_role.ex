@@ -1,5 +1,5 @@
 defmodule AshA2ui.Test.HubRole do
-  @moduledoc "Fixture: a party of a `AshA2ui.Test.HubContract`, as its vendor or its PMC."
+  @moduledoc "Fixture: a party of a `AshA2ui.Test.HubContract`, as its vendor or its owner."
 
   use Ash.Resource,
     domain: AshA2ui.Test.Domain,
@@ -11,7 +11,7 @@ defmodule AshA2ui.Test.HubRole do
 
   attributes do
     uuid_primary_key :id
-    attribute :role, :atom, public?: true, constraints: [one_of: [:vendor, :pmc]]
+    attribute :role, :atom, public?: true, constraints: [one_of: [:vendor, :owner]]
     attribute :party_name, :string, public?: true
   end
 

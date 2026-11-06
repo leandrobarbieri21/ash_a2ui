@@ -18,7 +18,7 @@ import {fileURLToPath} from "node:url";
 import {dirname, join} from "node:path";
 
 const url = process.argv[2] || "http://127.0.0.1:4173/nb_demo.html";
-const playwrightModule = `${process.env.PLAYWRIGHT_NODE_MODULES ?? "/home/lukegalea/vendorpm/quality-assurance/node_modules"}/playwright/index.mjs`;
+const playwrightModule = `${process.env.PLAYWRIGHT_NODE_MODULES ?? `${process.cwd()}/node_modules`}/playwright/index.mjs`;
 const {chromium} = await import(playwrightModule);
 
 const shotDir = join(dirname(fileURLToPath(import.meta.url)), "screenshots");

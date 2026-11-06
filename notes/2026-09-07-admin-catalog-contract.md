@@ -158,7 +158,7 @@ mirroring the `createAshA2ui_catalog` pattern (`priv/js/ash_a2ui_catalog.js`):
 same-Lit-instance discipline, registration under the admin catalog id so a
 surface declaring `catalogId: https://ash-a2ui.dev/catalogs/admin/v1`
 resolves its components. Study `@a2ui/lit` in the host
-(`~/vendorpm/ash_enterprise/assets/node_modules/@a2ui/lit/`, READ-ONLY) for
+(its `assets/node_modules/@a2ui/lit/`, READ-ONLY) for
 the registration surface. No new build tooling in this library — plain ES
 modules consumed by the host's esbuild, exactly like the existing JS.
 
