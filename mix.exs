@@ -11,7 +11,7 @@ defmodule AshA2ui.MixProject do
     [
       app: :ash_a2ui,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.20",
       # NO_PHOENIX builds compile a different dep set (the whole Phoenix
       # stack is stripped), so they must not share _build with normal builds:
       # a shared build dir leaves an orphaned .app referencing bandit and

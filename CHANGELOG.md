@@ -8,6 +8,8 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ## Unreleased
 
+Requires Elixir 1.20 or later.
+
 ### Features:
 
 - **A canvas registry can state what running an action does.** The
