@@ -44,14 +44,16 @@ defmodule AshA2ui.Verifiers.VerifyCalendar do
     end)
   end
 
+  @doc false
   # The resource a table reads: a related table's `resource`, else the
   # surface's (`for_resource` in a standalone module, the resource itself
-  # otherwise). `nil` when it cannot be resolved yet.
-  defp table_resource(%{resource: resource}, _dsl_state) when not is_nil(resource) do
+  # otherwise). `nil` when it cannot be resolved yet. Shared with
+  # AshA2ui.Verifiers.VerifyTableDisplays.
+  def table_resource(%{resource: resource}, _dsl_state) when not is_nil(resource) do
     if Code.ensure_loaded?(resource) and ResourceInfo.resource?(resource), do: resource
   end
 
-  defp table_resource(_component, dsl_state) do
+  def table_resource(_component, dsl_state) do
     case Verifier.get_option(dsl_state, [:a2ui], :for_resource) do
       nil ->
         if Ash.Resource.Dsl in Verifier.get_persisted(dsl_state, :extensions, []),

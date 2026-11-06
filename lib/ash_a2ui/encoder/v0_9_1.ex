@@ -346,6 +346,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
            |> put_bulk_state(resolved_view)
            |> put_experience_state(resolved_view)
            |> put_lane_totals(resolved_view)
+           |> put_matrix_data(resolved_view)
            |> put_wizard_state(resolved_view)
            |> put_diagram_state(resolved_view, opts)}
       end
@@ -761,7 +762,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # key is gone), so both mark a dynamic table set.
   defp admin_core_table?(table) do
     is_nil(Map.get(table, :sections)) and is_nil(Map.get(table, :section)) and
-      is_nil(table.export) and is_nil(table.editable) and not AshA2ui.Bulk.enabled?(table)
+      is_nil(table.export) and is_nil(table.editable) and not AshA2ui.Bulk.enabled?(table) and
+      not AshA2ui.Timeline.timeline?(table) and not AshA2ui.Matrix.matrix?(table)
   end
 
   # Board lanes fall back to the basic board composition (the board
@@ -1530,7 +1532,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       create_button_ids(view, table, sfx) ++
       child_if(AshA2ui.Bulk.enabled?(table), AshA2ui.Bulk.toolbar_id(sfx)) ++
       child_if(AshA2ui.Calendar.calendar?(table), "calendar#{sfx}") ++
-      ["records_list#{sfx}"] ++
+      [collection_id(table, sfx)] ++
       empty_state_ids(view, table, sfx) ++
       child_if(table.query, "query#{sfx}_pagination") ++
       child_if(table.export, "export#{sfx}_controls")
@@ -1543,6 +1545,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     do: ["report_#{AshA2ui.Component.key(component)}"]
 
   defp component_root_children(_view, _form), do: []
+
+  defp collection_id(table, sfx) do
+    if AshA2ui.Matrix.matrix?(table), do: "matrix#{sfx}", else: "records_list#{sfx}"
+  end
 
   # `[id]` when the feature is present (truthy), `[]` otherwise.
   defp child_if(present, _id) when present in [nil, false], do: []
@@ -1651,13 +1657,25 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "component" => "Text",
         "text" => heading,
         "variant" => "h2"
-      },
-      %{
-        "id" => "records_list#{sfx}",
-        "component" => "List",
-        "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
       }
+      | collection_components(table, sfx)
     ] ++ bulk_toolbar_components(view, table, sfx)
+  end
+
+  # A table's collection: the templated records list, or a matrix's grid
+  # (see AshA2ui.Matrix).
+  defp collection_components(table, sfx) do
+    if AshA2ui.Matrix.matrix?(table) do
+      AshA2ui.Matrix.components(table, sfx)
+    else
+      [
+        %{
+          "id" => "records_list#{sfx}",
+          "component" => "List",
+          "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
+        }
+      ]
+    end
   end
 
   # The bulk-action toolbar above the list (tables with bulk_actions only;
@@ -2105,10 +2123,18 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     ]
   end
 
-  # Prepends the row's `_calendar_when` Text to the row (the card header
-  # under a row_layout, the content Row otherwise).
+  # Prepends the row's `_calendar_when` (calendars) or `_timeline_when`
+  # (timelines) Text to the row (the card header under a row_layout, the
+  # content Row otherwise).
   defp with_calendar_when(components, table, sfx) do
-    if AshA2ui.Calendar.calendar?(table) do
+    when_path =
+      cond do
+        AshA2ui.Calendar.calendar?(table) -> "_calendar_when"
+        AshA2ui.Timeline.timeline?(table) -> "_timeline_when"
+        true -> nil
+      end
+
+    if when_path do
       when_id = "record_row#{sfx}_when"
 
       host_id =
@@ -2119,7 +2145,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       text = %{
         "id" => when_id,
         "component" => "Text",
-        "text" => %{"path" => "_calendar_when"},
+        "text" => %{"path" => when_path},
         "variant" => "caption"
       }
 
@@ -2708,7 +2734,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
+  # A matrix templates no record rows (see AshA2ui.Matrix).
   defp table_descendants(view, table, sfx) do
+    if AshA2ui.Matrix.matrix?(table),
+      do: [],
+      else: record_row_descendants(view, table, sfx)
+  end
+
+  defp record_row_descendants(view, table, sfx) do
     {action_ids, action_components} =
       table.row_actions
       |> Enum.map(&row_action_components(view, table, &1, sfx))
@@ -4745,6 +4778,37 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end
   end
 
+  # Matrix tables carry their grid at the reserved /_matrix_<table> path
+  # (see AshA2ui.Matrix); a no-op on surfaces without matrices.
+  defp put_matrix_data(value, view) do
+    view.tables
+    |> Enum.filter(&AshA2ui.Matrix.matrix?/1)
+    |> Enum.reduce(value, fn table, value ->
+      Map.put(
+        value,
+        String.trim_leading(AshA2ui.Matrix.path(table), "/"),
+        matrix_data(view, table, rows_at(value, view, table))
+      )
+    end)
+  end
+
+  @doc false
+  # The grid of a matrix table over its serialized rows, with the field
+  # labels this surface shows (shared with AshA2ui.ActionHandler's refresh).
+  @spec matrix_data(ResolvedView.t(), ResolvedView.table(), [map]) :: map
+  def matrix_data(view, table, rows) do
+    config = table.matrix
+
+    labels =
+      Map.new([config.row_field], fn field ->
+        {field,
+         (view.fields[field] && view.fields[field].label) ||
+           Label.resolve(view.l10n, nil, field)}
+      end)
+
+    AshA2ui.Matrix.data(table, rows, labels, view.l10n)
+  end
+
   # Board lanes carry their total at the reserved /_lane_total_<lane> path
   # (see AshA2ui.Board); a no-op on surfaces without boards.
   # A swimlaned board adds its swimlane-row and stage-column totals (sums of
@@ -4803,7 +4867,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           view.fields |> Map.values() |> Enum.reject(& &1.hidden) |> Enum.map(& &1.name)
       end
 
-    row = field_values(view, record, [:id | field_names])
+    row = field_values(view, record, [:id | field_names] ++ AshA2ui.Matrix.fields(table))
 
     row
     |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
@@ -4816,6 +4880,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.merge(AshA2ui.Links.row_data(links, record, row))
     |> Map.merge(AshA2ui.Bulk.row_data(table))
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))
+    |> Map.merge(AshA2ui.Timeline.row_data(table, record))
     |> Map.merge(primary_action_data(view, table, record))
   end
 

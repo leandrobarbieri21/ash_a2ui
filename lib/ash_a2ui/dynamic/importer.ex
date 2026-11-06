@@ -205,8 +205,8 @@ defmodule AshA2ui.Dynamic.Importer do
     {spec, component_rejections(component, path)}
   end
 
-  # A board or calendar carries its display (`:list` is the default and is
-  # left out); a calendar also carries its window options.
+  # A board, calendar, timeline or matrix carries its display (`:list` is
+  # the default and is left out), and the options that go with it.
   defp put_display(spec, %{display: :calendar} = component) do
     spec
     |> Map.put("display", "calendar")
@@ -217,6 +217,21 @@ defmodule AshA2ui.Dynamic.Importer do
   end
 
   defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")
+
+  defp put_display(spec, %{display: :timeline} = component) do
+    spec
+    |> Map.put("display", "timeline")
+    |> put_opt("date_field", component.date_field)
+  end
+
+  defp put_display(spec, %{display: :matrix} = component) do
+    spec
+    |> Map.put("display", "matrix")
+    |> put_opt("row_field", component.row_field)
+    |> put_opt("column_field", component.column_field)
+    |> put_opt("cell_field", component.cell_field)
+  end
+
   defp put_display(spec, _component), do: spec
 
   # Declared component features with no spec vocabulary: rejected with the

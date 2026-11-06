@@ -192,7 +192,9 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
   test "the spec schema offers the calendar vocabulary" do
     component = Dynamic.spec_schema(@allowlist)["properties"]["components"]["items"]
 
-    assert component["properties"]["display"]["enum"] == ["list", "board", "calendar"]
+    assert component["properties"]["display"]["enum"] ==
+             ["list", "board", "calendar", "timeline", "matrix"]
+
     assert component["properties"]["granularity"]["enum"] == ["day", "week", "month"]
     assert Map.has_key?(component["properties"], "date_field")
     assert Map.has_key?(component["properties"], "end_date_field")

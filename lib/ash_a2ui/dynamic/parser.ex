@@ -137,12 +137,21 @@ defmodule AshA2ui.Dynamic.Parser do
     "date_field" => :date_field,
     "end_date_field" => :end_date_field,
     "granularity" => :granularity,
-    "granularities" => :granularities
+    "granularities" => :granularities,
+    "row_field" => :row_field,
+    "column_field" => :column_field,
+    "cell_field" => :cell_field
   }
 
   # Closed vocabularies, string -> atom by lookup (never created from
   # input).
-  @displays %{"list" => :list, "board" => :board, "calendar" => :calendar}
+  @displays %{
+    "list" => :list,
+    "board" => :board,
+    "calendar" => :calendar,
+    "timeline" => :timeline,
+    "matrix" => :matrix
+  }
   @button_variants Map.new(AshA2ui.PrimaryAction.variants(), &{Atom.to_string(&1), &1})
   @granularities Map.new(AshA2ui.Calendar.granularities(), &{Atom.to_string(&1), &1})
 
@@ -1038,7 +1047,15 @@ defmodule AshA2ui.Dynamic.Parser do
   defp option_shape(:granularities), do: {:enum_list, @granularities}
 
   defp option_shape(option)
-       when option in [:date_field, :end_date_field, :scope_by, :swimlanes_by],
+       when option in [
+              :date_field,
+              :end_date_field,
+              :scope_by,
+              :swimlanes_by,
+              :row_field,
+              :column_field,
+              :cell_field
+            ],
        do: :existing_name
 
   defp option_shape(option) when option in [:values, :swimlane_values], do: :value_list
@@ -1088,6 +1105,9 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp existing_name_hint(option) when option in [:date_field, :end_date_field],
     do: "its date or datetime attributes"
+
+  defp existing_name_hint(option) when option in [:row_field, :column_field, :cell_field],
+    do: "its public attributes"
 
   defp existing_name_hint(_option),
     do: "its enumerated attributes (an Ash.Type.Enum or a one_of constraint)"

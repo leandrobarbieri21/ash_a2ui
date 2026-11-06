@@ -92,6 +92,10 @@ msgctxt "one_of:status"
 msgid "Archived"
 msgstr ""
 
+#: test/support/table_displays.ex:132
+msgid "Arm"
+msgstr ""
+
 #: test/support/article.ex:1
 msgid "Article"
 msgstr ""
@@ -123,6 +127,11 @@ msgstr ""
 #: test/support/ticket.ex:1
 #: test/support/ticket_search_ui.ex:1
 msgid "Author id"
+msgstr ""
+
+#: test/support/table_displays.ex:132
+msgctxt "one_of:arm"
+msgid "Baseline"
 msgstr ""
 
 #: test/support/kitchen_sink.ex:1
@@ -195,8 +204,22 @@ msgctxt "one_of:status"
 msgid "Cancelled"
 msgstr ""
 
+#: test/support/table_displays.ex:101
+msgid "Candidate"
+msgstr ""
+
+#: test/support/table_displays.ex:132
+msgctxt "one_of:arm"
+msgid "Candidate"
+msgstr ""
+
 #: test/support/canvas.ex:172
 msgid "Canvas Test App"
+msgstr ""
+
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgid "Case name"
 msgstr ""
 
 #: test/support/canvas.ex:172
@@ -369,6 +392,12 @@ msgctxt "one_of:status"
 msgid "Declined"
 msgstr ""
 
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgctxt "one_of:outcome"
+msgid "Degraded"
+msgstr ""
+
 #: test/support/prompt_scope.ex:132
 #: test/support/prompt_scope.ex:161
 #: test/support/prompt_scope.ex:190
@@ -524,6 +553,12 @@ msgstr ""
 msgid "Explode"
 msgstr ""
 
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgctxt "one_of:outcome"
+msgid "Failed"
+msgstr ""
+
 #: test/support/diagram_flow.ex:114
 msgctxt "one_of:status"
 msgid "Failed"
@@ -578,6 +613,12 @@ msgstr ""
 
 #: test/support/hub_ui.ex:1
 msgid "Hub contract"
+msgstr ""
+
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgctxt "one_of:outcome"
+msgid "Improved"
 msgstr ""
 
 #: test/support/enum_types.ex:15
@@ -833,6 +874,11 @@ msgctxt "one_of:status"
 msgid "Open"
 msgstr ""
 
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgid "Outcome"
+msgstr ""
+
 #: test/support/column_task.ex:1
 msgctxt "one_of:status_detail"
 msgid "Overdue"
@@ -1040,6 +1086,11 @@ msgstr ""
 msgid "Reprioritize"
 msgstr ""
 
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgid "Result"
+msgstr ""
+
 #: test/support/submission.ex:1
 msgid "Review"
 msgstr ""
@@ -1087,6 +1138,10 @@ msgstr ""
 msgid "Search contracts or vendors"
 msgstr ""
 
+#: test/support/table_displays.ex:78
+msgid "Seen at"
+msgstr ""
+
 #: test/support/appointments_ui.ex:1
 msgctxt "select_context"
 msgid "Select appointment"
@@ -1120,8 +1175,19 @@ msgstr ""
 msgid "Severity"
 msgstr ""
 
+#: test/support/table_displays.ex:132
+msgctxt "one_of:arm"
+msgid "Shadow"
+msgstr ""
+
 #: test/support/article.ex:1
 msgid "Shout title"
+msgstr ""
+
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgctxt "one_of:outcome"
+msgid "Skipped"
 msgstr ""
 
 #: test/support/promotion.ex:1
@@ -1233,6 +1299,10 @@ msgstr ""
 #: test/support/submission.ex:1
 msgctxt "one_of:state"
 msgid "Submitted"
+msgstr ""
+
+#: test/support/table_displays.ex:78
+msgid "Summary"
 msgstr ""
 
 #: test/support/links.ex:267
@@ -1350,6 +1420,12 @@ msgstr ""
 msgid "Try other words or filters."
 msgstr ""
 
+#: test/support/table_displays.ex:101
+#: test/support/table_displays.ex:132
+msgctxt "one_of:outcome"
+msgid "Unmeasured"
+msgstr ""
+
 #: test/support/canvas.ex:172
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
@@ -1378,6 +1454,7 @@ msgid "Very high"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114
+#: test/support/table_displays.ex:78
 msgid "Visit"
 msgstr ""
 

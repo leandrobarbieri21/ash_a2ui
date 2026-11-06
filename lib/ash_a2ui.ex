@@ -1632,7 +1632,7 @@ defmodule AshA2ui do
         """
       ],
       display: [
-        type: {:one_of, [:list, :board, :calendar]},
+        type: {:one_of, [:list, :board, :calendar, :timeline, :matrix]},
         default: :list,
         doc: """
         How a `:table` lays out its records. `:list` (default) renders rows
@@ -1644,15 +1644,45 @@ defmodule AshA2ui do
         records on a month, week or day grid placed by `date_field` (and
         `end_date_field`): the table's `query` reads only the visible window,
         and changing the window or picking a day re-queries. It requires
-        `date_field` and a `query`. See the Calendars topic.
+        `date_field` and a `query`. See the Calendars topic. `:timeline`
+        renders the rows in `date_field` order, each led by its date or
+        time. `:matrix` renders a grid: one row per `row_field` value, one
+        column per `column_field` value, each cell showing `cell_field`.
+        Both are basic-catalog compositions. See the Timelines and Matrices
+        topic.
         """
       ],
       date_field: [
         type: :atom,
         doc: """
-        `display :calendar` only: the public `:date` or datetime attribute of
-        the table's resource that places each record on the calendar (its
-        start). Required with `display :calendar`.
+        `display :calendar` and `display :timeline` only: the public `:date`
+        or datetime attribute of the table's resource that places each record
+        on the calendar (its start) or on the timeline. Required with either.
+        """
+      ],
+      row_field: [
+        type: :atom,
+        doc: """
+        `display :matrix` only: the public attribute whose values are the
+        matrix's rows, in the order the table reads them. Required with
+        `display :matrix`.
+        """
+      ],
+      column_field: [
+        type: :atom,
+        doc: """
+        `display :matrix` only: the public attribute whose values are the
+        matrix's columns: an enumerated attribute's values in declaration
+        order, else the values in the order the table reads them. Required
+        with `display :matrix`.
+        """
+      ],
+      cell_field: [
+        type: :atom,
+        doc: """
+        `display :matrix` only: the public attribute shown in each cell, from
+        the record at that row and column. A cell with no record says so.
+        Required with `display :matrix`.
         """
       ],
       end_date_field: [
@@ -2050,6 +2080,7 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyQueries,
     AshA2ui.Verifiers.VerifySections,
     AshA2ui.Verifiers.VerifyCalendar,
+    AshA2ui.Verifiers.VerifyTableDisplays,
     AshA2ui.Verifiers.VerifyEditable,
     AshA2ui.Verifiers.VerifyReports,
     AshA2ui.Verifiers.VerifyExport,

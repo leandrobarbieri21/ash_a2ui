@@ -99,6 +99,7 @@ defmodule AshA2ui.MixProject do
         "documentation/topics/reports-and-exports.md",
         "documentation/topics/bulk-actions.md",
         "documentation/topics/calendars.md",
+        "documentation/topics/timelines-and-matrices.md",
         "documentation/topics/live-diagrams.md",
         "documentation/topics/contexts-and-details.md",
         "documentation/topics/agent-composed-surfaces.md",

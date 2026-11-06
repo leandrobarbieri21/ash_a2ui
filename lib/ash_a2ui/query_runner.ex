@@ -430,7 +430,12 @@ defmodule AshA2ui.QueryRunner do
     query = view.query
     calendar = Map.get(view, :calendar)
     params = with_window(params, view)
-    effective_sort = read_sort(effective_sort(query, params), calendar)
+
+    effective_sort =
+      query
+      |> effective_sort(params)
+      |> read_sort(calendar)
+      |> AshA2ui.Timeline.read_sort(Map.get(view, :timeline))
 
     base =
       view

@@ -220,8 +220,9 @@ defmodule AshA2ui.Calendar do
     * `date_field` / `end_date_field` public `:date` or datetime attributes
       of `resource` (skipped when `resource` is `nil`, i.e. not resolvable
       yet), and not the same attribute,
-    * `date_field`, `end_date_field` and `granularity` only with
-      `display :calendar`.
+    * `end_date_field` and `granularity` only with `display :calendar`,
+      and `date_field` only with `display :calendar` or `:timeline` (whose
+      own rules are `AshA2ui.Timeline.validate/2`).
 
   Returns `:ok` or `{:error, option, message}`, `option` being the
   offending component option.
@@ -236,11 +237,20 @@ defmodule AshA2ui.Calendar do
     end
   end
 
+  # `date_field` is shared with `display :timeline` (see AshA2ui.Timeline,
+  # which checks it there).
+  def validate(%{display: :timeline} = component, _resource),
+    do: calendar_only_options(component, [:end_date_field, :granularity, :granularities])
+
   def validate(component, _resource) do
-    case Enum.find(
-           [:date_field, :end_date_field, :granularity, :granularities],
-           &Map.get(component, &1)
-         ) do
+    if Map.get(component, :date_field),
+      do:
+        {:error, :date_field, "date_field is only supported with display :calendar or :timeline"},
+      else: calendar_only_options(component, [:end_date_field, :granularity, :granularities])
+  end
+
+  defp calendar_only_options(component, options) do
+    case Enum.find(options, &Map.get(component, &1)) do
       nil -> :ok
       option -> {:error, option, "#{option} is only supported with display :calendar"}
     end
@@ -920,6 +930,12 @@ defmodule AshA2ui.Calendar do
        do: time
 
   defp same_day_suffix(_start_text, finish_text), do: finish_text
+
+  @doc false
+  # A date or datetime as the calendar writes it (`2026-10-17`,
+  # `2026-10-17 09:30` in the configured time zone); `""` for anything else.
+  @spec moment_text(term) :: String.t()
+  def moment_text(value), do: point_text(value, time_zone())
 
   defp point_text(%Date{} = date, _zone), do: Date.to_iso8601(date)
 

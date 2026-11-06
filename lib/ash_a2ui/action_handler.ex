@@ -3110,6 +3110,17 @@ defmodule AshA2ui.ActionHandler do
     [update_data_model(view, table.records_path, rows)]
     |> Kernel.++(empty_state_messages(view, table, rows))
     |> Kernel.++(lane_total_messages(view, table, rows, nil))
+    |> Kernel.++(matrix_messages(view, table, rows))
+  end
+
+  # A matrix rewrites its grid at /_matrix_<table> beside its records (see
+  # AshA2ui.Matrix).
+  defp matrix_messages(view, table, rows) do
+    if AshA2ui.Matrix.matrix?(table),
+      do: [
+        update_data_model(view, AshA2ui.Matrix.path(table), V0_9_1.matrix_data(view, table, rows))
+      ],
+      else: []
   end
 
   # Board lanes rewrite their /_lane_total_<lane> beside their records (see

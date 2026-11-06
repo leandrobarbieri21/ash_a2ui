@@ -160,7 +160,8 @@ defmodule AshA2ui.ResolvedView do
   (`%{value:, label:, filter: {attribute, value}, template:}`) its reads AND on.
 
   A `display :calendar` table carries its resolved calendar config under
-  `calendar` (`nil` on every other table); see `AshA2ui.Calendar`.
+  `calendar` (`nil` on every other table); see `AshA2ui.Calendar`. Likewise
+  `timeline` (`AshA2ui.Timeline`) and `matrix` (`AshA2ui.Matrix`).
 
   A board cell of a swimlaned board (`swimlanes_by`) adds `lane:` (the
   stage column's runtime name) and `swimlane:` (`%{value:, label:, tone:,
@@ -184,7 +185,9 @@ defmodule AshA2ui.ResolvedView do
           sections: map | nil,
           editable: map | nil,
           export: map | nil,
-          calendar: AshA2ui.Calendar.config() | nil
+          calendar: AshA2ui.Calendar.config() | nil,
+          timeline: AshA2ui.Timeline.config() | nil,
+          matrix: AshA2ui.Matrix.config() | nil
         }
 
   @typedoc """
@@ -718,7 +721,9 @@ defmodule AshA2ui.ResolvedView do
         sections: resolve_sections(component.sections, resource),
         editable: resolve_editable(resource, component.editable),
         export: resolve_export(component, component.fields || public_attribute_names(resource)),
-        calendar: AshA2ui.Calendar.resolve(component, resource)
+        calendar: AshA2ui.Calendar.resolve(component, resource),
+        timeline: AshA2ui.Timeline.resolve(component, resource),
+        matrix: AshA2ui.Matrix.resolve(component)
       }
     end)
   end

@@ -662,20 +662,35 @@ defmodule AshA2ui.Dynamic do
           ),
         "display" => %{
           "type" => "string",
-          "enum" => ["list", "board", "calendar"],
+          "enum" => ["list", "board", "calendar", "timeline", "matrix"],
           "description" =>
             "Tables only: \"calendar\" shows the records on a month, week or day " <>
               "grid placed by date_field; it needs date_field and a query (the query " <>
               "reads only the visible window). \"board\" shows source-less sections " <>
               "as lanes side by side (optionally split into swimlanes); it needs " <>
-              "sections without a source and a row_layout. Default \"list\"."
+              "sections without a source and a row_layout. \"timeline\" lists the " <>
+              "records oldest first by date_field, each led by its date; it needs " <>
+              "date_field. \"matrix\" shows a grid with a row per row_field value, " <>
+              "a column per column_field value and cell_field in each cell; it needs " <>
+              "all three. Default \"list\"."
         },
         "date_field" =>
           Map.put(
             name,
             "description",
-            "Calendar tables: the date or datetime attribute that places each record."
+            "Calendar and timeline tables: the date or datetime attribute that places " <>
+              "each record."
           ),
+        "row_field" =>
+          Map.put(name, "description", "Matrix tables: the attribute whose values are the rows."),
+        "column_field" =>
+          Map.put(
+            name,
+            "description",
+            "Matrix tables: the attribute whose values are the columns."
+          ),
+        "cell_field" =>
+          Map.put(name, "description", "Matrix tables: the attribute shown in each cell."),
         "end_date_field" =>
           Map.put(
             name,

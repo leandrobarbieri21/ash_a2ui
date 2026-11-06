@@ -19,6 +19,16 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
   three, or no callback keeps the derived consequence, so nothing changes
   for a registry that does not implement it.
 
+- **Timelines and matrices.** A `:table` can declare `display :timeline`
+  (with a `date_field`: read oldest first unless a sort is declared or
+  requested, each row led by `_timeline_when`) or `display :matrix` (with
+  `row_field`, `column_field` and `cell_field`: a grid the server serves at
+  `/_matrix_<table>`, where a cell with no value is `"recorded": false` and
+  reads "Not recorded"). Both render basic-catalog compositions under every
+  catalog, so a client that advertises only the basic catalog shows them in
+  full. Composed surfaces take the same displays. Additive: surfaces that
+  declare neither are unchanged.
+
 - **A column's "+N more" tag is written by the server.** A column with
   `more` adds `_more_text_<column>` to each row ("+2 more", a plural
   message); with `more_values`, `_more_caption_<column>` ("3 properties",
