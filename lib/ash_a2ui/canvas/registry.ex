@@ -48,7 +48,32 @@ defmodule AshA2ui.Canvas.Registry do
   """
   @callback projections(target :: module() | struct(), derived :: [atom()]) :: [atom()] | nil
 
-  @optional_callbacks [label: 1, projections: 2]
+  @doc """
+  Optional consequence override. Receives the resource module, the action
+  name and the consequence the library derived from the action's type
+  (`:read` for a read, `:destructive` for a destroy, `:mutation` otherwise),
+  and returns the consequence the capability should carry; `nil` (or not
+  implementing the callback) keeps the derived one.
+
+  A host that keeps its own declaration of what each action does (reads
+  only, changes data, deletes or reaches outside) answers from it, so a
+  generic action that only reads is not shown as a change, and one that
+  removes data asks for confirmation. The consequence drives the
+  capability's `confirmation` (`:required` for `:destructive`).
+
+  Anything other than `:read`, `:mutation` or `:destructive` keeps the
+  derived consequence: an unrecognised answer is never read as a lighter
+  one.
+  """
+  @callback consequence(resource :: module(), action :: atom(), derived :: consequence()) ::
+              consequence() | nil
+
+  @typedoc "What running an action does, as a capability states it."
+  @type consequence :: :read | :mutation | :destructive
+
+  @optional_callbacks [label: 1, projections: 2, consequence: 3]
+
+  @consequences [:read, :mutation, :destructive]
 
   @doc false
   # The registry's domain list, with a fail-loud check: a registry that does
@@ -84,6 +109,20 @@ defmodule AshA2ui.Canvas.Registry do
         nil -> derived
         list when is_list(list) -> list
         _not_a_list -> derived
+      end
+    else
+      derived
+    end
+  end
+
+  @doc false
+  # The host's consequence for `resource`'s `action`, defaulting to the
+  # library's derived one. An answer outside the vocabulary keeps `derived`.
+  def consequence(registry, resource, action, derived) do
+    if Code.ensure_loaded?(registry) and function_exported?(registry, :consequence, 3) do
+      case registry.consequence(resource, action, derived) do
+        consequence when consequence in @consequences -> consequence
+        _nil_or_unknown -> derived
       end
     else
       derived

@@ -10,6 +10,15 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 ### Features:
 
+- **A canvas registry can state what running an action does.** The
+  optional `AshA2ui.Canvas.Registry.consequence/3` callback receives the
+  resource, the action name and the consequence the library derived from
+  the action's type, and returns `:read`, `:mutation` or `:destructive`
+  (which makes the capability's `confirmation` `:required`). It applies to
+  resource and record capabilities alike. `nil`, an answer outside those
+  three, or no callback keeps the derived consequence, so nothing changes
+  for a registry that does not implement it.
+
 - **A column's "+N more" tag is written by the server.** A column with
   `more` adds `_more_text_<column>` to each row ("+2 more", a plural
   message); with `more_values`, `_more_caption_<column>` ("3 properties",

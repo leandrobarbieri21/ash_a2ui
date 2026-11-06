@@ -194,7 +194,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
         ),
       description: nil,
       projections: host_projections(registry, resource, resource_projections(resource)),
-      capabilities: resource_capabilities(ref, resource, l10n(opts)),
+      capabilities: resource_capabilities(ref, resource, registry, l10n(opts)),
       provenance: %{domain: domain, resource: resource}
     }
 
@@ -245,12 +245,13 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
   # Resource level: presence only. Execution still routes through the
   # library's authorized action paths.
-  defp resource_capabilities(ref, resource, l10n) do
+  defp resource_capabilities(ref, resource, registry, l10n) do
     resource
     |> ResourceInfo.actions()
     |> Enum.sort_by(&to_string(&1.name))
     |> Enum.map(fn action ->
-      {verb, consequence} = classify(action.type)
+      {verb, derived} = classify(action.type)
+      consequence = Registry.consequence(registry, resource, action.name, derived)
       capability(ref, verb, action.name, consequence, true, l10n)
     end)
   end
@@ -291,21 +292,46 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
     read = primary(resource, :read)
     update = primary(resource, :update)
+    registry = Keyword.fetch!(opts, :registry)
+    consequence = &Registry.consequence(registry, resource, &1, &2)
 
     view_capability =
       read &&
-        capability(ref, :view, read.name, :read, can_read?.(read.name), l10n(opts))
+        capability(
+          ref,
+          :view,
+          read.name,
+          consequence.(read.name, :read),
+          can_read?.(read.name),
+          l10n(opts)
+        )
 
     edit_capability =
       update &&
-        capability(ref, :edit, update.name, :mutation, can_update?.(update.name), l10n(opts))
+        capability(
+          ref,
+          :edit,
+          update.name,
+          consequence.(update.name, :mutation),
+          can_update?.(update.name),
+          l10n(opts)
+        )
 
     act_capabilities =
       resource
       |> ResourceInfo.actions()
       |> Enum.filter(&(&1.type == :action))
       |> Enum.sort_by(&to_string(&1.name))
-      |> Enum.map(&capability(ref, :act, &1.name, :mutation, can_act?.(&1.name), l10n(opts)))
+      |> Enum.map(
+        &capability(
+          ref,
+          :act,
+          &1.name,
+          consequence.(&1.name, :mutation),
+          can_act?.(&1.name),
+          l10n(opts)
+        )
+      )
 
     List.wrap(view_capability) ++ List.wrap(edit_capability) ++ act_capabilities
   end
