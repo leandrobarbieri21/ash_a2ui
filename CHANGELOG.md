@@ -12,6 +12,17 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **A surface can be built for the catalog a client supports.**
+  `AshA2ui.Experience.catalog_for/1` reads a client's A2UI client
+  capabilities (`supportedCatalogIds`, the v1.0 or v0.9 shape) and returns
+  `{:ok, :admin_v1}`, `{:ok, :basic}` (the fallback for a client without the
+  admin catalog) or `{:error, :no_common_catalog}`. The new `:catalog` option
+  of `AshA2ui.Info.build_surface/2`, `build_data_model/2`,
+  `AshA2ui.Dynamic.build_surface/2` and `AshA2ui.ActionHandler.handle/3`
+  builds with that catalog instead of the configured one. Without the option
+  the configured catalog is used, so nothing changes for a host that does
+  not pass it.
+
 - **A canvas registry can state what running an action does.** The
   optional `AshA2ui.Canvas.Registry.consequence/3` callback receives the
   resource, the action name and the consequence the library derived from

@@ -82,6 +82,10 @@ defmodule AshA2ui.Experience do
   @type mode :: :create | :view | :edit | :hidden
 
   @admin_catalog_id "https://ash-a2ui.dev/catalogs/admin/v1"
+  @basic_catalog_ids [
+    "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+  ]
 
   @doc """
   The configured component catalog: `:basic` (default) or `:admin_v1`
@@ -98,6 +102,60 @@ defmodule AshA2ui.Experience do
   """
   @spec admin?() :: boolean
   def admin?, do: catalog() == :admin_v1
+
+  @doc """
+  Whether `view` is encoded with the admin catalog: the catalog its resolve
+  chose (the `:catalog` build option), else the configured `catalog/0`.
+  """
+  @spec admin?(ResolvedView.t()) :: boolean
+  def admin?(%ResolvedView{catalog: nil}), do: admin?()
+  def admin?(%ResolvedView{catalog: catalog}), do: catalog == :admin_v1
+
+  @doc """
+  The catalog to build a surface with for a client that sent its A2UI
+  client capabilities (`a2uiClientCapabilities`, the
+  `priv/a2ui/v1_0/client_capabilities.json` shape, or the v0.9 one):
+  pass the result as the `:catalog` option of `AshA2ui.Info.build_surface/2`,
+  `AshA2ui.Dynamic.build_surface/2` and `AshA2ui.ActionHandler.handle/3`.
+
+    * `{:ok, :admin_v1}` — the configured catalog is `:admin_v1` and the
+      client lists the admin catalog id.
+    * `{:ok, :basic}` — otherwise, when the client lists the basic catalog
+      id (v1.0's or v0.9's). The admin catalog extends the basic one, so
+      this is the fallback for a client without the admin catalog.
+    * `{:error, :no_common_catalog}` — the client lists neither, or sent
+      capabilities without a `supportedCatalogIds` list. No surface this
+      library builds can be rendered there; what the client gets instead
+      is the host's choice (text, a link).
+
+  `nil` (the client sent no capabilities: no negotiation took place) is the
+  configured `catalog/0`, so hosts that never pass capabilities see no
+  change. Inline catalogs are not accepted.
+  """
+  @spec catalog_for(map | nil) :: {:ok, :basic | :admin_v1} | {:error, :no_common_catalog}
+  def catalog_for(nil), do: {:ok, catalog()}
+
+  def catalog_for(%{} = capabilities) do
+    ids = supported_catalog_ids(capabilities)
+
+    cond do
+      catalog() == :admin_v1 and @admin_catalog_id in ids -> {:ok, :admin_v1}
+      Enum.any?(@basic_catalog_ids, &(&1 in ids)) -> {:ok, :basic}
+      true -> {:error, :no_common_catalog}
+    end
+  end
+
+  def catalog_for(_other), do: {:error, :no_common_catalog}
+
+  defp supported_catalog_ids(capabilities) do
+    capabilities
+    |> Map.take(["v1.0", "v0.9"])
+    |> Map.values()
+    |> Enum.flat_map(fn
+      %{"supportedCatalogIds" => ids} when is_list(ids) -> Enum.filter(ids, &is_binary/1)
+      _other -> []
+    end)
+  end
 
   @doc false
   # The admin catalog id emitted on createSurface when the admin emission
@@ -427,8 +485,8 @@ defmodule AshA2ui.Experience do
   # — a no-op unless the admin catalog is selected. The sentinels stay
   # (basic renderers keep working); the admin Pagination component binds
   # these plain booleans instead.
-  def with_admin_pagination_booleans(query_state, record_count) do
-    if admin?() and is_map(query_state) do
+  def with_admin_pagination_booleans(query_state, record_count, view) do
+    if admin?(view) and is_map(query_state) do
       state = pagination_state(query_state, record_count)
 
       Map.merge(query_state, %{

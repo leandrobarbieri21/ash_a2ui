@@ -11,11 +11,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: ash_a2ui\n"
 
-#: lib/ash_a2ui/action_handler.ex:1661
+#: lib/ash_a2ui/action_handler.ex:1663
 msgid "%{action} completed."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1666
+#: lib/ash_a2ui/action_handler.ex:1668
 msgid "%{action} is not available for this record."
 msgstr ""
 
@@ -25,7 +25,7 @@ msgid_plural "%{action}: %{ok} of %{selected} selected records done"
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/action_handler.ex:1658
+#: lib/ash_a2ui/action_handler.ex:1660
 msgid "%{action}: done."
 msgstr ""
 
@@ -71,8 +71,8 @@ msgstr ""
 msgid "%{field} to"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2099
-#: lib/ash_a2ui/action_handler.ex:3325
+#: lib/ash_a2ui/action_handler.ex:2101
+#: lib/ash_a2ui/action_handler.ex:3327
 msgid "%{field}: %{message}"
 msgstr ""
 
@@ -80,12 +80,12 @@ msgstr ""
 msgid "%{first}, %{rest}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2104
-#: lib/ash_a2ui/action_handler.ex:3505
+#: lib/ash_a2ui/action_handler.ex:2106
+#: lib/ash_a2ui/action_handler.ex:3507
 msgid "%{first}; %{rest}"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:400
+#: lib/ash_a2ui/experience.ex:458
 msgid "%{first}–%{last} of %{total}"
 msgstr ""
 
@@ -159,11 +159,11 @@ msgstr ""
 msgid "Confirm"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:175
+#: lib/ash_a2ui/experience.ex:233
 msgid "Create %{resource}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1412
+#: lib/ash_a2ui/action_handler.ex:1414
 msgid "Created successfully."
 msgstr ""
 
@@ -180,7 +180,7 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:195
+#: lib/ash_a2ui/experience.ex:253
 msgid "Edit %{resource}"
 msgstr ""
 
@@ -192,7 +192,7 @@ msgstr ""
 msgid "Export CSV"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2576
+#: lib/ash_a2ui/action_handler.ex:2578
 msgid "Exported %{filename} (%{count} rows)."
 msgid_plural "Exported %{filename} (%{count} rows)."
 msgstr[0] ""
@@ -228,7 +228,7 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:238
+#: lib/ash_a2ui/experience.ex:296
 msgid "No %{resource} records yet."
 msgstr ""
 
@@ -253,7 +253,7 @@ msgstr ""
 msgid "Remove"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2442
+#: lib/ash_a2ui/action_handler.ex:2444
 msgid "Report complete: %{count} row."
 msgid_plural "Report complete: %{count} rows."
 msgstr[0] ""
@@ -271,7 +271,7 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:182
+#: lib/ash_a2ui/experience.ex:240
 msgid "Save changes"
 msgstr ""
 
@@ -287,7 +287,7 @@ msgstr ""
 msgid "Select"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2499
+#: lib/ash_a2ui/action_handler.ex:2501
 msgid "Select at least one column to export."
 msgstr ""
 
@@ -305,19 +305,19 @@ msgid_plural "Selected the first %{cap} of %{count} records: a bulk action runs 
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/experience.ex:403
+#: lib/ash_a2ui/experience.ex:461
 msgid "Showing %{first}–%{last}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:408
-#: lib/ash_a2ui/action_handler.ex:3428
-#: lib/ash_a2ui/action_handler.ex:3452
+#: lib/ash_a2ui/action_handler.ex:410
+#: lib/ash_a2ui/action_handler.ex:3430
+#: lib/ash_a2ui/action_handler.ex:3454
 msgid "The action failed."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:933
-#: lib/ash_a2ui/action_handler.ex:1215
-#: lib/ash_a2ui/action_handler.ex:1300
+#: lib/ash_a2ui/action_handler.ex:935
+#: lib/ash_a2ui/action_handler.ex:1217
+#: lib/ash_a2ui/action_handler.ex:1302
 msgid "The selected option was not found."
 msgstr ""
 
@@ -347,15 +347,15 @@ msgstr[1] ""
 msgid "True"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2682
+#: lib/ash_a2ui/action_handler.ex:2684
 msgid "Updated %{field}."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1421
+#: lib/ash_a2ui/action_handler.ex:1423
 msgid "Updated successfully."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3431
+#: lib/ash_a2ui/action_handler.ex:3433
 msgid "Validation failed. Please review the field errors."
 msgstr ""
 
@@ -366,7 +366,7 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:192
+#: lib/ash_a2ui/experience.ex:250
 msgid "View %{resource}"
 msgstr ""
 
@@ -378,6 +378,6 @@ msgstr ""
 msgid "Week"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3309
+#: lib/ash_a2ui/action_handler.ex:3311
 msgid "You are not authorized to perform this action."
 msgstr ""

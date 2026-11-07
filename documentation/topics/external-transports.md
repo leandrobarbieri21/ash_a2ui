@@ -330,7 +330,9 @@ the v0.9.1 and v1.0 extension specifications:
 * Metadata: `a2uiClientCapabilities` (supported catalogs) travels in every
   client message's `metadata`; when `sendDataModel` is enabled the client
   echoes `a2uiClientDataModel` the same way. A2UI sessions map to A2A
-  `contextId`.
+  `contextId`. `AshA2ui.Experience.catalog_for/1` turns those capabilities
+  into the `:catalog` build option (or `{:error, :no_common_catalog}`), and
+  any transport whose client sends them can use it today.
 
 Since AshA2ui's message lists are already spec-valid maps, the eventual
 implementation is thin: wrap `AshA2ui.Info.build_surface/2` output in a

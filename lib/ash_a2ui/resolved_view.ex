@@ -74,6 +74,7 @@ defmodule AshA2ui.ResolvedView do
     :create_action,
     :update_action,
     :query,
+    :catalog,
     spec_version: :v0_9_1,
     sectioned?: false,
     components: [],
@@ -273,6 +274,7 @@ defmodule AshA2ui.ResolvedView do
           surface_id: String.t(),
           title: String.t() | nil,
           record_label: String.t() | nil,
+          catalog: :basic | :admin_v1,
           spec_version: :v0_9_1 | :v1_0,
           sectioned?: boolean,
           components: [AshA2ui.Component.t()],
@@ -310,6 +312,7 @@ defmodule AshA2ui.ResolvedView do
     :context_state,
     :surface_properties,
     :spec_version,
+    :catalog,
     :link_buttons,
     :as_of,
     :header,
@@ -337,6 +340,10 @@ defmodule AshA2ui.ResolvedView do
       declared `spec_version` for this resolve. Transports whose renderer
       only speaks one protocol version (see the External Transports topic)
       use this to pin the wire version without touching the DSL.
+    * `:catalog` — `:basic` or `:admin_v1`: overrides the configured
+      catalog (`AshA2ui.Experience.catalog/0`) for this resolve. Transports
+      pass what `AshA2ui.Experience.catalog_for/1` negotiated from the
+      client's capabilities.
     * `:locale` / `:gettext_fn` / `:gettext_backend` / `:metadata_domain` / `:errors_domain` —
       the translator (see `AshA2ui.L10n`). Display labels are translated
       here, once, in the metadata domain, and
@@ -379,6 +386,7 @@ defmodule AshA2ui.ResolvedView do
       surface_id: surface_id(resource_or_ui_module, resource),
       title: optional_label(resource_or_ui_module, :a2ui_title),
       record_label: optional_label(resource_or_ui_module, :a2ui_record_label),
+      catalog: catalog(opts[:catalog]),
       spec_version: spec_version(resource_or_ui_module, opts[:spec_version]),
       sectioned?: sectioned?,
       components: components,
@@ -1224,6 +1232,12 @@ defmodule AshA2ui.ResolvedView do
       :error -> default_surface_id(resource)
     end
   end
+
+  defp catalog(nil), do: AshA2ui.Experience.catalog()
+  defp catalog(catalog) when catalog in [:basic, :admin_v1], do: catalog
+
+  defp catalog(other),
+    do: raise(ArgumentError, "catalog must be :basic or :admin_v1, got: #{inspect(other)}")
 
   # The declared `spec_version` DSL option, normalized to the version atom
   # the encoders and handler dispatch on. Defaults to :v0_9_1 (the DSL

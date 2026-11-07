@@ -84,7 +84,7 @@ defmodule AshA2ui.Encoder.V1_0 do
     create =
       %{
         "surfaceId" => resolved_view.surface_id,
-        "catalogId" => catalog_id(),
+        "catalogId" => catalog_id(resolved_view),
         "components" => components,
         "dataModel" => data_model
       }
@@ -95,8 +95,8 @@ defmodule AshA2ui.Encoder.V1_0 do
 
   # The admin catalog (`catalog: :admin_v1`) surfaces declare the admin
   # catalog id on their inline createSurface too.
-  defp catalog_id do
-    if Experience.admin?(), do: Experience.admin_catalog_id(), else: @catalog_id
+  defp catalog_id(view) do
+    if Experience.admin?(view), do: Experience.admin_catalog_id(), else: @catalog_id
   end
 
   @doc """

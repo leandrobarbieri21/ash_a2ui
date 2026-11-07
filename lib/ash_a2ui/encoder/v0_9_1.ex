@@ -258,7 +258,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "version" => @version,
         "createSurface" => %{
           "surfaceId" => resolved_view.surface_id,
-          "catalogId" => catalog_id()
+          "catalogId" => catalog_id(resolved_view)
         }
       },
       %{
@@ -304,8 +304,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # The admin catalog (`catalog: :admin_v1`) surfaces declare their own
   # catalog id; everything else stays the basic catalog.
-  defp catalog_id do
-    if AshA2ui.Experience.admin?(),
+  defp catalog_id(view) do
+    if AshA2ui.Experience.admin?(view),
       do: AshA2ui.Experience.admin_catalog_id(),
       else: @catalog_id
   end
@@ -610,7 +610,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp components(view, options) do
     view = put_prompt_options(view, options)
 
-    if AshA2ui.Experience.admin?() do
+    if AshA2ui.Experience.admin?(view) do
       admin_components(view, options)
     else
       basic_components(view, options)
@@ -2416,7 +2416,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     }
     |> maybe_put(
       "placeholder",
-      if(AshA2ui.Experience.admin?(),
+      if(AshA2ui.Experience.admin?(view),
         do: translate_declared(view.l10n, table.query.search_placeholder)
       )
     )
@@ -2466,7 +2466,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # flatten to their leaves and path filters get no picker.
   defp filter_picker(view, table, name, sfx) do
     query = table.query
-    admin? = AshA2ui.Experience.admin?()
+    admin? = AshA2ui.Experience.admin?(view)
     path? = AshA2ui.Query.path_filter?(query, name)
     multi? = AshA2ui.Query.multi_select?(query, name)
 
@@ -4760,7 +4760,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp adorned_query_state(view, state, count) do
     state
     |> AshA2ui.Experience.with_pagination_sentinels(count, view.l10n)
-    |> AshA2ui.Experience.with_admin_pagination_booleans(count)
+    |> AshA2ui.Experience.with_admin_pagination_booleans(count, view)
   end
 
   defp adorned_table_state({name, state}, value, view, query_tables) do

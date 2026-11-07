@@ -297,6 +297,8 @@ defmodule AshA2ui.ActionHandler do
       translate the feedback, status lines and any re-rendered chrome (see
       `AshA2ui.Info.build_surface/2`). Pass the same values the surface was
       built with.
+    * `:catalog` — the catalog the surface was built with (see
+      `AshA2ui.Info.build_surface/2`); omitted, the configured one.
   """
   @spec handle(module | Spark.Dsl.t(), action_message :: map, opts :: keyword) ::
           {:ok, [map]} | {:error, [map]}
@@ -3156,7 +3158,7 @@ defmodule AshA2ui.ActionHandler do
         table.query_path,
         state
         |> Experience.with_pagination_sentinels(length(rows), view.l10n)
-        |> Experience.with_admin_pagination_booleans(length(rows))
+        |> Experience.with_admin_pagination_booleans(length(rows), view)
       )
     ] ++ lane_total_messages(view, table, rows, state)
   end

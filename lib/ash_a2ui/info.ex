@@ -144,6 +144,13 @@ defmodule AshA2ui.Info do
       `:open_surface` callback or an `:open_surface_url` template.
       Admin-catalog link columns and FieldDisplays render their links
       regardless; only its basic-component fallbacks follow this option.
+    * `:catalog` — `:basic` or `:admin_v1`: the component catalog for this
+      build, overriding `config :ash_a2ui, :catalog`. A transport serving a
+      client that sent its A2UI client capabilities passes what
+      `AshA2ui.Experience.catalog_for/1` returns for them, so a client
+      without the admin catalog gets the basic composition and the basic
+      `catalogId`. Pass the same value to `AshA2ui.ActionHandler.handle/3`
+      for that surface's actions. Omitted, the configured catalog is used.
     * `:header` — `false` leaves the surface's own heading out, for a host
       page that already renders one (a second `<h1>` is a duplicate and an
       outline error). Basic catalog: the `surface_title` Text is not
