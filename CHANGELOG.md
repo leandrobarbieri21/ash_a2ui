@@ -12,6 +12,12 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **The canvas ships its client half.** `priv/js/ash_canvas_hook.js` (the
+  `AshCanvas` hook) and `priv/js/ash_canvas_graph.js` (the
+  `<ash-canvas-graph>` element) were copied byte for byte into each host.
+  Import them from the package, on the same arrangement as the A2UI hook: the
+  host owns the `cytoscape` and `lit` dependencies and the bundle.
+
 - **A surface can be built for the catalog a client supports.**
   `AshA2ui.Experience.catalog_for/1` reads a client's A2UI client
   capabilities (`supportedCatalogIds`, the v1.0 or v0.9 shape) and returns
