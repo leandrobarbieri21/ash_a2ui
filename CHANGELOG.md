@@ -10,8 +10,28 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Bug Fixes:
+
+- **The destructive-action confirm dialog renders, and its focus trap holds.**
+  `<ash-admin-confirm-dialog>` has no controller (the DataGrid mounts it by
+  hand), and `A2uiLitElement` renders nothing without one, so confirming a
+  destructive row action showed nothing. It now renders through `LitElement`.
+  Its Tab trap compared `document.activeElement` (the dialog host, from outside
+  its shadow root) with the buttons, so Tab left the dialog; it now uses the
+  dialog's own root.
+
 ### Features:
 
+- **A host can draw the catalog's action buttons.** Every button the admin
+  catalog draws for an action (row actions and the inline primary action, the
+  form's primary button, the prompt and confirm dialogs' Cancel and Confirm,
+  the pager, the calendar's tools, the clear-filters button) now goes through
+  an optional `renderActionButton(opts)` dep of `createAshAdminCatalog`. It
+  receives the label, tone, size, destructive, busy, disabled and pressed
+  state and the click handler, and returns a Lit template or `undefined` to
+  keep the stock `<button class="am-btn">`. Without the dep nothing changes
+  apart from a `data-am-button` attribute on each button, which the dialogs'
+  focus traps now look for as well as `button`.
 - **The canvas ships its client half.** `priv/js/ash_canvas_hook.js` (the
   `AshCanvas` hook) and `priv/js/ash_canvas_graph.js` (the
   `<ash-canvas-graph>` element) were copied byte for byte into each host.

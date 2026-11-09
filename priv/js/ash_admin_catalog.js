@@ -262,7 +262,12 @@ void GRID_TABLE_MIN;
  * lit: {html, css, nothing}}`, plus the optional `loadMermaid` (a function
  * returning a promise of the mermaid engine, called the first time a
  * `liveDiagram` draws; see priv/js/ash_a2ui_mermaid.js) and
- * `openSurface`.
+ * `openSurface`, and `renderActionButton(opts)`: every button the catalog
+ * draws for an action (row actions, the form's primary button, dialog
+ * Cancel/Confirm, pager, calendar tools) is passed to it, and a host that
+ * returns a Lit template draws the button with its own design system;
+ * returning undefined keeps the stock `<button class="am-btn">`. The
+ * options are documented on `stockActionButton` in this module.
  *
  * @returns {object} a `@a2ui/web_core` Catalog registered under the admin
  *   catalog id, extending `deps.basicCatalog`.
@@ -737,14 +742,14 @@ function fieldErrors(props, selfError) {
  * legacy nested `{label, action: {event: ...}}` is tolerated defensively.
  */
 /**
- * The button class of a primary action variant (the A2UI Button variants):
+ * The button tone of a primary action variant (the A2UI Button variants):
  * primary is the filled call to action, borderless reads as a link,
  * default (and anything unknown) is the outlined button.
  */
-function primaryVariantClass(variant) {
-  if (variant === "primary") return "am-btn-primary";
-  if (variant === "borderless") return "am-btn-quiet";
-  return "";
+function primaryVariantTone(variant) {
+  if (variant === "primary") return "primary";
+  if (variant === "borderless") return "quiet";
+  return "default";
 }
 
 function rowActionEnvelope(entry) {
@@ -858,6 +863,65 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   const {basicCatalog, A2uiLitElement, A2uiController, lit} = deps;
   const {html, css, nothing} = lit;
   const {shared, buttons, content} = createAdminStyles(css);
+
+  // --- action buttons ----------------------------------------------------------
+
+  /**
+   * The stock action button: a native `<button class="am-btn ...">`.
+   *
+   * `opts` is the whole contract of the `deps.renderActionButton` seam:
+   *   label          string or Lit template, the button's content
+   *   tone           "default" (outlined) | "primary" (filled) | "quiet" (link-like)
+   *   destructive    boolean; a primary tone draws as the destructive fill,
+   *                  a quiet one as danger text
+   *   size           "md" (default) | "sm"
+   *   busy           undefined when the button has no busy state; otherwise
+   *                  true draws a spinner and disables the button, with
+   *                  `aria-busy` reflecting it
+   *   disabled       boolean
+   *   pressed        undefined, or the `aria-pressed` state of a toggle
+   *   primaryAction  boolean; marks a row's primary action (`data-primary-action`)
+   *   onClick        (event) => void, called for an enabled button
+   */
+  function stockActionButton(opts) {
+    const {label, tone = "default", destructive = false, size = "md", busy, disabled = false, pressed, primaryAction = false, onClick} = opts;
+    const classes = ["am-btn"];
+    if (tone === "primary") classes.push(destructive ? "am-btn-destructive" : "am-btn-primary");
+    if (tone === "quiet") classes.push("am-btn-quiet");
+    if (size === "sm") classes.push("am-btn-sm");
+    if (tone === "quiet" && destructive) classes.push("am-btn-danger");
+    return html`<button
+      type="button"
+      class=${classes.join(" ")}
+      data-am-button
+      ?data-primary-action=${primaryAction}
+      ?disabled=${disabled || busy === true}
+      aria-busy=${busy === undefined ? nothing : busy ? "true" : "false"}
+      aria-pressed=${pressed === undefined ? nothing : pressed ? "true" : "false"}
+      @click=${onClick}
+    >
+      ${busy === true ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
+      ${label}
+    </button>`;
+  }
+
+  /**
+   * Every button the catalog draws for an action goes through here, so a
+   * host can draw them with its own design system: `deps.renderActionButton(opts)`
+   * receives the options documented on stockActionButton and returns a Lit
+   * template, or undefined/null to leave that button to the stock drawing.
+   * The element it draws must be the focusable control itself (or a host that
+   * delegates focus), honour `disabled` and `aria-busy`, call `onClick(event)`
+   * only while enabled, and carry the `data-am-button` attribute, which the
+   * dialogs' focus traps look for.
+   */
+  function renderActionButton(opts) {
+    if (typeof deps.renderActionButton === "function") {
+      const drawn = deps.renderActionButton(opts);
+      if (drawn !== undefined && drawn !== null) return drawn;
+    }
+    return stockActionButton(opts);
+  }
 
   // --- shared read-only content: links, values -------------------------------
 
@@ -1876,29 +1940,24 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         );
         const variant =
           typeof rowClick.variantPath === "string"
-            ? primaryVariantClass(getByPath(row, rowClick.variantPath))
-            : primaryVariantClass(null);
+            ? primaryVariantTone(getByPath(row, rowClick.variantPath))
+            : primaryVariantTone(null);
         const action = {...rowClick, label};
         const busy =
           this._amBusyRowAction !== null &&
           this._amBusyRowAction.row === this.rowIdentity(row, index) &&
           this._amBusyRowAction.label === label;
-        return html`
-          <button
-            type="button"
-            class="am-btn am-btn-sm ${variant}"
-            data-primary-action
-            ?disabled=${busy}
-            aria-busy=${busy ? "true" : "false"}
-            @click=${(event) => {
-              event.stopPropagation();
-              this.onRowAction(action, index);
-            }}
-          >
-            ${busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
-            ${label}
-          </button>
-        `;
+        return renderActionButton({
+          label,
+          tone: variant,
+          size: "sm",
+          busy,
+          primaryAction: true,
+          onClick: (event) => {
+            event.stopPropagation();
+            this.onRowAction(action, index);
+          },
+        });
       }
 
       rowClickable() {
@@ -1937,18 +1996,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             this._amBusyRowAction !== null &&
             this._amBusyRowAction.row === rowIdentity &&
             this._amBusyRowAction.label === label;
-          return html`
-            <button
-              type="button"
-              class="am-btn am-btn-quiet am-btn-sm ${destructive ? "am-btn-danger" : ""}"
-              ?disabled=${busy}
-              aria-busy=${busy ? "true" : "false"}
-              @click=${() => this.onRowAction(action, index)}
-            >
-              ${busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
-              ${label}
-            </button>
-          `;
+          return renderActionButton({
+            label,
+            tone: "quiet",
+            size: "sm",
+            destructive,
+            busy,
+            onClick: () => this.onRowAction(action, index),
+          });
         })}</div>`;
       }
 
@@ -2029,7 +2084,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       lastPromptButton() {
-        const buttons = [...this.renderRoot.querySelectorAll(".prompt-dialog button")].filter(
+        const buttons = [...this.renderRoot.querySelectorAll(".prompt-dialog :is(button, [data-am-button])")].filter(
           (element) => !element.hasAttribute("disabled"),
         );
         return buttons[buttons.length - 1] ?? null;
@@ -2067,17 +2122,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 : nothing}
               ${ref ? html`${this.renderNode(ref)}` : nothing}
               <div class="prompt-actions">
-                <button type="button" class="am-btn" @click=${() => this.closePrompt()}>Cancel</button>
-                <button
-                  type="button"
-                  class="am-btn am-btn-primary"
-                  ?disabled=${prompt.busy}
-                  aria-busy=${prompt.busy ? "true" : "false"}
-                  @click=${() => this.confirmPrompt()}
-                >
-                  ${prompt.busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
-                  ${str(spec.confirmLabel) || "Confirm"}
-                </button>
+                ${renderActionButton({label: "Cancel", onClick: () => this.closePrompt()})}
+                ${renderActionButton({
+                  label: str(spec.confirmLabel) || "Confirm",
+                  tone: "primary",
+                  busy: prompt.busy,
+                  onClick: () => this.confirmPrompt(),
+                })}
               </div>
             </div>
           </div>
@@ -2298,9 +2349,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const clear = props.clearAction;
         if (!clear || props.clearVisible !== true || !clear.action?.name) return nothing;
         return html`<div class="empty-action">
-          <button type="button" class="am-btn am-btn-primary" @click=${() => this.clear()}>
-            ${str(clear.label)}
-          </button>
+          ${renderActionButton({label: str(clear.label), tone: "primary", onClick: () => this.clear()})}
         </div>`;
       }
 
@@ -2472,16 +2521,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return html`
           <nav class="pager" aria-label=${label}>
             ${showPrevious
-              ? html`
-                  <button
-                    type="button"
-                    class="am-btn am-btn-quiet am-btn-sm"
-                    @click=${() => this.turnPage(-1)}
-                  >
-                    <span class="pager-chevron" aria-hidden="true">‹</span>
-                    Previous
-                  </button>
-                `
+              ? this.renderTurn(-1, true)
               : nothing}
             <span class="pager-status">
               ${Number.isFinite(page)
@@ -2493,16 +2533,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             </span>
             ${this.renderPageSize(props)}
             ${showNext
-              ? html`
-                  <button
-                    type="button"
-                    class="am-btn am-btn-quiet am-btn-sm"
-                    @click=${() => this.turnPage(1)}
-                  >
-                    Next
-                    <span class="pager-chevron" aria-hidden="true">›</span>
-                  </button>
-                `
+              ? this.renderTurn(1, true)
               : nothing}
           </nav>
         `;
@@ -2518,18 +2549,24 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return Math.max(1, Math.ceil(total / size));
       }
 
+      /** The Previous (direction -1) or Next (1) button. */
+      renderTurn(direction, enabled) {
+        const previous = direction < 0;
+        return renderActionButton({
+          label: previous
+            ? html`<span class="pager-chevron" aria-hidden="true">‹</span> Previous`
+            : html`Next <span class="pager-chevron" aria-hidden="true">›</span>`,
+          tone: "quiet",
+          size: "sm",
+          disabled: !enabled,
+          onClick: () => this.turnPage(direction),
+        });
+      }
+
       renderWindowed(props, page, totalPages, label, showPrevious, showNext) {
         return html`
           <nav class="pager" aria-label=${label}>
-            <button
-              type="button"
-              class="am-btn am-btn-quiet am-btn-sm"
-              ?disabled=${!showPrevious || page <= 1}
-              @click=${() => this.turnPage(-1)}
-            >
-              <span class="pager-chevron" aria-hidden="true">‹</span>
-              Previous
-            </button>
+            ${this.renderTurn(-1, showPrevious && page > 1)}
             <span class="pager-pages">
               ${pageWindow(page, totalPages).map((entry) =>
                 entry === "…"
@@ -2546,15 +2583,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                       </button>`,
               )}
             </span>
-            <button
-              type="button"
-              class="am-btn am-btn-quiet am-btn-sm"
-              ?disabled=${!showNext || page >= totalPages}
-              @click=${() => this.turnPage(1)}
-            >
-              Next
-              <span class="pager-chevron" aria-hidden="true">›</span>
-            </button>
+            ${this.renderTurn(1, showNext && page < totalPages)}
             ${props.rangeText
               ? html`<span class="pager-range">${str(props.rangeText)}</span>`
               : nothing}
@@ -3232,18 +3261,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return html`
           <div class="bar" role="group" aria-label="Record actions">
             ${label !== ""
-              ? html`
-                  <button
-                    type="button"
-                    class="am-btn ${destructive ? "am-btn-destructive" : "am-btn-primary"}"
-                    ?disabled=${busy}
-                    aria-busy=${busy ? "true" : "false"}
-                    @click=${() => this.submit()}
-                  >
-                    ${busy ? html`<span class="am-spinner" aria-hidden="true"></span>` : nothing}
-                    ${label}
-                  </button>
-                `
+              ? renderActionButton({
+                  label,
+                  tone: "primary",
+                  destructive,
+                  busy,
+                  onClick: () => this.submit(),
+                })
               : nothing}
             ${children.length > 0
               ? html`<div class="bar-secondary">
@@ -3589,20 +3613,17 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 ${day
                   ? html`<span class="cal-day">${this.formatDay(str(state.anchor))}</span>`
                   : nothing}
-                <button type="button" class="am-btn am-btn-quiet am-btn-sm" @click=${() => this.goToday()}>
-                  Today
-                </button>
+                ${renderActionButton({label: "Today", tone: "quiet", size: "sm", onClick: () => this.goToday()})}
                 ${this.granularities.length > 1
                   ? html`<span class="cal-sizes" role="group" aria-label="Calendar view">
-                      ${this.granularities.map(
-                        (size) => html`<button
-                          type="button"
-                          class="am-btn am-btn-quiet am-btn-sm"
-                          aria-pressed=${size === this.granularity ? "true" : "false"}
-                          @click=${() => this.switchSize(size)}
-                        >
-                          ${this.sizeLabel(size)}
-                        </button>`,
+                      ${this.granularities.map((size) =>
+                        renderActionButton({
+                          label: this.sizeLabel(size),
+                          tone: "quiet",
+                          size: "sm",
+                          pressed: size === this.granularity,
+                          onClick: () => this.switchSize(size),
+                        }),
                       )}
                     </span>`
                   : nothing}
@@ -3619,13 +3640,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
               <div class="cal-scope">
                 <h3 class="cal-scope-title">${this.scopeTitle(state)}</h3>
                 ${!day && selected
-                  ? html`<button
-                      type="button"
-                      class="am-btn am-btn-quiet am-btn-sm"
-                      @click=${() => this.pickDay("")}
-                    >
-                      All days
-                    </button>`
+                  ? renderActionButton({label: "All days", tone: "quiet", size: "sm", onClick: () => this.pickDay("")})
                   : nothing}
               </div>
               ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
@@ -4424,6 +4439,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return null;
       }
 
+      // A2uiLitElement renders only once it has a controller, and this
+      // dialog never gets one (no controller binding, no context: the
+      // DataGrid mounts it by hand), so it rendered nothing at all. Render
+      // through LitElement directly.
+      update(changedProperties) {
+        Object.getPrototypeOf(A2uiLitElement.prototype).update.call(this, changedProperties);
+      }
+
       updated(changedProperties) {
         super.updated(changedProperties);
         if (!changedProperties.has("open")) return;
@@ -4469,16 +4492,19 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           // Focus trap: cycle within the dialog while it is open.
           const focusables = [
             ...this.renderRoot.querySelectorAll(
-              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+              'button, [data-am-button], [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
             ),
           ].filter((element) => !element.hasAttribute("disabled"));
           if (focusables.length === 0) return;
           const first = focusables[0];
           const last = focusables[focusables.length - 1];
-          if (event.shiftKey && document.activeElement === first) {
+          // The dialog's own shadow root: from outside it, document.activeElement
+          // is the dialog host, never one of its buttons.
+          const active = this.renderRoot.activeElement;
+          if (event.shiftKey && active === first) {
             event.preventDefault();
             last.focus();
-          } else if (!event.shiftKey && document.activeElement === last) {
+          } else if (!event.shiftKey && active === last) {
             event.preventDefault();
             first.focus();
           }
@@ -4511,14 +4537,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 ? html`<p class="dialog-body" id="am-dialog-body">${str(this.body)}</p>`
                 : nothing}
               <div class="dialog-actions">
-                <button type="button" class="am-btn" @click=${() => this.cancel()}>Cancel</button>
-                <button
-                  type="button"
-                  class="am-btn ${this.destructive ? "am-btn-destructive" : "am-btn-primary"}"
-                  @click=${() => this.confirm()}
-                >
-                  ${str(this.confirmLabel) || "Confirm"}
-                </button>
+                ${renderActionButton({label: "Cancel", onClick: () => this.cancel()})}
+                ${renderActionButton({
+                  label: str(this.confirmLabel) || "Confirm",
+                  tone: "primary",
+                  destructive: this.destructive,
+                  onClick: () => this.confirm(),
+                })}
               </div>
             </div>
           </div>
