@@ -150,6 +150,37 @@ and whose Column upgrades AshA2ui's search-picker composites to a
 typeahead combobox with an anchored results overlay. All three are covered
 in [Theming](theming.md).
 
+### Every hook at once: `priv/js/hooks.js`
+
+`priv/js/hooks.js` exports a `hooks` map for hosts that register more than
+the `AshA2ui` hook (today: `AshCanvas`, whose `load` imports
+`ash_canvas_hook.js` and the `<ash-canvas-graph>` element module together).
+Each entry maps the hook's registered name to `{events, load}`: `events` is
+every event name the hook passes to `handleEvent`, and `load` fetches the
+hook's code and resolves to the hook object. The file has no top-level
+imports — hosts import it on every page, so it must not pull in a hook's
+dependencies — and `AshA2ui`/`AshA2uiShell` stay out of it because they
+need `configureAshA2ui` first (import them directly as shown above).
+
+An eager host resolves everything at startup:
+
+```javascript
+import { hooks } from "../../deps/ash_a2ui/priv/js/hooks.js";
+
+const resolvedHooks = Object.fromEntries(
+  await Promise.all(Object.entries(hooks).map(async ([name, hook]) => [name, await hook.load()])),
+);
+```
+
+or keeps importing the hook module directly — the wiring above is
+unchanged. A lazy host wraps each `load` and subscribes to `events` first,
+so nothing the server `push_event`s while the hook's code is in flight is
+dropped.
+
+`test/js_hooks_test.exs` reads `hooks.js` and the hook sources and fails
+when `events` drifts from the `handleEvent` calls, so a host that copies
+the list stays honest.
+
 ## Transport 2: plain JSON endpoints
 
 The protocol core is transport-agnostic — a read-only surface is one

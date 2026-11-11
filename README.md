@@ -504,7 +504,9 @@ See the
 [Getting Started tutorial](documentation/tutorials/getting-started-with-ash-a2ui.md)
 for the router and JS wiring, and
 [Rendering Clients](documentation/topics/rendering-clients.md) for the full
-hook contract.
+hook contract. Every shipped LiveView hook is also listed in
+`priv/js/hooks.js` — each hook's registered name mapped to `{events, load}`
+(the events it handles, and a loader for eager or lazy registration).
 
 Making the surface match your app's design system is covered in
 [Theming](documentation/topics/theming.md): the package ships a neutral

@@ -27,6 +27,16 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **`priv/js/hooks.js` exports the LiveView hooks with the events they
+  handle.** Each entry maps the hook's registered name to `{events, load}`:
+  every event name the hook passes to `handleEvent` (so a host that loads
+  the hook lazily subscribes before the code arrives) and a loader that
+  resolves to the hook object (`AshCanvas` today, importing
+  `ash_canvas_hook.js` and the `<ash-canvas-graph>` module together;
+  `AshA2ui` and `AshA2uiShell` stay out — hosts import them directly, after
+  `configureAshA2ui`). The file has no top-level imports, and
+  `test/js_hooks_test.exs` parses the JS and fails when `events` drifts
+  from the hook sources, so hosts no longer keep a hand-written copy.
 - **`AshA2ui.Manifest`: what a surface's tables and row actions are, as
   plain data.** `for_surface/2` (and `for_surfaces/2`, keyed by surface id,
   over `surfaces/1`, an application's surface modules) describes each table
