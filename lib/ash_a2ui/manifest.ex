@@ -115,7 +115,8 @@ defmodule AshA2ui.Manifest do
 
     * `data-a2ui-id="<component id>"` on the element carrying a table's
       rows: the admin catalog's `dataGrid` element, or the basic catalog's
-      record row content (a `Row`, or a `Column` for card rows). A table's
+      record row content (a `Row`), or the card body of a table with a
+      `row_layout` (a `Column`). A table's
       `component_id` names it; it is `nil` where the id is not static
       (sectioned tables) or the display is not a list.
     * `data-a2ui-row-id="<record id>"` on each rendered row: the admin
@@ -363,6 +364,7 @@ defmodule AshA2ui.Manifest do
     cond do
       table.sections || table.component.display != :list -> nil
       Experience.admin?(view) -> "data_grid#{table_suffix(view, table)}"
+      table.component.row_layout -> "record_row#{table_suffix(view, table)}_body"
       true -> "record_row#{table_suffix(view, table)}_content"
     end
   end

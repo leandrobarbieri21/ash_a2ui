@@ -156,7 +156,7 @@ msgstr ""
 
 #: lib/ash_a2ui/encoder/v0_9_1.ex:1222
 #: lib/ash_a2ui/encoder/v0_9_1.ex:3346
-#: lib/ash_a2ui/manifest.ex:448
+#: lib/ash_a2ui/manifest.ex:450
 msgid "Confirm"
 msgstr ""
 
@@ -364,7 +364,7 @@ msgstr ""
 #: lib/ash_a2ui/encoder/v0_9_1.ex:1128
 #: lib/ash_a2ui/encoder/v0_9_1.ex:2459
 #: lib/ash_a2ui/encoder/v0_9_1.ex:2795
-#: lib/ash_a2ui/manifest.ex:391
+#: lib/ash_a2ui/manifest.ex:393
 msgid "View"
 msgstr ""
 

@@ -85,6 +85,17 @@ defmodule AshA2ui.ManifestTest do
       assert done.row_actions == ["done_tasks.reopen"]
     end
 
+    test "names the card body for a table with a row_layout" do
+      assert [%{component_id: "record_row_body"}] =
+               Manifest.for_surface(AshA2ui.Test.Promotion, catalog: :basic).tables
+
+      assert [
+               %{component_id: "record_row_inbox_body"},
+               %{component_id: "record_row_everything_content"}
+             ] =
+               Manifest.for_surface(AshA2ui.Test.BulkCardsUI, catalog: :basic).tables
+    end
+
     test "names the element carrying the rows for the catalog it is built for" do
       assert [%{component_id: "record_row_open_tasks_content"}, _done] =
                Manifest.for_surface(ManifestTask, catalog: :basic).tables

@@ -479,10 +479,12 @@ function componentIdOf(element) {
 // them.
 //
 // A table's record row content (`record_row_content`, or
-// `record_row_<table>_content` on a multi-table surface; a Row, or a Column
-// for card rows) carries `data-a2ui-id` (its component id) and
-// `data-a2ui-row-id` (its record's id, followed as the row's data changes).
-const RECORD_ROW_CONTENT = /^record_row(?:_.+)?_content$/;
+// `record_row_<table>_content` on a multi-table surface; a Row) or, for card
+// rows (a `row_layout`, and every board card), the card body
+// (`record_row_body`, `record_row_<table>_body`; a Column) carries
+// `data-a2ui-id` (its component id) and `data-a2ui-row-id` (its record's id,
+// followed as the row's data changes).
+const RECORD_ROW_CONTENT = /^record_row(?:_.+)?_(?:content|body)$/;
 
 function markRecordRow(element) {
   const id = componentIdOf(element);

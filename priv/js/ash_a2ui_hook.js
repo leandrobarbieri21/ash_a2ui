@@ -136,6 +136,7 @@ import {
   V1_VERSION,
   adaptMessage,
   panelStateOf,
+  replaceExistingSurfaces,
   settledUiResponse,
 } from "./ash_a2ui_messages.js";
 
@@ -499,7 +500,7 @@ export const AshA2ui = {
       if (callFunction) this.executeFunctionCall(callFunction);
     }
 
-    this.feedProcessor(adapted);
+    this.feedProcessor(replaceExistingSurfaces(adapted, (id) => this.surfaceExists(id)));
 
     // Belt and braces for the skeleton: onSurfaceCreated dismisses it, but
     // a processor without that hook still boots a surface through a
@@ -594,6 +595,17 @@ export const AshA2ui = {
         field.focus();
       }
     }
+  },
+
+  /**
+   * Whether the processor still holds a surface. After a LiveView re-join
+   * the server bootstraps the surface again on this same hook instance; the
+   * old surface must then be replaced, not created twice.
+   */
+  surfaceExists(surfaceId) {
+    const model = this.processor && this.processor.model;
+    if (model && typeof model.getSurface === "function") return Boolean(model.getSurface(surfaceId));
+    return this.surfaceIds.has(surfaceId);
   },
 
   feedProcessor(messages) {

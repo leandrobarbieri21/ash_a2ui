@@ -82,6 +82,46 @@ export function adaptV1CreateSurface(payload, catalogs) {
   return {messages, createdSurfaceId: surfaceId};
 }
 
+/**
+ * Makes a message batch safe to feed a processor that already holds some
+ * surfaces. A page that re-joins its LiveView (a dropped socket, a crashed
+ * process) keeps this hook instance, and the server then bootstraps the
+ * surface again: a `createSurface` for an id the processor still holds
+ * would be rejected as a state error. Each such message is preceded by a
+ * `deleteSurface` for the same id, so the old surface is disposed (its
+ * subscriptions released) and the new one replaces it.
+ *
+ * `exists(surfaceId)` says whether the processor holds the surface now.
+ * Ids created earlier in the same batch count as existing, and a
+ * `deleteSurface` in the batch clears the id. Returns a new array; the
+ * messages themselves are not modified.
+ */
+export function replaceExistingSurfaces(messages, exists) {
+  const live = new Map();
+  const isLive = (id) => (live.has(id) ? live.get(id) : Boolean(exists(id)));
+  const out = [];
+
+  for (const message of messages) {
+    const created = message && message.createSurface;
+    const deleted = message && message.deleteSurface;
+
+    if (created && created.surfaceId !== undefined) {
+      if (isLive(created.surfaceId)) {
+        const removal = {deleteSurface: {surfaceId: created.surfaceId}};
+        if (message.version !== undefined) removal.version = message.version;
+        out.push(removal);
+      }
+      live.set(created.surfaceId, true);
+    } else if (deleted && deleted.surfaceId !== undefined) {
+      live.set(deleted.surfaceId, false);
+    }
+
+    out.push(message);
+  }
+
+  return out;
+}
+
 // The panel visibility sentinel is a zero-or-one list (`[]` hidden,
 // `[...]` visible — AshA2ui.Experience.sentinel/1).
 function panelVisibleSentinel(value) {
