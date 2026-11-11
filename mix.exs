@@ -239,6 +239,7 @@ defmodule AshA2ui.MixProject do
     [
       sobelow: "sobelow --skip",
       credo: "credo --strict",
+      "js.test": "cmd node --test test/js/*.test.mjs",
       docs: [
         "spark.cheat_sheets",
         "docs",

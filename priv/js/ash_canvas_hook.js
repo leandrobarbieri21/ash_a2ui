@@ -3,7 +3,8 @@
  * LiveView and the `<ash-canvas-graph>` element.
  *
  * Wiring (see docs/plans/2026-09-09-canvas-host-contract.md — names are
- * pinned):
+ * pinned; import ash_canvas_graph.js alongside so its side effect
+ * registers the custom element):
  *
  *   - Server → client (once on mount): the LiveView pushes
  *     `canvas:graph` with `%{"revision" => ..., "nodes" => [...],
@@ -15,46 +16,26 @@
  *     the element's outbound contract a plain DOM event makes the element
  *     LiveView-agnostic (and testable outside a socket).
  *
- * The hook owns nothing else: selection semantics, keyboard model, layout
- * and styling all live in the element (ash_canvas_graph.js).
+ * The LiveView renders an empty container (`phx-update="ignore"` keeps
+ * the created element across re-renders), so the hook creates the
+ * element. It owns nothing else: selection semantics, keyboard model,
+ * layout and styling all live in the element (ash_canvas_graph.js); the
+ * element's teardown removes these listeners with the container.
  */
-
-const GRAPH_EVENT = "canvas:graph";
-const SELECT_EVENT = "canvas:select";
-const ELEMENT_TAG = "ash-canvas-graph";
-const ELEMENT_SELECT_EVENT = "ash-canvas:select";
 
 export const AshCanvas = {
   mounted() {
-    // The LiveView renders the element inside this hook's container
-    // (`phx-update="ignore"` keeps it across re-renders). Creating it
-    // when absent keeps hydration working regardless of markup order.
-    this.graphEl = this.el.querySelector(ELEMENT_TAG);
-    if (!this.graphEl) {
-      this.graphEl = document.createElement(ELEMENT_TAG);
-      this.el.appendChild(this.graphEl);
-    }
+    const graphEl = document.createElement("ash-canvas-graph");
+    this.el.appendChild(graphEl);
 
-    this.onGraph = (payload) => {
-      if (this.graphEl) this.graphEl.graph = payload;
-    };
-    this.handleEvent(GRAPH_EVENT, this.onGraph);
+    this.handleEvent("canvas:graph", (graph) => {
+      graphEl.graph = graph;
+    });
 
-    this.onSelect = (event) => {
+    graphEl.addEventListener("ash-canvas:select", (event) => {
       const ref = event?.detail?.ref;
-      if (typeof ref !== "string" || ref === "") return;
-      this.pushEvent(SELECT_EVENT, {ref});
-    };
-    this.el.addEventListener(ELEMENT_SELECT_EVENT, this.onSelect);
-  },
-
-  destroyed() {
-    if (this.onSelect) {
-      this.el.removeEventListener(ELEMENT_SELECT_EVENT, this.onSelect);
-    }
-    this.onGraph = null;
-    this.onSelect = null;
-    this.graphEl = null;
+      if (typeof ref === "string" && ref !== "") this.pushEvent("canvas:select", {ref});
+    });
   },
 };
 

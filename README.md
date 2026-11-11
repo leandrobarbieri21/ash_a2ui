@@ -839,4 +839,8 @@ Every payload-producing change must keep the schema-validation test suite
 green (`mix test`) — the vendored A2UI JSON Schemas in `priv/a2ui/v0_9_1/`
 and `priv/a2ui/v1_0/` are the executable spec.
 
+The JavaScript under `priv/js/` has its own tests (`test/js/`, plain
+`node --test`, no npm dependencies): run them with `mix js.test` (or
+`node --test test/js/*.test.mjs` directly; Node 18+).
+
 Agents: read [AGENTS.md](AGENTS.md) before you change this repository. It links the agent constitution (`AGENT_PRINCIPLES.md`).

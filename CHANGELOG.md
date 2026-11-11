@@ -37,6 +37,24 @@ Requires Elixir 1.20 or later.
   `<ash-canvas-graph>` element) were copied byte for byte into each host.
   Import them from the package, on the same arrangement as the A2UI hook: the
   host owns the `cytoscape` and `lit` dependencies and the bundle.
+- **The canvas hook is a plain hook.** `AshCanvas`
+  (`priv/js/ash_canvas_hook.js`) is down to its contract: create the
+  `<ash-canvas-graph>` element (the LiveView renders the container empty —
+  the server never renders the element), hydrate it from the `canvas:graph`
+  event, and forward the element's `ash-canvas:select` selection events as
+  `canvas:select` pushes. Same `AshCanvas` export, same event names and
+  payloads; the find-or-create branch and the reference-nulling teardown
+  are gone.
+- **The surface hook's message adaptation has its own tested module.** The
+  pure half of `priv/js/ash_a2ui_hook.js` — mapping the server->client
+  messages onto what the v0_9 renderer takes (`adaptMessage`, the v1.0
+  `createSurface` expansion, panel-state extraction, `/ui/response`
+  settlement) — moved to `priv/js/ash_a2ui_messages.js` with no DOM or
+  LiveView access. Tests run on plain `node --test` (`mix js.test`), no npm
+  dependencies. Event names, payloads and exports are unchanged, and the
+  `globalThis.__ASH_A2UI_DEPS__` fallback stays: it is documented in
+  `documentation/topics/rendering-clients.md` and `usage-rules/liveview.md`
+  as the alternative wiring for separately bundled hooks.
 
 - **A surface can be built for the catalog a client supports.**
   `AshA2ui.Experience.catalog_for/1` reads a client's A2UI client

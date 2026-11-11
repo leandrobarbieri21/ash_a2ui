@@ -126,7 +126,18 @@
  *
  * v0 limitation: a single surface per hook — the last surface created by the
  * processor wins the `<a2ui-surface>` element.
+ *
+ * The pure half of that work — mapping server->client messages onto what
+ * the renderer takes — lives in `ash_a2ui_messages.js` (tested with
+ * `node --test`, `mix js.test`); this file runs the side effects around it.
  */
+
+import {
+  V1_VERSION,
+  adaptMessage,
+  panelStateOf,
+  settledUiResponse,
+} from "./ash_a2ui_messages.js";
 
 let hookDeps = null;
 
@@ -200,10 +211,7 @@ function resolveDeps() {
   };
 }
 
-const V1_VERSION = "v1.0";
 const OPEN_SURFACE_EVENT = "ash-a2ui:open-surface";
-const V1_BASIC_CATALOG_ID = "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json";
-const V0_BASIC_CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
 const BUILTIN_FUNCTIONS = {
   openUrl: (args) => {
@@ -366,32 +374,6 @@ function containsAcrossRoots(ancestor, node) {
 
 // --- zero-jank: record-task panel state --------------------------------------
 
-// The panel visibility sentinel is a zero-or-one list (`[]` hidden,
-// `[...]` visible — AshA2ui.Experience.sentinel/1).
-function panelVisibleSentinel(value) {
-  return Array.isArray(value) && value.length > 0;
-}
-
-// Extracts the panel state a server->client message carries, if any:
-// `/ui/panel` writes from the action handler, or the full data model under
-// "/" (bootstrap, data-only refreshes). Returns true | false | null
-// (message carries no panel state).
-function panelStateOf(message) {
-  if (!message || !message.updateDataModel) return null;
-  const {path, value} = message.updateDataModel;
-
-  if (path === "/ui/panel") {
-    return panelVisibleSentinel(value && value.visible);
-  }
-
-  if (path === "/") {
-    const panel = value && value.ui && value.ui.panel;
-    return panel ? panelVisibleSentinel(panel.visible) : null;
-  }
-
-  return null;
-}
-
 const PANEL_IDS = ["record_panel", "form_slot", "form"];
 
 export const AshA2ui = {
@@ -498,14 +480,23 @@ export const AshA2ui = {
 
   /**
    * Feeds pushed server->client messages into the renderer, adapting v1.0
-   * messages for the v0_9 MessageProcessor (see "A2UI v1.0 support" above).
+   * messages for the v0_9 MessageProcessor (see "A2UI v1.0 support"
+   * above). The mapping itself is `adaptMessage` in
+   * `ash_a2ui_messages.js`; the consumed messages' side effects run here,
+   * in message order.
    */
   processMessages(messages) {
     if (!this.processor) return;
 
     const adapted = [];
     for (const message of messages) {
-      adapted.push(...this.adaptMessage(message));
+      const {messages: mapped, createdSurfaceId, actionResponse, callFunction, deletedSurfaceId} =
+        adaptMessage(message, {catalogs: this.deps.catalogs});
+      adapted.push(...mapped);
+      if (createdSurfaceId !== undefined) this.v1Surfaces.add(createdSurfaceId);
+      if (deletedSurfaceId) this.v1Surfaces.delete(deletedSurfaceId);
+      if (actionResponse) this.resolveActionResponse(actionResponse);
+      if (callFunction) this.executeFunctionCall(callFunction);
     }
 
     this.feedProcessor(adapted);
@@ -621,68 +612,6 @@ export const AshA2ui = {
   },
 
   /**
-   * Maps one server->client message to the list of messages handed to the
-   * v0_9 renderer. v0.9.1 messages pass through untouched; v1.0 messages
-   * are expanded/consumed per the header comment.
-   */
-  adaptMessage(message) {
-    if (!message || message.version !== V1_VERSION) return [message];
-
-    if (message.createSurface) return this.adaptV1CreateSurface(message.createSurface);
-
-    if (message.actionResponse) {
-      this.resolveActionResponse(message);
-      return [];
-    }
-
-    if (message.callFunction) {
-      this.executeFunctionCall(message);
-      return [];
-    }
-
-    if (message.deleteSurface && message.deleteSurface.surfaceId) {
-      this.v1Surfaces.delete(message.deleteSurface.surfaceId);
-    }
-
-    // updateComponents / updateDataModel / deleteSurface payloads are
-    // shape-compatible with v0.9; the processor does not inspect `version`.
-    return [message];
-  },
-
-  /**
-   * Expands v1.0's inline createSurface (surface + components + dataModel
-   * in one message) into the v0.9 triple the published renderer
-   * understands, mapping the v1.0 basic-catalog id onto a registered
-   * catalog and passing surfaceProperties through as the surface's theme
-   * metadata slot.
-   */
-  adaptV1CreateSurface(payload) {
-    const {surfaceId, catalogId, surfaceProperties, sendDataModel, components, dataModel} = payload;
-
-    this.v1Surfaces.add(surfaceId);
-
-    const registered = (this.deps.catalogs || []).some((catalog) => catalog.id === catalogId);
-    const mappedCatalogId =
-      !registered && catalogId === V1_BASIC_CATALOG_ID ? V0_BASIC_CATALOG_ID : catalogId;
-
-    const create = {surfaceId, catalogId: mappedCatalogId};
-    if (surfaceProperties) create.theme = surfaceProperties;
-    if (sendDataModel !== undefined) create.sendDataModel = sendDataModel;
-
-    const expanded = [{createSurface: create}];
-
-    if (components && components.length > 0) {
-      expanded.push({updateComponents: {surfaceId, components}});
-    }
-
-    if (dataModel !== undefined) {
-      expanded.push({updateDataModel: {surfaceId, path: "/", value: dataModel}});
-    }
-
-    return expanded;
-  },
-
-  /**
    * Resolves a server actionResponse: clears the pending entry (and its
    * watchdog), settles the optimistic /ui/response pending state with the
    * response itself, and re-dispatches the response as a bubbling DOM event
@@ -700,23 +629,7 @@ export const AshA2ui = {
       // FIRST message of the server's reply batch, so a server /ui/response
       // write in the same batch (e.g. an invoke result) lands after this
       // and wins — this is only the floor.
-      const response = message.actionResponse || {};
-      const settled = response.error
-        ? {
-            status: "error",
-            code: response.error.code || "",
-            message: response.error.message || "",
-            result: {},
-            resultText: "",
-          }
-        : {
-            status: "ok",
-            message: "",
-            result: {},
-            resultText: "",
-            ...(response.value || {}),
-          };
-
+      const settled = settledUiResponse(message.actionResponse);
       this.writeUiResponse(pending.surfaceId, settled);
     }
 
