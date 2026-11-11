@@ -12,6 +12,11 @@ Requires Elixir 1.20 or later.
 
 ### Bug Fixes:
 
+- **A basic TextField's input is named by its label.** The basic catalog draws
+  the label beside the `<input>` with no association, so the input had no
+  accessible name (a screen reader read "edit text", and a prompt's inputs
+  could not be found by label). The input now carries `aria-label` from the
+  label, unless something already names it.
 - **The destructive-action confirm dialog renders, and its focus trap holds.**
   `<ash-admin-confirm-dialog>` has no controller (the DataGrid mounts it by
   hand), and `A2uiLitElement` renders nothing without one, so confirming a
@@ -21,6 +26,29 @@ Requires Elixir 1.20 or later.
   dialog's own root.
 
 ### Features:
+
+- **`AshA2ui.Manifest`: what a surface's tables and row actions are, as
+  plain data.** `for_surface/2` (and `for_surfaces/2`, keyed by surface id,
+  over `surfaces/1`, an application's surface modules) describes each table
+  (resource, read action, columns, query, presets with their filters and
+  read actions, context scoping) and each row action (a stable id, the
+  rendered button label, the Ash action and resource, `visible_when` as
+  conditions, `prompt_fields` with label, type, widget, required and options,
+  and the confirm control's label), with a `version`. It reads no records and
+  is built from the resolved view with the encoder's own label functions, so
+  it states what renders, translated with the same options. `visible?/2` and
+  `filter_input/1` evaluate a row action's conditions against a row or turn
+  them, or a preset's filter, into Ash filter input. For browser test
+  generators, accessibility audits and coverage ledgers.
+- **Rows and row actions carry selection attributes.** The admin grid's rows
+  (`<tr>` and the narrow layout's cards) and the basic composition's record
+  rows carry `data-a2ui-row-id` (the record's id), and the element holding a
+  table's rows carries `data-a2ui-id` (its component id); each row action
+  control carries `data-a2ui-action` (the action's name; in the admin grid on
+  a `display: contents` wrapper, so a host-drawn button is covered too). The
+  basic composition's rows are Cards with no row role, and the admin grid's
+  narrow layout is a card list, so a role or text alone could not find a
+  record's row.
 
 - **A host can draw the catalog's action buttons.** Every button the admin
   catalog draws for an action (row actions and the inline primary action, the

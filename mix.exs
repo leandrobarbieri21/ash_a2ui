@@ -137,7 +137,8 @@ defmodule AshA2ui.MixProject do
           AshA2ui.Diagram,
           AshA2ui.Diagram.Source,
           AshA2ui.Editable,
-          AshA2ui.Export
+          AshA2ui.Export,
+          AshA2ui.Manifest
         ],
         Encoding: [
           AshA2ui.Encoder,

@@ -24,6 +24,10 @@ msgctxt "one_of:status"
 msgid "Active"
 msgstr ""
 
+#: test/support/manifest_task.ex:1
+msgid "Add note"
+msgstr ""
+
 #: test/support/calendar_event.ex:121
 msgid "All"
 msgstr ""
@@ -38,6 +42,10 @@ msgstr ""
 #: test/support/adoption.ex:243
 #: test/support/adoption.ex:356
 msgid "Annotate"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Annotate task"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
@@ -78,6 +86,7 @@ msgid "Approved"
 msgstr ""
 
 #: test/support/bulk_presets_ui.ex:1
+#: test/support/manifest_task.ex:1
 msgid "Archived"
 msgstr ""
 
@@ -431,6 +440,10 @@ msgstr ""
 msgid "Details"
 msgstr ""
 
+#: test/support/manifest_task.ex:1
+msgid "Discard"
+msgstr ""
+
 #: test/support/article.ex:1
 msgid "Display title"
 msgstr ""
@@ -449,12 +462,17 @@ msgstr ""
 #: test/support/adoption_ui.ex:77
 #: test/support/column_task.ex:1
 #: test/support/diagram_flow.ex:114
+#: test/support/manifest_task.ex:1
 msgctxt "one_of:status"
 msgid "Done"
 msgstr ""
 
 #: test/support/review_item.ex:1
 msgid "Done items"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Done tasks"
 msgstr ""
 
 #: test/support/submission.ex:1
@@ -603,6 +621,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
 #: test/support/l10n_review_fixtures.ex:2
+#: test/support/manifest_task.ex:1
 msgctxt "one_of:priority"
 msgid "High"
 msgstr ""
@@ -678,6 +697,10 @@ msgstr ""
 msgid "Line count"
 msgstr ""
 
+#: test/support/manifest_task.ex:1
+msgid "Live"
+msgstr ""
+
 #: test/support/adoption.ex:243
 #: test/support/adoption_ui.ex:31
 msgid "Lock"
@@ -707,8 +730,13 @@ msgstr ""
 #: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
 #: test/support/l10n_review_fixtures.ex:2
+#: test/support/manifest_task.ex:1
 msgctxt "one_of:priority"
 msgid "Low"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Mark done"
 msgstr ""
 
 #: test/support/board_task_ui.ex:111
@@ -820,6 +848,7 @@ msgstr ""
 #: test/support/links.ex:230
 #: test/support/links.ex:267
 #: test/support/links.ex:333
+#: test/support/manifest_task.ex:1
 msgid "Note"
 msgstr ""
 
@@ -867,11 +896,16 @@ msgstr ""
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/live_filters_ui.ex:1
+#: test/support/manifest_task.ex:1
 #: test/support/paginated.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/tabbed_presets_ui.ex:1
 msgctxt "one_of:status"
 msgid "Open"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Open tasks"
 msgstr ""
 
 #: test/support/table_displays.ex:101
@@ -985,6 +1019,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:52
 #: test/support/column_task.ex:1
 #: test/support/l10n_review_fixtures.ex:2
+#: test/support/manifest_task.ex:1
 msgid "Priority"
 msgstr ""
 
@@ -1026,6 +1061,10 @@ msgstr ""
 #: test/support/kitchen_sink_v1_ui.ex:1
 msgctxt "one_of:status"
 msgid "Published"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Purge"
 msgstr ""
 
 #: test/support/ticket.ex:1
@@ -1072,6 +1111,10 @@ msgstr ""
 
 #: test/support/hub_ui.ex:1
 msgid "Renews soon"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Reopen"
 msgstr ""
 
 #: test/support/bucket_words_ui.ex:1
@@ -1256,6 +1299,7 @@ msgstr ""
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/live_filters_ui.ex:1
+#: test/support/manifest_task.ex:1
 #: test/support/paginated.ex:1
 #: test/support/referral.ex:1
 #: test/support/sort_only_ui.ex:1
@@ -1326,6 +1370,7 @@ msgstr ""
 
 #: test/support/canvas.ex:172
 #: test/support/experience_ui.ex:10
+#: test/support/manifest_task.ex:1
 #: test/support/prompt_scope.ex:132
 #: test/support/prompt_scope.ex:161
 #: test/support/prompt_scope.ex:190
@@ -1382,6 +1427,7 @@ msgstr ""
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/live_filters_ui.ex:1
+#: test/support/manifest_task.ex:1
 #: test/support/post.ex:1
 #: test/support/prompt_scope.ex:132
 #: test/support/prompt_scope.ex:161
@@ -1435,6 +1481,10 @@ msgstr ""
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
 msgid "Updated at"
+msgstr ""
+
+#: test/support/manifest_task.ex:1
+msgid "Urgent"
 msgstr ""
 
 #: test/support/hub_ui.ex:1

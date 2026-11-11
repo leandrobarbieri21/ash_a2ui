@@ -765,6 +765,17 @@ function rowActionEnvelope(entry) {
 }
 
 /**
+ * The name a row action entry's control carries in `data-a2ui-action`: the
+ * declared row action's name (its envelope's `context.action`), else the
+ * entry's own action (`view_record`, `start_edit`, `context_select`).
+ */
+function rowActionKey(action) {
+  const named = action?.context?.action;
+  if (typeof named === "string" && named !== "") return named;
+  return typeof action?.action === "string" ? action.action : "";
+}
+
+/**
  * Whether a row action is offered on `row`: entries without a `visiblePath`
  * always are; otherwise the row's value there must be a non-empty list (the
  * server-computed `_visible_<action>` slot) or `true`. Hiding is a
@@ -1353,6 +1364,11 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             justify-content: flex-end;
             gap: var(--am-space-2xs);
           }
+          /* The per-action wrapper carrying data-a2ui-action takes no box:
+           * its button stays a flex item of .row-actions. */
+          .row-action {
+            display: contents;
+          }
           /* Prompt dialog (prompt_fields row actions). */
           .prompt-overlay {
             position: fixed;
@@ -1487,6 +1503,12 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       updated(changedProperties) {
         super.updated(changedProperties);
+        // Selection attributes (see AshA2ui.Manifest): the grid carries its
+        // component id; its rows `data-a2ui-row-id` and its row action
+        // controls `data-a2ui-action` (renderTableRow, renderCard,
+        // renderRowActions).
+        const componentId = this.context?.componentModel?.id;
+        if (componentId) this.setAttribute("data-a2ui-id", componentId);
         this.syncConfirmDialog();
         if (this._amPrompt && !this._amPrompt.focused) {
           // Prompt opened: move focus into the dialog.
@@ -1721,6 +1743,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return html`
           <tr
             id="row-${rowId}"
+            data-a2ui-row-id=${rowId}
             class=${clickable ? "is-clickable" : ""}
             tabindex=${clickable ? "0" : nothing}
             @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
@@ -1756,6 +1779,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return html`
           <li
             class="card ${clickable ? "is-clickable" : ""}"
+            data-a2ui-row-id=${this.rowIdentity(row, index)}
             @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
           >
             <dl class="card-fields">
@@ -1996,14 +2020,17 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             this._amBusyRowAction !== null &&
             this._amBusyRowAction.row === rowIdentity &&
             this._amBusyRowAction.label === label;
-          return renderActionButton({
+          // The wrapper (display: contents) names the action — a declared
+          // row action's name, else the entry's own ("view_record", ...) —
+          // whatever draws the button (renderActionButton's host seam).
+          return html`<span class="row-action" data-a2ui-action=${rowActionKey(action)}>${renderActionButton({
             label,
             tone: "quiet",
             size: "sm",
             destructive,
             busy,
             onClick: () => this.onRowAction(action, index),
-          });
+          })}</span>`;
         })}</div>`;
       }
 

@@ -116,6 +116,7 @@ const TEXT_TAG = "ash-a2ui-text";
 const BUTTON_TAG = "ash-a2ui-button";
 const ROW_TAG = "ash-a2ui-row";
 const MODAL_TAG = "ash-a2ui-modal";
+const TEXTFIELD_TAG = "ash-a2ui-textfield";
 
 /**
  * Builds the merged catalog. See the module docs for the `deps` contract.
@@ -155,6 +156,7 @@ export function createAshA2uiCatalog(deps) {
     ["Text", TEXT_TAG],
     ["Button", BUTTON_TAG],
     ["Row", ROW_TAG],
+    ["TextField", TEXTFIELD_TAG],
   ]) {
     const api = basicCatalog.components.get(type);
     if (api && customElements.get(tag)) overrides.set(type, retagged(api, tag));
@@ -468,6 +470,69 @@ function componentIdOf(element) {
     return element.context?.componentModel?.id ?? "";
   } catch {
     return "";
+  }
+}
+
+// Selection attributes, for tools that find a table's rows and row actions
+// by identity rather than by text (see AshA2ui.Manifest). The basic
+// composition's rows are Cards with no row semantics, so a role cannot find
+// them.
+//
+// A table's record row content (`record_row_content`, or
+// `record_row_<table>_content` on a multi-table surface; a Row, or a Column
+// for card rows) carries `data-a2ui-id` (its component id) and
+// `data-a2ui-row-id` (its record's id, followed as the row's data changes).
+const RECORD_ROW_CONTENT = /^record_row(?:_.+)?_content$/;
+
+function markRecordRow(element) {
+  const id = componentIdOf(element);
+  if (!RECORD_ROW_CONTENT.test(id)) return;
+  element.setAttribute("data-a2ui-id", id);
+  let rowId;
+  try {
+    const {dataContext} = element.context;
+    const {dataModel} = dataContext;
+    const path = `${dataContext.path.replace(/\/$/, "")}/id`;
+    if (element._a2uiRowIdPath !== path) {
+      element._a2uiRowIdSubscription?.unsubscribe();
+      element._a2uiRowIdSubscription = dataModel.subscribe(path, () => element.requestUpdate());
+      element._a2uiRowIdPath = path;
+    }
+    rowId = dataModel.get(path);
+  } catch {
+    // No surface yet: the next update marks the row.
+  }
+  if (rowId === null || rowId === undefined) {
+    element.removeAttribute("data-a2ui-row-id");
+  } else {
+    element.setAttribute("data-a2ui-row-id", String(rowId));
+  }
+}
+
+function unmarkRecordRow(element) {
+  element._a2uiRowIdSubscription?.unsubscribe();
+  element._a2uiRowIdSubscription = null;
+  element._a2uiRowIdPath = null;
+}
+
+// A row action's button (`row_action_<action>_button`, with the table's
+// suffix; not the prompt's confirm or search buttons) carries
+// `data-a2ui-action`, the name of the action it invokes or prompts for.
+function markRowAction(element) {
+  const id = componentIdOf(element);
+  let name = null;
+  if (/(^|_)row_action_.*_button$/.test(id) && !id.endsWith("_confirm_button") && !id.includes("_prompt_")) {
+    try {
+      const action = element.context?.componentModel?.properties?.action?.event?.context?.action;
+      if (typeof action === "string" && action !== "") name = action;
+    } catch {
+      // No component model yet.
+    }
+  }
+  if (name === null) {
+    element.removeAttribute("data-a2ui-action");
+  } else {
+    element.setAttribute("data-a2ui-action", name);
   }
 }
 
@@ -988,6 +1053,7 @@ function defineAnatomyElements({lit, basicCatalog}) {
       super.updated(changedProperties);
       watchAutoApply(this);
       hideAutoApplyHost(this);
+      markRowAction(this);
     }
 
     disconnectedCallback() {
@@ -1023,6 +1089,7 @@ function defineAnatomyElements({lit, basicCatalog}) {
   if (!customElements.get(BUTTON_TAG)) customElements.define(BUTTON_TAG, AshA2uiButtonElement);
 
   defineRowElement(basicCatalog);
+  defineTextFieldElement(basicCatalog);
 }
 
 // A table's query controls Row (`query_controls_body`, or
@@ -1045,10 +1112,41 @@ function defineRowElement(basicCatalog) {
       } else {
         this.style.removeProperty("flex-wrap");
       }
+      markRecordRow(this);
+    }
+
+    disconnectedCallback() {
+      super.disconnectedCallback();
+      unmarkRecordRow(this);
     }
   }
 
   customElements.define(ROW_TAG, AshA2uiRowElement);
+}
+
+// The basic TextField draws its label as a <label> beside the <input> with
+// no association, so the input had no accessible name: a screen reader read
+// "edit text", and nothing could find a prompt's input by its label. The
+// input is named by the label (`aria-label`), unless something already
+// names it. Rendering is otherwise upstream's.
+function defineTextFieldElement(basicCatalog) {
+  if (customElements.get(TEXTFIELD_TAG)) return;
+  const A2uiBasicTextFieldElement = upstreamElementClass(basicCatalog, "TextField");
+  if (!A2uiBasicTextFieldElement) return;
+
+  class AshA2uiTextFieldElement extends A2uiBasicTextFieldElement {
+    updated(changedProperties) {
+      super.updated(changedProperties);
+      const input = (this.renderRoot || this).querySelector("input, textarea");
+      if (!input) return;
+      const label = this.controller?.props?.label;
+      if (typeof label === "string" && label !== "" && !input.hasAttribute("aria-labelledby")) {
+        input.setAttribute("aria-label", label);
+      }
+    }
+  }
+
+  customElements.define(TEXTFIELD_TAG, AshA2uiTextFieldElement);
 }
 
 // --- Apply on change -----------------------------------------------------------
@@ -1772,6 +1870,7 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
     updated(changedProperties) {
       super.updated(changedProperties);
       if (this.picker) return;
+      markRecordRow(this);
       const props = this.controller?.props;
       if (props) {
         this.style.justifyContent = JUSTIFY_MAP[props.justify ?? ""] ?? "flex-start";
@@ -1887,6 +1986,7 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
       this.teardownPicker();
       this.swimlaneSubscription?.unsubscribe();
       this.swimlaneSubscription = null;
+      unmarkRecordRow(this);
     }
 
     teardownPicker() {

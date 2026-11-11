@@ -940,6 +940,26 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # row-relative — rows are items of the records list, like the record_row
   # template.
   defp admin_columns(view, table) do
+    layout = table.component.row_layout
+    columns = Map.new(table.component.columns, &{&1.name, &1})
+
+    table
+    |> grid_column_fields()
+    |> Enum.map(fn field ->
+      %{"label" => view.fields[field].label, "path" => to_string(field)}
+      |> put_column_presentation(view, table.resource, field)
+      |> put_column_badge(layout, field)
+      |> put_link_binding(view, field, "_links/#{field}")
+      |> put_column_sortable(table, field, columns[field])
+      |> put_column_cells(columns[field], view.l10n)
+    end)
+  end
+
+  @doc false
+  # The fields the admin dataGrid draws a column for, in order. Shared with
+  # `AshA2ui.Manifest`, so the manifest's columns are the grid's.
+  @spec grid_column_fields(ResolvedView.table()) :: [atom]
+  def grid_column_fields(table) do
     fields =
       case {table.component.row_layout, Map.get(table.component, :column_order, :layout)} do
         {nil, _order} ->
@@ -957,18 +977,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           |> Enum.uniq()
       end
 
-    layout = table.component.row_layout
-    columns = Map.new(table.component.columns, &{&1.name, &1})
-
-    (fields -- AshA2ui.Column.folded_fields(table.component.columns))
-    |> Enum.map(fn field ->
-      %{"label" => view.fields[field].label, "path" => to_string(field)}
-      |> put_column_presentation(view, table.resource, field)
-      |> put_column_badge(layout, field)
-      |> put_link_binding(view, field, "_links/#{field}")
-      |> put_column_sortable(table, field, columns[field])
-      |> put_column_cells(columns[field], view.l10n)
-    end)
+    fields -- AshA2ui.Column.folded_fields(table.component.columns)
   end
 
   defp primary_action_sources(%{primary_action: %{label_from: field}}) when not is_nil(field),
