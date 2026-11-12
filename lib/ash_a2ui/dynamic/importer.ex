@@ -133,12 +133,14 @@ defmodule AshA2ui.Dynamic.Importer do
       {:record_label, Extension.get_opt(module, [:a2ui], :record_label, nil),
        "record labels drive the task-panel labels and have no spec key — keep them in the promoted module"},
       {:spec_version, Extension.get_opt(module, [:a2ui], :spec_version, "0.9.1"),
-       "the wire version is a resolve option (:spec_version), not part of the spec"}
+       "the wire version is a resolve option (:spec_version), not part of the spec"},
+      {:component_order, Extension.get_opt(module, [:a2ui], :component_order, :kind),
+       "the admin catalog's section order has no spec key — keep it in the promoted module"}
     ]
 
     for {option, value, note} <- notes,
         not is_nil(value),
-        {option, value} != {:spec_version, "0.9.1"} do
+        {option, value} not in [{:spec_version, "0.9.1"}, {:component_order, :kind}] do
       Rejection.new(
         "a2ui.#{option}",
         to_string(option),
@@ -183,6 +185,9 @@ defmodule AshA2ui.Dynamic.Importer do
     spec =
       %{"kind" => to_string(component.name)}
       |> put_component_name(component)
+      |> put_opt("label", component.label)
+      |> put_opt("section", component.section)
+      |> put_list("hide_empty", component.hide_empty)
       |> put_related_resource(component.resource, surface_resource)
       |> put_list("fields", component.fields)
       |> put_opt("read_action", component.read_action)
@@ -217,6 +222,7 @@ defmodule AshA2ui.Dynamic.Importer do
   end
 
   defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")
+  defp put_display(spec, %{display: :rows}), do: Map.put(spec, "display", "rows")
 
   defp put_display(spec, %{display: :timeline} = component) do
     spec
@@ -285,6 +291,8 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_keyword("badge_tones", layout.badge_tones, :name)
       |> put_keyword("badge_help", Map.get(layout, :badge_help, []), :raw)
       |> put_list("meta", layout.meta)
+      |> put_list("trailing", layout.trailing)
+      |> put_list("expand", layout.expand)
       |> put_value("columns", layout.columns)
 
     Map.put(spec, "row_layout", row_layout)
@@ -453,6 +461,11 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_link(field.link)
       |> put_opt("links", field.links)
       |> put_opt("link_label", field.link_label)
+      |> put_value("note", field.note)
+      |> put_value("empty_text", field.empty_text)
+      |> put_keyword("badge_text", field.badge_text, :raw)
+      |> put_keyword("badge_tones", field.badge_tones, :name)
+      |> put_keyword("badge_help", field.badge_help, :raw)
     end)
   end
 

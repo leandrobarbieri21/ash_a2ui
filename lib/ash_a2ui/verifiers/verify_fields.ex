@@ -37,14 +37,16 @@ defmodule AshA2ui.Verifiers.VerifyFields do
         known = known_field_names(target)
         exempt = relationship_field_names(dsl_state)
 
-        with :ok <- verify_components(dsl_state, target, module, known, exempt) do
-          # A field override may style a related table's column too.
-          known =
-            dsl_state
-            |> related_resources(target)
-            |> Enum.reduce(known, &MapSet.union(&2, known_field_names(&1)))
+        # A field override may style a related table's column too.
+        overridable =
+          dsl_state
+          |> related_resources(target)
+          |> Enum.reduce(known, &MapSet.union(&2, known_field_names(&1)))
 
-          verify_field_overrides(dsl_state, module, known, exempt)
+        with :ok <- verify_components(dsl_state, target, module, known, exempt),
+             :ok <- verify_field_overrides(dsl_state, module, overridable, exempt),
+             :ok <- verify_badge_tones(dsl_state, module) do
+          verify_hide_empty(dsl_state, module)
         end
     end
   end
@@ -239,6 +241,63 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       %{type: ^type} = action -> action
       _ -> nil
     end
+  end
+
+  # A field's detail badge tones come from the row layout badge vocabulary.
+  defp verify_badge_tones(dsl_state, module) do
+    bad =
+      for %AshA2ui.Field{name: name, badge_tones: tones} <-
+            Verifier.get_entities(dsl_state, [:a2ui]),
+          {value, tone} <- tones,
+          tone not in AshA2ui.RowLayout.tones(),
+          do: {name, value, tone}
+
+    case bad do
+      [] ->
+        :ok
+
+      [{name, value, tone} | _rest] ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :field, name, :badge_tones],
+           message:
+             "badge_tones for #{inspect(value)} must be one of " <>
+               "#{inspect(AshA2ui.RowLayout.tones())}, got: #{inspect(tone)}"
+         )}
+    end
+  end
+
+  # `hide_empty` belongs to :detail cards, and names fields the card shows.
+  defp verify_hide_empty(dsl_state, module) do
+    dsl_state
+    |> components()
+    |> Enum.find_value(:ok, fn
+      %AshA2ui.Component{hide_empty: []} ->
+        nil
+
+      %AshA2ui.Component{name: :detail, fields: fields, hide_empty: hidden} = component ->
+        case hidden -- (fields || []) do
+          [] ->
+            nil
+
+          [name | _rest] ->
+            {:error,
+             DslError.exception(
+               module: module,
+               path: [:a2ui, :component, AshA2ui.Component.key(component), :hide_empty],
+               message: "hide_empty names #{inspect(name)}, which is not one of the card's fields"
+             )}
+        end
+
+      component ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, AshA2ui.Component.key(component), :hide_empty],
+           message: "hide_empty is only valid on :detail components"
+         )}
+    end)
   end
 
   defp components(dsl_state) do

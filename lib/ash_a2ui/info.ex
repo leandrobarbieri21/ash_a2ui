@@ -513,9 +513,16 @@ defmodule AshA2ui.Info do
                read_opts(resolved_view, opts),
                loads
              ) do
-          {:ok, record} -> ResolvedView.record_values(resolved_view, record, fields, opts)
-          :not_found -> %{}
-          {:error, error} -> raise Ash.Error.to_error_class(error)
+          {:ok, record} ->
+            resolved_view
+            |> ResolvedView.record_values(record, fields, opts)
+            |> Map.merge(ResolvedView.detail_badge_data(resolved_view, record, fields))
+
+          :not_found ->
+            %{}
+
+          {:error, error} ->
+            raise Ash.Error.to_error_class(error)
         end
     end
   end

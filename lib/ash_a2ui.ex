@@ -142,6 +142,55 @@ defmodule AshA2ui do
         attribute of `[:name, :title, :label, :username, :email]` on the
         destination, else its primary key.
         """
+      ],
+      note: [
+        type: :string,
+        doc: """
+        A few words beside the field's label on `:detail` cards, saying how
+        the value came to be: "Calculated", "From the signed copy". Admin
+        catalog (`fieldDisplay`'s `note`); translated in the metadata domain.
+        """
+      ],
+      empty_text: [
+        type: :string,
+        doc: """
+        What a `:detail` card shows for this field when the record has no
+        value (`nil` or `""`), instead of a blank: "Not stated", "None". Shown
+        muted by the admin catalog (`fieldDisplay`'s `emptyText`); the basic
+        catalog shows the blank. Translated in the metadata domain.
+        """
+      ],
+      badge_text: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Draws this field as a badge on `:detail` cards, with the display text
+        per value, matched like a `row_layout`'s `badge_text` (atom and
+        boolean values). Unmatched values show their humanized value, an
+        enumerated value its choice label. Declaring any of `badge_text`,
+        `badge_tones` or `badge_help` makes the field a badge; its text, tone
+        and help are served at `/detail/<context>/_badge_<field>`,
+        `_badge_tone_<field>` and `_badge_help_<field>`, the same keys a row
+        layout's badge uses.
+        """
+      ],
+      badge_tones: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        The tone per value of a `:detail` badge (see `badge_text`), from the
+        row layout badge tones (`AshA2ui.RowLayout.tones/0`). Unmatched values
+        are `:neutral`.
+        """
+      ],
+      badge_help: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        A short explanation per value of a `:detail` badge (see `badge_text`),
+        shown as its tooltip by the admin catalog. Translated in the metadata
+        domain.
+        """
       ]
     ]
   }
@@ -1203,7 +1252,30 @@ defmodule AshA2ui do
         type: {:list, :atom},
         doc: """
         The fields rendered in the card's labeled metadata grid, in order.
-        Defaults to the table's fields minus `title` and `badge`.
+        Defaults to the table's fields minus `title`, `badge`, `trailing`
+        and `expand`.
+        """
+      ],
+      trailing: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Fields drawn at the end of the row, right-aligned: an amount over its
+        unit, a due date. The admin dataGrid's columns for them carry
+        `"placement": "trailing"`; the basic card shows them in its metadata
+        grid.
+        """
+      ],
+      expand: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Fields shown only when the row is opened: a scope of work, an
+        amendment's full text. Declaring any makes each row a disclosure that
+        opens below itself (rows start closed and open independently). The
+        admin dataGrid's columns for them carry `"placement": "expand"`;
+        renderers that do not draw disclosures show them as columns, and the
+        basic card shows them in its metadata grid.
         """
       ],
       columns: [
@@ -1599,6 +1671,28 @@ defmodule AshA2ui do
         required: true,
         doc: "The kind of component. One of `:table`, `:form`, `:detail` or `:report`."
       ],
+      section: [
+        type: :string,
+        doc: """
+        The page section this component belongs to: consecutive components
+        (in the surface's root order) naming the same section render under
+        one heading — "Overview" over its Details and Parties cards — inside
+        a wrapper `Column` whose id is `section_<first component's key>`
+        (an anchor a section nav can target). A component in a section with
+        no `label` of its own draws no heading of its own. Translated in the
+        metadata domain.
+        """
+      ],
+      label: [
+        type: :string,
+        doc: """
+        The heading this component's section is shown under: a table's
+        heading on multi-table surfaces, a `:detail` or `:report` card's
+        heading. Defaults to the humanized component name (`:contract_value`
+        reads "Contract value"), which cannot say "Properties & pricing".
+        Translated in the metadata domain like a field's `label`.
+        """
+      ],
       as: [
         type: :atom,
         doc: """
@@ -1680,11 +1774,16 @@ defmodule AshA2ui do
         """
       ],
       display: [
-        type: {:one_of, [:list, :board, :calendar, :timeline, :matrix]},
+        type: {:one_of, [:list, :rows, :board, :calendar, :timeline, :matrix]},
         default: :list,
         doc: """
         How a `:table` lays out its records. `:list` (default) renders rows
-        (and stacks a sectioned table's sections). `:board` renders a
+        (and stacks a sectioned table's sections). `:rows` is a list drawn
+        as a stack of rows without a header — a record page's related lines
+        — and requires a `row_layout`: the admin dataGrid carries
+        `"layout": "rows"`, which renderers may draw as list rows (title and
+        subtitle, badge, trailing values, an opening detail); renderers that
+        ignore it draw the grid. `:board` renders a
         sectioned table's sections side by side as lanes, each with its
         heading and total, card list and pagination; it requires a
         `sections` block and a `row_layout`, and cards move between lanes
@@ -1808,6 +1907,17 @@ defmodule AshA2ui do
         and the detail panels and related tables bound to the context follow.
         On a board (`display :board`) every card carries the button; other
         sectioned tables do not take `select_context`.
+        """
+      ],
+      hide_empty: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        `:detail` components only: fields whose row is left out of the card
+        while the record has no value for them (`nil` or `""`), instead of
+        showing a blank or the field's `empty_text` — "Terminated by" on a
+        contract that was never terminated. Admin catalog (`fieldDisplay`'s
+        `hideWhenEmpty`); the basic catalog shows the row.
         """
       ],
       context: [
@@ -2069,6 +2179,18 @@ defmodule AshA2ui do
         module rather than after the thing: a surface over `Legacy.User` is
         headed "User" though it is a list of users from another application's
         estate. Set it to the words the host already uses in its own navigation.
+        """
+      ],
+      component_order: [
+        type: {:one_of, [:kind, :declared]},
+        default: :kind,
+        doc: """
+        The order of the surface's sections in the admin catalog. `:kind`
+        (the default) places every table before the `:detail` and `:report`
+        cards; `:declared` places them in the order the components are
+        declared, so a record page can interleave its detail cards and
+        related tables (Overview, then the lines, then the renewal terms).
+        The basic catalog always uses declaration order.
         """
       ],
       record_label: [

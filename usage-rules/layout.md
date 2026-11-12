@@ -115,6 +115,39 @@ topics for the full contracts.
   byte-identical to the pre-layout encoder when undeclared, so adding one
   never breaks existing renderers.
 
+## List rows (`display :rows`)
+
+- A record page's related lines (a contract's services and prices, its
+  amendments) read as a stack of rows, not a grid: `display :rows` plus a
+  `row_layout`. The layout's `trailing` fields sit at the row's end,
+  right-aligned (an amount, a due date); its `expand` fields show only when
+  the row is opened, and declaring any makes every row a disclosure:
+
+  ```elixir
+  component :table, :lines do
+    label "Properties & pricing"
+    resource MyApp.ContractLine
+    display :rows
+    fields [:service_name, :period, :price, :scope_of_work]
+    context_filter contract_id: :contract
+
+    row_layout do
+      title :service_name
+      trailing [:price]
+      expand [:scope_of_work]
+    end
+  end
+  ```
+
+- `trailing`/`expand` must reference the table's fields (compile-verified)
+  and drop out of the default `meta`. `display :rows` without a
+  `row_layout` does not compile.
+- Admin catalog 1.12: the dataGrid carries `"layout": "rows"` and those
+  columns `"placement": "trailing" | "expand"`. A renderer that draws list
+  rows uses them; one that ignores them draws the grid with every column.
+  The basic card has no trailing slot or disclosure: both join its
+  metadata grid.
+
 ## Table columns
 
 - A `column` entity on a `:table` says how the admin data grid draws one

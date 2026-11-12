@@ -13,6 +13,8 @@ defmodule AshA2ui.RowLayout do
     badge_text: [],
     badge_tones: [],
     badge_help: [],
+    trailing: [],
+    expand: [],
     columns: 2,
     __spark_metadata__: nil
   ]
@@ -21,6 +23,8 @@ defmodule AshA2ui.RowLayout do
           title: atom,
           badge: atom | nil,
           meta: [atom] | nil,
+          trailing: [atom],
+          expand: [atom],
           badge_text: keyword(String.t()),
           badge_tones: keyword(atom),
           badge_help: keyword(String.t()),

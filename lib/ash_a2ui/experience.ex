@@ -174,7 +174,7 @@ defmodule AshA2ui.Experience do
   pagination page sizes and the extended ChoicePicker/TextField keys.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.11.0"
+  def admin_catalog_version, do: "1.12.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item
@@ -302,12 +302,21 @@ defmodule AshA2ui.Experience do
   # multi-table surfaces (same scheme as the section headings).
   @spec collection_label(ResolvedView.t(), ResolvedView.table()) :: String.t()
   def collection_label(view, table) do
-    if ResolvedView.multi_table?(view) do
-      Label.resolve(view.l10n, nil, table.name)
-    else
-      resource_label(view)
+    cond do
+      ResolvedView.multi_table?(view) -> component_label(view, table.component, table.name)
+      # A declared label heads a lone table too; without one it keeps the
+      # resource name (frozen).
+      table.component.label -> component_label(view, table.component, table.name)
+      true -> resource_label(view)
     end
   end
+
+  @doc false
+  # A section's heading: the component's declared `label`, else its humanized
+  # name (`name` is the table's or card's runtime key), translated in the
+  # metadata domain either way.
+  def component_label(view, component, name),
+    do: Label.resolve(view.l10n, component && component.label, name)
 
   @doc false
   # The root data-model path of a table's `_empty_visible` sentinel
