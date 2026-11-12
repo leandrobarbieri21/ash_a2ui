@@ -24,6 +24,7 @@ defmodule AshA2ui.Dynamic.Promoter do
   @component_options [
     label: :raw,
     section: :raw,
+    section_note: :name,
     hide_empty: :name_list,
     fields: :name_list,
     read_action: :name,
@@ -54,6 +55,9 @@ defmodule AshA2ui.Dynamic.Promoter do
     meta: :name_list,
     trailing: :name_list,
     expand: :name_list,
+    group_by: :name,
+    group_subtitle: :name,
+    group_icon: :raw,
     columns: :raw
   ]
 

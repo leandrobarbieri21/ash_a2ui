@@ -11,7 +11,8 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       that are strings, `badge_text` only alongside a `badge`, and
       `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` and
       `badge_help` values that are strings (both also only alongside a
-      `badge`),
+      `badge`), and `group_subtitle`/`group_icon` only alongside a
+      `group_by`,
     * `column` entities appear only on `:table` components, with unique
       names that are table fields, `subtitle`/`icon`/`more`/`detail`/
       `detail_date`/`caption` referencing table fields that are not columns
@@ -363,10 +364,26 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
     with :ok <- verify_layout_fields_known(component, layout, module),
          :ok <- verify_layout_fields_distinct(layout, module),
          :ok <- verify_badge_text(layout, module),
-         :ok <- verify_badge_help(layout, module) do
+         :ok <- verify_badge_help(layout, module),
+         :ok <- verify_group(layout, module) do
       verify_badge_tones(layout, module)
     end
   end
+
+  defp verify_group(%{group_by: nil} = layout, module) do
+    case Enum.find([:group_subtitle, :group_icon], &Map.get(layout, &1)) do
+      nil ->
+        :ok
+
+      option ->
+        {:error,
+         error(module, [:a2ui, :component, :table, :row_layout, option],
+           message: "row_layout declares #{option} without a group_by field"
+         )}
+    end
+  end
+
+  defp verify_group(_layout, _module), do: :ok
 
   defp verify_layout_fields_known(%{fields: nil}, _layout, _module), do: :ok
 
@@ -478,7 +495,7 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
   end
 
   defp referenced_fields(layout) do
-    Enum.reject([layout.title, layout.badge], &is_nil/1) ++
+    Enum.reject([layout.title, layout.badge, layout.group_by, layout.group_subtitle], &is_nil/1) ++
       (layout.meta || []) ++ layout.trailing ++ layout.expand
   end
 

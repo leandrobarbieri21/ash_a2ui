@@ -488,7 +488,8 @@ defmodule AshA2ui.Info do
   # record (authorized, with the detail components' loads), unselected ones
   # render %{}.
   defp load_details!(resolved_view, selected, opts) do
-    resolved_view.details
+    resolved_view
+    |> ResolvedView.detail_sources()
     |> Enum.group_by(& &1.context)
     |> Map.new(fn {context_name, details} ->
       {context_name, detail_value!(resolved_view, context_name, details, selected, opts)}

@@ -147,6 +147,26 @@ topics for the full contracts.
   rows uses them; one that ignores them draws the grid with every column.
   The basic card has no trailing slot or disclosure: both join its
   metadata grid.
+- Lines that belong to something (a contract's lines per property) group
+  with `group_by`: each run of consecutive rows sharing its value is headed
+  once, with `group_subtitle` under the header and `group_icon` beside it.
+  Rows are grouped as they arrive, so sort the table's read (or its query)
+  by the group first:
+
+  ```elixir
+  row_layout do
+    group_by :property_name
+    group_subtitle :property_address
+    group_icon "home"
+    title :service_name
+    trailing [:price]
+  end
+  ```
+
+- `group_subtitle` and `group_icon` need a `group_by`; both fields must be
+  the table's and drop out of the default `meta`. Admin catalog 1.14: their
+  columns carry `"placement": "group" | "groupSubtitle"` and the dataGrid
+  `groupIcon`; the basic card shows them in its metadata grid.
 
 ## Table columns
 

@@ -46,6 +46,23 @@ Requires Elixir 1.20 or later.
   or `report` click until the server answers; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
+- **Admin catalog 1.14: grouped list rows and section notes.** A
+  `row_layout`'s `group_by :field` heads each run of consecutive rows sharing
+  that value with one header (a property over its contract lines), with
+  `group_subtitle :field` under it (taken from the group's first row) and
+  `group_icon "home"` for the headers. The admin dataGrid's columns carry
+  `"placement": "group" | "groupSubtitle"` and the grid `groupIcon`; the basic
+  card shows the group's fields in its metadata grid. Order the rows so each
+  group is together. A field's `empty_text` now rides on its dataGrid column
+  too (`emptyText`), for a list row's empty value. A component's `section_note :field` draws a field of its
+  context's record (a `:detail`'s context, or the one context a related
+  table's `context_filter` names) under its section's heading
+  (`section_<key>_note`, a caption Text bound to `/detail/<context>/<field>`),
+  read and refreshed with that record. Verified: the group options only with
+  a `group_by` among the table's fields; a note only with a `section` and a
+  context whose resource has it. The `RowLayout` struct gains `group_by`,
+  `group_subtitle` and `group_icon`, the `Component` struct `section_note`.
+
 - **Admin catalog 1.13: plain links.** A `field`'s `link_url :field` links
   its value to a page or address held by another field of the same
   resource (a path or an absolute URL), not to a surface's record. Rows carry
