@@ -806,7 +806,10 @@ Documented as roadmap (not built):
   and waits on an Elixir A2A server to embed in plus a concrete
   agent-to-agent consumer.
 - **Raw WebSocket transport.**
-- **Custom component catalogs** beyond the basic catalog.
+- **A server-side extension point for third-party component catalogs.** The encoder
+  emits the `ash_a2ui` and `admin` catalogs. A host can ship its own Lit catalog and
+  register it in the browser today; see
+  [ADR 0001](docs/adr/0001-custom-component-catalogs.md).
 
 ## Documentation
 
