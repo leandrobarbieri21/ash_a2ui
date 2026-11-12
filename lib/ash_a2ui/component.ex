@@ -15,6 +15,7 @@ defmodule AshA2ui.Component do
     :as,
     :label,
     :section,
+    :section_note,
     :fields,
     :resource,
     :read_action,
@@ -59,6 +60,7 @@ defmodule AshA2ui.Component do
           as: atom | String.t() | nil,
           label: String.t() | nil,
           section: String.t() | nil,
+          section_note: atom | nil,
           fields: [atom] | nil,
           resource: module | nil,
           read_action: atom | nil,
@@ -109,6 +111,21 @@ defmodule AshA2ui.Component do
   @spec key(t()) :: atom | String.t()
   def key(%__MODULE__{as: nil, name: name}), do: name
   def key(%__MODULE__{as: as}), do: as
+
+  @doc """
+  The context whose record supplies a component's `section_note`: a
+  `:detail`'s `context`, or the one context a related table's
+  `context_filter` names. `nil` when there is no single context.
+  """
+  @spec note_context(t()) :: atom | nil
+  def note_context(%__MODULE__{name: :detail, context: context}), do: context
+
+  def note_context(%__MODULE__{context_filter: filter}) do
+    case filter |> Keyword.values() |> Enum.uniq() do
+      [context] -> context
+      _none_or_many -> nil
+    end
+  end
 
   @doc """
   The resource a component reads: a related `:table`'s own `resource`, else

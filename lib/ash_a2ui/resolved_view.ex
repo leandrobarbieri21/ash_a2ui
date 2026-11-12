@@ -91,6 +91,7 @@ defmodule AshA2ui.ResolvedView do
     contexts: %{},
     context_order: [],
     details: [],
+    section_notes: [],
     reports: [],
     prompts: %{},
     prompt_selects: %{},
@@ -296,6 +297,7 @@ defmodule AshA2ui.ResolvedView do
           contexts: %{atom => context},
           context_order: [atom],
           details: [detail],
+          section_notes: [detail],
           reports: [report],
           prompts: %{atom => [prompt_field]},
           prompt_selects: %{atom => select},
@@ -409,6 +411,7 @@ defmodule AshA2ui.ResolvedView do
       contexts: Map.new(contexts, &{&1.name, &1}),
       context_order: Enum.map(contexts, & &1.name),
       details: resolve_details(components, contexts, fields),
+      section_notes: resolve_section_notes(components, contexts, fields),
       reports: resolve_reports(resource, components),
       prompts: resolve_prompts(resource, actions, declared, prompt_selects, l10n),
       prompt_selects: prompt_selects,
@@ -456,9 +459,17 @@ defmodule AshA2ui.ResolvedView do
   by the rendered context's name. Empty on surfaces without details.
   """
   @spec detail_state(t()) :: %{String.t() => map}
-  def detail_state(%__MODULE__{details: details}) do
-    Map.new(details, fn detail -> {to_string(detail.context), %{}} end)
+  def detail_state(%__MODULE__{} = view) do
+    Map.new(detail_sources(view), fn detail -> {to_string(detail.context), %{}} end)
   end
+
+  @doc """
+  Everything read with a context's record into `/detail/<context>`: the
+  `:detail` components, then the `section_note`s (each shaped like a detail:
+  its context, its one field and that field's loads).
+  """
+  @spec detail_sources(t()) :: [detail]
+  def detail_sources(%__MODULE__{details: details, section_notes: notes}), do: details ++ notes
 
   @doc """
   Serializes `fields` of an Ash `record` to the wire map shape (string keys,
@@ -1001,6 +1012,25 @@ defmodule AshA2ui.ResolvedView do
     end)
   end
 
+  # A section_note reads with its context's record, like a one-field detail
+  # (the verifier guarantees the context).
+  defp resolve_section_notes(components, contexts, fields) do
+    by_name = Map.new(contexts, &{&1.name, &1})
+
+    for %{section_note: note} = component when not is_nil(note) <- components,
+        context = by_name[AshA2ui.Component.note_context(component)],
+        not is_nil(context) do
+      %{
+        name: AshA2ui.Component.key(component),
+        component: component,
+        context: context.name,
+        fields: [note],
+        loads: field_loads(context.resource, [note], fields),
+        detail_path: "/detail/#{context.name}"
+      }
+    end
+  end
+
   # Calculations referenced by visible_when conditions of this table's row
   # actions must be loaded with the records so per-row visibility can be
   # evaluated (deduplicated against the rendered-field loads).
@@ -1376,25 +1406,36 @@ defmodule AshA2ui.ResolvedView do
     }
   end
 
-  # `meta` defaults to the table's effective fields minus title and badge,
+  # `meta` defaults to the table's effective fields minus title, badge and the
+  # placed fields (trailing, expand, the group's),
   # in field order; an explicit meta list keeps its declared order.
   defp normalize_row_layout(nil, _effective), do: nil
 
   defp normalize_row_layout(layout, effective) do
     trailing = Enum.filter(layout.trailing, &(&1 in effective))
     expand = Enum.filter(layout.expand, &(&1 in effective))
+    group_by = if layout.group_by in effective, do: layout.group_by
+    group_subtitle = if group_by && layout.group_subtitle in effective, do: layout.group_subtitle
 
     meta =
       case layout.meta do
         nil ->
           effective --
-            (Enum.reject([layout.title, layout.badge], &is_nil/1) ++ trailing ++ expand)
+            (Enum.reject([layout.title, layout.badge, group_by, group_subtitle], &is_nil/1) ++
+               trailing ++ expand)
 
         meta ->
           Enum.filter(meta, &(&1 in effective))
       end
 
-    %{layout | meta: meta, trailing: trailing, expand: expand}
+    %{
+      layout
+      | meta: meta,
+        trailing: trailing,
+        expand: expand,
+        group_by: group_by,
+        group_subtitle: group_subtitle
+    }
   end
 
   # Calculations carry a type/constraints just like attributes; aggregates

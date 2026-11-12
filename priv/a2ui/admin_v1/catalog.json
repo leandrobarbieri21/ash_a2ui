@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "x-changelog": {
+    "1.14.0": "Additive: grouped list rows. dataGrid columns gain the placements group (the value heading a group of consecutive rows) and groupSubtitle (the line under that heading, from the group's first row), and the dataGrid an optional groupIcon (an icon name for the group headers, resolved in the renderer's own icon set). Columns gain an optional emptyText (the field's empty_text: the muted words a list-rows renderer shows when the row's value is empty). A list-rows renderer starts a new group wherever the group value changes; renderers that ignore them draw the columns as any other. The catalogId is unchanged.",
     "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
     "1.12.0": "Additive: record pages. fieldDisplay gains optional badge, badgeTone and badgeHelp (bindings to the field's _badge_<field>, _badge_tone_<field> and _badge_help_<field> under its /detail/<context> path: the value drawn as a pill with that tone and one-line tooltip), note (a few words beside the label saying how the value came to be), emptyText (the muted words shown when the value is empty) and hideWhenEmpty (true: an empty value draws no row at all). dataGrid gains an optional layout (rows: list rows instead of a grid) and columns an optional placement (trailing or expand: where a list-rows renderer draws them). Renderers that ignore them draw the plain value and the grid. The catalogId is unchanged.",
     "1.11.0": "Additive: the table's cells and sort. A badge column's badge gains an optional helpPath (row-relative, the _badge_help_<field> key: the pill's one-line tooltip, empty for none). dataGrid columns gain an optional caption ({path, text?}: a third line under the value and its subtitle, the text's {date} filled with the path's value formatted as a date and {value} with it as is; without text the line is the value) and sortFirst (desc when the header's first click sorts descending). The dataGrid's sort gains an optional reset: true, a header's third click then sends a null sort (the query's default order) instead of toggling back. Renderers that ignore them draw the pill without a tooltip, no third line, and toggle. The catalogId is unchanged.",
@@ -149,10 +150,14 @@
                 "enum": ["desc"],
                 "description": "Optional (1.11): the direction a sortable header's first click sorts in when it is not ascending."
               },
+              "emptyText": {
+                "type": "string",
+                "description": "Optional (1.14): the muted words a list-rows renderer shows for the column when a row's value is empty (the field's empty_text)."
+              },
               "placement": {
                 "type": "string",
-                "enum": ["trailing", "expand"],
-                "description": "Optional (1.12): where a list-rows renderer (layout rows) draws the column: trailing at the row's end, right-aligned; expand only when the row is opened. Grids draw it as any other column."
+                "enum": ["trailing", "expand", "group", "groupSubtitle"],
+                "description": "Optional (1.12): where a list-rows renderer (layout rows) draws the column: trailing at the row's end, right-aligned; expand only when the row is opened. 1.14: group heads each run of consecutive rows sharing its value; groupSubtitle sits under that heading. Grids draw it as any other column."
               },
               "caption": {
                 "type": "object",
@@ -174,6 +179,10 @@
           "type": "string",
           "enum": ["rows"],
           "description": "Optional (1.12): rows asks for list rows instead of a grid: no header, each row its title (and subtitle), badge, trailing columns, and a disclosure opening its expand columns. Renderers that ignore it draw the grid."
+        },
+        "groupIcon": {
+          "type": "string",
+          "description": "Optional (1.14): an icon name for a list-rows renderer's group headers (\"home\"), resolved in the renderer's own icon set."
         },
         "rowId": {
           "type": "string",

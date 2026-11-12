@@ -1359,7 +1359,8 @@ defmodule AshA2ui.ActionHandler do
   # components (details of the same context share the path — loads and
   # fields are unioned).
   defp context_detail_messages(view, change, ash_opts) do
-    view.details
+    view
+    |> ResolvedView.detail_sources()
     |> Enum.filter(&(&1.context in change.changed))
     |> Enum.group_by(& &1.context)
     |> Enum.reduce_while({:ok, []}, fn {context_name, details}, {:ok, acc} ->

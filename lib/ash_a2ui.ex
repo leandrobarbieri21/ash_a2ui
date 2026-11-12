@@ -170,7 +170,9 @@ defmodule AshA2ui do
         What a `:detail` card shows for this field when the record has no
         value (`nil` or `""`), instead of a blank: "Not stated", "None". Shown
         muted by the admin catalog (`fieldDisplay`'s `emptyText`); the basic
-        catalog shows the blank. Translated in the metadata domain.
+        catalog shows the blank. A table's admin dataGrid column carries it too
+        (catalog 1.14), for list rows ("No scope of work stated"). Translated in
+        the metadata domain.
         """
       ],
       badge_text: [
@@ -1265,8 +1267,8 @@ defmodule AshA2ui do
         type: {:list, :atom},
         doc: """
         The fields rendered in the card's labeled metadata grid, in order.
-        Defaults to the table's fields minus `title`, `badge`, `trailing`
-        and `expand`.
+        Defaults to the table's fields minus `title`, `badge`, `trailing`,
+        `expand`, `group_by` and `group_subtitle`.
         """
       ],
       trailing: [
@@ -1289,6 +1291,32 @@ defmodule AshA2ui do
         admin dataGrid's columns for them carry `"placement": "expand"`;
         renderers that do not draw disclosures show them as columns, and the
         basic card shows them in its metadata grid.
+        """
+      ],
+      group_by: [
+        type: :atom,
+        doc: """
+        A field whose value heads a group of rows: consecutive rows sharing
+        it render under one header (a property over its lines). Order the
+        rows so each group's rows are together (the table's read action or
+        query sort). The admin dataGrid's column for it carries
+        `"placement": "group"`; the basic card shows it in its metadata grid.
+        """
+      ],
+      group_subtitle: [
+        type: :atom,
+        doc: """
+        A field drawn under the group's header (a property's address), taken
+        from the group's first row. Needs `group_by`. Its admin dataGrid
+        column carries `"placement": "groupSubtitle"`.
+        """
+      ],
+      group_icon: [
+        type: :string,
+        doc: """
+        An icon name for the group headers (`"home"`), carried as the admin
+        dataGrid's `groupIcon`; renderers resolve it in their own icon set.
+        Needs `group_by`.
         """
       ],
       columns: [
@@ -1694,6 +1722,17 @@ defmodule AshA2ui do
         (an anchor a section nav can target). A component in a section with
         no `label` of its own draws no heading of its own. Translated in the
         metadata domain.
+        """
+      ],
+      section_note: [
+        type: :atom,
+        doc: """
+        A field of the component's context record drawn under its section's
+        heading, muted ("3 contract lines · 2 properties"): a `:detail`'s
+        `context`, or the one context a related table's `context_filter`
+        names. Read with the context's record at `/detail/<context>/<field>`;
+        the section's first component that declares one supplies it. Needs
+        `section`.
         """
       ],
       label: [

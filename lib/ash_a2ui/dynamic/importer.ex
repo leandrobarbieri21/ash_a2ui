@@ -187,6 +187,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_component_name(component)
       |> put_opt("label", component.label)
       |> put_opt("section", component.section)
+      |> put_opt("section_note", component.section_note)
       |> put_list("hide_empty", component.hide_empty)
       |> put_related_resource(component.resource, surface_resource)
       |> put_list("fields", component.fields)
@@ -293,6 +294,9 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_list("meta", layout.meta)
       |> put_list("trailing", layout.trailing)
       |> put_list("expand", layout.expand)
+      |> put_opt("group_by", layout.group_by)
+      |> put_opt("group_subtitle", layout.group_subtitle)
+      |> put_opt("group_icon", layout.group_icon)
       |> put_value("columns", layout.columns)
 
     Map.put(spec, "row_layout", row_layout)

@@ -125,6 +125,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "name" => :as,
     "label" => :label,
     "section" => :section,
+    "section_note" => :section_note,
     "hide_empty" => :hide_empty,
     "fields" => :fields,
     "read_action" => :read_action,
@@ -304,6 +305,9 @@ defmodule AshA2ui.Dynamic.Parser do
     "meta" => :meta,
     "trailing" => :trailing,
     "expand" => :expand,
+    "group_by" => :group_by,
+    "group_subtitle" => :group_subtitle,
+    "group_icon" => :group_icon,
     "columns" => :columns
   }
 

@@ -782,10 +782,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   # Consecutive components naming the same `section` share one wrapper: a
-  # Column (`section_<first key>`) holding the section's heading and the
-  # components' root ids. Returns the root ids, with each run replaced by its
-  # wrapper, and the wrapper components. Components without a section (and
-  # components contributing no root ids) pass through.
+  # Column (`section_<first key>`) holding the section's heading, its note
+  # when a component declares a `section_note`, and the components' root
+  # ids. Returns the root ids, with each run replaced by its wrapper, and the
+  # wrapper components. Components without a section (and components
+  # contributing no root ids) pass through.
   defp group_sections(pairs, view) do
     pairs
     |> Enum.reject(fn {_component, ids} -> ids == [] end)
@@ -804,18 +805,41 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
       section ->
         base = "section_#{AshA2ui.Component.key(first)}"
+        note = section_note(run, base)
+        header = ["#{base}_heading" | Enum.map(note, & &1["id"])]
 
         {[base],
          [
-           %{"id" => base, "component" => "Column", "children" => ["#{base}_heading" | ids]},
+           %{"id" => base, "component" => "Column", "children" => header ++ ids},
            %{
              "id" => "#{base}_heading",
              "component" => "Text",
              "text" => Label.translate(view.l10n, section),
              "variant" => "h2"
            }
+           | note
          ]}
     end
+  end
+
+  # The section's note under its heading: the first component's in the run
+  # that declares one, bound to its context's record.
+  defp section_note(run, base) do
+    Enum.find_value(run, [], fn {component, _ids} ->
+      with note when not is_nil(note) <- Map.get(component, :section_note),
+           context when not is_nil(context) <- AshA2ui.Component.note_context(component) do
+        [
+          %{
+            "id" => "#{base}_note",
+            "component" => "Text",
+            "text" => %{"path" => "/detail/#{context}/#{note}"},
+            "variant" => "caption"
+          }
+        ]
+      else
+        _none -> nil
+      end
+    end)
   end
 
   defp card_children(%{name: :detail} = component),
@@ -906,6 +930,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       }
       |> put_row_click(view, table)
       |> maybe_put("layout", if(table.component.display == :rows, do: "rows"))
+      |> maybe_put(
+        "groupIcon",
+        table.component.row_layout && table.component.row_layout.group_icon
+      )
       |> put_grid_sort(view, table)
       |> drop_inline_duplicate(view, table)
 
@@ -1023,6 +1051,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
       |> put_column_placement(layout, field)
+      |> put_empty_text(view, field)
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
@@ -1030,13 +1059,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   end
 
   # Catalog 1.12: a row layout's trailing and expand fields say where a
-  # list-rows renderer draws them.
+  # list-rows renderer draws them; 1.14 adds the group's header fields.
   defp put_column_placement(column, nil, _field), do: column
 
   defp put_column_placement(column, layout, field) do
     cond do
       field in layout.trailing -> Map.put(column, "placement", "trailing")
       field in layout.expand -> Map.put(column, "placement", "expand")
+      field == layout.group_by -> Map.put(column, "placement", "group")
+      field == layout.group_subtitle -> Map.put(column, "placement", "groupSubtitle")
       true -> column
     end
   end
@@ -1060,6 +1091,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           [layout.title, layout.badge]
           |> Enum.reject(&is_nil/1)
           |> Kernel.++(layout.meta ++ layout.trailing ++ layout.expand)
+          |> Kernel.++(Enum.reject([layout.group_by, layout.group_subtitle], &is_nil/1))
           |> Enum.uniq()
       end
 
@@ -3103,9 +3135,14 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       ] ++ badge ++ meta_components
   end
 
-  # The basic card has no trailing slot or disclosure: trailing and expand
-  # fields join its metadata grid.
-  defp card_meta_fields(layout), do: Enum.uniq(layout.meta ++ layout.trailing ++ layout.expand)
+  # The basic card has no trailing slot, disclosure or group header: the
+  # group's fields, trailing and expand fields join its metadata grid.
+  defp card_meta_fields(layout) do
+    Enum.uniq(
+      Enum.reject([layout.group_by, layout.group_subtitle], &is_nil/1) ++
+        layout.meta ++ layout.trailing ++ layout.expand
+    )
+  end
 
   # An N-column grid: items chunked into Rows of `columns` equal-weight cell
   # Columns (each holding the ids `cell_fun` returns for its item), the last

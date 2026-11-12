@@ -25,6 +25,9 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     * every `:detail` component names a declared `context` and renders
       public attributes / calculations / aggregates of that context's
       resource,
+    * a component's `section_note` comes with a `section` and one context
+      (`AshA2ui.Component.note_context/1`) whose resource has it as a
+      public attribute, calculation or aggregate,
     * context options stay on the components they belong to:
       `context_filter` / `require_context` / `select_context` are
       table-only, `context` is detail-only.
@@ -52,8 +55,9 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     with :ok <- verify_unique_names(contexts, module),
          :ok <- verify_options_namespace(contexts, dsl_state, module),
          :ok <- verify_contexts(contexts, module),
-         :ok <- verify_tables(components, contexts, dsl_state, module) do
-      verify_details(components, names, contexts, dsl_state, module)
+         :ok <- verify_tables(components, contexts, dsl_state, module),
+         :ok <- verify_details(components, names, contexts, dsl_state, module) do
+      verify_section_notes(components, contexts, module)
     end
   end
 
@@ -501,6 +505,46 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     public_attribute?(resource, name) or
       match?(%{public?: true}, ResourceInfo.calculation(resource, name)) or
       match?(%{public?: true}, ResourceInfo.aggregate(resource, name))
+  end
+
+  # --- section notes -------------------------------------------------------------
+
+  defp verify_section_notes(components, contexts, module) do
+    by_name = Map.new(contexts, &{&1.name, &1})
+
+    components
+    |> Enum.reject(&is_nil(&1.section_note))
+    |> Enum.find_value(:ok, &section_note_error(&1, by_name, module))
+  end
+
+  defp section_note_error(component, by_name, module) do
+    key = AshA2ui.Component.key(component)
+    context = by_name[AshA2ui.Component.note_context(component)]
+
+    detail =
+      cond do
+        is_nil(component.section) ->
+          "needs a section to sit under"
+
+        is_nil(context) ->
+          "needs one context to read it from: a :detail's context, or a table whose " <>
+            "context_filter names exactly one context"
+
+        not detail_renderable?(context.resource, component.section_note) ->
+          "#{inspect(component.section_note)} is not a public attribute, calculation, or " <>
+            "aggregate of the context's resource #{inspect(context.resource)}"
+
+        true ->
+          nil
+      end
+
+    detail &&
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :component, key, :section_note],
+         message: "section_note on component #{inspect(key)} #{detail}"
+       )}
   end
 
   # --- shared helpers ------------------------------------------------------------

@@ -103,18 +103,35 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.14 is additive: grouped list rows" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.14.0"
+    assert Experience.admin_catalog_version() == "1.14.0"
+    assert catalog["x-changelog"]["1.14.0"] =~ "grouped list rows"
+
+    grid = catalog["components"]["dataGrid"]["properties"]
+    assert grid["groupIcon"]["type"] == "string"
+    assert grid["columns"]["items"]["properties"]["emptyText"]["type"] == "string"
+
+    assert grid["columns"]["items"]["properties"]["placement"]["enum"] == [
+             "trailing",
+             "expand",
+             "group",
+             "groupSubtitle"
+           ]
+
+    source = File.read!(@renderer_asset_path)
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.14.0")
+  end
+
   test "catalog 1.13 is additive: plain links" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.13.0"
-    assert Experience.admin_catalog_version() == "1.13.0"
     assert catalog["x-changelog"]["1.13.0"] =~ "{href, label} with no surface"
 
     field_link = catalog["components"]["fieldDisplay"]["properties"]["link"]
     assert field_link["description"] =~ "a plain link {href, label} with no surface"
-
-    source = File.read!(@renderer_asset_path)
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.13.0")
   end
 
   test "catalog 1.12 is additive: fieldDisplay badge, emptyText, hideWhenEmpty; grid rows" do
@@ -134,10 +151,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     grid = catalog["components"]["dataGrid"]["properties"]
     assert grid["layout"]["enum"] == ["rows"]
 
-    assert grid["columns"]["items"]["properties"]["placement"]["enum"] == [
-             "trailing",
-             "expand"
-           ]
+    assert ["trailing", "expand" | _later] =
+             grid["columns"]["items"]["properties"]["placement"]["enum"]
   end
 
   test "catalog 1.11 is additive: badge helpPath, column caption and sortFirst, sort reset" do
