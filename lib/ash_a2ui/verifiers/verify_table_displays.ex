@@ -28,7 +28,8 @@ defmodule AshA2ui.Verifiers.VerifyTableDisplays do
     |> Enum.reduce_while(:ok, fn component, :ok ->
       resource = VerifyCalendar.table_resource(component, dsl_state)
 
-      with :ok <- AshA2ui.Timeline.validate(component, resource),
+      with :ok <- validate_rows(component),
+           :ok <- AshA2ui.Timeline.validate(component, resource),
            :ok <- AshA2ui.Matrix.validate(component, resource) do
         {:cont, :ok}
       else
@@ -36,6 +37,12 @@ defmodule AshA2ui.Verifiers.VerifyTableDisplays do
       end
     end)
   end
+
+  # A list-rows table draws its rows from a row layout.
+  defp validate_rows(%Component{display: :rows, row_layout: nil}),
+    do: {:error, :display, "display :rows requires a row_layout"}
+
+  defp validate_rows(_component), do: :ok
 
   defp error(component, module, option, message) do
     key = Component.key(component)

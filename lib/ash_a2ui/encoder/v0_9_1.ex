@@ -856,6 +856,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => ["empty_state#{sfx}" | pagination_children] ++ prompt_ids
       }
       |> put_row_click(view, table)
+      |> maybe_put("layout", if(table.component.display == :rows, do: "rows"))
       |> put_grid_sort(view, table)
       |> drop_inline_duplicate(view, table)
 
@@ -972,10 +973,23 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{"label" => view.fields[field].label, "path" => to_string(field)}
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
+      |> put_column_placement(layout, field)
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
     end)
+  end
+
+  # Catalog 1.12: a row layout's trailing and expand fields say where a
+  # list-rows renderer draws them.
+  defp put_column_placement(column, nil, _field), do: column
+
+  defp put_column_placement(column, layout, field) do
+    cond do
+      field in layout.trailing -> Map.put(column, "placement", "trailing")
+      field in layout.expand -> Map.put(column, "placement", "expand")
+      true -> column
+    end
   end
 
   @doc false
@@ -996,7 +1010,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         {layout, _order} ->
           [layout.title, layout.badge]
           |> Enum.reject(&is_nil/1)
-          |> Kernel.++(layout.meta)
+          |> Kernel.++(layout.meta ++ layout.trailing ++ layout.expand)
           |> Enum.uniq()
       end
 
@@ -2962,7 +2976,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       end
 
     {meta_row_ids, meta_components} =
-      grid_components("#{base}_meta", layout.columns, layout.meta, fn field ->
+      grid_components("#{base}_meta", layout.columns, card_meta_fields(layout), fn field ->
         {value_id, value_components} =
           linked_value(
             table,
@@ -3026,6 +3040,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
       ] ++ badge ++ meta_components
   end
+
+  # The basic card has no trailing slot or disclosure: trailing and expand
+  # fields join its metadata grid.
+  defp card_meta_fields(layout), do: Enum.uniq(layout.meta ++ layout.trailing ++ layout.expand)
 
   # An N-column grid: items chunked into Rows of `columns` equal-weight cell
   # Columns (each holding the ids `cell_fun` returns for its item), the last

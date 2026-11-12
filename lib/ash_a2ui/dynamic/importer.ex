@@ -220,6 +220,7 @@ defmodule AshA2ui.Dynamic.Importer do
   end
 
   defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")
+  defp put_display(spec, %{display: :rows}), do: Map.put(spec, "display", "rows")
 
   defp put_display(spec, %{display: :timeline} = component) do
     spec
@@ -288,6 +289,8 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_keyword("badge_tones", layout.badge_tones, :name)
       |> put_keyword("badge_help", Map.get(layout, :badge_help, []), :raw)
       |> put_list("meta", layout.meta)
+      |> put_list("trailing", layout.trailing)
+      |> put_list("expand", layout.expand)
       |> put_value("columns", layout.columns)
 
     Map.put(spec, "row_layout", row_layout)

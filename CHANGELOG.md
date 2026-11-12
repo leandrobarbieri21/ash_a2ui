@@ -27,6 +27,26 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **Admin catalog 1.12: record pages.** A page about one record (a
+  pickerless context, its detail cards and related tables) can now be laid
+  out and worded like one:
+  - a component's `label` heads its section (multi-table and lone tables,
+    detail and report cards), translated as metadata;
+  - `component_order :declared` lays the admin catalog's sections out in
+    declaration order, so detail cards and related tables interleave;
+  - a `field` declaring `badge_text`, `badge_tones` or `badge_help` draws as a
+    badge with a tooltip on detail cards (`fieldDisplay`'s `badge`,
+    `badgeTone`, `badgeHelp`);
+  - a `field`'s `empty_text` replaces an empty detail value with muted words,
+    and a detail's `hide_empty` leaves rows out while empty (`emptyText`,
+    `hideWhenEmpty`);
+  - `display :rows` draws a table as list rows, with a row layout's
+    `trailing` fields at the row's end and its `expand` fields behind a
+    disclosure (the dataGrid's `layout` and its columns' `placement`).
+
+  All additive: surfaces that declare none of them encode exactly as before.
+  The `Component`, `Field` and `RowLayout` structs gain the new keys.
+
 - **Admin catalog 1.11: a badge explains itself, a column has a third line,
   and a header can return to the default order.** All opt-in and additive;
   a table without them emits exactly what it did.

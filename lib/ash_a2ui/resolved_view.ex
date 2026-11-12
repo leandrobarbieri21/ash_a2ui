@@ -1379,13 +1379,20 @@ defmodule AshA2ui.ResolvedView do
   defp normalize_row_layout(nil, _effective), do: nil
 
   defp normalize_row_layout(layout, effective) do
+    trailing = Enum.filter(layout.trailing, &(&1 in effective))
+    expand = Enum.filter(layout.expand, &(&1 in effective))
+
     meta =
       case layout.meta do
-        nil -> effective -- Enum.reject([layout.title, layout.badge], &is_nil/1)
-        meta -> Enum.filter(meta, &(&1 in effective))
+        nil ->
+          effective --
+            (Enum.reject([layout.title, layout.badge], &is_nil/1) ++ trailing ++ expand)
+
+        meta ->
+          Enum.filter(meta, &(&1 in effective))
       end
 
-    %{layout | meta: meta}
+    %{layout | meta: meta, trailing: trailing, expand: expand}
   end
 
   # Calculations carry a type/constraints just like attributes; aggregates

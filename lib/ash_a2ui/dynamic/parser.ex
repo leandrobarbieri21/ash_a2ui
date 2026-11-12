@@ -148,6 +148,7 @@ defmodule AshA2ui.Dynamic.Parser do
   # input).
   @displays %{
     "list" => :list,
+    "rows" => :rows,
     "board" => :board,
     "calendar" => :calendar,
     "timeline" => :timeline,
@@ -299,6 +300,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "badge_tones" => :badge_tones,
     "badge_help" => :badge_help,
     "meta" => :meta,
+    "trailing" => :trailing,
+    "expand" => :expand,
     "columns" => :columns
   }
 

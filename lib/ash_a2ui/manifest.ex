@@ -362,7 +362,7 @@ defmodule AshA2ui.Manifest do
   # runtime suffix per section).
   defp component_id(view, table) do
     cond do
-      table.sections || table.component.display != :list -> nil
+      table.sections || table.component.display not in [:list, :rows] -> nil
       Experience.admin?(view) -> "data_grid#{table_suffix(view, table)}"
       table.component.row_layout -> "record_row#{table_suffix(view, table)}_body"
       true -> "record_row#{table_suffix(view, table)}_content"

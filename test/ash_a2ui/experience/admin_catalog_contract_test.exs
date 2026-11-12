@@ -103,7 +103,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
-  test "catalog 1.12 is additive: fieldDisplay badge, emptyText, hideWhenEmpty" do
+  test "catalog 1.12 is additive: fieldDisplay badge, emptyText, hideWhenEmpty; grid rows" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
     assert catalog["version"] == "1.12.0"
@@ -118,6 +118,14 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
 
     assert field["properties"]["emptyText"]["type"] == "string"
     assert field["properties"]["hideWhenEmpty"]["type"] == "boolean"
+
+    grid = catalog["components"]["dataGrid"]["properties"]
+    assert grid["layout"]["enum"] == ["rows"]
+
+    assert grid["columns"]["items"]["properties"]["placement"]["enum"] == [
+             "trailing",
+             "expand"
+           ]
 
     source = File.read!(@renderer_asset_path)
     assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.12.0")

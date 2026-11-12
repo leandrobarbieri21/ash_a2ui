@@ -50,6 +50,8 @@ defmodule AshA2ui.Dynamic.Promoter do
     badge_tones: :name_keyword,
     badge_help: :string_keyword,
     meta: :name_list,
+    trailing: :name_list,
+    expand: :name_list,
     columns: :raw
   ]
 

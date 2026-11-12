@@ -137,6 +137,30 @@ end
   `deep_link: true` it `push_patch`es `ctx` params on context changes and
   re-applies them on back/forward.
 
+## Record pages
+
+A page about one record is a pickerless context (`picker false`, opened
+with `?ctx[<context>]=<id>`), its `:detail` cards and its related tables:
+
+- Head each section with `label` (`component :detail, :overview do label
+  "Overview" ... end`); the default is the humanized component name, which
+  cannot say "Properties & pricing". Labels translate as metadata.
+- `component_order :declared` (a section option) lays the admin catalog's
+  sections out in declaration order — Overview, the lines, then Renewal
+  terms — instead of every table before the cards. The basic catalog always
+  uses declaration order.
+- A detail value that is a state reads as a badge: declare `badge_text`,
+  `badge_tones` and `badge_help` on its `field`, the row layout's
+  vocabulary. The detail data carries `_badge_<field>`,
+  `_badge_tone_<field>` and `_badge_help_<field>`; the admin `fieldDisplay`
+  binds them as `badge`, `badgeTone` and `badgeHelp` (catalog 1.12).
+- A value the record does not state shows the field's `empty_text`
+  ("Not stated") instead of a blank; a row that only makes sense when set
+  ("Terminated by") is listed in the card's `hide_empty` and left out while
+  empty. Both are admin catalog only.
+- Values from related records are calculations on the context's resource:
+  a detail field cannot take a `source` path.
+
 ## Avoid list
 
 - ❌ Modeling a simple enum/status narrowing as a context — that's a query

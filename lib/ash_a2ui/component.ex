@@ -77,7 +77,7 @@ defmodule AshA2ui.Component do
           hide_empty: [atom],
           row_actions: [atom],
           bulk_actions: [atom],
-          display: :list | :board | :calendar | :timeline | :matrix,
+          display: :list | :rows | :board | :calendar | :timeline | :matrix,
           column_order: :layout | :fields,
           date_field: atom | nil,
           end_date_field: atom | nil,

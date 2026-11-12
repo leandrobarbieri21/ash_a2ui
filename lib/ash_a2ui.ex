@@ -1244,7 +1244,30 @@ defmodule AshA2ui do
         type: {:list, :atom},
         doc: """
         The fields rendered in the card's labeled metadata grid, in order.
-        Defaults to the table's fields minus `title` and `badge`.
+        Defaults to the table's fields minus `title`, `badge`, `trailing`
+        and `expand`.
+        """
+      ],
+      trailing: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Fields drawn at the end of the row, right-aligned: an amount over its
+        unit, a due date. The admin dataGrid's columns for them carry
+        `"placement": "trailing"`; the basic card shows them in its metadata
+        grid.
+        """
+      ],
+      expand: [
+        type: {:list, :atom},
+        default: [],
+        doc: """
+        Fields shown only when the row is opened: a scope of work, an
+        amendment's full text. Declaring any makes each row a disclosure that
+        opens below itself (rows start closed and open independently). The
+        admin dataGrid's columns for them carry `"placement": "expand"`;
+        renderers that do not draw disclosures show them as columns, and the
+        basic card shows them in its metadata grid.
         """
       ],
       columns: [
@@ -1731,11 +1754,16 @@ defmodule AshA2ui do
         """
       ],
       display: [
-        type: {:one_of, [:list, :board, :calendar, :timeline, :matrix]},
+        type: {:one_of, [:list, :rows, :board, :calendar, :timeline, :matrix]},
         default: :list,
         doc: """
         How a `:table` lays out its records. `:list` (default) renders rows
-        (and stacks a sectioned table's sections). `:board` renders a
+        (and stacks a sectioned table's sections). `:rows` is a list drawn
+        as a stack of rows without a header — a record page's related lines
+        — and requires a `row_layout`: the admin dataGrid carries
+        `"layout": "rows"`, which renderers may draw as list rows (title and
+        subtitle, badge, trailing values, an opening detail); renderers that
+        ignore it draw the grid. `:board` renders a
         sectioned table's sections side by side as lanes, each with its
         heading and total, card list and pagination; it requires a
         `sections` block and a `row_layout`, and cards move between lanes
