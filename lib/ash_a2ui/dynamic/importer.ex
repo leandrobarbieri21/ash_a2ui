@@ -461,6 +461,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_link(field.link)
       |> put_opt("links", field.links)
       |> put_opt("link_label", field.link_label)
+      |> put_opt("link_url", field.link_url)
       |> put_value("note", field.note)
       |> put_value("empty_text", field.empty_text)
       |> put_keyword("badge_text", field.badge_text, :raw)

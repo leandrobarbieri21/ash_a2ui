@@ -45,7 +45,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
 
         with :ok <- verify_components(dsl_state, target, module, known, exempt),
              :ok <- verify_field_overrides(dsl_state, module, overridable, exempt),
-             :ok <- verify_badge_tones(dsl_state, module) do
+             :ok <- verify_badge_tones(dsl_state, module),
+             :ok <- verify_link_urls(dsl_state, module, overridable) do
           verify_hide_empty(dsl_state, module)
         end
     end
@@ -242,6 +243,45 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       _ -> nil
     end
   end
+
+  # A plain link's URL is a field of the same resource, and the field links
+  # one way only.
+  defp verify_link_urls(dsl_state, module, known) do
+    dsl_state
+    |> Verifier.get_entities([:a2ui])
+    |> Enum.find_value(:ok, fn
+      %AshA2ui.Field{link_url: nil} ->
+        nil
+
+      %AshA2ui.Field{name: name, link_url: url} = field ->
+        cond do
+          field.link || field.links || field.source ->
+            link_url_error(module, name, "link_url cannot be combined with link, links or source")
+
+          not MapSet.member?(known, url) ->
+            link_url_error(
+              module,
+              name,
+              "link_url names #{inspect(url)}, which is not a public attribute, calculation or aggregate"
+            )
+
+          true ->
+            nil
+        end
+
+      _other ->
+        nil
+    end)
+  end
+
+  defp link_url_error(module, name, message),
+    do:
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :field, name, :link_url],
+         message: message
+       )}
 
   # A field's detail badge tones come from the row layout badge vocabulary.
   defp verify_badge_tones(dsl_state, module) do

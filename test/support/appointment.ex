@@ -30,6 +30,15 @@ defmodule AshA2ui.Test.Appointment do
     belongs_to :clinic, AshA2ui.Test.Clinic, public?: true
   end
 
+  calculations do
+    # A page of the visit's own, for plain links (`link_url`): none once completed.
+    calculate :page_url,
+              :string,
+              expr(if status == :completed, do: nil, else: "/visits/" <> type(id, :string)) do
+      public? true
+    end
+  end
+
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
   end

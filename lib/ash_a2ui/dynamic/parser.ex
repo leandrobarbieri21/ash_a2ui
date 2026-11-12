@@ -624,6 +624,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "link" => :link,
     "links" => :links,
     "link_label" => :link_label,
+    "link_url" => :link_url,
     "note" => :note,
     "empty_text" => :empty_text,
     "badge_text" => :badge_text,

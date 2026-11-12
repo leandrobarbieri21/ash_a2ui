@@ -138,6 +138,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     link: :link,
     links: :name,
     link_label: :name,
+    link_url: :name,
     note: :raw,
     empty_text: :raw,
     badge_text: :string_keyword,

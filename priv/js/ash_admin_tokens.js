@@ -577,7 +577,12 @@ export function badgeTone(tone) {
 export function linkEntries(value) {
   const list = Array.isArray(value) ? value : value ? [value] : [];
   return list.filter(
-    (entry) => entry && typeof entry === "object" && typeof entry.surface === "string" && entry.surface !== "",
+    (entry) =>
+      entry &&
+      typeof entry === "object" &&
+      ((typeof entry.surface === "string" && entry.surface !== "") ||
+        // 1.13: a plain link, a page or address with no surface.
+        (!entry.surface && typeof entry.href === "string" && entry.href !== "")),
   );
 }
 
