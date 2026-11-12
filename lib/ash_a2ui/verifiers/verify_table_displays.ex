@@ -38,9 +38,10 @@ defmodule AshA2ui.Verifiers.VerifyTableDisplays do
     end)
   end
 
-  # A list-rows table draws its rows from a row layout.
-  defp validate_rows(%Component{display: :rows, row_layout: nil}),
-    do: {:error, :display, "display :rows requires a row_layout"}
+  # List rows and cards draw their records from a row layout.
+  defp validate_rows(%Component{display: display, row_layout: nil})
+       when display in [:rows, :cards],
+       do: {:error, :display, "display #{inspect(display)} requires a row_layout"}
 
   defp validate_rows(_component), do: :ok
 

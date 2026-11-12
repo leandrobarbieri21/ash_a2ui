@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "x-changelog": {
+    "1.16.0": "Additive: card rows. dataGrid layout gains cards (one card per row: the title and badge head it, the other columns are labeled rows, and expand columns fold under a disclosure), the dataGrid an optional expandLabel (the words on that disclosure, translated) and columns an optional pairs (true: the value is a list of {term, value} objects, drawn as one labeled row each). Renderers that ignore them draw the grid. The catalogId is unchanged.",
     "1.15.0": "Additive: document rows and table footers. dataGrid columns gain the placement leading (a short code drawn before the row's title, such as a file's type); a plain link object may carry download: true (the address is a file to download, not a page to open); the dataGrid gains an optional footerNote (a binding to a line of text drawn under the rows, inside the table's card) and footerLink ({href, label}: a link beside it). Renderers that ignore them draw the column as any other, follow the link, and leave the footer out. The catalogId is unchanged.",
     "1.14.0": "Additive: grouped list rows. dataGrid columns gain the placements group (the value heading a group of consecutive rows) and groupSubtitle (the line under that heading, from the group's first row), and the dataGrid an optional groupIcon (an icon name for the group headers, resolved in the renderer's own icon set). Columns gain an optional emptyText (the field's empty_text: the muted words a list-rows renderer shows when the row's value is empty). A list-rows renderer starts a new group wherever the group value changes; renderers that ignore them draw the columns as any other. The catalogId is unchanged.",
     "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
@@ -151,6 +152,10 @@
                 "enum": ["desc"],
                 "description": "Optional (1.11): the direction a sortable header's first click sorts in when it is not ascending."
               },
+              "pairs": {
+                "type": "boolean",
+                "description": "Optional (1.16): true when the value is a list of {term, value} objects: a renderer draws one labeled row per pair."
+              },
               "emptyText": {
                 "type": "string",
                 "description": "Optional (1.14): the muted words a list-rows renderer shows for the column when a row's value is empty (the field's empty_text)."
@@ -178,8 +183,12 @@
         },
         "layout": {
           "type": "string",
-          "enum": ["rows"],
-          "description": "Optional (1.12): rows asks for list rows instead of a grid: no header, each row its title (and subtitle), badge, trailing columns, and a disclosure opening its expand columns. Renderers that ignore it draw the grid."
+          "enum": ["rows", "cards"],
+          "description": "Optional (1.12): rows asks for list rows instead of a grid: no header, each row its title (and subtitle), badge, trailing columns, and a disclosure opening its expand columns. 1.16: cards asks for one card per row, headed by its title and badge, its other columns as labeled rows and its expand columns under a disclosure. Renderers that ignore it draw the grid."
+        },
+        "expandLabel": {
+          "type": "string",
+          "description": "Optional (1.16): the words on the disclosure that opens a row's expand columns (\"Show notes\"), translated."
         },
         "footerNote": {
           "type": "object",

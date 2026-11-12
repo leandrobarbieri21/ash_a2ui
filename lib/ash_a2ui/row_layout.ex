@@ -11,6 +11,7 @@ defmodule AshA2ui.RowLayout do
     :badge,
     :meta,
     :leading,
+    :expand_label,
     :group_by,
     :group_subtitle,
     :group_icon,
@@ -30,6 +31,7 @@ defmodule AshA2ui.RowLayout do
           trailing: [atom],
           expand: [atom],
           leading: atom | nil,
+          expand_label: String.t() | nil,
           group_by: atom | nil,
           group_subtitle: atom | nil,
           group_icon: String.t() | nil,
@@ -43,7 +45,8 @@ defmodule AshA2ui.RowLayout do
   The computed badge row data a serialized record carries when its table
   declares a `row_layout` with a `badge`: `%{"_badge_<field>" => text}`,
   where the text is the `badge_text` entry matching the record's value
-  (atom/boolean values only — keyword keys), the humanized value otherwise,
+  (atom/boolean values only — keyword keys), a string that is already words
+  (it has a space or a capital) as written, the humanized value otherwise,
   and `""` for `nil`. Layouts declaring `badge_tones` add
   `"_badge_tone_<field>"`: the matching tone (`"neutral"` when unmatched).
   Layouts declaring `badge_help` add `"_badge_help_<field>"`: the matching
@@ -120,10 +123,19 @@ defmodule AshA2ui.RowLayout do
       is_atom(value) ->
         AshA2ui.Label.translate(l10n, AshA2ui.Label.humanize(value))
 
+      written_text?(value) ->
+        value
+
       true ->
         AshA2ui.Label.humanize(value)
     end
   end
+
+  # A string that is already words (a space or a capital: "Sent 3 days ago",
+  # a calculation's display text) is shown as written; an identifier-like one
+  # (`in_review`) is humanized.
+  defp written_text?(value) when is_binary(value), do: value =~ ~r/[\s\p{Lu}]/u
+  defp written_text?(_value), do: false
 
   defp choice_context(%{__struct__: resource}, badge),
     do: AshA2ui.TypeMapper.choice_context(resource, badge)

@@ -132,7 +132,7 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
       {put.("end_date_field", "starts_on"), ~r/end_date_field must differ from date_field/},
       {put.("granularity", "year"), ~r/granularity must be one of: day, month, week/},
       {put.("display", "board"), ~r/a board needs a :table component with a sections block/},
-      {put.("display", "grid"), ~r/display must be one of: board, calendar, list/},
+      {put.("display", "grid"), ~r/display must be one of: board, calendar, cards, list/},
       {put.("display", "list"),
        ~r/(date_field|end_date_field|granularity) is only supported with display :calendar/},
       {put.("bulk_actions", ["confirm"]), ~r/unknown key "bulk_actions"/}

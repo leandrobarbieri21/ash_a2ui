@@ -52,6 +52,20 @@ Requires Elixir 1.20 or later.
   or `report` click until the server answers; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
+- **Admin catalog 1.16: card rows.** `display :cards` on a table draws one
+  card per row: the `row_layout`'s title and badge head it, its `meta`
+  fields are labeled rows and its `expand` fields fold under a disclosure
+  whose words are the layout's `expand_label` (translated). A field's
+  `pairs true` marks a value that is a list of `{term, value}` maps, drawn
+  as one labeled row each. The dataGrid carries `"layout": "cards"` and
+  `expandLabel`, and the column `"pairs": true`. A row layout's badge that
+  is a string already in words (it has a space or a capital) is now shown
+  as written instead of humanized ("AI review" no longer becomes "Ai
+  review"); identifier-like strings are still humanized. Verified:
+  `display :cards` needs a `row_layout`, `expand_label` needs `expand`
+  fields. The `RowLayout` struct gains `expand_label`, the `Field` struct
+  `pairs`.
+
 - **Admin catalog 1.15: document rows and table footers.** A `row_layout`'s
   `leading :field` draws a short code before the row's title (a file's type);
   its dataGrid column carries `"placement": "leading"`, and the basic card

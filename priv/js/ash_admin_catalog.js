@@ -184,7 +184,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.15.0";
+export const ADMIN_CATALOG_VERSION = "1.16.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -494,12 +494,17 @@ export function buildSchemas(basicCatalog = null) {
           // 1.14: group / groupSubtitle head a run of rows sharing the value;
           // 1.15: leading is a short code before the row's title.
           placement: EnumOf(["trailing", "expand", "group", "groupSubtitle", "leading"]).optional(),
+          // 1.16: the value is a list of {term, value} pairs.
+          pairs: Bool.optional(),
           // 1.14: the field's empty_text, for a list-rows renderer.
           emptyText: Str.optional(),
         }),
       ),
       // 1.12: "rows" asks for list rows instead of a grid (display :rows).
-      layout: EnumOf(["rows"]).optional(),
+      // 1.16: "cards", one card per row.
+      layout: EnumOf(["rows", "cards"]).optional(),
+      // 1.16: the words on the disclosure opening the expand columns.
+      expandLabel: Str.optional(),
       // 1.14: the icon name for a list-rows renderer's group headers.
       groupIcon: Str.optional(),
       // 1.15: the line under the rows (a binding) and the link beside it.

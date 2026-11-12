@@ -154,6 +154,7 @@ defmodule AshA2ui.Dynamic.Parser do
   @displays %{
     "list" => :list,
     "rows" => :rows,
+    "cards" => :cards,
     "board" => :board,
     "calendar" => :calendar,
     "timeline" => :timeline,
@@ -308,6 +309,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "trailing" => :trailing,
     "expand" => :expand,
     "leading" => :leading,
+    "expand_label" => :expand_label,
     "group_by" => :group_by,
     "group_subtitle" => :group_subtitle,
     "group_icon" => :group_icon,
@@ -633,6 +635,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "link_label" => :link_label,
     "link_url" => :link_url,
     "download" => :download,
+    "pairs" => :pairs,
     "note" => :note,
     "empty_text" => :empty_text,
     "badge_text" => :badge_text,
