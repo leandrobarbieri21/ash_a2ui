@@ -39,7 +39,7 @@ defmodule AshA2ui.Test.CaptionedTask do
     query :default do
       sortable [:title, :due_on]
       default_sort title: :asc
-      sort_reset(true)
+      sort_reset true
     end
 
     component :table do
@@ -51,17 +51,17 @@ defmodule AshA2ui.Test.CaptionedTask do
         title :title
         badge :status
         badge_tones open: :info, done: :success
-        badge_help(open: "Still to do", done: "Finished and checked")
+        badge_help open: "Still to do", done: "Finished and checked"
       end
 
       column :title do
         subtitle :assignee_name
-        caption(:created_on)
-        caption_text("Created {date}")
+        caption :created_on
+        caption_text "Created {date}"
       end
 
       column :due_on do
-        sort_first(:desc)
+        sort_first :desc
       end
     end
   end
