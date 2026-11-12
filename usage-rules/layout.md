@@ -117,24 +117,24 @@ topics for the full contracts.
 
 ## List rows (`display :rows`)
 
-- A record page's related lines (a contract's services and prices, its
-  amendments) read as a stack of rows, not a grid: `display :rows` plus a
+- A record page's related lines (an order's items and prices, its
+  shipments) read as a stack of rows, not a grid: `display :rows` plus a
   `row_layout`. The layout's `trailing` fields sit at the row's end,
   right-aligned (an amount, a due date); its `expand` fields show only when
   the row is opened, and declaring any makes every row a disclosure:
 
   ```elixir
-  component :table, :lines do
-    label "Properties & pricing"
-    resource MyApp.ContractLine
+  component :table, :items do
+    label "Items"
+    resource MyApp.OrderItem
     display :rows
-    fields [:service_name, :period, :price, :scope_of_work]
-    context_filter contract_id: :contract
+    fields [:product_name, :delivery_window, :price, :notes]
+    context_filter order_id: :order
 
     row_layout do
-      title :service_name
+      title :product_name
       trailing [:price]
-      expand [:scope_of_work]
+      expand [:notes]
     end
   end
   ```
@@ -147,7 +147,7 @@ topics for the full contracts.
   rows uses them; one that ignores them draws the grid with every column.
   The basic card has no trailing slot or disclosure: both join its
   metadata grid.
-- Lines that belong to something (a contract's lines per property) group
+- Lines that belong to something (an order's items per warehouse) group
   with `group_by`: each run of consecutive rows sharing its value is headed
   once, with `group_subtitle` under the header and `group_icon` beside it.
   Rows are grouped as they arrive, so sort the table's read (or its query)
@@ -155,10 +155,10 @@ topics for the full contracts.
 
   ```elixir
   row_layout do
-    group_by :property_name
-    group_subtitle :property_address
+    group_by :warehouse_name
+    group_subtitle :warehouse_address
     group_icon "home"
-    title :service_name
+    title :product_name
     trailing [:price]
   end
   ```

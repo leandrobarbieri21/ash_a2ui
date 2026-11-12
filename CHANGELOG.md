@@ -71,7 +71,7 @@ Requires Elixir 1.20 or later.
 
 - **Admin catalog 1.14: grouped list rows and section notes.** A
   `row_layout`'s `group_by :field` heads each run of consecutive rows sharing
-  that value with one header (a property over its contract lines), with
+  that value with one header (a warehouse over an order's items), with
   `group_subtitle :field` under it (taken from the group's first row) and
   `group_icon "home"` for the headers. The admin dataGrid's columns carry
   `"placement": "group" | "groupSubtitle"` and the grid `groupIcon`; the basic

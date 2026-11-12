@@ -150,9 +150,9 @@ with `?ctx[<context>]=<id>`), its `:detail` cards and its related tables:
   `Column` (`section_<first component's key>`, an anchor a section nav can
   target). A card in a section without a `label` draws no heading of its
   own, so a one-card section ("Renewal terms") is not headed twice.
-- A section's summary line ("3 contract lines · 2 properties") is a
+- A section's summary line ("12 items · 3 warehouses") is a
   `section_note :field` on one of its components: a field of the context's
-  record (a calculation on the contract), drawn muted under the section's
+  record (a calculation on the order), drawn muted under the section's
   heading and read with that record, so it changes when the context does.
   It needs the component's `section` and one context: a `:detail`'s
   `context`, or a related table's single `context_filter` context.

@@ -1314,7 +1314,7 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         A field whose value heads a group of rows: consecutive rows sharing
-        it render under one header (a property over its lines). Order the
+        it render under one header (a warehouse over its items). Order the
         rows so each group's rows are together (the table's read action or
         query sort). The admin dataGrid's column for it carries
         `"placement": "group"`; the basic card shows it in its metadata grid.
@@ -1323,7 +1323,7 @@ defmodule AshA2ui do
       group_subtitle: [
         type: :atom,
         doc: """
-        A field drawn under the group's header (a property's address), taken
+        A field drawn under the group's header (a warehouse's address), taken
         from the group's first row. Needs `group_by`. Its admin dataGrid
         column carries `"placement": "groupSubtitle"`.
         """
@@ -1768,7 +1768,7 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         A field of the component's context record drawn under its section's
-        heading, muted ("3 contract lines · 2 properties"): a `:detail`'s
+        heading, muted ("12 items · 3 warehouses"): a `:detail`'s
         `context`, or the one context a related table's `context_filter`
         names. Read with the context's record at `/detail/<context>/<field>`;
         the section's first component that declares one supplies it. Needs
