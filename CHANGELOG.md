@@ -12,6 +12,12 @@ Requires Elixir 1.20 or later.
 
 ### Bug Fixes:
 
+- **Dynamic specs with list rows, plain links, groups or a section note
+  resolve.** The parser passed `trailing`, `expand`, `link_url`, `group_by`,
+  `group_subtitle` and `section_note` through as strings, so a surface that
+  declares them imported to a spec that `AshA2ui.Dynamic.resolve/2` rejected
+  ("expected atom"). They now convert to names like the other field options.
+
 - **A basic TextField's input is named by its label.** The basic catalog draws
   the label beside the `<input>` with no association, so the input had no
   accessible name (a screen reader read "edit text", and a prompt's inputs

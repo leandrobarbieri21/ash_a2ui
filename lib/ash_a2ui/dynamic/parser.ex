@@ -1022,7 +1022,11 @@ defmodule AshA2ui.Dynamic.Parser do
               :value,
               :sort,
               :links,
-              :link_label
+              :link_label,
+              :link_url,
+              :group_by,
+              :group_subtitle,
+              :section_note
             ],
        do: :name
 
@@ -1040,6 +1044,8 @@ defmodule AshA2ui.Dynamic.Parser do
               :refreshes,
               :prompt_fields,
               :meta,
+              :trailing,
+              :expand,
               :depends_on_path
             ],
        do: :name_list

@@ -117,6 +117,15 @@ defmodule AshA2ui.GroupedRowsTest do
     assert visits["row_layout"]["group_icon"] == "home"
   end
 
+  test "imported specs with list rows, groups, notes and plain links resolve again" do
+    allow = AshA2ui.Dynamic.allowlist([Owner, Appointment, Clinic])
+
+    for ui <- [GroupedVisitsUI, AshA2ui.Test.OwnerVisitsUI, AshA2ui.Test.LinkedVisitsUI] do
+      {:ok, spec, _rejections} = Importer.import(ui)
+      assert {:ok, %AshA2ui.Dynamic.Surface{}} = AshA2ui.Dynamic.resolve(spec, allowlist: allow)
+    end
+  end
+
   describe "compile-time checks" do
     test "a group subtitle without a group" do
       assert capture_io(:stderr, fn ->
