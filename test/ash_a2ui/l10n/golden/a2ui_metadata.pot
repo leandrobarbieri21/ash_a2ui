@@ -50,6 +50,7 @@ msgstr ""
 
 #: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
+#: test/support/linked_visits_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgid "Appointment"
 msgstr ""
@@ -346,6 +347,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:189
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
+#: test/support/linked_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
 #: test/support/word_report_ui.ex:82
@@ -1206,6 +1208,7 @@ msgid "Schedule"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
+#: test/support/linked_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
 #: test/support/word_report_ui.ex:82
@@ -1274,6 +1277,11 @@ msgstr ""
 #: test/support/links.ex:333
 msgctxt "select_context"
 msgid "Select person"
+msgstr ""
+
+#: test/support/linked_visits_ui.ex:1
+msgctxt "select_context"
+msgid "Select visit"
 msgstr ""
 
 #: test/support/board_task_ui.ex:111
@@ -1362,6 +1370,7 @@ msgstr ""
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
 #: test/support/linked_filters_ui.ex:1
+#: test/support/linked_visits_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:267
 #: test/support/links.ex:333
@@ -1497,6 +1506,7 @@ msgstr ""
 #: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 #: test/support/linked_filters_ui.ex:1
+#: test/support/linked_visits_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:206
 #: test/support/links.ex:230
@@ -1583,8 +1593,13 @@ msgid "Very high"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114
+#: test/support/linked_visits_ui.ex:1
 #: test/support/table_displays.ex:78
 msgid "Visit"
+msgstr ""
+
+#: test/support/linked_visits_ui.ex:1
+msgid "Visit card"
 msgstr ""
 
 #: test/support/owner_overview_ui.ex:1

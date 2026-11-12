@@ -87,6 +87,7 @@ spark_locals_without_parens = [
   limit: 1,
   link: 1,
   link_label: 1,
+  link_url: 1,
   links: 1,
   max_page_size: 1,
   meta: 1,

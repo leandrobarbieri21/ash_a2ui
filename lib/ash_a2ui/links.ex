@@ -13,7 +13,8 @@ defmodule AshA2ui.Links do
 
   plus `"href"` when `config :ash_a2ui, :open_surface_url` is set (a
   template with `{surface}` and `{recordId}` placeholders, e.g.
-  `"/app/r/{surface}/{recordId}"`). Single links (`link`) carry one map,
+  `"/app/r/{surface}/{recordId}"`). A plain link (`link_url`) is
+  `%{"href", "label"}` with no `"surface"`: a page or address to follow. Single links (`link`) carry one map,
   multi-valued links (`links`) a list. A field without a link for this row —
   nil reference, a target the actor cannot read, or a surface the
   `AshA2ui.LinkResolver` vetoed — is simply absent from `"_links"`. Rows of
@@ -34,6 +35,7 @@ defmodule AshA2ui.Links do
 
   @doc "Whether a resolved field declares `link` or `links`."
   @spec link_field?(AshA2ui.Field.t() | nil) :: boolean
+  def link_field?(%{link_url: url}) when not is_nil(url), do: true
   def link_field?(%{link: link}) when not is_nil(link), do: true
   def link_field?(%{links: links}) when not is_nil(links), do: true
   def link_field?(_field), do: false
@@ -60,6 +62,9 @@ defmodule AshA2ui.Links do
 
       {:path, _surface, path} ->
         path_loads(resource, path)
+
+      {:url, name} ->
+        if loadable?(resource, name), do: [name], else: []
     end
   end
 
@@ -155,6 +160,10 @@ defmodule AshA2ui.Links do
           path: path,
           surface: AshA2ui.LinkResolver.resolve({:surface, surface}, resolver_context)
         }
+
+      # A plain link: no surface to resolve, nothing for the resolver to veto.
+      {:url, name} ->
+        %{field: field.name, cardinality: :url, url_field: name}
     end
   end
 
@@ -165,6 +174,7 @@ defmodule AshA2ui.Links do
 
   defp cell_label?(_relationship, _field), do: true
 
+  defp kind(%{link_url: name}) when not is_nil(name), do: {:url, name}
   defp kind(%{links: name}) when not is_nil(name), do: {:relationship, :many, name}
   defp kind(%{link: name}) when is_atom(name), do: {:relationship, :one, name}
 
@@ -209,6 +219,18 @@ defmodule AshA2ui.Links do
   end
 
   defp field_links(%{surface: nil}, _record, _row, _url), do: nil
+
+  # A plain link (`link_url`): the URL field's value, labelled by the cell.
+  defp field_links(%{cardinality: :url} = spec, record, row, _url) do
+    case Map.get(record, spec.url_field) do
+      href when is_binary(href) and href != "" ->
+        cell = Map.get(row, to_string(spec.field))
+        %{"href" => href, "label" => if(is_binary(cell) and cell != "", do: cell, else: href)}
+
+      _none ->
+        nil
+    end
+  end
 
   defp field_links(%{cardinality: :one} = spec, record, row, url) do
     case loaded(Map.get(record, spec.relationship)) do
@@ -277,6 +299,10 @@ defmodule AshA2ui.Links do
       relationship -> join_labels(cardinality, related_labels(relationship, field, record))
     end
   end
+
+  # A `link_url` field is a field of its own (verified), so it is never virtual;
+  # a stray one reads as empty.
+  defp virtual({:url, _name}, _field, _resource, _record), do: ""
 
   defp virtual({:path, _surface, path}, _field, _resource, record) do
     id_string(walk(record, path)) || ""

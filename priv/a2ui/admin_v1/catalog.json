@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "x-changelog": {
+    "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
     "1.12.0": "Additive: record pages. fieldDisplay gains optional badge, badgeTone and badgeHelp (bindings to the field's _badge_<field>, _badge_tone_<field> and _badge_help_<field> under its /detail/<context> path: the value drawn as a pill with that tone and one-line tooltip), note (a few words beside the label saying how the value came to be), emptyText (the muted words shown when the value is empty) and hideWhenEmpty (true: an empty value draws no row at all). dataGrid gains an optional layout (rows: list rows instead of a grid) and columns an optional placement (trailing or expand: where a list-rows renderer draws them). Renderers that ignore them draw the plain value and the grid. The catalogId is unchanged.",
     "1.11.0": "Additive: the table's cells and sort. A badge column's badge gains an optional helpPath (row-relative, the _badge_help_<field> key: the pill's one-line tooltip, empty for none). dataGrid columns gain an optional caption ({path, text?}: a third line under the value and its subtitle, the text's {date} filled with the path's value formatted as a date and {value} with it as is; without text the line is the value) and sortFirst (desc when the header's first click sorts descending). The dataGrid's sort gains an optional reset: true, a header's third click then sends a null sort (the query's default order) instead of toggling back. Renderers that ignore them draw the pill without a tooltip, no third line, and toggle. The catalogId is unchanged.",
     "1.10.0": "Additive: the filter bar and the table header. dataGrid columns gain optional help ({title, body}: header help opened from an info mark; body paragraphs separated by blank lines, a line `**Term** — text` a definition) and sortField (the field a sortable header sorts by when it is not the column's path); a column's detail gains an optional helpPath (row-relative, the _detail_help_<column> key: an info mark with a tooltip after the line). dataGrid columns also gain optional width (px) and moreNoun, more gains valuesPath (the row's list of all the values), and rowClick an optional width. emptyState gains optional title, icon (inbox | search | archive), clearAction ({label, action}) and clearVisible. pagination gains optional pageSizeOptions (the sizes offered) and pageSizeAction (the query envelope sent with the picked pageSize and page 1). The basic inputs this catalog replaces accept more keys: ChoicePicker hint (a footer under the options), counts (a binding to a value → count map), dynamicOptions (a binding to an option list) and options carrying parent (their group's value) or group: true (a group: picking it picks all its leaves; only leaf values are written); TextField placeholder. An empty statusBanner takes no layout space. Badge and icon tones gain pending and gray. The catalogId is unchanged.",
@@ -76,7 +77,7 @@
               },
               "link": {
                 "type": "object",
-                "description": "Row-relative binding ({path: \"_links/<field>\"}) to the cell's reference link(s): a link object {surface, recordId, label[, href]} or a list of them (multi-valued links). Absent on a row = no link for that row (pruned per actor). Activating a link invokes the openSurface function with {surface, recordId}.",
+                "description": "Row-relative binding ({path: \"_links/<field>\"}) to the cell's reference link(s): a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface, or a list of them (multi-valued links). Absent on a row = no link for that row (pruned per actor). Activating a link invokes the openSurface function with {surface, recordId}.",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
@@ -389,7 +390,7 @@
         },
         "link": {
           "type": "object",
-          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]} or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
+          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface, or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
           "properties": {"path": {"type": "string"}},
           "required": ["path"],
           "additionalProperties": false

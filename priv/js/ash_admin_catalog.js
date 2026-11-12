@@ -180,7 +180,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.12.0";
+export const ADMIN_CATALOG_VERSION = "1.13.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -968,7 +968,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
    * a link-styled button.
    */
   function renderLink(element, link) {
-    const label = str(link.label) || str(link.recordId);
+    const label = str(link.label) || str(link.recordId) || str(link.href);
+
+    // 1.13: a plain link (no surface) is a page or address: the browser follows it.
+    if (!link.surface) {
+      return html`<a class="am-link" href=${link.href}>${label}</a>`;
+    }
+
     const activate = (event) => {
       if (event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
         return;
