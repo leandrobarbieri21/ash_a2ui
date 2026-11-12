@@ -11,6 +11,7 @@ defmodule AshA2ui.DetailRowsTest do
   import ExUnit.CaptureIO
 
   alias Ash.DataLayer.Ets
+  alias AshA2ui.Dynamic.Importer
   alias AshA2ui.Gettext.Metadata
   alias AshA2ui.Test.{Appointment, AppointmentPageUI, Clinic, Owner}
 
@@ -88,6 +89,19 @@ defmodule AshA2ui.DetailRowsTest do
 
     for text <- ["Booked", "Seen and signed off", "Completed", "Not booked yet"],
         do: assert(text in texts, "#{text} is not collected")
+  end
+
+  test "dynamic specs carry the badge, the placeholder and hide_empty" do
+    {:ok, spec, _rejections} = Importer.import(AppointmentPageUI)
+    fields = Map.new(spec["fields"], &{&1["name"], &1})
+
+    assert fields["status"]["badge_text"] == %{"scheduled" => "Booked"}
+    assert fields["status"]["badge_tones"] == %{"scheduled" => "info", "completed" => "success"}
+    assert fields["status"]["badge_help"] == %{"completed" => "Seen and signed off"}
+    assert fields["scheduled_for"]["empty_text"] == "Not booked yet"
+
+    schedule = Enum.find(spec["components"], &(&1["name"] == "schedule"))
+    assert schedule["hide_empty"] == ["scheduled_for"]
   end
 
   describe "compile-time checks" do

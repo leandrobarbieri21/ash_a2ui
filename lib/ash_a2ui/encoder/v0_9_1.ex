@@ -644,6 +644,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     diagram_sections = Enum.flat_map(view.diagrams, &basic_diagram_components(view, &1))
 
     form_components = (form && form_components(view, form)) || []
+    {_ids, section_wrappers} = basic_section_children(view)
 
     root = %{
       "id" => "root",
@@ -662,7 +663,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       | surface_title_components(view) ++
           context_sections ++
           diagram_sections ++
-          table_sections ++ detail_sections ++ report_sections ++ form_components
+          table_sections ++
+          detail_sections ++ report_sections ++ section_wrappers ++ form_components
     ] ++
       form_descendants(view, form, options) ++ [status | action_result_components()]
   end
@@ -713,8 +715,10 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     table_sections = List.flatten(table_section_lists)
 
-    section_children =
-      admin_section_children(view, Enum.zip(view.tables, table_children_lists))
+    {section_children, section_wrappers} =
+      view
+      |> admin_section_children(Enum.zip(view.tables, table_children_lists))
+      |> group_sections(view)
 
     detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
@@ -741,7 +745,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       root
       | context_sections ++
           diagram_sections ++
-          table_sections ++ detail_sections ++ report_sections ++ form_sections
+          table_sections ++
+          detail_sections ++ report_sections ++ section_wrappers ++ form_sections
     ] ++ [admin_status_banner() | action_result_components()]
   end
 
@@ -755,18 +760,55 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # where it was declared (an expanded section set's tables at their
   # template, in order).
   defp admin_section_children(%{component_order: :declared} = view, table_children) do
-    Enum.flat_map(view.components, fn
+    Enum.map(view.components, fn
       %{name: :table} = component ->
-        for {%{component: ^component}, ids} <- table_children, id <- ids, do: id
+        {component, for({%{component: ^component}, ids} <- table_children, id <- ids, do: id)}
 
       other ->
-        card_children(other)
+        {other, card_children(other)}
     end)
   end
 
   defp admin_section_children(view, table_children) do
-    Enum.flat_map(table_children, &elem(&1, 1)) ++
-      Enum.flat_map(view.components, &card_children/1)
+    Enum.map(table_children, fn {table, ids} -> {table.component, ids} end) ++
+      Enum.map(view.components, &{&1, card_children(&1)})
+  end
+
+  # Consecutive components naming the same `section` share one wrapper: a
+  # Column (`section_<first key>`) holding the section's heading and the
+  # components' root ids. Returns the root ids, with each run replaced by its
+  # wrapper, and the wrapper components. Components without a section (and
+  # components contributing no root ids) pass through.
+  defp group_sections(pairs, view) do
+    pairs
+    |> Enum.reject(fn {_component, ids} -> ids == [] end)
+    |> Enum.chunk_by(fn {component, _ids} -> Map.get(component, :section) end)
+    |> Enum.map(&section_run(&1, view))
+    |> Enum.unzip()
+    |> then(fn {ids, wrappers} -> {List.flatten(ids), List.flatten(wrappers)} end)
+  end
+
+  defp section_run([{first, _ids} | _rest] = run, view) do
+    ids = Enum.flat_map(run, &elem(&1, 1))
+
+    case Map.get(first, :section) do
+      nil ->
+        {ids, []}
+
+      section ->
+        base = "section_#{AshA2ui.Component.key(first)}"
+
+        {[base],
+         [
+           %{"id" => base, "component" => "Column", "children" => ["#{base}_heading" | ids]},
+           %{
+             "id" => "#{base}_heading",
+             "component" => "Text",
+             "text" => Label.translate(view.l10n, section),
+             "variant" => "h2"
+           }
+         ]}
+    end
   end
 
   defp card_children(%{name: :detail} = component),
@@ -1526,23 +1568,20 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
         |> put_detail_badge(view, field, "/detail/#{detail.context}/")
         |> put_empty_text(view, field)
+        |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
       end)
+
+    {heading_ids, heading} = detail_heading(view, detail, base)
 
     [
       %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
       %{
         "id" => "#{base}_body",
         "component" => "Column",
-        "children" => ["#{base}_heading" | Enum.map(detail.fields, &"#{base}_field_#{&1}")]
-      },
-      %{
-        "id" => "#{base}_heading",
-        "component" => "Text",
-        "text" => AshA2ui.Experience.component_label(view, detail.component, detail.name),
-        "variant" => "h3"
+        "children" => heading_ids ++ Enum.map(detail.fields, &"#{base}_field_#{&1}")
       }
-      | fields
+      | heading ++ fields
     ]
   end
 
@@ -1566,6 +1605,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> Map.put("badge", %{"path" => "#{base}_badge_#{field}"})
     |> maybe_put("badgeTone", if(tones != [], do: %{"path" => "#{base}_badge_tone_#{field}"}))
     |> maybe_put("badgeHelp", if(help != [], do: %{"path" => "#{base}_badge_help_#{field}"}))
+  end
+
+  defp put_field_note(display, view, field) do
+    case view.fields[field] do
+      %{note: note} when is_binary(note) ->
+        Map.put(display, "note", Label.translate(view.l10n, note))
+
+      _none ->
+        display
+    end
   end
 
   defp put_empty_text(display, view, field) do
@@ -1594,7 +1643,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     context_children =
       for name <- view.context_order, view.contexts[name].picker, do: "context_#{name}"
 
-    component_children = Enum.flat_map(view.components, &component_root_children(view, &1))
+    {component_children, _wrappers} = basic_section_children(view)
 
     form_child = if form, do: ["form_slot"], else: []
 
@@ -1603,6 +1652,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       ["status_text"] ++
       context_children ++
       diagram_children(view) ++ component_children ++ ["action_result_panel"]
+  end
+
+  defp basic_section_children(view) do
+    view.components
+    |> Enum.map(&{&1, component_root_children(view, &1)})
+    |> group_sections(view)
   end
 
   # The title child — present exactly when surface_title_components/1
@@ -4195,6 +4250,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         ]
       end)
 
+    {heading_ids, heading} = detail_heading(view, detail, base)
+
     [
       %{
         "id" => base,
@@ -4204,16 +4261,29 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_body",
         "component" => "Column",
-        "children" => ["#{base}_heading" | Enum.map(detail.fields, &"#{base}_field_#{&1}")]
-      },
-      %{
-        "id" => "#{base}_heading",
-        "component" => "Text",
-        "text" => AshA2ui.Experience.component_label(view, detail.component, detail.name),
-        "variant" => "h3"
+        "children" => heading_ids ++ Enum.map(detail.fields, &"#{base}_field_#{&1}")
       }
-      | field_rows
+      | heading ++ field_rows
     ]
+  end
+
+  # A detail card's heading: its label, else its humanized name — none when
+  # it sits in a `section` without a label of its own (the section's heading
+  # names it).
+  defp detail_heading(_view, %{component: %{section: section, label: nil}}, _base)
+       when is_binary(section),
+       do: {[], []}
+
+  defp detail_heading(view, detail, base) do
+    {["#{base}_heading"],
+     [
+       %{
+         "id" => "#{base}_heading",
+         "component" => "Text",
+         "text" => AshA2ui.Experience.component_label(view, detail.component, detail.name),
+         "variant" => "h3"
+       }
+     ]}
   end
 
   # A badge field shows its badge text (the declared or humanized label), not

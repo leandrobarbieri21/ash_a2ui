@@ -605,6 +605,7 @@ export function buildSchemas(basicCatalog = null) {
       badge: DynamicStringSchema.nullable().optional(),
       badgeTone: DynamicStringSchema.nullable().optional(),
       badgeHelp: DynamicStringSchema.nullable().optional(),
+      note: Str.optional(),
       emptyText: Str.optional(),
       hideWhenEmpty: Bool.optional(),
       accessibility: Any.optional(),
@@ -3001,6 +3002,11 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             font-size: var(--am-font-size-m);
             overflow-wrap: anywhere;
           }
+          .field-note {
+            font-weight: var(--am-font-weight-regular);
+            text-transform: none;
+            letter-spacing: normal;
+          }
           .field-value-empty {
             color: var(--am-text-muted);
           }
@@ -3056,7 +3062,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (empty && props.emptyText) {
           return html`
             <dl class="field">
-              <dt class="field-label">${str(props.label)}</dt>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value field-value-empty">${str(props.emptyText)}</dd>
             </dl>
           `;
@@ -3068,7 +3074,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           const help = str(props.badgeHelp);
           return html`
             <dl class="field">
-              <dt class="field-label">${str(props.label)}</dt>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">
                 <span class="am-badge" data-tone=${tone} title=${help || nothing}
                   aria-description=${help || nothing}>${badge}</span>
@@ -3080,7 +3086,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (links.length > 0) {
           return html`
             <dl class="field">
-              <dt class="field-label">${str(props.label)}</dt>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderLinks(this, links)}</dd>
             </dl>
           `;
@@ -3090,7 +3096,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           const value = formatDisplayValue(props.value, props.format);
           return html`
             <dl class="field">
-              <dt class="field-label">${str(props.label)}</dt>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd
                 class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
               >
@@ -3102,7 +3108,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         return html`
           <dl class="field">
-            <dt class="field-label">${str(props.label)}</dt>
+            <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
             <dd class="field-value">${renderValue(props.value, props.format)}</dd>
           </dl>
         `;

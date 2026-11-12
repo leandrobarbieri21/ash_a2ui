@@ -143,6 +143,14 @@ defmodule AshA2ui do
         destination, else its primary key.
         """
       ],
+      note: [
+        type: :string,
+        doc: """
+        A few words beside the field's label on `:detail` cards, saying how
+        the value came to be: "Calculated", "From the signed copy". Admin
+        catalog (`fieldDisplay`'s `note`); translated in the metadata domain.
+        """
+      ],
       empty_text: [
         type: :string,
         doc: """
@@ -1662,6 +1670,18 @@ defmodule AshA2ui do
         type: {:one_of, [:table, :form, :detail, :report]},
         required: true,
         doc: "The kind of component. One of `:table`, `:form`, `:detail` or `:report`."
+      ],
+      section: [
+        type: :string,
+        doc: """
+        The page section this component belongs to: consecutive components
+        (in the surface's root order) naming the same section render under
+        one heading — "Overview" over its Details and Parties cards — inside
+        a wrapper `Column` whose id is `section_<first component's key>`
+        (an anchor a section nav can target). A component in a section with
+        no `label` of its own draws no heading of its own. Translated in the
+        metadata domain.
+        """
       ],
       label: [
         type: :string,

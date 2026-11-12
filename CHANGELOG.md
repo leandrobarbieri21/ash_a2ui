@@ -32,11 +32,15 @@ Requires Elixir 1.20 or later.
   out and worded like one:
   - a component's `label` heads its section (multi-table and lone tables,
     detail and report cards), translated as metadata;
+  - a component's `section` groups consecutive components under one h2
+    heading in a `section_<key>` wrapper (a card with no label of its own
+    then draws no heading);
   - `component_order :declared` lays the admin catalog's sections out in
     declaration order, so detail cards and related tables interleave;
   - a `field` declaring `badge_text`, `badge_tones` or `badge_help` draws as a
     badge with a tooltip on detail cards (`fieldDisplay`'s `badge`,
     `badgeTone`, `badgeHelp`);
+  - a `field`'s `note` sits beside its label on detail cards ("Calculated");
   - a `field`'s `empty_text` replaces an empty detail value with muted words,
     and a detail's `hide_empty` leaves rows out while empty (`emptyText`,
     `hideWhenEmpty`);

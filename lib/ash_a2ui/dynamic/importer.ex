@@ -186,6 +186,8 @@ defmodule AshA2ui.Dynamic.Importer do
       %{"kind" => to_string(component.name)}
       |> put_component_name(component)
       |> put_opt("label", component.label)
+      |> put_opt("section", component.section)
+      |> put_list("hide_empty", component.hide_empty)
       |> put_related_resource(component.resource, surface_resource)
       |> put_list("fields", component.fields)
       |> put_opt("read_action", component.read_action)
@@ -459,6 +461,11 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_link(field.link)
       |> put_opt("links", field.links)
       |> put_opt("link_label", field.link_label)
+      |> put_value("note", field.note)
+      |> put_value("empty_text", field.empty_text)
+      |> put_keyword("badge_text", field.badge_text, :raw)
+      |> put_keyword("badge_tones", field.badge_tones, :name)
+      |> put_keyword("badge_help", field.badge_help, :raw)
     end)
   end
 

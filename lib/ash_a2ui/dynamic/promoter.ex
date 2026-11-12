@@ -23,6 +23,8 @@ defmodule AshA2ui.Dynamic.Promoter do
   # the parser's inverse, JSON spec values back to DSL literals.
   @component_options [
     label: :raw,
+    section: :raw,
+    hide_empty: :name_list,
     fields: :name_list,
     read_action: :name,
     create_action: :name,
@@ -135,7 +137,12 @@ defmodule AshA2ui.Dynamic.Promoter do
     option_search: :name_list,
     link: :link,
     links: :name,
-    link_label: :name
+    link_label: :name,
+    note: :raw,
+    empty_text: :raw,
+    badge_text: :string_keyword,
+    badge_tones: :name_keyword,
+    badge_help: :string_keyword
   ]
 
   @action_options [

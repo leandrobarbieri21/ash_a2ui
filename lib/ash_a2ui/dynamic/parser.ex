@@ -124,6 +124,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "kind" => :name,
     "name" => :as,
     "label" => :label,
+    "section" => :section,
+    "hide_empty" => :hide_empty,
     "fields" => :fields,
     "read_action" => :read_action,
     "create_action" => :create_action,
@@ -621,7 +623,12 @@ defmodule AshA2ui.Dynamic.Parser do
     "option_search" => :option_search,
     "link" => :link,
     "links" => :links,
-    "link_label" => :link_label
+    "link_label" => :link_label,
+    "note" => :note,
+    "empty_text" => :empty_text,
+    "badge_text" => :badge_text,
+    "badge_tones" => :badge_tones,
+    "badge_help" => :badge_help
   }
 
   defp parse_field(entry, path) when is_map(entry) do
