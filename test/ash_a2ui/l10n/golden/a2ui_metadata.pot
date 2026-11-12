@@ -48,6 +48,7 @@ msgstr ""
 msgid "Annotate task"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgid "Appointment"
@@ -128,6 +129,10 @@ msgstr ""
 msgid "Assignee name"
 msgstr ""
 
+#: test/support/record_page_ui.ex:1
+msgid "At a glance"
+msgstr ""
+
 #: test/support/post.ex:1
 msgid "Author email"
 msgstr ""
@@ -178,6 +183,7 @@ msgstr ""
 msgid "Body"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
 #: test/support/calendar_event.ex:182
 msgid "Booked"
 msgstr ""
@@ -329,12 +335,14 @@ msgstr ""
 msgid "Complete"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/board_task_ui.ex:1
 #: test/support/board_task_ui.ex:133
 #: test/support/board_task_ui.ex:189
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:88
+#: test/support/record_page_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgctxt "one_of:status"
 msgid "Completed"
@@ -356,6 +364,10 @@ msgstr ""
 #: test/support/calendar_event.ex:80
 msgctxt "one_of:status"
 msgid "Confirmed"
+msgstr ""
+
+#: test/support/record_page_ui.ex:1
+msgid "Contact"
 msgstr ""
 
 #: test/support/referral.ex:1
@@ -520,6 +532,7 @@ msgstr ""
 #: test/support/enrollment.ex:1
 #: test/support/enrollment.ex:112
 #: test/support/enrollment.ex:79
+#: test/support/record_page_ui.ex:1
 msgid "Email"
 msgstr ""
 
@@ -805,6 +818,7 @@ msgstr ""
 #: test/support/minimal_ui.ex:1
 #: test/support/paginated.ex:1
 #: test/support/promotion.ex:1
+#: test/support/record_page_ui.ex:1
 #: test/support/review_item.ex:1
 #: test/support/time_travel.ex:47
 msgid "Name"
@@ -858,6 +872,10 @@ msgstr ""
 #: test/support/column_task.ex:1
 msgctxt "one_of:priority"
 msgid "Normal"
+msgstr ""
+
+#: test/support/appointment_page_ui.ex:1
+msgid "Not booked yet"
 msgstr ""
 
 #: test/support/adoption.ex:243
@@ -943,6 +961,7 @@ msgid "Overdue since {date}"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
+#: test/support/record_page_ui.ex:1
 msgid "Owner"
 msgstr ""
 
@@ -1168,7 +1187,12 @@ msgstr ""
 msgid "Role"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
+msgid "Schedule"
+msgstr ""
+
 #: test/support/appointments_ui.ex:1
+#: test/support/record_page_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgctxt "one_of:status"
 msgid "Scheduled"
@@ -1179,6 +1203,7 @@ msgstr ""
 msgid "Scheduled at"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 msgid "Scheduled for"
 msgstr ""
@@ -1199,6 +1224,10 @@ msgstr ""
 
 #: test/support/hub_ui.ex:1
 msgid "Search contracts or vendors"
+msgstr ""
+
+#: test/support/appointment_page_ui.ex:1
+msgid "Seen and signed off"
 msgstr ""
 
 #: test/support/table_displays.ex:78
@@ -1297,6 +1326,7 @@ msgstr ""
 #: test/support/adoption_ui.ex:57
 #: test/support/adoption_ui.ex:6
 #: test/support/adoption_ui.ex:77
+#: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/article.ex:1
 #: test/support/board_task_ui.ex:1
@@ -1322,6 +1352,7 @@ msgstr ""
 #: test/support/live_filters_ui.ex:1
 #: test/support/manifest_task.ex:1
 #: test/support/paginated.ex:1
+#: test/support/record_page_ui.ex:1
 #: test/support/referral.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/tabbed_presets_ui.ex:1
@@ -1370,6 +1401,7 @@ msgctxt "one_of:state"
 msgid "Submitted"
 msgstr ""
 
+#: test/support/appointment_page_ui.ex:1
 #: test/support/table_displays.ex:78
 msgid "Summary"
 msgstr ""
@@ -1434,6 +1466,7 @@ msgstr ""
 #: test/support/adoption_ui.ex:57
 #: test/support/adoption_ui.ex:6
 #: test/support/adoption_ui.ex:77
+#: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/article.ex:1
 #: test/support/bulk_cards_ui.ex:1
@@ -1459,6 +1492,7 @@ msgstr ""
 #: test/support/prompt_scope.ex:161
 #: test/support/prompt_scope.ex:190
 #: test/support/prompt_scope.ex:220
+#: test/support/record_page_ui.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
@@ -1532,6 +1566,10 @@ msgstr ""
 #: test/support/diagram_flow.ex:114
 #: test/support/table_displays.ex:78
 msgid "Visit"
+msgstr ""
+
+#: test/support/record_page_ui.ex:1
+msgid "Visits & follow-ups"
 msgstr ""
 
 #: test/support/diagram_flow.ex:114

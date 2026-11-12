@@ -712,18 +712,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> Enum.unzip()
 
     table_sections = List.flatten(table_section_lists)
-    table_children = List.flatten(table_children_lists)
+
+    section_children =
+      admin_section_children(view, Enum.zip(view.tables, table_children_lists))
 
     detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
     report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
     diagram_sections = Enum.map(view.diagrams, &admin_diagram_component(view, &1))
-
-    detail_children =
-      Enum.flat_map(view.components, fn
-        %{name: :detail} = component -> ["detail_#{AshA2ui.Component.key(component)}"]
-        %{name: :report} = component -> ["report_#{AshA2ui.Component.key(component)}"]
-        _other -> []
-      end)
 
     {form_sections, form_children} = admin_form_sections(view, form, options)
 
@@ -739,7 +734,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           ["status_banner"] ++
           context_children(view) ++
           diagram_children(view) ++
-          table_children ++ detail_children ++ ["action_result_panel"]
+          section_children ++ ["action_result_panel"]
     }
 
     [
@@ -753,6 +748,34 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   defp context_children(view) do
     for name <- view.context_order, view.contexts[name].picker, do: "context_#{name}"
   end
+
+  # The root children of the surface's sections. `component_order :kind` (the
+  # default, frozen) places every table before the detail and report cards;
+  # `:declared` follows the components' declaration order, a table's ids
+  # where it was declared (an expanded section set's tables at their
+  # template, in order).
+  defp admin_section_children(%{component_order: :declared} = view, table_children) do
+    Enum.flat_map(view.components, fn
+      %{name: :table} = component ->
+        for {%{component: ^component}, ids} <- table_children, id <- ids, do: id
+
+      other ->
+        card_children(other)
+    end)
+  end
+
+  defp admin_section_children(view, table_children) do
+    Enum.flat_map(table_children, &elem(&1, 1)) ++
+      Enum.flat_map(view.components, &card_children/1)
+  end
+
+  defp card_children(%{name: :detail} = component),
+    do: ["detail_#{AshA2ui.Component.key(component)}"]
+
+  defp card_children(%{name: :report} = component),
+    do: ["report_#{AshA2ui.Component.key(component)}"]
+
+  defp card_children(_table_or_form), do: []
 
   # A table whose whole subtree upgrades to the semantic components: no
   # dynamic sections, no export controls, no inline cell editing — the
@@ -1487,6 +1510,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
         |> maybe_put("format", display_format(view, resource, field))
         |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
+        |> put_detail_badge(view, field, "/detail/#{detail.context}/")
+        |> put_empty_text(view, field)
+        |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
       end)
 
     [
@@ -1499,7 +1525,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => Label.resolve(view.l10n, nil, detail.name),
+        "text" => AshA2ui.Experience.component_label(view, detail.component, detail.name),
         "variant" => "h3"
       }
       | fields
@@ -1508,6 +1534,34 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   defp table_suffix(view, table) do
     if ResolvedView.multi_table?(view), do: "_#{table.name}", else: ""
+  end
+
+  # Catalog 1.12: a badge field draws its value as a badge on a detail card,
+  # each part bound to the `_badge_*` key a row layout's badge uses, under the
+  # context's /detail path.
+  defp put_detail_badge(display, view, field, base) do
+    declared = view.fields[field]
+
+    if ResolvedView.badge_field?(declared),
+      do: put_badge_bindings(display, declared, base),
+      else: display
+  end
+
+  defp put_badge_bindings(display, %{name: field, badge_tones: tones, badge_help: help}, base) do
+    display
+    |> Map.put("badge", %{"path" => "#{base}_badge_#{field}"})
+    |> maybe_put("badgeTone", if(tones != [], do: %{"path" => "#{base}_badge_tone_#{field}"}))
+    |> maybe_put("badgeHelp", if(help != [], do: %{"path" => "#{base}_badge_help_#{field}"}))
+  end
+
+  defp put_empty_text(display, view, field) do
+    case view.fields[field] do
+      %{empty_text: text} when is_binary(text) ->
+        Map.put(display, "emptyText", Label.translate(view.l10n, text))
+
+      _none ->
+        display
+    end
   end
 
   # Root order: the optional surface title
@@ -1677,8 +1731,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           label
 
         _not_a_section ->
-          if ResolvedView.multi_table?(view),
-            do: Label.resolve(view.l10n, nil, table.name),
+          if ResolvedView.multi_table?(view) or table.component.label,
+            do: AshA2ui.Experience.component_label(view, table.component, table.name),
             else: Label.translate(view.l10n, Label.resource_name(view.resource))
       end
 
@@ -4102,7 +4156,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
             %{
               "id" => "#{base}_value_#{field}",
               "component" => "Text",
-              "text" => %{"path" => "/detail/#{detail.context}/#{field}"}
+              "text" => %{"path" => detail_value_path(view, detail, field)}
             },
             "/detail/#{detail.context}/"
           )
@@ -4137,11 +4191,19 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => Label.resolve(view.l10n, nil, detail.name),
+        "text" => AshA2ui.Experience.component_label(view, detail.component, detail.name),
         "variant" => "h3"
       }
       | field_rows
     ]
+  end
+
+  # A badge field shows its badge text (the declared or humanized label), not
+  # the raw value.
+  defp detail_value_path(view, detail, field) do
+    if ResolvedView.badge_field?(view.fields[field]),
+      do: "/detail/#{detail.context}/_badge_#{field}",
+      else: "/detail/#{detail.context}/#{field}"
   end
 
   defp detail_field_label(view, field) do
@@ -4220,7 +4282,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => Label.resolve(view.l10n, nil, report.name),
+        "text" => AshA2ui.Experience.component_label(view, report.component, report.name),
         "variant" => "h3"
       },
       %{

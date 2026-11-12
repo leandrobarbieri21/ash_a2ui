@@ -76,6 +76,7 @@ defmodule AshA2ui.ResolvedView do
     :query,
     :catalog,
     spec_version: :v0_9_1,
+    component_order: :kind,
     sectioned?: false,
     components: [],
     fields: %{},
@@ -386,6 +387,7 @@ defmodule AshA2ui.ResolvedView do
       surface_id: surface_id(resource_or_ui_module, resource),
       title: optional_label(resource_or_ui_module, :a2ui_title),
       record_label: optional_label(resource_or_ui_module, :a2ui_record_label),
+      component_order: component_order(resource_or_ui_module),
       catalog: catalog(opts[:catalog]),
       spec_version: spec_version(resource_or_ui_module, opts[:spec_version]),
       sectioned?: sectioned?,
@@ -480,6 +482,38 @@ defmodule AshA2ui.ResolvedView do
     |> then(&AshA2ui.Links.context(record.__struct__, &1, fields, opts))
     |> AshA2ui.Links.row_data(record, row)
     |> Map.merge(row)
+  end
+
+  @doc """
+  Whether `field` draws as a badge on `:detail` cards: it declares any of
+  `badge_text`, `badge_tones` or `badge_help`.
+  """
+  @spec badge_field?(AshA2ui.Field.t() | nil) :: boolean
+  def badge_field?(%AshA2ui.Field{badge_text: text, badge_tones: tones, badge_help: help}),
+    do: text != [] or tones != [] or help != []
+
+  def badge_field?(_undeclared), do: false
+
+  @doc """
+  The badge data a `:detail` record carries for its badge fields (see
+  `badge_field?/1`): `_badge_<field>`, and `_badge_tone_<field>` /
+  `_badge_help_<field>` where declared, computed exactly as a row layout's
+  badge (`AshA2ui.RowLayout.badge_data/3`). Shared by the initial render and
+  the context refreshes.
+  """
+  @spec detail_badge_data(t(), Ash.Resource.record(), [atom]) :: %{String.t() => String.t()}
+  def detail_badge_data(%__MODULE__{} = view, record, fields) do
+    for name <- fields, field = view.fields[name], badge_field?(field), reduce: %{} do
+      acc ->
+        layout = %AshA2ui.RowLayout{
+          badge: name,
+          badge_text: field.badge_text,
+          badge_tones: field.badge_tones,
+          badge_help: field.badge_help
+        }
+
+        Map.merge(acc, AshA2ui.RowLayout.badge_data(layout, record, view.l10n))
+    end
   end
 
   defp serialized_field(view, record, name) do
@@ -1219,6 +1253,11 @@ defmodule AshA2ui.ResolvedView do
 
   # `title` and `record_label` are both optional and both default to the
   # derived resource label, so absence is the common case and must stay cheap.
+  defp component_order(resource_or_ui_module) do
+    {:ok, order} = AshA2ui.Info.a2ui_component_order(resource_or_ui_module)
+    order
+  end
+
   defp optional_label(resource_or_ui_module, fun) do
     case apply(AshA2ui.Info, fun, [resource_or_ui_module]) do
       {:ok, value} when is_binary(value) -> value

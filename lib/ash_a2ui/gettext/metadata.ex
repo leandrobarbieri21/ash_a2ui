@@ -88,6 +88,7 @@ defmodule AshA2ui.Gettext.Metadata do
 
       AshA2ui.Info.encoder(view).encode_surface(view, no_records(view), [])
       Enum.each(view.tables, &collect_table(&1, view.l10n))
+      Enum.each(view.details, &collect_detail(&1, view))
     end
 
     drain([]) |> Enum.reverse() |> Enum.uniq()
@@ -120,6 +121,36 @@ defmodule AshA2ui.Gettext.Metadata do
       {context, text} -> Label.translate(l10n, text, context)
       text -> Label.translate(l10n, text)
     end)
+  end
+
+  # A detail card's badge fields: their texts and help show only once a record
+  # selects them, like a row layout's badge.
+  defp collect_detail(detail, view) do
+    resource = view.contexts[detail.context].resource
+
+    # Only the admin catalog shows the placeholder, so the basic encoder run
+    # above never translates it.
+    for name <- detail.fields,
+        %{empty_text: text} when is_binary(text) <- [view.fields[name]],
+        do: Label.translate(view.l10n, text)
+
+    for name <- detail.fields,
+        field = view.fields[name],
+        ResolvedView.badge_field?(field),
+        text <-
+          layout_texts(
+            %AshA2ui.RowLayout{
+              badge: name,
+              badge_text: field.badge_text,
+              badge_help: field.badge_help
+            },
+            resource
+          ) do
+      case text do
+        {context, text} -> Label.translate(view.l10n, text, context)
+        text -> Label.translate(view.l10n, text)
+      end
+    end
   end
 
   defp column_texts(column) do

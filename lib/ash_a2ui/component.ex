@@ -13,6 +13,7 @@ defmodule AshA2ui.Component do
   defstruct [
     :name,
     :as,
+    :label,
     :fields,
     :resource,
     :read_action,
@@ -37,6 +38,7 @@ defmodule AshA2ui.Component do
     :granularities,
     context_filter: [],
     require_context: [],
+    hide_empty: [],
     row_actions: [],
     columns: [],
     bulk_actions: [],
@@ -53,6 +55,7 @@ defmodule AshA2ui.Component do
   @type t :: %__MODULE__{
           name: :table | :form | :detail | :report,
           as: atom | String.t() | nil,
+          label: String.t() | nil,
           fields: [atom] | nil,
           resource: module | nil,
           read_action: atom | nil,
@@ -71,6 +74,7 @@ defmodule AshA2ui.Component do
           context: atom | nil,
           context_filter: [{atom, atom}],
           require_context: [atom],
+          hide_empty: [atom],
           row_actions: [atom],
           bulk_actions: [atom],
           display: :list | :board | :calendar | :timeline | :matrix,

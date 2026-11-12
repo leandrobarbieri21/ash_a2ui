@@ -103,11 +103,29 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.12 is additive: fieldDisplay badge, emptyText, hideWhenEmpty" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.12.0"
+    assert Experience.admin_catalog_version() == "1.12.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.12.0")
+
+    field = catalog["components"]["fieldDisplay"]
+    assert field["required"] == ["component", "label", "value"]
+
+    for binding <- ~w(badge badgeTone badgeHelp),
+        do: assert(field["properties"][binding]["required"] == ["path"])
+
+    assert field["properties"]["emptyText"]["type"] == "string"
+    assert field["properties"]["hideWhenEmpty"]["type"] == "boolean"
+
+    source = File.read!(@renderer_asset_path)
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.12.0")
+  end
+
   test "catalog 1.11 is additive: badge helpPath, column caption and sortFirst, sort reset" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.11.0"
-    assert Experience.admin_catalog_version() == "1.11.0"
     assert Map.has_key?(catalog["x-changelog"], "1.11.0")
 
     grid = catalog["components"]["dataGrid"]["properties"]
@@ -119,9 +137,6 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert column["properties"]["sortFirst"]["enum"] == ["desc"]
     assert grid["sort"]["properties"]["reset"]["type"] == "boolean"
     assert grid["sort"]["required"] == ["path", "action"]
-
-    source = File.read!(@renderer_asset_path)
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.11.0")
   end
 
   test "catalog 1.10 is additive: column help and sortField, detail helpPath, page sizes" do

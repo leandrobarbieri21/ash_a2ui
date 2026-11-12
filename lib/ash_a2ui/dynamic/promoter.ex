@@ -22,6 +22,7 @@ defmodule AshA2ui.Dynamic.Promoter do
   # conversions (see AshA2ui.Dynamic.Parser.option_shape/1): the promoter is
   # the parser's inverse, JSON spec values back to DSL literals.
   @component_options [
+    label: :raw,
     fields: :name_list,
     read_action: :name,
     create_action: :name,

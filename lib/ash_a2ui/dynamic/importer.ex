@@ -133,12 +133,14 @@ defmodule AshA2ui.Dynamic.Importer do
       {:record_label, Extension.get_opt(module, [:a2ui], :record_label, nil),
        "record labels drive the task-panel labels and have no spec key — keep them in the promoted module"},
       {:spec_version, Extension.get_opt(module, [:a2ui], :spec_version, "0.9.1"),
-       "the wire version is a resolve option (:spec_version), not part of the spec"}
+       "the wire version is a resolve option (:spec_version), not part of the spec"},
+      {:component_order, Extension.get_opt(module, [:a2ui], :component_order, :kind),
+       "the admin catalog's section order has no spec key — keep it in the promoted module"}
     ]
 
     for {option, value, note} <- notes,
         not is_nil(value),
-        {option, value} != {:spec_version, "0.9.1"} do
+        {option, value} not in [{:spec_version, "0.9.1"}, {:component_order, :kind}] do
       Rejection.new(
         "a2ui.#{option}",
         to_string(option),
@@ -183,6 +185,7 @@ defmodule AshA2ui.Dynamic.Importer do
     spec =
       %{"kind" => to_string(component.name)}
       |> put_component_name(component)
+      |> put_opt("label", component.label)
       |> put_related_resource(component.resource, surface_resource)
       |> put_list("fields", component.fields)
       |> put_opt("read_action", component.read_action)

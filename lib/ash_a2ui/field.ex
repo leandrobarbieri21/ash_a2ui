@@ -19,7 +19,11 @@ defmodule AshA2ui.Field do
     :link,
     :links,
     :link_label,
+    :empty_text,
     order: 0,
+    badge_text: [],
+    badge_tones: [],
+    badge_help: [],
     hidden: false,
     option_limit: 100,
     option_search: [],
@@ -41,6 +45,10 @@ defmodule AshA2ui.Field do
           link: atom | {atom | String.t(), atom | [atom]} | nil,
           links: atom | nil,
           link_label: atom | nil,
+          empty_text: String.t() | nil,
+          badge_text: keyword(String.t()),
+          badge_tones: keyword(atom),
+          badge_help: keyword(String.t()),
           order: non_neg_integer,
           hidden: boolean
         }

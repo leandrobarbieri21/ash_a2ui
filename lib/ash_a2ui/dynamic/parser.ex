@@ -123,6 +123,7 @@ defmodule AshA2ui.Dynamic.Parser do
   @component_keys %{
     "kind" => :name,
     "name" => :as,
+    "label" => :label,
     "fields" => :fields,
     "read_action" => :read_action,
     "create_action" => :create_action,

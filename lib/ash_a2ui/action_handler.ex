@@ -1384,10 +1384,18 @@ defmodule AshA2ui.ActionHandler do
         fields = details |> Enum.flat_map(& &1.fields) |> Enum.uniq()
 
         case ContextRunner.fetch_selected(view, context, value, selected, ash_opts, loads) do
-          {:ok, record} -> {:ok, linked_record_values(view, record, fields, ash_opts)}
+          {:ok, record} ->
+            {:ok,
+             view
+             |> linked_record_values(record, fields, ash_opts)
+             |> Map.merge(ResolvedView.detail_badge_data(view, record, fields))}
+
           # The selection was just validated; a raced-away record renders empty.
-          :not_found -> {:ok, %{}}
-          {:error, error} -> {:error, error}
+          :not_found ->
+            {:ok, %{}}
+
+          {:error, error} ->
+            {:error, error}
         end
     end
   end
