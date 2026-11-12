@@ -27,7 +27,7 @@ defmodule AshA2ui.Test.LinkedVisitsUI do
     end
 
     field :title do
-      link_url(:page_url)
+      link_url :page_url
     end
   end
 end
