@@ -20,6 +20,7 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.Referral
     resource AshA2ui.Test.EnumRecord
     resource AshA2ui.Test.ColumnTask
+    resource AshA2ui.Test.CaptionedTask
     resource AshA2ui.Test.Ticket
     resource AshA2ui.Test.TicketNote
     resource AshA2ui.Test.Tag

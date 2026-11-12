@@ -186,8 +186,8 @@ defmodule AshA2ui.Dynamic do
   `AshA2ui.L10n`); reads are authorized by default.
 
   The text the spec's author wrote (titles, labels, `prompt_title`, and the
-  `labels`, `icon_labels`, `swimlane_labels`, `detail_text` and `badge_text`
-  maps) is shown as written, not translated. It is matched by its string, so
+  `labels`, `icon_labels`, `swimlane_labels`, `detail_text`, `badge_text` and
+  `badge_help` maps) is shown as written, not translated. It is matched by its string, so
   another label with exactly the same text is shown as written too. A spec
   resolved with `imported?: true` has no such text.
   """
@@ -228,7 +228,14 @@ defmodule AshA2ui.Dynamic do
   defp verbatim(%Surface{spec: spec}, opts),
     do: Keyword.put(opts, :verbatim, MapSet.new(authored_text(spec)))
 
-  @text_maps ["labels", "icon_labels", "swimlane_labels", "detail_text", "badge_text"]
+  @text_maps [
+    "labels",
+    "icon_labels",
+    "swimlane_labels",
+    "detail_text",
+    "badge_text",
+    "badge_help"
+  ]
 
   defp authored_text(%{} = node) do
     Enum.flat_map(node, fn
@@ -765,6 +772,12 @@ defmodule AshA2ui.Dynamic do
                 "enum" => Enum.map(AshA2ui.RowLayout.tones(), &Atom.to_string/1)
               },
               "description" => "Semantic tone per badge value, e.g. {\"true\": \"success\"}."
+            },
+            "badge_help" => %{
+              "type" => "object",
+              "additionalProperties" => %{"type" => "string"},
+              "description" =>
+                "A one-line tooltip per badge value, e.g. {\"active\": \"Currently in force\"}."
             },
             "meta" =>
               Map.put(

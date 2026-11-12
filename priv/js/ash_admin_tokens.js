@@ -480,6 +480,7 @@ export function createAdminStyles(css) {
       display: block;
     }
     .am-cell-sub,
+    .am-cell-caption,
     .am-cell-detail {
       font-size: var(--am-font-size-xs);
       color: var(--am-text-muted);

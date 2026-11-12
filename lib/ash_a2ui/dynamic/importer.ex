@@ -283,6 +283,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("badge", layout.badge)
       |> put_keyword("badge_text", layout.badge_text, :raw)
       |> put_keyword("badge_tones", layout.badge_tones, :name)
+      |> put_keyword("badge_help", Map.get(layout, :badge_help, []), :raw)
       |> put_list("meta", layout.meta)
       |> put_value("columns", layout.columns)
 

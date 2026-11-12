@@ -9,13 +9,15 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       `title`/`badge`/`meta` referencing the table's fields, no field
       referenced twice across `title`/`badge`/`meta`, `badge_text` values
       that are strings, `badge_text` only alongside a `badge`, and
-      `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` (also only
-      alongside a `badge`),
+      `badge_tones` values drawn from `AshA2ui.RowLayout.tones/0` and
+      `badge_help` values that are strings (both also only alongside a
+      `badge`),
     * `column` entities appear only on `:table` components, with unique
       names that are table fields, `subtitle`/`icon`/`more`/`detail`/
-      `detail_date` referencing table fields that are not columns of their
-      own, the icon options only alongside an `icon` and the detail options
-      only alongside a `detail`, `icon_names` drawn from
+      `detail_date`/`caption` referencing table fields that are not columns
+      of their own, the icon options only alongside an `icon`, the detail
+      options only alongside a `detail` and `caption_text` only alongside a
+      `caption`, `icon_names` drawn from
       `AshA2ui.Column.icons/0`, `icon_tones` from `AshA2ui.RowLayout.tones/0`,
       and `icon_labels`/`detail_text` values that are strings,
     * `display :board` appears only on `:table` components that declare a
@@ -312,7 +314,9 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
       {is_nil(column.detail) and not is_nil(Map.get(column, :detail_help)),
        "detail_help without a detail field"},
       {is_nil(Map.get(column, :help)) and not is_nil(Map.get(column, :help_title)),
-       "help_title without help"}
+       "help_title without help"},
+      {is_nil(Map.get(column, :caption)) and not is_nil(Map.get(column, :caption_text)),
+       "caption_text without a caption field"}
     ]
   end
 
@@ -358,7 +362,8 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
   defp verify_row_layout(component, layout, module) do
     with :ok <- verify_layout_fields_known(component, layout, module),
          :ok <- verify_layout_fields_distinct(layout, module),
-         :ok <- verify_badge_text(layout, module) do
+         :ok <- verify_badge_text(layout, module),
+         :ok <- verify_badge_help(layout, module) do
       verify_badge_tones(layout, module)
     end
   end
@@ -424,6 +429,26 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
         {:error,
          error(module, [:a2ui, :component, :table, :row_layout, :badge_text],
            message: "badge_text for #{inspect(value)} must be a string, got: #{inspect(text)}"
+         )}
+    end
+  end
+
+  defp verify_badge_help(%{badge: nil, badge_help: [_ | _]}, module) do
+    {:error,
+     error(module, [:a2ui, :component, :table, :row_layout, :badge_help],
+       message: "row_layout declares badge_help without a badge field"
+     )}
+  end
+
+  defp verify_badge_help(layout, module) do
+    case Enum.find(Map.get(layout, :badge_help, []), fn {_value, text} -> not is_binary(text) end) do
+      nil ->
+        :ok
+
+      {value, text} ->
+        {:error,
+         error(module, [:a2ui, :component, :table, :row_layout, :badge_help],
+           message: "badge_help for #{inspect(value)} must be a string, got: #{inspect(text)}"
          )}
     end
   end

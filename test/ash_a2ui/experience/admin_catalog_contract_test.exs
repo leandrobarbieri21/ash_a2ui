@@ -103,11 +103,30 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.11 is additive: badge helpPath, column caption and sortFirst, sort reset" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.11.0"
+    assert Experience.admin_catalog_version() == "1.11.0"
+    assert Map.has_key?(catalog["x-changelog"], "1.11.0")
+
+    grid = catalog["components"]["dataGrid"]["properties"]
+    column = grid["columns"]["items"]
+    assert column["required"] == ["label", "path"]
+    assert column["properties"]["badge"]["properties"]["helpPath"]["type"] == "string"
+    assert column["properties"]["caption"]["required"] == ["path"]
+    assert column["properties"]["caption"]["properties"]["text"]["type"] == "string"
+    assert column["properties"]["sortFirst"]["enum"] == ["desc"]
+    assert grid["sort"]["properties"]["reset"]["type"] == "boolean"
+    assert grid["sort"]["required"] == ["path", "action"]
+
+    source = File.read!(@renderer_asset_path)
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.11.0")
+  end
+
   test "catalog 1.10 is additive: column help and sortField, detail helpPath, page sizes" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.10.0"
-    assert Experience.admin_catalog_version() == "1.10.0"
     assert Map.has_key?(catalog["x-changelog"], "1.10.0")
 
     column = catalog["components"]["dataGrid"]["properties"]["columns"]["items"]
@@ -120,9 +139,6 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert pagination["properties"]["pageSizeOptions"]["items"]["type"] == "integer"
     assert Map.has_key?(pagination["properties"], "pageSizeAction")
     refute "pageSizeOptions" in pagination["required"]
-
-    source = File.read!(@renderer_asset_path)
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.10.0")
   end
 
   test "catalog 1.9 is additive: dataGrid rowClick labelPath, variantPath and inline" do

@@ -532,6 +532,17 @@ defmodule AshA2ui do
         envelope on change, and one that doesn't keeps showing Apply.
         """
       ],
+      sort_reset: [
+        type: :boolean,
+        default: false,
+        doc: """
+        A sortable header cycles through three steps instead of two: its
+        first direction, the other, then back to the query's `default_sort`
+        (the header sends a `nil` sort, which the runner reads as the
+        default). The grid's `sort` binding carries `"reset": true`; a
+        renderer without it keeps toggling between the two directions.
+        """
+      ],
       multi_select_filters: [
         type: {:list, :atom},
         default: [],
@@ -1078,6 +1089,31 @@ defmodule AshA2ui do
         The column carries `"sortable": true` and `"sortField"`.
         """
       ],
+      sort_first: [
+        type: {:one_of, [:asc, :desc]},
+        doc: """
+        The direction the column's header sorts in first, when it is not
+        ascending — e.g. `sort_first :desc` for a date read newest first.
+        The column carries `"sortFirst"`.
+        """
+      ],
+      caption: [
+        type: :atom,
+        doc: """
+        A table field drawn as a third line under the value and its
+        `subtitle`, through `caption_text` — e.g. `caption :created_on` with
+        `caption_text "Created {date}"`. Like `subtitle`, it is folded into
+        the column. The column carries `"caption": {"path", "text"}`.
+        """
+      ],
+      caption_text: [
+        type: :string,
+        doc: """
+        The caption line's words, translated as display metadata. `{date}`
+        is replaced with the `caption` field's value formatted as a date and
+        `{value}` with the value as is. Without it the line is the value.
+        """
+      ],
       help_title: [
         type: :string,
         doc: "The title of the column's header help (see `help`)."
@@ -1149,6 +1185,18 @@ defmodule AshA2ui do
         renderers map them onto theme tokens. Unmatched values render
         `:neutral`. Served per row at the reserved `_badge_tone_<field>` key
         (the admin catalog's badge column binds it as `tonePath`).
+        """
+      ],
+      badge_help: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        A one-line explanation per badge value, shown as the badge's tooltip,
+        matched like `badge_text` — e.g.
+        `badge_help active: "Contract is currently active"`. Translated as
+        display metadata. Served per row at the reserved
+        `_badge_help_<field>` key (`""` when unmatched; the admin catalog's
+        badge column binds it as `helpPath`).
         """
       ],
       meta: [

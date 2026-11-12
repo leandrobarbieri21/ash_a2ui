@@ -16,8 +16,8 @@ defmodule AshA2ui.Gettext.Metadata do
   `ash_a2ui.pot` and are not collected.
 
   Labels that only a record selects (an enum's choice labels, the `icon_labels`,
-  `detail_text`, `badge_text` and primary action `labels` of a row, a query's
-  empty states) are collected from their declarations, every value once.
+  `detail_text`, `badge_text`, `badge_help` and primary action `labels` of a
+  row, a column's `caption_text`, a query's empty states) are collected from their declarations, every value once.
   A canvas registry (`AshA2ui.Canvas.Registry`) is collected by building its
   graph and resolving each resource.
 
@@ -123,7 +123,12 @@ defmodule AshA2ui.Gettext.Metadata do
   end
 
   defp column_texts(column) do
-    help = [column.help_title, column.help && String.trim(column.help), column.more_noun]
+    help = [
+      column.help_title,
+      column.help && String.trim(column.help),
+      column.more_noun,
+      Map.get(column, :caption_text)
+    ]
 
     unlabeled =
       for {value, _icon} <- column.icon_names,
@@ -145,7 +150,9 @@ defmodule AshA2ui.Gettext.Metadata do
           not Keyword.has_key?(layout.badge_text, value),
           do: {context, Label.humanize(value)}
 
-    Keyword.values(layout.badge_text) ++ unlabeled
+    Keyword.values(layout.badge_text) ++
+      Keyword.values(Map.get(layout, :badge_help, [])) ++
+      unlabeled
   end
 
   # "Updated <field>." names the edited field by its humanized name.

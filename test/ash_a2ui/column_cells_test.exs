@@ -322,6 +322,46 @@ defmodule AshA2ui.ColumnCellsTest do
       assert result =~ ~r/column :title reads from :owner, which is a column of its own/
     end
 
+    test "caption_text needs a caption field" do
+      result =
+        define(
+          quote do
+            column :title do
+              caption_text("Created {date}")
+            end
+          end
+        )
+
+      assert result =~ ~r/caption_text without a caption field/
+    end
+
+    test "a caption must be a table field" do
+      result =
+        define(
+          quote do
+            column :title do
+              caption(:nope)
+            end
+          end
+        )
+
+      assert result =~ ~r/column :title references field :nope/
+    end
+
+    test "badge_help needs a badge field" do
+      result =
+        define(
+          quote do
+            row_layout do
+              title :title
+              badge_help(open: "Still to do")
+            end
+          end
+        )
+
+      assert result =~ ~r/row_layout declares badge_help without a badge field/
+    end
+
     test "icon names come from the vocabulary" do
       result =
         define(

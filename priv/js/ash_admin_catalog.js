@@ -180,7 +180,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.10.0";
+export const ADMIN_CATALOG_VERSION = "1.11.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -481,6 +481,10 @@ export function buildSchemas(basicCatalog = null) {
           // more" list (more.valuesPath names the row's list of values).
           width: Num.optional(),
           moreNoun: Str.optional(),
+          // 1.11: a third line ({path, text?}) and the direction a
+          // header's first click sorts in when it is not ascending.
+          caption: RecordAny.optional(),
+          sortFirst: EnumOf(["desc"]).optional(),
         }),
       ),
       // Row arrays / a "/rows" binding / a function call — DynamicValue's
@@ -1726,14 +1730,19 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const sort = this.controller?.props?.sort;
         const surface = this.surface;
         if (!sort?.action || !surface || !this.context?.componentModel) return;
-        const dir = this.sortDirection(column) === "asc" ? "desc" : "asc";
+        // 1.11: a column's first direction (sortFirst), and with the
+        // sort's reset a third click back to the default order (null).
+        const first = column.sortFirst === "desc" ? "desc" : "asc";
+        const current = this.sortDirection(column);
+        const other = first === "asc" ? "desc" : "asc";
+        const dir = !current ? first : current === first ? other : sort.reset === true ? null : first;
         const resolved = resolveEventContext(
           {event: {name: sort.action.name, context: sort.action.context || {}}},
           surface.dataModel,
           "/",
         );
         const context = resolved.event.context;
-        context.query = {...(context.query || {}), sort: {field: sortField(column), dir}};
+        context.query = {...(context.query || {}), sort: dir ? {field: sortField(column), dir} : null};
         surface.dispatchAction(resolved, this.context.componentModel.id);
       }
 
@@ -1809,7 +1818,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
        */
       renderCell(row, column) {
         const value = this.renderCellValue(row, column);
-        if (!column.subtitle && !column.icon && !column.more && !column.detail) return value;
+        if (!column.subtitle && !column.icon && !column.more && !column.detail && !column.caption) return value;
 
         const at = (binding) =>
           binding && typeof binding.path === "string" ? getByPath(row, binding.path) : undefined;
@@ -1841,6 +1850,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           typeof column.detail?.iconTonePath === "string"
             ? badgeTone(getByPath(row, column.detail.iconTonePath))
             : "neutral";
+        // 1.11: the third line, its words filled with the caption value.
+        const captionValue = at(column.caption);
+        const caption =
+          captionValue === null || captionValue === undefined || captionValue === ""
+            ? ""
+            : typeof column.caption.text === "string" && column.caption.text !== ""
+              ? detailText(column.caption.text.replaceAll("{value}", str(captionValue)), captionValue)
+              : str(captionValue);
         // 1.10: a detail line's explanation, an info mark with a tooltip.
         const detailHelp =
           detail && typeof column.detail.helpPath === "string"
@@ -1878,6 +1895,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           ${subtitle === null || subtitle === undefined || subtitle === ""
             ? nothing
             : html`<span class="am-cell-sub">${str(subtitle)}</span>`}
+          ${caption ? html`<span class="am-cell-caption">${caption}</span>` : nothing}
           ${detail
             ? html`<span class="am-cell-detail">${detailIcon
                 ? html`<svg
@@ -1928,7 +1946,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             typeof column.badge.tonePath === "string"
               ? badgeTone(getByPath(row, column.badge.tonePath))
               : "neutral";
-          return html`<span class="am-badge" data-tone=${tone}>${str(text)}</span>`;
+          // 1.11: the pill's one-line explanation, as its tooltip.
+          const help = typeof column.badge.helpPath === "string" ? str(getByPath(row, column.badge.helpPath)) : "";
+          return help
+            ? html`<span class="am-badge" data-tone=${tone} title=${help} aria-description=${help}
+                >${str(text)}</span
+              >`
+            : html`<span class="am-badge" data-tone=${tone}>${str(text)}</span>`;
         }
 
         const raw = getByPath(row, column.path);
