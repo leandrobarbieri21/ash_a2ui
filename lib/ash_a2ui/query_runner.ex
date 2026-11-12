@@ -24,7 +24,7 @@ defmodule AshA2ui.QueryRunner do
         "preset" => "pending",                              # only when the query declares presets
         "autoApply" => %{"debounceMs" => 300},              # only on apply_on_change queries
         "facets" => %{"status" => %{"open" => 3}},          # only with facet_counts
-        "options" => %{"vendor" => [%{"label" => _, "value" => _}]},
+        "options" => %{"supplier" => [%{"label" => _, "value" => _}]},
                                                             # only with path_filters
         "sort" => %{"field" => "name", "dir" => "asc"},     # or nil when unsorted
         "page" => 1,

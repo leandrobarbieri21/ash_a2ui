@@ -359,7 +359,7 @@ defmodule AshA2ui.Verifiers.VerifyQueries do
     {:error, search_path_error(query, path, ctx.module, "a path must have at least two steps")}
   end
 
-  # A computed search field (`search_fields [:vendor_name]`, a `first`
+  # A computed search field (`search_fields [:supplier_name]`, a `first`
   # aggregate) is searched in the data layer like an attribute, so it must
   # be expressible there (`sortable?/3`: expression calculations, and
   # aggregates other than a `first` over an unsortable field) and resolve to

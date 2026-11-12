@@ -521,7 +521,7 @@ defmodule AshA2ui do
         type: {:keyword_list, @empty_state_keys},
         doc: """
         The empty state shown while this preset is selected and nothing
-        matches, e.g. `empty_state title: "No archived contracts", icon:
+        matches, e.g. `empty_state title: "No archived orders", icon:
         :archive`. Needs the query's own `empty_state`.
         """
       ],
@@ -578,7 +578,7 @@ defmodule AshA2ui do
         doc: """
         Fields searched with a case-insensitive contains, OR'd together. Each
         entry is a public string attribute (`:subject`), a string-typed public
-        aggregate or expression calculation (`:vendor_name`, a `first`
+        aggregate or expression calculation (`:supplier_name`, a `first`
         aggregate — searched in the data layer), or a relationship path
         to one (`[:author, :email]` — every step but the last a public
         relationship, the last a public string attribute of the destination).
@@ -671,7 +671,7 @@ defmodule AshA2ui do
         doc: """
         Nested options for a filter with declared choices, per field: a
         group value and the leaf values it stands for, e.g.
-        `filter_groups status: [expiring: [:expiring_soon, :scheduled_renewal]]`.
+        `filter_groups status: [due: [:due_today, :due_this_week]]`.
         The group is emitted as an option `{"label", "value", "group": true}`
         right before its leaves, which carry `"parent": "<group>"`. Only leaf
         values are filter values: selecting a group selects its leaves. A
@@ -684,7 +684,7 @@ defmodule AshA2ui do
         default: [],
         doc: """
         The label of each `filter_groups` group, per field, e.g.
-        `group_labels status: [expiring: "Expiring soon"]`. Defaults to the
+        `group_labels status: [due: "Due soon"]`. Defaults to the
         field's choice label for that value, else the humanized value.
         """
       ],
@@ -693,7 +693,7 @@ defmodule AshA2ui do
         default: [],
         doc: """
         The picker label per filter (`filters` or `path_filters` name), e.g.
-        `filter_labels vendor: "Vendor"`. Defaults to the field's declared
+        `filter_labels supplier: "Supplier"`. Defaults to the field's declared
         `label`, else the humanized name.
         """
       ],
@@ -735,10 +735,10 @@ defmodule AshA2ui do
         default: [],
         doc: """
         Filters over a related value, by name: a relationship path ending in
-        an attribute (`property: [:lines, :property, :name]`, matching
+        an attribute (`warehouse: [:items, :warehouse, :name]`, matching
         records with *any* related value among the selected ones), or a
         single public attribute, aggregate or expression calculation
-        (`vendor: :vendor_name`, `field in values`). The client sends them
+        (`supplier: :supplier_name`, `field in values`). The client sends them
         under `/query/filters/<name>` like `filters`. Their options are the
         distinct non-nil values the actor can read through the table's read
         (same preset, tenant and context scope), sorted, written on every
@@ -751,7 +751,7 @@ defmodule AshA2ui do
       search_placeholder: [
         type: :string,
         doc: """
-        The search box's placeholder, e.g. `"Search contracts or vendors"`.
+        The search box's placeholder, e.g. `"Search orders or suppliers"`.
         Emitted as the search TextField's `"placeholder"`; the field keeps
         its `"label"` (an accessible name).
         """
@@ -769,7 +769,7 @@ defmodule AshA2ui do
         type: {:keyword_list, @empty_state_keys},
         doc: """
         The admin grid's empty state when there are no records:
-        `empty_state title: "No contracts yet", message: "...", icon: :inbox`.
+        `empty_state title: "No orders yet", message: "...", icon: :inbox`.
         The emptyState component then binds `title`, `message` and `icon` to
         the `/query` state's `"emptyState"`, which the runner fills with this,
         `no_results_state` or the selected preset's `empty_state`.
@@ -793,7 +793,7 @@ defmodule AshA2ui do
         envelope at page 1, sent after the client clears search and
         filters), shown while `clearVisible` is true. Needs `empty_state`.
         A `message` may say `{total}`: the read's count before search and
-        filters ("There are {total} contracts on this account.").
+        filters ("There are {total} orders on this account.").
         """
       ],
       page_size_options: [
@@ -1185,7 +1185,7 @@ defmodule AshA2ui do
       more_noun: [
         type: :string,
         doc: """
-        The plural noun for that list's caption ("3 properties"). The column
+        The plural noun for that list's caption ("3 warehouses"). The column
         carries `\"moreNoun\"`, and each row its caption, translated, at
         `_more_caption_<column>` (the binding's `captionPath`). The caption
         shows only for two values or more, so the noun is always plural.
@@ -1304,7 +1304,7 @@ defmodule AshA2ui do
         doc: """
         A one-line explanation per badge value, shown as the badge's tooltip,
         matched like `badge_text` — e.g.
-        `badge_help active: "Contract is currently active"`. Translated as
+        `badge_help active: "Account is currently active"`. Translated as
         display metadata. Served per row at the reserved
         `_badge_help_<field>` key (`""` when unmatched; the admin catalog's
         badge column binds it as `helpPath`).
@@ -1332,8 +1332,8 @@ defmodule AshA2ui do
         type: {:list, :atom},
         default: [],
         doc: """
-        Fields shown only when the row is opened: a scope of work, an
-        amendment's full text. Declaring any makes each row a disclosure that
+        Fields shown only when the row is opened: an item's notes, a
+        message's full text. Declaring any makes each row a disclosure that
         opens below itself (rows start closed and open independently). The
         admin dataGrid's columns for them carry `"placement": "expand"`;
         renderers that do not draw disclosures show them as columns, and the
@@ -1911,7 +1911,7 @@ defmodule AshA2ui do
         type: :keyword_list,
         doc: """
         A placeholder per `:report` param, e.g.
-        `param_placeholders search: "Search vendors", status: "Any status"`.
+        `param_placeholders search: "Search suppliers", status: "Any status"`.
         Emitted as that param's TextField `"placeholder"` on the admin
         catalog (the basic TextField takes none); the field keeps its
         `"label"` as its accessible name. Keys must be among `params`.
@@ -2093,8 +2093,8 @@ defmodule AshA2ui do
         doc: """
         `:detail` components only: fields whose row is left out of the card
         while the record has no value for them (`nil` or `""`), instead of
-        showing a blank or the field's `empty_text` — "Terminated by" on a
-        contract that was never terminated. Admin catalog (`fieldDisplay`'s
+        showing a blank or the field's `empty_text` — "Cancelled by" on an
+        order that was never cancelled. Admin catalog (`fieldDisplay`'s
         `hideWhenEmpty`); the basic catalog shows the row.
         """
       ],
@@ -2367,7 +2367,7 @@ defmodule AshA2ui do
         (the default) places every table before the `:detail` and `:report`
         cards; `:declared` places them in the order the components are
         declared, so a record page can interleave its detail cards and
-        related tables (Overview, then the lines, then the renewal terms).
+        related tables (Overview, then the items, then the shipping details).
         The basic catalog always uses declaration order.
         """
       ],
