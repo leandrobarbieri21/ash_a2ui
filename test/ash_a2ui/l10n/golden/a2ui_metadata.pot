@@ -123,6 +123,7 @@ msgstr ""
 msgid "Assign clerk"
 msgstr ""
 
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 msgid "Assignee name"
 msgstr ""
@@ -224,6 +225,10 @@ msgstr ""
 
 #: test/support/canvas.ex:172
 msgid "Canvas Test App"
+msgstr ""
+
+#: test/support/captioned_task.ex:1
+msgid "Captioned task"
 msgstr ""
 
 #: test/support/table_displays.ex:101
@@ -384,6 +389,14 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
+#: test/support/captioned_task.ex:1
+msgid "Created on"
+msgstr ""
+
+#: test/support/captioned_task.ex:1
+msgid "Created {date}"
+msgstr ""
+
 #: test/support/board_task_ui.ex:133
 msgid "Critical"
 msgstr ""
@@ -460,6 +473,7 @@ msgstr ""
 #: test/support/adoption_ui.ex:57
 #: test/support/adoption_ui.ex:6
 #: test/support/adoption_ui.ex:77
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 #: test/support/diagram_flow.ex:114
 #: test/support/manifest_task.ex:1
@@ -488,6 +502,7 @@ msgctxt "one_of:status"
 msgid "Draft"
 msgstr ""
 
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 msgid "Due on"
 msgstr ""
@@ -590,6 +605,10 @@ msgstr ""
 #: test/support/adoption.ex:243
 #: test/support/submission.ex:1
 msgid "Finish"
+msgstr ""
+
+#: test/support/captioned_task.ex:1
+msgid "Finished and checked"
 msgstr ""
 
 #: test/support/column_task.ex:1
@@ -890,6 +909,7 @@ msgstr ""
 #: test/support/bulk_cards_ui.ex:1
 #: test/support/bulk_presets_ui.ex:1
 #: test/support/bulk_tasks_ui.ex:1
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 #: test/support/linked_filters_ui.ex:1
 #: test/support/links.ex:135
@@ -1289,6 +1309,7 @@ msgstr ""
 #: test/support/bulk_tasks_ui.ex:1
 #: test/support/calendar_event.ex:182
 #: test/support/calendar_event.ex:80
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 #: test/support/diagram_flow.ex:114
 #: test/support/hub_ui.ex:1
@@ -1322,6 +1343,10 @@ msgstr ""
 
 #: test/support/hub_ui.ex:1
 msgid "Statuses update nightly."
+msgstr ""
+
+#: test/support/captioned_task.ex:1
+msgid "Still to do"
 msgstr ""
 
 #: test/support/enrollment.ex:151
@@ -1419,6 +1444,7 @@ msgstr ""
 #: test/support/calendar_event.ex:182
 #: test/support/calendar_event.ex:218
 #: test/support/calendar_event.ex:80
+#: test/support/captioned_task.ex:1
 #: test/support/column_task.ex:1
 #: test/support/linked_filters_ui.ex:1
 #: test/support/links.ex:135

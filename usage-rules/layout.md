@@ -106,6 +106,11 @@ topics for the full contracts.
   unmatched values are `:neutral`. Rows carry the tone at
   `_badge_tone_<field>` and the admin dataGrid's badge column binds it as
   `tonePath`. Use tones for meaning (state), not decoration.
+- Explain each badge value in one line with `badge_help` (matched like
+  `badge_text`, e.g. `badge_help active: "Contract is currently active"`):
+  the admin grid draws it as the pill's tooltip. Translated as display
+  metadata; rows carry it at `_badge_help_<field>` (`""` unmatched) and the
+  badge column binds it as `helpPath` (catalog 1.11).
 - Without a `row_layout`, rows stay flat cell Rows — both layouts are
   byte-identical to the pre-layout encoder when undeclared, so adding one
   never breaks existing renderers.
@@ -169,6 +174,16 @@ topics for the full contracts.
     — every value behind "+N more", as strings at `_more_values_<column>`
     (`more.valuesPath`), and the noun for their caption (`"moreNoun"`).
     Needs `more`.
+- Catalog 1.11 adds, all optional and admin-only:
+  - `caption :field` + `caption_text "Created {date}"` — a third line under
+    the value and its subtitle (a contract's created date under its vendor).
+    `{date}` is the field's value formatted as a date in the reader's locale,
+    `{value}` the value as is; without `caption_text` the line is the value.
+    The field is folded like `subtitle`; the column carries
+    `"caption": {"path", "text"}`. `caption_text` needs `caption`.
+  - `sort_first :desc` — the header's first click sorts descending (a date
+    read newest first). The column carries `"sortFirst": "desc"`.
+  - On the badge column, `badge_help` (on the `row_layout`, see above).
 - `column_order :fields` on a table with a `row_layout` orders the admin
   grid's columns as the component's `fields` (default `:layout`: title,
   badge, meta). The badge column keeps its `badge_text`/`badge_tones`

@@ -3,11 +3,12 @@ defmodule AshA2ui.Column do
   Target struct for the `column` DSL entity — how a `:table` component's
   data grid draws one field's cell beyond its value: a second line under
   it (`subtitle`), a leading icon chosen per row (`icon`), a "+N more" tag
-  from a count (`more`) and a detail line under it (`detail`).
+  from a count (`more`), a detail line under it (`detail`) and a third line
+  (`caption`).
 
   The fields a column reads from (`subtitle`, `icon`, `more`, `detail`,
-  `detail_date`) are table fields, so rows carry them; the data grid draws
-  them inside the column rather than as columns of their own.
+  `detail_date`, `caption`) are table fields, so rows carry them; the data
+  grid draws them inside the column rather than as columns of their own.
   """
 
   import AshA2ui.Gettext, only: [msg: 1, msg_plural: 2]
@@ -26,6 +27,9 @@ defmodule AshA2ui.Column do
     :help_title,
     :help,
     :sort_by,
+    :sort_first,
+    :caption,
+    :caption_text,
     :width,
     :more_values,
     :more_noun,
@@ -55,6 +59,9 @@ defmodule AshA2ui.Column do
           help_title: String.t() | nil,
           help: String.t() | nil,
           sort_by: atom | nil,
+          sort_first: :asc | :desc | nil,
+          caption: atom | nil,
+          caption_text: String.t() | nil,
           width: pos_integer | nil,
           more_values: atom | nil,
           more_noun: String.t() | nil
@@ -71,7 +78,8 @@ defmodule AshA2ui.Column do
 
   @doc """
   The fields a column reads from besides its own: its subtitle, icon,
-  count, detail, detail date and detail help fields, in that order.
+  count, detail, detail date, detail help, values and caption fields, in
+  that order.
   """
   @spec source_fields(t()) :: [atom]
   def source_fields(column) do
@@ -83,7 +91,8 @@ defmodule AshA2ui.Column do
         column.detail,
         column.detail_date,
         Map.get(column, :detail_help),
-        Map.get(column, :more_values)
+        Map.get(column, :more_values),
+        Map.get(column, :caption)
       ],
       &is_nil/1
     )

@@ -989,15 +989,22 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # `sort` binding (put_grid_sort/3) carries the current sort and the
   # envelope a header click sends.
   defp put_column_sortable(column, %{query: %{sortable: sortable}}, field, cells) do
-    case cells && Map.get(cells, :sort_by) do
-      nil ->
-        if field in sortable, do: Map.put(column, "sortable", true), else: column
+    column =
+      case cells && Map.get(cells, :sort_by) do
+        nil ->
+          if field in sortable, do: Map.put(column, "sortable", true), else: column
 
-      sort_by ->
-        # A column sorted by another field (`sort_by`) says which.
-        if sort_by in sortable,
-          do: Map.merge(column, %{"sortable" => true, "sortField" => to_string(sort_by)}),
-          else: column
+        sort_by ->
+          # A column sorted by another field (`sort_by`) says which.
+          if sort_by in sortable,
+            do: Map.merge(column, %{"sortable" => true, "sortField" => to_string(sort_by)}),
+            else: column
+      end
+
+    # A sortable column whose first direction is not ascending says which.
+    case {column["sortable"], cells && Map.get(cells, :sort_first)} do
+      {true, :desc} -> Map.put(column, "sortFirst", "desc")
+      _other -> column
     end
   end
 
@@ -1017,7 +1024,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         |> put_contexts_binding(view)
     }
 
-    Map.put(grid, "sort", %{"path" => "#{table.query_path}/sort", "action" => action})
+    sort =
+      %{"path" => "#{table.query_path}/sort", "action" => action}
+      |> maybe_put("reset", if(Map.get(table.query, :sort_reset, false), do: true))
+
+    Map.put(grid, "sort", sort)
   end
 
   defp put_grid_sort(grid, _view, _table), do: grid
@@ -1037,6 +1048,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> maybe_put("icon", cells.icon && icon_binding(name, cells))
     |> maybe_put("more", cells.more && more_binding(name, cells))
     |> maybe_put("detail", cells.detail && detail_binding(name, cells))
+    |> maybe_put("caption", Map.get(cells, :caption) && caption_binding(cells, l10n))
     |> maybe_put("help", AshA2ui.Column.help(cells, l10n))
     |> maybe_put("width", Map.get(cells, :width))
     |> maybe_put("moreNoun", translate_declared(l10n, Map.get(cells, :more_noun)))
@@ -1049,6 +1061,13 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     |> maybe_put("valuesPath", if(values?, do: "_more_values_#{name}"))
     |> maybe_put("captionPath", if(values?, do: "_more_caption_#{name}"))
     |> maybe_put("labelPath", if(values?, do: "_more_label_#{name}"))
+  end
+
+  # The third line: the caption field, read off the row, and the column's
+  # words for it (`{date}` / `{value}` filled by the renderer).
+  defp caption_binding(cells, l10n) do
+    %{"path" => to_string(cells.caption)}
+    |> maybe_put("text", translate_declared(l10n, Map.get(cells, :caption_text)))
   end
 
   defp icon_binding(name, cells) do
@@ -1086,13 +1105,16 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
   # The row_layout badge column renders as a pill: its text is the
   # server-computed `_badge_<field>` row key (the badge_text mapping), its
-  # tone the `_badge_tone_<field>` key when `badge_tones` are declared.
+  # tone the `_badge_tone_<field>` key when `badge_tones` are declared, its
+  # tooltip the `_badge_help_<field>` key when `badge_help` is.
   defp put_column_badge(column, %{badge: field} = layout, field) do
     badge =
-      case layout.badge_tones do
-        [] -> %{"path" => "_badge_#{field}"}
-        _tones -> %{"path" => "_badge_#{field}", "tonePath" => "_badge_tone_#{field}"}
-      end
+      %{"path" => "_badge_#{field}"}
+      |> maybe_put("tonePath", if(layout.badge_tones != [], do: "_badge_tone_#{field}"))
+      |> maybe_put(
+        "helpPath",
+        if(Map.get(layout, :badge_help, []) != [], do: "_badge_help_#{field}")
+      )
 
     Map.put(column, "badge", badge)
   end

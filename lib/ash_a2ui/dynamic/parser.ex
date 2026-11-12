@@ -296,6 +296,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "badge" => :badge,
     "badge_text" => :badge_text,
     "badge_tones" => :badge_tones,
+    "badge_help" => :badge_help,
     "meta" => :meta,
     "columns" => :columns
   }
@@ -1029,7 +1030,7 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp option_shape(:context_filter), do: :name_keyword
   defp option_shape(option) when option in [:visible_when, :filter], do: :raw_keyword
-  defp option_shape(:badge_text), do: :string_keyword
+  defp option_shape(option) when option in [:badge_text, :badge_help], do: :string_keyword
   defp option_shape(option) when option in [:icon_labels, :detail_text], do: :string_keyword
 
   defp option_shape(option) when option in [:icon_names, :detail_icon_names],

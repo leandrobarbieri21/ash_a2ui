@@ -12,6 +12,7 @@ defmodule AshA2ui.RowLayout do
     :meta,
     badge_text: [],
     badge_tones: [],
+    badge_help: [],
     columns: 2,
     __spark_metadata__: nil
   ]
@@ -22,6 +23,7 @@ defmodule AshA2ui.RowLayout do
           meta: [atom] | nil,
           badge_text: keyword(String.t()),
           badge_tones: keyword(atom),
+          badge_help: keyword(String.t()),
           columns: pos_integer
         }
 
@@ -32,6 +34,8 @@ defmodule AshA2ui.RowLayout do
   (atom/boolean values only — keyword keys), the humanized value otherwise,
   and `""` for `nil`. Layouts declaring `badge_tones` add
   `"_badge_tone_<field>"`: the matching tone (`"neutral"` when unmatched).
+  Layouts declaring `badge_help` add `"_badge_help_<field>"`: the matching
+  explanation, translated (`""` when unmatched).
   Empty for layout-less tables and badge-less layouts.
 
   Shared by the encoder and `AshA2ui.ActionHandler` so initial renders and
@@ -44,17 +48,19 @@ defmodule AshA2ui.RowLayout do
   def badge_data(nil, _record, _l10n), do: %{}
   def badge_data(%__MODULE__{badge: nil}, _record, _l10n), do: %{}
 
-  def badge_data(%__MODULE__{badge: badge, badge_tones: []} = layout, record, l10n) do
-    %{"_badge_#{badge}" => badge_text(layout, record, l10n)}
-  end
-
   def badge_data(%__MODULE__{badge: badge} = layout, record, l10n) do
     value = Map.get(record, badge)
 
-    %{
-      "_badge_#{badge}" => badge_text(layout, record, l10n),
-      "_badge_tone_#{badge}" => badge_tone(layout, value)
-    }
+    data = %{"_badge_#{badge}" => badge_text(layout, record, l10n)}
+
+    data =
+      if layout.badge_tones == [],
+        do: data,
+        else: Map.put(data, "_badge_tone_#{badge}", badge_tone(layout, value))
+
+    if layout.badge_help == [],
+      do: data,
+      else: Map.put(data, "_badge_help_#{badge}", badge_help(layout, value, l10n))
   end
 
   @tones ~w(neutral info success warning danger accent pending gray)a
@@ -62,6 +68,15 @@ defmodule AshA2ui.RowLayout do
   @doc "The badge tone vocabulary `badge_tones` values are drawn from."
   @spec tones() :: [atom]
   def tones, do: @tones
+
+  defp badge_help(_layout, nil, _l10n), do: ""
+
+  defp badge_help(layout, value, l10n) do
+    case is_atom(value) && Keyword.get(layout.badge_help, value) do
+      text when is_binary(text) -> AshA2ui.Label.translate(l10n, text)
+      _unmatched -> ""
+    end
+  end
 
   defp badge_tone(_layout, nil), do: "neutral"
 

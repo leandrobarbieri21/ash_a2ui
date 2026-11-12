@@ -174,7 +174,7 @@ defmodule AshA2ui.Experience do
   pagination page sizes and the extended ChoicePicker/TextField keys.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.10.0"
+  def admin_catalog_version, do: "1.11.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item

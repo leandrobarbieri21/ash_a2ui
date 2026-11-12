@@ -27,6 +27,26 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **Admin catalog 1.11: a badge explains itself, a column has a third line,
+  and a header can return to the default order.** All opt-in and additive;
+  a table without them emits exactly what it did.
+  - `badge_help` on a `row_layout` (matched like `badge_text`): a one-line
+    explanation per badge value, translated as display metadata. Rows carry
+    it at `_badge_help_<field>` (`""` unmatched); the badge column binds it
+    as `helpPath`, and the stock grid draws it as the pill's tooltip.
+  - `caption :field` + `caption_text "Created {date}"` on a `column`: a third
+    line under the value and its subtitle. `{date}` is the field's value
+    formatted as a date, `{value}` the value as is. The field is folded
+    like `subtitle`; the column carries `"caption": {"path", "text"}`.
+  - `sort_first :desc` on a `column`: the header's first click sorts
+    descending (`"sortFirst": "desc"`).
+  - `sort_reset true` on a `query`: a sortable header cycles first
+    direction, the other, then back to `default_sort` (it sends a `nil`
+    sort, which the runner already reads as the default). The grid's
+    `sort` carries `"reset": true`; renderers without it keep toggling.
+  - `badge_help` round-trips through dynamic specs like `badge_text`; the
+    verifier rejects `badge_help` without a `badge`, a non-string
+    `badge_help` value, and `caption_text` without a `caption`.
 - **`priv/js/hooks.js` exports the LiveView hooks with the events they
   handle.** Each entry maps the hook's registered name to `{events, load}`:
   every event name the hook passes to `handleEvent` (so a host that loads
