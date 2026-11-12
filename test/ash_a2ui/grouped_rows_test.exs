@@ -98,7 +98,7 @@ defmodule AshA2ui.GroupedRowsTest do
 
   test "the note updates when the context changes", %{owner: owner} do
     view = AshA2ui.ResolvedView.resolve(GroupedVisitsUI)
-    assert [%{context: :owner, fields: [:name]}] = view.section_notes
+    assert [%{context: :owner, fields: [:name]}] = view.notes
 
     {_components, data} = build(:admin_v1)
     assert data["detail"]["owner"] == %{}

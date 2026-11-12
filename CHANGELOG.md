@@ -52,6 +52,23 @@ Requires Elixir 1.20 or later.
   or `report` click until the server answers; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
+- **Admin catalog 1.15: document rows and table footers.** A `row_layout`'s
+  `leading :field` draws a short code before the row's title (a file's type);
+  its dataGrid column carries `"placement": "leading"`, and the basic card
+  keeps it in its metadata grid. A `field`'s `download true` (only with
+  `link_url`) marks its plain link as a file to download: the link entry
+  carries `"download": true` and the stock renderer draws `<a download>`. A
+  table's `footer_note :field` (a field of its context record, read and
+  refreshed like a `section_note`) and `footer_link href: ..., label: ...`
+  draw under its rows, in its card: the dataGrid carries `footerNote` (a
+  binding to `/detail/<context>/<field>`) and `footerLink` (`{href, label}`,
+  the label translated). The basic catalog leaves the footer out. Verified:
+  `download` only with `link_url`; footers only on tables; a footer note
+  from one context whose resource has it. The `RowLayout` struct gains
+  `leading`, the `Field` struct `download`, the `Component` struct
+  `footer_note` and `footer_link`, and `ResolvedView` reads both kinds of
+  note through one `notes` list (it was `section_notes`).
+
 - **Admin catalog 1.14: grouped list rows and section notes.** A
   `row_layout`'s `group_by :field` heads each run of consecutive rows sharing
   that value with one header (a property over its contract lines), with

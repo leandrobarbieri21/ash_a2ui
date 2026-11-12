@@ -163,6 +163,16 @@ topics for the full contracts.
   end
   ```
 
+- A row about a file reads as a document row: its type as a `leading` code
+  before the title (`"PDF"`), and a trailing link that downloads it
+  (`link_url :uri` plus `download true` on the field). Admin catalog 1.15:
+  the column carries `"placement": "leading"`; the basic card keeps it in its
+  metadata grid.
+- A line under a table's rows, in the same card ("2 versions on file"), is a
+  `footer_note :field` on the table (a field of its context record, read
+  like a `section_note`), with an optional `footer_link href: "#history",
+  label: "All versions"`. Admin catalog only: the dataGrid's `footerNote`
+  and `footerLink`.
 - `group_subtitle` and `group_icon` need a `group_by`; both fields must be
   the table's and drop out of the default `meta`. Admin catalog 1.14: their
   columns carry `"placement": "group" | "groupSubtitle"` and the dataGrid

@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "x-changelog": {
+    "1.15.0": "Additive: document rows and table footers. dataGrid columns gain the placement leading (a short code drawn before the row's title, such as a file's type); a plain link object may carry download: true (the address is a file to download, not a page to open); the dataGrid gains an optional footerNote (a binding to a line of text drawn under the rows, inside the table's card) and footerLink ({href, label}: a link beside it). Renderers that ignore them draw the column as any other, follow the link, and leave the footer out. The catalogId is unchanged.",
     "1.14.0": "Additive: grouped list rows. dataGrid columns gain the placements group (the value heading a group of consecutive rows) and groupSubtitle (the line under that heading, from the group's first row), and the dataGrid an optional groupIcon (an icon name for the group headers, resolved in the renderer's own icon set). Columns gain an optional emptyText (the field's empty_text: the muted words a list-rows renderer shows when the row's value is empty). A list-rows renderer starts a new group wherever the group value changes; renderers that ignore them draw the columns as any other. The catalogId is unchanged.",
     "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
     "1.12.0": "Additive: record pages. fieldDisplay gains optional badge, badgeTone and badgeHelp (bindings to the field's _badge_<field>, _badge_tone_<field> and _badge_help_<field> under its /detail/<context> path: the value drawn as a pill with that tone and one-line tooltip), note (a few words beside the label saying how the value came to be), emptyText (the muted words shown when the value is empty) and hideWhenEmpty (true: an empty value draws no row at all). dataGrid gains an optional layout (rows: list rows instead of a grid) and columns an optional placement (trailing or expand: where a list-rows renderer draws them). Renderers that ignore them draw the plain value and the grid. The catalogId is unchanged.",
@@ -78,7 +79,7 @@
               },
               "link": {
                 "type": "object",
-                "description": "Row-relative binding ({path: \"_links/<field>\"}) to the cell's reference link(s): a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface, or a list of them (multi-valued links). Absent on a row = no link for that row (pruned per actor). Activating a link invokes the openSurface function with {surface, recordId}.",
+                "description": "Row-relative binding ({path: \"_links/<field>\"}) to the cell's reference link(s): a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface (1.15: with download: true when the address is a file to download), or a list of them (multi-valued links). Absent on a row = no link for that row (pruned per actor). Activating a link invokes the openSurface function with {surface, recordId}.",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
@@ -156,8 +157,8 @@
               },
               "placement": {
                 "type": "string",
-                "enum": ["trailing", "expand", "group", "groupSubtitle"],
-                "description": "Optional (1.12): where a list-rows renderer (layout rows) draws the column: trailing at the row's end, right-aligned; expand only when the row is opened. 1.14: group heads each run of consecutive rows sharing its value; groupSubtitle sits under that heading. Grids draw it as any other column."
+                "enum": ["trailing", "expand", "group", "groupSubtitle", "leading"],
+                "description": "Optional (1.12): where a list-rows renderer (layout rows) draws the column: trailing at the row's end, right-aligned; expand only when the row is opened. 1.14: group heads each run of consecutive rows sharing its value; groupSubtitle sits under that heading. 1.15: leading is a short code drawn before the row's title. Grids draw it as any other column."
               },
               "caption": {
                 "type": "object",
@@ -179,6 +180,17 @@
           "type": "string",
           "enum": ["rows"],
           "description": "Optional (1.12): rows asks for list rows instead of a grid: no header, each row its title (and subtitle), badge, trailing columns, and a disclosure opening its expand columns. Renderers that ignore it draw the grid."
+        },
+        "footerNote": {
+          "type": "object",
+          "description": "Optional (1.15): binding to a line of text a renderer draws under the rows, inside the table's card (a field of the table's context record, at /detail/<context>/<field>)."
+        },
+        "footerLink": {
+          "type": "object",
+          "description": "Optional (1.15): a link a renderer draws beside the footer note: {href, label}.",
+          "properties": {"href": {"type": "string"}, "label": {"type": "string"}},
+          "required": ["href", "label"],
+          "additionalProperties": false
         },
         "groupIcon": {
           "type": "string",
@@ -399,7 +411,7 @@
         },
         "link": {
           "type": "object",
-          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface, or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
+          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface (1.15: with download: true when the address is a file to download), or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
           "properties": {"path": {"type": "string"}},
           "required": ["path"],
           "additionalProperties": false

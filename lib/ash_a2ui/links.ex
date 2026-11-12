@@ -163,7 +163,7 @@ defmodule AshA2ui.Links do
 
       # A plain link: no surface to resolve, nothing for the resolver to veto.
       {:url, name} ->
-        %{field: field.name, cardinality: :url, url_field: name}
+        %{field: field.name, cardinality: :url, url_field: name, download: field.download == true}
     end
   end
 
@@ -225,7 +225,14 @@ defmodule AshA2ui.Links do
     case Map.get(record, spec.url_field) do
       href when is_binary(href) and href != "" ->
         cell = Map.get(row, to_string(spec.field))
-        %{"href" => href, "label" => if(is_binary(cell) and cell != "", do: cell, else: href)}
+
+        link = %{
+          "href" => href,
+          "label" => if(is_binary(cell) and cell != "", do: cell, else: href)
+        }
+
+        # 1.15: a file to download rather than a page to open.
+        if Map.get(spec, :download), do: Map.put(link, "download", true), else: link
 
       _none ->
         nil

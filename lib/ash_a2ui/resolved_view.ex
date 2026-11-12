@@ -91,7 +91,7 @@ defmodule AshA2ui.ResolvedView do
     contexts: %{},
     context_order: [],
     details: [],
-    section_notes: [],
+    notes: [],
     reports: [],
     prompts: %{},
     prompt_selects: %{},
@@ -297,7 +297,7 @@ defmodule AshA2ui.ResolvedView do
           contexts: %{atom => context},
           context_order: [atom],
           details: [detail],
-          section_notes: [detail],
+          notes: [detail],
           reports: [report],
           prompts: %{atom => [prompt_field]},
           prompt_selects: %{atom => select},
@@ -411,7 +411,7 @@ defmodule AshA2ui.ResolvedView do
       contexts: Map.new(contexts, &{&1.name, &1}),
       context_order: Enum.map(contexts, & &1.name),
       details: resolve_details(components, contexts, fields),
-      section_notes: resolve_section_notes(components, contexts, fields),
+      notes: resolve_notes(components, contexts, fields),
       reports: resolve_reports(resource, components),
       prompts: resolve_prompts(resource, actions, declared, prompt_selects, l10n),
       prompt_selects: prompt_selects,
@@ -465,11 +465,11 @@ defmodule AshA2ui.ResolvedView do
 
   @doc """
   Everything read with a context's record into `/detail/<context>`: the
-  `:detail` components, then the `section_note`s (each shaped like a detail:
-  its context, its one field and that field's loads).
+  `:detail` components, then the `section_note`s and `footer_note`s (each
+  shaped like a detail: its context, its one field and that field's loads).
   """
   @spec detail_sources(t()) :: [detail]
-  def detail_sources(%__MODULE__{details: details, section_notes: notes}), do: details ++ notes
+  def detail_sources(%__MODULE__{details: details, notes: notes}), do: details ++ notes
 
   @doc """
   Serializes `fields` of an Ash `record` to the wire map shape (string keys,
@@ -1012,12 +1012,15 @@ defmodule AshA2ui.ResolvedView do
     end)
   end
 
-  # A section_note reads with its context's record, like a one-field detail
-  # (the verifier guarantees the context).
-  defp resolve_section_notes(components, contexts, fields) do
+  # A section or footer note reads with its context's record, like a
+  # one-field detail (the verifier guarantees the context).
+  defp resolve_notes(components, contexts, fields) do
     by_name = Map.new(contexts, &{&1.name, &1})
 
-    for %{section_note: note} = component when not is_nil(note) <- components,
+    for component <- components,
+        option <- [:section_note, :footer_note],
+        note = Map.get(component, option),
+        not is_nil(note),
         context = by_name[AshA2ui.Component.note_context(component)],
         not is_nil(context) do
       %{
@@ -1414,6 +1417,7 @@ defmodule AshA2ui.ResolvedView do
   defp normalize_row_layout(layout, effective) do
     trailing = Enum.filter(layout.trailing, &(&1 in effective))
     expand = Enum.filter(layout.expand, &(&1 in effective))
+    leading = if layout.leading in effective, do: layout.leading
     group_by = if layout.group_by in effective, do: layout.group_by
     group_subtitle = if group_by && layout.group_subtitle in effective, do: layout.group_subtitle
 
@@ -1421,7 +1425,10 @@ defmodule AshA2ui.ResolvedView do
       case layout.meta do
         nil ->
           effective --
-            (Enum.reject([layout.title, layout.badge, group_by, group_subtitle], &is_nil/1) ++
+            (Enum.reject(
+               [layout.title, layout.badge, leading, group_by, group_subtitle],
+               &is_nil/1
+             ) ++
                trailing ++ expand)
 
         meta ->
@@ -1433,6 +1440,7 @@ defmodule AshA2ui.ResolvedView do
       | meta: meta,
         trailing: trailing,
         expand: expand,
+        leading: leading,
         group_by: group_by,
         group_subtitle: group_subtitle
     }

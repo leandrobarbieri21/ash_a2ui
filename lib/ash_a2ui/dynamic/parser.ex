@@ -126,6 +126,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "label" => :label,
     "section" => :section,
     "section_note" => :section_note,
+    "footer_note" => :footer_note,
+    "footer_link" => :footer_link,
     "hide_empty" => :hide_empty,
     "fields" => :fields,
     "read_action" => :read_action,
@@ -305,6 +307,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "meta" => :meta,
     "trailing" => :trailing,
     "expand" => :expand,
+    "leading" => :leading,
     "group_by" => :group_by,
     "group_subtitle" => :group_subtitle,
     "group_icon" => :group_icon,
@@ -629,6 +632,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "links" => :links,
     "link_label" => :link_label,
     "link_url" => :link_url,
+    "download" => :download,
     "note" => :note,
     "empty_text" => :empty_text,
     "badge_text" => :badge_text,
@@ -1026,7 +1030,9 @@ defmodule AshA2ui.Dynamic.Parser do
               :link_url,
               :group_by,
               :group_subtitle,
-              :section_note
+              :section_note,
+              :leading,
+              :footer_note
             ],
        do: :name
 
@@ -1052,7 +1058,10 @@ defmodule AshA2ui.Dynamic.Parser do
 
   defp option_shape(:context_filter), do: :name_keyword
   defp option_shape(option) when option in [:visible_when, :filter], do: :raw_keyword
-  defp option_shape(option) when option in [:badge_text, :badge_help], do: :string_keyword
+
+  defp option_shape(option) when option in [:badge_text, :badge_help, :footer_link],
+    do: :string_keyword
+
   defp option_shape(option) when option in [:icon_labels, :detail_text], do: :string_keyword
 
   defp option_shape(option) when option in [:icon_names, :detail_icon_names],

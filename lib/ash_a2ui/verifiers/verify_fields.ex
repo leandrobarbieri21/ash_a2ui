@@ -250,6 +250,14 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     dsl_state
     |> Verifier.get_entities([:a2ui])
     |> Enum.find_value(:ok, fn
+      %AshA2ui.Field{link_url: nil, download: true, name: name} ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :field, name, :download],
+           message: "download needs a link_url: only a plain link downloads its address"
+         )}
+
       %AshA2ui.Field{link_url: nil} ->
         nil
 

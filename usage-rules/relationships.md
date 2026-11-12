@@ -206,7 +206,9 @@ end
   `openSurface`, nothing for the `LinkResolver` to resolve or veto, so prune
   in the calculation if the actor should not see it). The basic catalog shows
   the plain value. Cannot be combined with `link`, `links` or `source`
-  (verified).
+  (verified). A link to a file to save rather than a page to open adds
+  `download true` (admin catalog 1.15): the entry carries `"download" =>
+  true`, and the stock renderer draws `<a download>`. Only with `link_url`.
 - Verified at compile time: `link` → public to-one relationship, `links`
   → public to-many, single-attribute destination PK, `link_label` a
   public destination field, `{surface, id_path}` walks public
