@@ -25,7 +25,26 @@ Requires Elixir 1.20 or later.
   its shadow root) with the buttons, so Tab left the dialog; it now uses the
   dialog's own root.
 
+- **Live diagram: labels and badges no longer overlap.** Mermaid placed two edge
+  labels in the same spot when a state had several transitions, and the marker
+  badges sat on the node's top edge, over the state box. Edge labels are now
+  moved the shortest distance that clears each other, every node and the badges,
+  and each node's badges form a group placed beside it, off every node
+  (`priv/js/ash_a2ui_diagram_layout.js`, unit-tested).
+
 ### Features:
+
+- **`param_placeholders` on a `:report` component.** A placeholder per report
+  param (`param_placeholders search: "Search vendors"`), emitted as the param
+  TextField's `"placeholder"` under the admin catalog, as `search_placeholder`
+  is for a query's search box. Keys must be among the component's `params`.
+- **`/ui/loading` and `AshA2ui.Loading`.** A reserved flag that says a surface's
+  rows are still being fetched, with `AshA2ui.Loading.messages/3` to set it. A
+  `:report` component now carries a loading row (`report_<name>_loading`,
+  templated over `/ui/loading_visible`), so an empty report no longer reads as
+  "no rows" while its rows are on the way. The hook sets the flag from a `query`
+  or `report` click until the server answers; a host that runs a report's rows
+  on arrival brackets the fetch with the same messages.
 
 - **Admin catalog 1.13: plain links.** A `field`'s `link_url :field` links
   its value to a page or address held by another field of the same

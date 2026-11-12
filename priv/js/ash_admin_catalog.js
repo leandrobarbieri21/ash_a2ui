@@ -156,6 +156,10 @@ import {
 // file has no imports of its own and defines its elements only when asked.
 import {defineNbComponents} from "./nb_components.js";
 
+// Keeps a live diagram's edge labels and marker badges clear of each other
+// and of the nodes (pure geometry, unit-tested without a browser).
+import {placeMarkerGroups, separate} from "./ash_a2ui_diagram_layout.js";
+
 // Schema builders from web_core's OWN zod (3.x) — the instance the
 // GenericBinder introspects. Importing the module directly (rather than
 // receiving builders through `deps`) guarantees instance identity: the
@@ -4044,6 +4048,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
     // Mermaid (v10–12) wraps a node's id: "<render id>-flowchart-<node id>-<n>".
     // Direct id/data-id matches come first for other renderers.
+    // The badge is 2rem square (see .marker); the layout works in pixels.
+    const MARKER_SIZE = 32;
+
     const findNode = (canvas, nodeId) => {
       const escaped = String(nodeId).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const pattern = new RegExp(`(^|-)${escaped}(-[0-9]+)?$`);
@@ -4098,6 +4105,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             border-radius: var(--am-radius-m);
             background: var(--ash-admin-diagram-background, var(--am-surface));
             padding: var(--am-space-m);
+            padding-bottom: calc(var(--am-space-m) + 2.5rem);
             overflow: auto;
           }
           .diagram-canvas svg {
@@ -4267,7 +4275,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._drawing = null; // the source being drawn
         this._failed = null; // the source mermaid could not draw (or no engine)
         this._mode = "pending"; // pending | ready | fallback
-        this._positions = {};
+        this._slots = {};
         this._resize = null;
       }
 
@@ -4323,13 +4331,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (this._mode !== "ready") return nothing;
         const rendered = [];
         for (const [nodeId, markers] of Object.entries(this.markerMap())) {
-          const point = this._positions[nodeId];
-          if (!point || !Array.isArray(markers)) continue;
-          // Badges along the node's top edge, from its right corner
-          // leftwards, so the node's own label stays readable.
+          const slots = this._slots[nodeId];
+          if (!slots || !Array.isArray(markers)) continue;
+          // Badges in a group beside their node (see placeMarkerGroups), so a
+          // state box is never covered, however many are marked on it.
           markers.forEach((marker, index) => {
-            const left = point.x - 4 - index * 28;
-            rendered.push(this.renderMarker(marker, `left: ${left}px; top: ${point.y}px`));
+            const slot = slots[index];
+            if (slot) rendered.push(this.renderMarker(marker, `left: ${slot.x}px; top: ${slot.y}px`));
           });
         }
         return rendered;
@@ -4436,27 +4444,77 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._resize.observe(canvas);
       }
 
-      /** Node top-right corners relative to the frame, for every node
-       * holding markers. */
+      /** Marker badges placed clear of every node, then the edge labels moved
+       * clear of one another, of every node and of the badges. */
       measure() {
         const frame = this.renderRoot.querySelector(".diagram-frame");
         const canvas = this.renderRoot.querySelector(".diagram-canvas");
-        if (!frame || !canvas) return;
+        const svg = canvas && canvas.querySelector("svg");
+        if (!frame || !svg) return;
         const origin = frame.getBoundingClientRect();
-        const positions = {};
-        for (const nodeId of Object.keys(this.markerMap())) {
+        const relative = (box) => ({
+          x: Math.round(box.left - origin.left + frame.scrollLeft),
+          y: Math.round(box.top - origin.top + frame.scrollTop),
+          width: Math.round(box.width),
+          height: Math.round(box.height),
+        });
+        const nodes = Array.from(svg.querySelectorAll("g.node")).map((node) => relative(node.getBoundingClientRect()));
+
+        const groups = [];
+        for (const [nodeId, markers] of Object.entries(this.markerMap())) {
           const node = findNode(canvas, nodeId);
-          if (!node) continue;
-          const box = node.getBoundingClientRect();
-          positions[nodeId] = {
-            x: Math.round(box.right - origin.left + frame.scrollLeft),
-            y: Math.round(box.top - origin.top + frame.scrollTop),
-          };
+          if (!node || !Array.isArray(markers) || markers.length === 0) continue;
+          groups.push({id: nodeId, node: relative(node.getBoundingClientRect()), count: markers.length});
         }
-        if (JSON.stringify(positions) !== JSON.stringify(this._positions)) {
-          this._positions = positions;
+        const slots = placeMarkerGroups(groups, nodes, {size: MARKER_SIZE});
+
+        const badges = Object.values(slots)
+          .flat()
+          .map((slot) => ({
+            x: slot.x - MARKER_SIZE / 2,
+            y: slot.y - MARKER_SIZE / 2,
+            width: MARKER_SIZE,
+            height: MARKER_SIZE,
+          }));
+        this.arrangeLabels(canvas, relative, nodes, badges);
+
+        if (JSON.stringify(slots) !== JSON.stringify(this._slots)) {
+          this._slots = slots;
           this.requestUpdate();
         }
+      }
+
+      /** Moves each edge label the shortest distance that clears the other
+       * labels, every node and the badges. Mermaid's own positions are kept
+       * in `data-ash-origin` so a re-measure starts from them again. */
+      arrangeLabels(canvas, relative, nodes, badges) {
+        const svg = canvas.querySelector("svg");
+        if (!svg) return;
+        const elements = Array.from(svg.querySelectorAll("g.edgeLabel")).filter((element) =>
+          (element.textContent || "").trim() !== "",
+        );
+        for (const element of elements) {
+          const origin = element.dataset.ashOrigin ?? element.getAttribute("transform") ?? "";
+          element.dataset.ashOrigin = origin;
+          element.setAttribute("transform", origin);
+        }
+        if (elements.length === 0) return;
+
+        const box = svg.getBoundingClientRect();
+        const viewBox = svg.viewBox && svg.viewBox.baseVal;
+        const scale = viewBox && viewBox.width > 0 && box.width > 0 ? box.width / viewBox.width : 1;
+
+        const items = elements.map((element, index) => ({id: index, ...relative(element.getBoundingClientRect())}));
+        const moves = separate(items, [...nodes, ...badges], {gap: 4, step: 4, radius: 200});
+
+        elements.forEach((element, index) => {
+          const {dx, dy} = moves[index];
+          if (dx === 0 && dy === 0) return;
+          const match = /translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/.exec(element.dataset.ashOrigin);
+          const x = match ? Number(match[1]) : 0;
+          const y = match ? Number(match[2]) : 0;
+          element.setAttribute("transform", `translate(${x + dx / scale}, ${y + dy / scale})`);
+        });
       }
     }
 

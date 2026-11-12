@@ -112,7 +112,18 @@ defmodule AshA2ui.ReportTest do
                "report_lengths_heading",
                "report_lengths_param_min_length",
                "report_lengths_run_button",
+               "report_lengths_loading",
                "report_lengths_list"
+             ]
+
+      # Shown only while /ui/loading_visible holds its one entry (AshA2ui.Loading).
+      assert components["report_lengths_loading"]["children"] == %{
+               "componentId" => "report_lengths_loading_item",
+               "path" => "/ui/loading_visible"
+             }
+
+      assert components["report_lengths_loading_item"]["children"] == [
+               "report_lengths_loading_text"
              ]
 
       param = components["report_lengths_param_min_length"]

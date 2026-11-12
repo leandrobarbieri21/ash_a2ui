@@ -1757,6 +1757,16 @@ defmodule AshA2ui do
         arguments, in declaration order.
         """
       ],
+      param_placeholders: [
+        type: :keyword_list,
+        doc: """
+        A placeholder per `:report` param, e.g.
+        `param_placeholders search: "Search vendors", status: "Any status"`.
+        Emitted as that param's TextField `"placeholder"` on the admin
+        catalog (the basic TextField takes none); the field keeps its
+        `"label"` as its accessible name. Keys must be among `params`.
+        """
+      ],
       create_action: [
         type: :atom,
         doc: "The create action submitted by the form."

@@ -107,6 +107,7 @@ spark_locals_without_parens = [
   order: 1,
   page_size: 1,
   page_size_options: 1,
+  param_placeholders: 1,
   params: 1,
   path_filters: 1,
   picker: 1,

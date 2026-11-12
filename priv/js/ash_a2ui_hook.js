@@ -140,6 +140,10 @@ import {
   settledUiResponse,
 } from "./ash_a2ui_messages.js";
 
+// Client actions that fetch the data a surface shows: the hook marks the
+// surface loading from the click until the server answers.
+const FETCH_ACTIONS = new Set(["query", "report"]);
+
 let hookDeps = null;
 
 /**
@@ -643,6 +647,7 @@ export const AshA2ui = {
       // and wins — this is only the floor.
       const settled = settledUiResponse(message.actionResponse);
       this.writeUiResponse(pending.surfaceId, settled);
+      if (pending.fetches) this.writeLoading(pending.surfaceId, false);
     }
 
     this.el.dispatchEvent(
@@ -720,6 +725,18 @@ export const AshA2ui = {
   },
 
   /**
+   * Writes the reserved /ui/loading flag (and its /ui/loading_visible
+   * zero-or-one list, see AshA2ui.Loading) locally: a data request is in
+   * flight (a `query` or `report` action) or has settled.
+   */
+  writeLoading(surfaceId, loading) {
+    this.feedProcessor([
+      {updateDataModel: {surfaceId, path: "/ui/loading", value: loading}},
+      {updateDataModel: {surfaceId, path: "/ui/loading_visible", value: loading ? [{id: "on"}] : []}},
+    ]);
+  },
+
+  /**
    * Writes the surface's reserved /ui/response object locally (through the
    * renderer's own data model) — the 0-RTT pending/timeout feedback path.
    */
@@ -764,6 +781,7 @@ export const AshA2ui = {
       timer = setTimeout(() => {
         if (!this.pendingActions.has(actionId)) return;
         this.pendingActions.delete(actionId);
+        this.writeLoading(action.surfaceId, false);
         this.writeUiResponse(action.surfaceId, {
           status: "error",
           code: "TIMEOUT",
@@ -774,7 +792,8 @@ export const AshA2ui = {
       }, this.deps.actionTimeoutMs);
     }
 
-    this.pendingActions.set(actionId, {surfaceId: action.surfaceId, timer});
+    this.pendingActions.set(actionId, {surfaceId: action.surfaceId, timer, fetches: FETCH_ACTIONS.has(action.name)});
+    if (FETCH_ACTIONS.has(action.name)) this.writeLoading(action.surfaceId, true);
 
     this.writeUiResponse(action.surfaceId, {
       status: "pending",

@@ -523,8 +523,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
   # on surfaces without :report components (frozen shape unchanged).
   defp put_report_state(value, view) do
     case ResolvedView.report_state(view) do
-      state when state == %{} -> value
-      state -> Map.put(value, "report", state)
+      state when state == %{} ->
+        value
+
+      state ->
+        value
+        |> Map.put("report", state)
+        # The report's loading row shows while this holds its one entry
+        # (AshA2ui.Loading); empty until a host or the hook says rows are coming.
+        |> Map.update!("ui", &Map.put(&1, "loading_visible", []))
     end
   end
 
@@ -4320,6 +4327,12 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           "label" => report_field_label(view, param),
           "value" => %{"path" => "#{report.path}/params/#{param}"}
         }
+        |> maybe_put(
+          "placeholder",
+          if(AshA2ui.Experience.admin?(view),
+            do: translate_declared(view.l10n, Keyword.get(report.param_placeholders, param))
+          )
+        )
       end)
 
     cells =
@@ -4364,7 +4377,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" =>
           ["#{base}_heading"] ++
             Enum.map(report.params, &"#{base}_param_#{&1}") ++
-            ["#{base}_run_button", "#{base}_list"] ++
+            ["#{base}_run_button", "#{base}_loading", "#{base}_list"] ++
             ((report.export && ["#{base}_export_controls"]) || [])
       },
       %{
@@ -4388,6 +4401,21 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         }
       },
       %{"id" => "#{base}_run_text", "component" => "Text", "text" => t(view, msg("Run"))},
+      # Shown only while the reserved /ui/loading_visible holds its one entry
+      # (AshA2ui.Loading): the rows are on their way, so an empty list is not
+      # "no rows". A renderer may draw the item as a spinner; the stock fallback
+      # is the Row with its text.
+      %{
+        "id" => "#{base}_loading",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_loading_item", "path" => "/ui/loading_visible"}
+      },
+      %{
+        "id" => "#{base}_loading_item",
+        "component" => "Row",
+        "children" => ["#{base}_loading_text"]
+      },
+      %{"id" => "#{base}_loading_text", "component" => "Text", "text" => t(view, msg("Loading"))},
       %{
         "id" => "#{base}_list",
         "component" => "List",

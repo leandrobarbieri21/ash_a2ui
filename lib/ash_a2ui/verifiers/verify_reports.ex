@@ -50,7 +50,10 @@ defmodule AshA2ui.Verifiers.VerifyReports do
   end
 
   defp verify_report_options_placement(components, module) do
-    case Enum.find(components, &(&1.name != :report and (&1.action || &1.params))) do
+    case Enum.find(
+           components,
+           &(&1.name != :report and (&1.action || &1.params || &1.param_placeholders))
+         ) do
       nil ->
         :ok
 
@@ -62,7 +65,7 @@ defmodule AshA2ui.Verifiers.VerifyReports do
            module: module,
            path: [:a2ui, :component, key],
            message:
-             "component #{inspect(key)} cannot declare `action`/`params`: they are " <>
+             "component #{inspect(key)} cannot declare `action`/`params`/`param_placeholders`: they are " <>
                ":report component options"
          )}
     end
@@ -160,14 +163,15 @@ defmodule AshA2ui.Verifiers.VerifyReports do
     end
   end
 
-  defp verify_params(%{params: nil}, _key, _action, _module), do: :ok
+  defp verify_params(%{params: nil} = component, key, action, module),
+    do: verify_placeholders(component, key, Enum.map(action.arguments, & &1.name), module)
 
   defp verify_params(component, key, action, module) do
     argument_names = MapSet.new(action.arguments, & &1.name)
 
     case Enum.find(component.params, &(not MapSet.member?(argument_names, &1))) do
       nil ->
-        :ok
+        verify_placeholders(component, key, component.params, module)
 
       unknown ->
         {:error,
@@ -177,6 +181,25 @@ defmodule AshA2ui.Verifiers.VerifyReports do
            message:
              "report param #{inspect(unknown)} is not an argument of action " <>
                "#{inspect(action.name)} (arguments: #{inspect(MapSet.to_list(argument_names))})"
+         )}
+    end
+  end
+
+  defp verify_placeholders(%{param_placeholders: nil}, _key, _params, _module), do: :ok
+
+  defp verify_placeholders(component, key, params, module) do
+    case Enum.find(Keyword.keys(component.param_placeholders), &(&1 not in params)) do
+      nil ->
+        :ok
+
+      unknown ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :param_placeholders],
+           message:
+             "report param_placeholders names #{inspect(unknown)}, which is not one of " <>
+               "the component's params (#{inspect(params)})"
          )}
     end
   end

@@ -88,6 +88,7 @@ defmodule AshA2ui.Gettext.Metadata do
 
       AshA2ui.Info.encoder(view).encode_surface(view, no_records(view), [])
       Enum.each(view.tables, &collect_table(&1, view.l10n))
+      Enum.each(view.reports, &collect_report(&1, view.l10n))
       Enum.each(view.details, &collect_detail(&1, view))
     end
 
@@ -101,6 +102,11 @@ defmodule AshA2ui.Gettext.Metadata do
           registry |> AshA2ui.Canvas.build_graph(opts) |> Map.fetch!(:nodes) |> Map.values() do
       AshA2ui.Canvas.resolve(id, [registry: registry] ++ opts)
     end
+  end
+
+  # A report param's placeholder shows only under the admin catalog.
+  defp collect_report(%{param_placeholders: placeholders}, l10n) do
+    for {_param, text} <- placeholders, is_binary(text), do: Label.translate(l10n, text)
   end
 
   # The labels a table shows only once a record selects them, or only the

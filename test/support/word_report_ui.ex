@@ -101,3 +101,24 @@ defmodule AshA2ui.Test.ExportAppointmentsV1UI do
     end
   end
 end
+
+defmodule AshA2ui.Test.WordReportPlaceholderUI do
+  @moduledoc """
+  The report fixture with a placeholder declared on its param
+  (`param_placeholders`): the admin catalog's TextField carries it.
+  """
+
+  use AshA2ui.Standalone
+
+  a2ui do
+    for_resource AshA2ui.Test.BucketWord
+    surface_id "word_report_placeholder"
+
+    component :report, :lengths do
+      action :length_report
+      params [:min_length]
+      param_placeholders min_length: "Shortest word to list"
+      fields [:word, :length, :state]
+    end
+  end
+end

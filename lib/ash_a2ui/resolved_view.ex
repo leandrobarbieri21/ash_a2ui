@@ -265,6 +265,7 @@ defmodule AshA2ui.ResolvedView do
           component: AshA2ui.Component.t(),
           action: atom,
           params: [atom],
+          param_placeholders: keyword,
           fields: [atom],
           path: String.t(),
           export: map | nil
@@ -883,6 +884,7 @@ defmodule AshA2ui.ResolvedView do
         component: component,
         action: component.action,
         params: component.params || default_report_params(resource, component),
+        param_placeholders: component.param_placeholders || [],
         fields: component.fields || [],
         path: "/report/#{name}",
         export: resolve_export(component, component.fields || [])
