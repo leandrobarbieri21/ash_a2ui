@@ -582,6 +582,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                  ~s(<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore"></div>)
       end
 
+      test "a host's own unrelated id, surface or primary assigns render the defaults" do
+        # A host LiveView passing its whole assigns through, with a `@surface`
+        # record of its own, must not crash the render or scope the container.
+        assert container(%{id: 42, surface: %{id: "host-record"}, primary: "yes"}) ==
+                 ~s(<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore"></div>)
+      end
+
       test "a LiveRenderer LiveView renders the default container", %{conn: conn} do
         conn = get(conn, "/live-renderer/stubbed")
 

@@ -524,6 +524,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     )
 
     def surface_container(assigns) do
+      # A host that passes its own assigns through (`surface_container(assigns)`)
+      # may hold an unrelated `@surface`, `@id` or `@primary` (a struct, a map):
+      # only a string id or surface and a literal `true` count, anything else
+      # renders as the default rather than crashing the render.
+      attrs = [
+        id: if(is_binary(assigns[:id]), do: assigns.id, else: "ash-a2ui-surface"),
+        surface: if(is_binary(assigns[:surface]), do: assigns.surface),
+        primary: assigns[:primary] == true
+      ]
+
+      # assign/2 keeps change tracking in a template; a hand call has none to keep.
+      assigns =
+        if Map.has_key?(assigns, :__changed__),
+          do: assign(assigns, attrs),
+          else: Map.merge(assigns, Map.new(attrs))
+
       ~H"""
       <div
         id={@id}

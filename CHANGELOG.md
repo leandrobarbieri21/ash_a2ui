@@ -12,6 +12,13 @@ Requires Elixir 1.20 or later.
 
 ### Bug Fixes:
 
+- **A host passing its own assigns to `surface_container/1` renders.** A
+  LiveView with an unrelated `@surface` (a record), `@id` or `@primary`
+  rendered `surface_container(assigns)` with those values, and a
+  struct-valued `surface` raised `Protocol.UndefinedError`. Only a string
+  `id` or `surface` and a literal `true` `primary` count now; anything else
+  renders the defaults.
+
 - **Dynamic specs with list rows, plain links, groups or a section note
   resolve.** The parser passed `trailing`, `expand`, `link_url`, `group_by`,
   `group_subtitle` and `section_note` through as strings, so a surface that
