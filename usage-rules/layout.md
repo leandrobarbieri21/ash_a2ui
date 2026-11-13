@@ -216,6 +216,58 @@ topics for the full contracts.
   ignores them draws the grid. The basic catalog draws its usual card,
   with the expand fields in its metadata grid.
 
+## Step fields (`steps true`)
+
+- A detail value that is a sequence of stages (an order's fulfilment:
+  Placed → Packed → Shipped → Delivered) draws as a numbered stepper: a
+  field whose value is a list of step maps, declared `steps true`.
+
+  ```elixir
+  # on MyApp.Order: one map per step
+  calculate :fulfilment, {:array, :map}, MyApp.Order.Fulfilment do
+    public? true
+  end
+
+  # [%{label: "Placed",    text: "3 Nov 2026", state: :complete},
+  #  %{label: "Packed",    text: "4 Nov 2026", state: :complete},
+  #  %{label: "Shipped",   text: "Not yet",    state: :current,
+  #    note: "Waiting for the carrier"},
+  #  %{label: "Delivered", text: "Not yet",    state: :upcoming}]
+
+  component :detail, :fulfilment do
+    context :order
+    fields [:fulfilment]
+  end
+
+  field :fulfilment do
+    steps true
+    empty_text "Not placed yet"
+  end
+  ```
+
+- Each step: `label` (required), `text` (the line under the label: a date,
+  "Not yet"), `note` (a smaller line) and `state`, one of `complete`,
+  `current`, `upcoming` or `overdue`. Keys and the state may be atoms or
+  strings. The step's place in the list is its number.
+- Bad values never fail the page: a step without a label is left out (the
+  rest are numbered 1..n), a missing or unknown state reads as `upcoming`,
+  a blank `text` or `note` is left out, and a value that is not a list has
+  no steps (the field's `empty_text` and the card's `hide_empty` apply).
+  Return the label you want shown; do not rely on the fallbacks.
+- The detail data carries the normalized steps at `_steps_<field>`: each
+  `{number, label, text?, note?, state, stateLabel, line}`, where
+  `stateLabel` is the state in words (a library string, translated) and
+  `line` the whole step as one line ("3. Shipped · Current · Not yet ·
+  Waiting for the carrier").
+- Admin catalog 1.17: the `fieldDisplay` binds them as `steps`; the stock
+  renderer draws an ordered list with each step's number, label, state (as
+  words, not only colour), text and note, and marks the current step
+  `aria-current="step"`. The basic catalog draws one Text row per step
+  (its `line`), so a basic-only client still shows every step.
+- Steps are drawn on `:detail` cards; a table or panel shows the raw value.
+  `steps` with `pairs`, a badge (`badge_text`, `badge_tones`,
+  `badge_help`), `link`, `links`, `link_url` or `source` does not compile.
+
 ## Table columns
 
 - A `column` entity on a `:table` says how the admin data grid draws one

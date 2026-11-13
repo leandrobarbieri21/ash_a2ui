@@ -149,6 +149,7 @@ defmodule AshA2ui.Dynamic.Promoter do
     link_url: :name,
     download: :raw,
     pairs: :raw,
+    steps: :raw,
     note: :raw,
     empty_text: :raw,
     badge_text: :string_keyword,

@@ -156,6 +156,25 @@ defmodule AshA2ui do
         labeled row per pair; renderers that ignore it show the raw list.
         """
       ],
+      steps: [
+        type: :boolean,
+        doc: """
+        The field's value is a list of steps (an `{:array, :map}` calculation),
+        drawn on `:detail` cards as a numbered stepper: an order's fulfilment
+        "Placed → Packed → Shipped → Delivered". Each step is a map with a
+        `label` (required), an optional `text` (the line under the label: a
+        date, "Not yet"), an optional `note` (a smaller line) and a `state`,
+        one of `"complete"`, `"current"`, `"upcoming"` or `"overdue"` (atom or
+        string keys and values). The step's place in the list gives its
+        number. A step without a label is left out (the others are numbered
+        without it); a missing or unknown state reads as `"upcoming"`; a value
+        that is not a list draws no steps. The record carries the normalized
+        steps at `_steps_<field>`, and the admin `fieldDisplay` binds them as
+        `steps` (admin catalog 1.17); the basic catalog draws one Text row per
+        step. Tables and panels show the raw value. Cannot be combined with
+        `pairs`, a badge or a link.
+        """
+      ],
       download: [
         type: :boolean,
         doc: """

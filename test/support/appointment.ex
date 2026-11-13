@@ -54,6 +54,38 @@ defmodule AshA2ui.Test.Appointment do
       public? true
     end
 
+    # A visit's steps (`steps`): booked, checked in, seen and billed, with
+    # the state of each.
+    calculate :progress,
+              {:array, :map},
+              fn records, _context ->
+                Enum.map(records, fn visit ->
+                  done? = visit.status == :completed
+
+                  [
+                    %{label: "Booked", text: "Requested online", state: :complete},
+                    %{
+                      label: "Checked in",
+                      text: if(done?, do: "At the front desk", else: "Not yet"),
+                      state: if(done?, do: :complete, else: :current)
+                    },
+                    %{
+                      label: "Seen",
+                      text: if(done?, do: visit.title, else: "Not yet"),
+                      state: if(done?, do: :complete, else: :upcoming)
+                    },
+                    %{
+                      "label" => "Billed",
+                      "text" => "Not yet",
+                      "note" => if(done?, do: "Invoice not sent"),
+                      "state" => if(done?, do: "overdue", else: "upcoming")
+                    }
+                  ]
+                end)
+              end do
+      public? true
+    end
+
     calculate :seen_by,
               :string,
               expr("Seen by Dr. " <> title) do
