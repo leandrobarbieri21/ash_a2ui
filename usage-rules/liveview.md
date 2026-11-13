@@ -121,7 +121,88 @@ The rendered container is
 `<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore">` —
 `phx-update="ignore"` is required; the renderer owns that DOM.
 
-v0 limitation: one surface per hook instance.
+A hook container renders one surface. To show a second surface on the same
+page, render a second container with its own `id` and `surface` (the
+surface's `surface_id`). The hook then takes only that surface's messages,
+and the first container keeps the rest:
+
+```heex
+<AshA2ui.LiveRenderer.surface_container id="order-summary" surface="order_summary" />
+<AshA2ui.LiveRenderer.surface_container />
+```
+
+How the hook routes each `"a2ui:messages"` push (LiveView delivers every
+push to every hook on the page, nested LiveViews too):
+
+- a message addressed to a surface (`createSurface`, `updateComponents`,
+  `updateDataModel`, `deleteSurface`) goes to the container whose `surface`
+  matches, else to the unscoped containers;
+- a v1.0 `actionResponse` goes to the container that sent the action;
+- a message that names no surface (`callFunction`) goes to the primary
+  container: the one with `primary`, else the unscoped one, else the first
+  mounted. Mark one `primary` when every container is scoped.
+
+With no `surface` and no `primary` on the page, every container takes every
+message, as before.
+
+What stays the host's job. The LiveRenderer builds, pushes and handles one
+UI. For the second surface the LiveView must:
+
+- build its messages (`AshA2ui.Info.build_surface/2`) and push them as
+  `"a2ui:messages"` (`%{messages: messages}`), on mount and whenever it
+  should refresh;
+- route each `"a2ui:action"` event by `envelope["action"]["surfaceId"]`:
+  the second surface's actions go to `AshA2ui.ActionHandler.handle/3` for
+  that UI, with the same actor and options it was built with, and the
+  returned messages are pushed back as `"a2ui:messages"`. Everything else
+  goes to the LiveRenderer as before.
+
+An order page with a small summary surface above it (`OrderSummaryUI`
+declares `surface_id "order_summary"`):
+
+```elixir
+defmodule MyAppWeb.OrderLive do
+  use MyAppWeb, :live_view
+
+  @summary MyApp.UI.OrderSummaryUI
+
+  def mount(_params, _session, socket) do
+    socket = assign(socket, :actor, socket.assigns.current_user)
+
+    socket =
+      if connected?(socket) do
+        push_summary(socket, AshA2ui.Info.build_surface(@summary, actor: socket.assigns.actor))
+      else
+        socket
+      end
+
+    {:ok, socket}
+  end
+
+  def render(assigns) do
+    ~H"""
+    <AshA2ui.LiveRenderer.surface_container id="order-summary" surface="order_summary" />
+    {live_render(@socket, MyAppWeb.OrdersA2uiLive, id: "orders")}
+    """
+  end
+
+  def handle_event("a2ui:action", %{"action" => %{"surfaceId" => "order_summary"}} = envelope, socket) do
+    {_outcome, messages} = AshA2ui.ActionHandler.handle(@summary, envelope, actor: socket.assigns.actor)
+    {:noreply, push_summary(socket, messages)}
+  end
+
+  defp push_summary(socket, messages),
+    do: push_event(socket, "a2ui:messages", %{messages: messages})
+end
+```
+
+`MyAppWeb.OrdersA2uiLive` is an ordinary `use AshA2ui.LiveRenderer`
+LiveView with the default, unscoped container. The hook pushes a
+container's `"a2ui:action"` events to the LiveView that owns that
+container, so here the summary's actions reach `OrderLive` and the
+orders' reach `OrdersA2uiLive`. When both containers sit in one LiveView,
+that LiveView's `handle_event("a2ui:action", ...)` sees both surfaces'
+actions and routes them by `surfaceId` itself.
 
 ## Optional host-side pieces
 

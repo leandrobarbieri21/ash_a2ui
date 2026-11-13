@@ -124,8 +124,26 @@
  * admin catalog's `recordPanel` manages its own focus; the reveal stays out
  * of the way when focus has already moved inside the panel.
  *
- * v0 limitation: a single surface per hook — the last surface created by the
- * processor wins the `<a2ui-surface>` element.
+ * ## More than one surface on a page
+ *
+ * LiveView delivers every `push_event` to every hook on the page (nested
+ * LiveViews included), so each hook decides which `"a2ui:messages"` it
+ * takes (`acceptsMessage` below):
+ *
+ *   - a container with `data-a2ui-surface="<id>"` is scoped: it takes only
+ *     messages addressed to that surface id (`createSurface`,
+ *     `updateComponents`, `updateDataModel`, `deleteSurface`) and renders
+ *     only that surface;
+ *   - an unscoped container (no `data-a2ui-surface`) takes every addressed
+ *     message except those for a surface a scoped hook on the page claims;
+ *   - a v1.0 `actionResponse` goes to the hook that holds its `actionId`;
+ *   - messages naming no surface (`callFunction`, and an `actionResponse`
+ *     no hook holds) go to the primary hook: the ones marked
+ *     `data-a2ui-primary`, else the unscoped ones, else the first mounted.
+ *
+ * With no `data-a2ui-surface` and no `data-a2ui-primary` anywhere on the
+ * page every hook takes every message, as before. An unscoped hook still
+ * binds the last surface its processor creates to its `<a2ui-surface>`.
  *
  * The pure half of that work — mapping server->client messages onto what
  * the renderer takes — lives in `ash_a2ui_messages.js` (tested with
@@ -381,11 +399,83 @@ function containsAcrossRoots(ancestor, node) {
 
 const PANEL_IDS = ["record_panel", "form_slot", "form"];
 
+// --- more than one surface: message routing ----------------------------------
+
+// Every mounted AshA2ui hook on the page. LiveView sends a push_event to all
+// of them, so each one checks its peers before taking a message.
+const mountedHooks = new Set();
+
+// Each push's messages -> the hooks that take each message, routed once per
+// push (see receiveMessages).
+const pushRoutes = new WeakMap();
+
+const ADDRESSED_KINDS = ["createSurface", "updateComponents", "updateDataModel", "deleteSurface"];
+
+/**
+ * The surface id a server->client message is addressed to, or `undefined`
+ * for one that names no surface (`actionResponse`, `callFunction`). v0.9.1
+ * and v1.0 both carry it as `message.<kind>.surfaceId`.
+ */
+export function addressedSurfaceId(message) {
+  if (!message) return undefined;
+  for (const kind of ADDRESSED_KINDS) {
+    const payload = message[kind];
+    if (payload && payload.surfaceId !== undefined) return payload.surfaceId;
+  }
+  return undefined;
+}
+
+function isPrimary(hook, hooks) {
+  if (hooks.some((peer) => peer.primary)) return Boolean(hook.primary);
+  if (hooks.some((peer) => !peer.scopedSurface)) return !hook.scopedSurface;
+  return hooks[0] === hook;
+}
+
+/**
+ * Whether `hook` takes `message`, given every hook mounted on the page
+ * (`hooks`, `hook` among them, in mount order). Reads only each hook's
+ * `scopedSurface` (its `data-a2ui-surface`, or null), `primary` (its
+ * `data-a2ui-primary`) and `pendingActions` (actionId -> pending entry).
+ *
+ *   - Addressed to a surface: a scoped hook takes it when the id is its own;
+ *     an unscoped hook takes it unless a scoped hook claims that id.
+ *   - `actionResponse`: the hook holding its `actionId` takes it; when none
+ *     does, it is unaddressed.
+ *   - Unaddressed: the primary hook takes it — those marked primary, else
+ *     the unscoped ones, else the first mounted.
+ *
+ * With no scoped and no primary hook on the page, every hook takes every
+ * message (the single-surface behaviour).
+ */
+export function acceptsMessage(message, hook, hooks) {
+  if (!hooks.some((peer) => peer.scopedSurface || peer.primary)) return true;
+
+  const surfaceId = addressedSurfaceId(message);
+
+  if (surfaceId !== undefined) {
+    if (hook.scopedSurface) return surfaceId === hook.scopedSurface;
+    return !hooks.some((peer) => peer.scopedSurface === surfaceId);
+  }
+
+  if (message && message.actionResponse && message.actionId !== undefined) {
+    const holder = hooks.find((peer) => peer.pendingActions && peer.pendingActions.has(message.actionId));
+    if (holder) return holder === hook;
+  }
+
+  return isPrimary(hook, hooks);
+}
+
 export const AshA2ui = {
   mounted() {
     const deps = resolveDeps();
     const {MessageProcessor, catalogs, markdown} = deps;
     this.deps = deps;
+
+    // More than one surface on a page: which surface this container renders
+    // (null renders whatever its processor creates) and whether it takes
+    // the messages that name no surface. See acceptsMessage.
+    this.scopedSurface = this.el.dataset.a2uiSurface || null;
+    this.primary = this.el.dataset.a2uiPrimary !== undefined;
 
     // v1.0 state: which surfaces speak v1.0, and the in-flight
     // actionId -> {surfaceId, timer} entries awaiting an actionResponse.
@@ -441,21 +531,19 @@ export const AshA2ui = {
     });
 
     // The surface element renders a SurfaceModel; hand it the model as soon
-    // as the processor creates it (single-surface v0 semantics).
+    // as the processor creates it.
     if (typeof this.processor.onSurfaceCreated === "function") {
-      this.surfaceSubscription = this.processor.onSurfaceCreated((surface) => {
-        if (surface && surface.id) this.surfaceIds.add(surface.id);
-        this.surfaceEl.surface = surface;
-        this.dismissSkeleton();
-      });
+      this.surfaceSubscription = this.processor.onSurfaceCreated((surface) => this.adoptSurface(surface));
     }
 
+    mountedHooks.add(this);
     this.handleEvent("a2ui:messages", ({messages}) => {
-      this.processMessages(messages || []);
+      this.receiveMessages(messages || []);
     });
   },
 
   destroyed() {
+    mountedHooks.delete(this);
     if (this.onOpenSurface) window.removeEventListener(OPEN_SURFACE_EVENT, this.onOpenSurface);
 
     for (const pending of this.pendingActions.values()) {
@@ -481,6 +569,38 @@ export const AshA2ui = {
     // The ContextProvider's listeners are attached to this.el, which the
     // LiveView is discarding — dropping the reference is enough.
     this.markdownProvider = null;
+  },
+
+  /**
+   * Binds a surface the processor created to this container's
+   * `<a2ui-surface>` element. A scoped container binds only its own
+   * surface; an unscoped one binds the last created.
+   */
+  adoptSurface(surface) {
+    if (this.scopedSurface && !(surface && surface.id === this.scopedSurface)) return;
+    if (surface && surface.id) this.surfaceIds.add(surface.id);
+    this.surfaceEl.surface = surface;
+    this.dismissSkeleton();
+  },
+
+  /**
+   * Takes the messages of one `"a2ui:messages"` push that are this hook's
+   * (see acceptsMessage) and processes them. `hooks` defaults to every
+   * AshA2ui hook mounted on the page.
+   *
+   * Every hook receives the same push object in turn, and processing it
+   * changes the state routing reads (resolving an actionResponse drops its
+   * pending entry). So the first hook to see a push routes all of it, and
+   * the others read that route.
+   */
+  receiveMessages(messages, hooks = [...mountedHooks]) {
+    let route = pushRoutes.get(messages);
+    if (!route) {
+      const peers = hooks.includes(this) ? hooks : [...hooks, this];
+      route = messages.map((message) => peers.filter((hook) => acceptsMessage(message, hook, peers)));
+      pushRoutes.set(messages, route);
+    }
+    this.processMessages(messages.filter((_message, index) => route[index].includes(this)));
   },
 
   /**

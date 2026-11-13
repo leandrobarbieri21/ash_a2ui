@@ -216,7 +216,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         @impl true
         def render(assigns) do
-          AshA2ui.LiveRenderer.surface_container(assigns)
+          # Only change tracking passes through: the LiveView's own assigns
+          # (an `:id`, say) must not reach the container's attrs.
+          AshA2ui.LiveRenderer.surface_container(Map.take(assigns, [:__changed__]))
         end
 
         @impl true
@@ -498,10 +500,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    @doc false
+    @doc """
+    The hook container: `<div id="ash-a2ui-surface" phx-hook="AshA2ui"
+    phx-update="ignore">`. `render/1` of a LiveRenderer LiveView renders it
+    with the defaults.
+
+    A page that shows a second surface renders a second container with its
+    own `id` and `surface`; the JS hook then takes only that surface's
+    messages (see the LiveView topic of the usage rules).
+
+        <AshA2ui.LiveRenderer.surface_container id="summary" surface="order_summary" />
+    """
+    attr(:id, :string, default: "ash-a2ui-surface", doc: "The container's DOM id.")
+
+    attr(:surface, :string,
+      default: nil,
+      doc: "The surface id this container renders (`data-a2ui-surface`). Unset renders any."
+    )
+
+    attr(:primary, :boolean,
+      default: false,
+      doc: "Takes the messages that name no surface (`data-a2ui-primary`)."
+    )
+
     def surface_container(assigns) do
       ~H"""
-      <div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore"></div>
+      <div
+        id={@id}
+        phx-hook="AshA2ui"
+        phx-update="ignore"
+        data-a2ui-surface={@surface}
+        data-a2ui-primary={@primary}
+      ></div>
       """
     end
 

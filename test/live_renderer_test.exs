@@ -7,6 +7,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # share the app-wide test endpoint/PubSub.
     use ExUnit.Case, async: false
 
+    import Phoenix.Component, only: [sigil_H: 2]
     import Phoenix.ConnTest
     import Phoenix.LiveViewTest
 
@@ -573,6 +574,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert render_hook(view, "a2ui:open_surface", %{"surface" => "person"}) =~
                  "ash-a2ui-surface"
       end
+    end
+
+    describe "surface_container/1" do
+      test "the defaults render the single-surface container unchanged" do
+        assert container(%{}) ==
+                 ~s(<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore"></div>)
+      end
+
+      test "a LiveRenderer LiveView renders the default container", %{conn: conn} do
+        conn = get(conn, "/live-renderer/stubbed")
+
+        assert html_response(conn, 200) =~
+                 ~s(<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore"></div>)
+      end
+
+      test "a scoped container names its surface" do
+        assert container(%{id: "summary", surface: "order_summary"}) ==
+                 ~s(<div id="summary" phx-hook="AshA2ui" phx-update="ignore" data-a2ui-surface="order_summary"></div>)
+      end
+
+      test "a primary container carries the flag" do
+        assert container(%{id: "orders", surface: "orders", primary: true}) ==
+                 ~s(<div id="orders" phx-hook="AshA2ui" phx-update="ignore" data-a2ui-surface="orders" data-a2ui-primary></div>)
+      end
+
+      test "the component takes the attrs from HEEx" do
+        assigns = %{}
+
+        html =
+          rendered_to_string(~H"""
+          <AshA2ui.LiveRenderer.surface_container id="summary" surface="order_summary" />
+          """)
+
+        assert html =~ ~s(id="summary")
+        assert html =~ ~s(data-a2ui-surface="order_summary")
+        refute html =~ "data-a2ui-primary"
+      end
+
+      defp container(assigns),
+        do: rendered_to_string(AshA2ui.LiveRenderer.surface_container(assigns))
     end
   end
 end
