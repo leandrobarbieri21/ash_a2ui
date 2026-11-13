@@ -29,7 +29,7 @@ defmodule AshA2ui.Test.CardVisitsUI do
         badge :seen_by
         meta [:details]
         expand [:clinic_id]
-        expand_label("Show clinic")
+        expand_label "Show clinic"
       end
     end
 
