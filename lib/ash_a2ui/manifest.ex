@@ -49,7 +49,7 @@ defmodule AshA2ui.Manifest do
         label: "Referral",                # the grid's accessible name (admin catalog)
         resource: MyApp.Referral,         # the resource the table reads
         read_action: :read,               # the read without a preset
-        display: :list,                   # :list | :board | :calendar | :timeline | :matrix
+        display: :list,                   # :list | :rows | :cards | :board | :calendar | :timeline | :matrix
         sectioned: false,                 # true: one rendered table per section record
         component_id: "data_grid",        # the element carrying the rows (see Selectors)
         records_path: "/records",
