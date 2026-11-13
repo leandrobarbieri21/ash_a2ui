@@ -4,7 +4,7 @@ defmodule AshA2ui.TimeTravelTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.{ActionHandler, AsOf, Info}
-  alias AshA2ui.Test.SchemaHelper
+  alias AshA2ui.Test.{Messages, SchemaHelper}
   alias AshA2ui.Test.TimeTravel.{Plan, PlanUI}
 
   doctest AshA2ui.AsOf
@@ -35,6 +35,7 @@ defmodule AshA2ui.TimeTravelTest do
 
   defp data_model(messages) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} -> value
       %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
       _other -> nil
     end)
@@ -90,7 +91,7 @@ defmodule AshA2ui.TimeTravelTest do
 
       assert Jason.encode!(live) =~ "change_tier"
       refute Jason.encode!(pinned) =~ "change_tier"
-      Enum.each(pinned, &SchemaHelper.assert_valid_server_message/1)
+      Enum.each(pinned, &SchemaHelper.assert_valid_agent_message/1)
     end
 
     test "build_data_model/2 refreshes at the same instant" do
@@ -106,12 +107,11 @@ defmodule AshA2ui.TimeTravelTest do
       %{t0: t0} = plan_with_history()
       [plan] = Ash.read!(Plan)
 
-      envelope = %{
-        "action" => %{
-          "name" => "invoke",
-          "context" => %{"action" => "change_tier", "recordId" => plan.id}
-        }
-      }
+      envelope =
+        Messages.call("invoke", "plans", %{
+          "action" => "change_tier",
+          "recordId" => plan.id
+        })
 
       assert {:error, messages} =
                ActionHandler.handle(PlanUI, envelope, as_of: DateTime.add(t0, 1, :day))
@@ -122,7 +122,7 @@ defmodule AshA2ui.TimeTravelTest do
 
     test "reads (query refreshes) run at the instant" do
       %{t0: t0} = plan_with_history()
-      envelope = %{"action" => %{"name" => "query", "context" => %{}}}
+      envelope = Messages.call("query", "plans", %{})
 
       assert {_ok_or_error, messages} =
                ActionHandler.handle(PlanUI, envelope, as_of: DateTime.add(t0, 1, :day))

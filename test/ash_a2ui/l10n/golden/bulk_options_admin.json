@@ -1,0 +1,27 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/ui/feedback",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "code": "INVALID_ACTION",
+        "functionCallId": "call-context_search",
+        "kind": "error",
+        "message": "Context \"project\" is not searchable: it declares no option_search.",
+        "result": {},
+        "resultText": ""
+      }
+    },
+    "version": "1.0"
+  },
+  {
+    "agentFunctionResponse": {
+      "error": {
+        "code": "INVALID_ACTION",
+        "message": "Context \"project\" is not searchable: it declares no option_search."
+      },
+      "functionCallId": "call-context_search"
+    },
+    "version": "1.0"
+  }
+]

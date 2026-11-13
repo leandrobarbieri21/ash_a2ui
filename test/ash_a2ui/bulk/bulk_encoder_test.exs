@@ -1,7 +1,7 @@
 defmodule AshA2ui.Bulk.BulkEncoderTest do
   @moduledoc """
   A2UI-104: the encoded selection state and toolbar of a table with
-  `bulk_actions`, on both spec versions and both row shapes.
+  `bulk_actions`, on both row shapes.
   """
 
   # Shared ETS fixtures and the experience/catalog application env.
@@ -23,17 +23,18 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
   defp by_id(components), do: Map.new(components, &{&1["id"], &1})
 
   @tag ac: "A2UI-104/AC-1"
-  test "encodes selection and toolbar for both versions" do
-    # v0.9.1: the createSurface -> updateComponents -> updateDataModel triple
-    [_create, components_message, data_message] =
-      messages = AshA2ui.Info.build_surface(BulkTasksUI, actor: actor())
+  test "encodes selection and toolbar" do
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}} = create] =
+      AshA2ui.Info.build_surface(BulkTasksUI, actor: actor())
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    assert_valid_agent_message(create)
 
-    components = by_id(components_message["updateComponents"]["components"])
-    data = data_message["updateDataModel"]["value"]
+    components = by_id(components)
 
     assert_bulk_flat_table(components)
+
+    assert components["bulk_action_approve_button"]["action"]["functionCall"]["@call"] ==
+             "ashAction"
 
     # every row carries "_selected": false; the result state starts at zero
     assert [_, _] = data["records"]
@@ -51,51 +52,31 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
              }
            }
 
-    # v1.0: one inline createSurface with the same composition
-    [create] = AshA2ui.Info.build_surface(BulkTasksUI, actor: actor(), spec_version: "1.0")
-    assert_valid_server_message(create, :v1_0)
-
-    v1_components = by_id(create["createSurface"]["components"])
-    assert_bulk_flat_table(v1_components)
-
-    assert v1_components["bulk_action_approve_button"]["action"]["event"]["wantResponse"] == true
-    assert Enum.all?(create["createSurface"]["dataModel"]["records"], &(&1["_selected"] == false))
-
     # card rows: the CheckBox leads the card header; a table without bulk
     # actions keeps its rows and components unchanged
-    for {version, schema} <- [{"0.9.1", :v0_9_1}, {"1.0", :v1_0}] do
-      {components, data} =
-        case AshA2ui.Info.build_surface(BulkCardsUI, actor: actor(), spec_version: version) do
-          [create] ->
-            assert_valid_server_message(create, schema)
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}} = create] =
+      AshA2ui.Info.build_surface(BulkCardsUI, actor: actor())
 
-            {by_id(create["createSurface"]["components"]), create["createSurface"]["dataModel"]}
+    assert_valid_agent_message(create)
+    components = by_id(components)
 
-          [_create, components_message, data_message] = triple ->
-            Enum.each(triple, &assert_valid_server_message(&1, schema))
+    assert ["record_row_inbox_selected" | _rest] =
+             components["record_row_inbox_header"]["children"]
 
-            {by_id(components_message["updateComponents"]["components"]),
-             data_message["updateDataModel"]["value"]}
-        end
+    assert components["record_row_inbox_selected"]["value"] == %{"@path" => "_selected"}
 
-      assert ["record_row_inbox_selected" | _rest] =
-               components["record_row_inbox_header"]["children"]
+    assert components["bulk_inbox_toolbar"]["children"] == [
+             "bulk_inbox_action_reject_button",
+             "bulk_inbox_select_page_button",
+             "bulk_inbox_clear_button"
+           ]
 
-      assert components["record_row_inbox_selected"]["value"] == %{"path" => "_selected"}
+    refute Map.has_key?(components, "bulk_everything_toolbar")
+    refute Map.has_key?(components, "record_row_everything_selected")
 
-      assert components["bulk_inbox_toolbar"]["children"] == [
-               "bulk_inbox_action_reject_button",
-               "bulk_inbox_select_page_button",
-               "bulk_inbox_clear_button"
-             ]
-
-      refute Map.has_key?(components, "bulk_everything_toolbar")
-      refute Map.has_key?(components, "record_row_everything_selected")
-
-      assert Enum.all?(data["records"]["inbox"], &(&1["_selected"] == false))
-      refute Enum.any?(data["records"]["everything"], &Map.has_key?(&1, "_selected"))
-      assert Map.keys(data["bulk"]) == ["inbox"]
-    end
+    assert Enum.all?(data["records"]["inbox"], &(&1["_selected"] == false))
+    refute Enum.any?(data["records"]["everything"], &Map.has_key?(&1, "_selected"))
+    assert Map.keys(data["bulk"]) == ["inbox"]
   end
 
   test "the admin catalog keeps a bulk table basic composed" do
@@ -105,10 +86,10 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
       Application.put_env(:ash_a2ui, :catalog, :basic)
     end)
 
-    [_create, components_message, _data] =
+    [%{"createSurface" => %{"components" => components_message, "dataModel" => _data}}] =
       AshA2ui.Info.build_surface(BulkTasksUI, actor: actor())
 
-    components = by_id(components_message["updateComponents"]["components"])
+    components = by_id(components_message)
 
     assert components["root"]["component"] == "entityPage"
     refute Map.has_key?(components, "data_grid")
@@ -126,7 +107,7 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
     assert %{
              "component" => "CheckBox",
              "label" => "Select",
-             "value" => %{"path" => "_selected"}
+             "value" => %{"@path" => "_selected"}
            } = components["record_row_selected"]
 
     root_children = components["root"]["children"]
@@ -142,27 +123,27 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
              "bulk_clear_button"
            ]
 
-    approve = components["bulk_action_approve_button"]["action"]["event"]
+    approve = components["bulk_action_approve_button"]["action"]["functionCall"]["args"]
     assert approve["name"] == "bulk_invoke"
 
     assert %{
              "action" => "approve",
              "component" => "table",
-             "records" => %{"path" => "/records"},
-             "query" => %{"path" => "/query"},
-             "contexts" => %{"path" => "/context"}
+             "records" => %{"@path" => "/records"},
+             "query" => %{"@path" => "/query"},
+             "contexts" => %{"@path" => "/context"}
            } = approve["context"]
 
     assert components["bulk_action_approve_text"]["text"] == "Approve"
 
     for {id, selected} <- [{"bulk_select_page_button", true}, {"bulk_clear_button", false}] do
-      event = components[id]["action"]["event"]
+      event = components[id]["action"]["functionCall"]["args"]
       assert event["name"] == "bulk_select"
 
       assert %{
                "component" => "table",
                "selected" => ^selected,
-               "records" => %{"path" => "/records"}
+               "records" => %{"@path" => "/records"}
              } = event["context"]
     end
   end
@@ -183,14 +164,19 @@ defmodule AshA2ui.Bulk.BulkEncoderTest do
       end
     end
 
-    [_create, components_message, _data] = AshA2ui.Info.build_surface(BulkClearUI, actor: actor())
-    components = components_message["updateComponents"]["components"]
+    [%{"createSurface" => %{"components" => components_message, "dataModel" => _data}}] =
+      AshA2ui.Info.build_surface(BulkClearUI, actor: actor())
+
+    components = components_message
     ids = Enum.map(components, & &1["id"])
 
     assert ids == Enum.uniq(ids)
 
     by_id = by_id(components)
-    assert by_id["bulk_action_clear_button"]["action"]["event"]["name"] == "bulk_invoke"
-    assert by_id["bulk_clear_button"]["action"]["event"]["name"] == "bulk_select"
+
+    assert by_id["bulk_action_clear_button"]["action"]["functionCall"]["args"]["name"] ==
+             "bulk_invoke"
+
+    assert by_id["bulk_clear_button"]["action"]["functionCall"]["args"]["name"] == "bulk_select"
   end
 end

@@ -172,7 +172,7 @@ ready to hand to an LLM as a tool parameter schema.
    the host-configured allowlist. Nothing outside it is introspectable or
    renderable.
 2. **Entity building** — every spec entry is built through
-   `Spark.Dsl.Entity.build/5` with the extension's own entity definitions,
+   `Spark.Dsl.Entity.build` with the extension's own entity definitions,
    so Spark's option schemas (types, `one_of` values, required options,
    defaults) apply to specs exactly as to DSL blocks. Identifier strings are
    format-checked (`^[a-zA-Z]\w*$`, ≤ 64 bytes) before becoming atoms, and
@@ -234,12 +234,12 @@ storage discipline the host must follow:
 
 1. **Resolve once, server-side.** Keep the returned `%Surface{}` in server
    state — a LiveView assign, ETS, a cache — keyed by `surface.surface_id`.
-2. **Serve actions from the server-held struct.** Route client `action`
-   envelopes to `AshA2ui.Dynamic.handle_action(surface, envelope, actor: actor)`
-   using the stored surface looked up by the envelope's surface id. Never
+2. **Serve actions from the server-held struct.** Route the renderer's
+   messages to `AshA2ui.Dynamic.handle_action(surface, message, actor: actor)`
+   using the stored surface looked up by the message's surface id. Never
    rebuild a surface from anything the client echoes back — the client's
-   `surfaceId` selects *which* stored surface handles the envelope, and
-   everything else about the envelope is validated the same way declared
+   `surfaceId` selects *which* stored surface handles the message, and
+   everything else about the message is validated the same way declared
    surfaces validate it (`row_actions` allowlist, query allowlists,
    `visible_when` enforcement, authorized reads).
 3. **Drop the struct when the surface is dismissed.**
@@ -264,11 +264,11 @@ def handle_info({:agent_designed_surface, spec}, socket) do
   end
 end
 
-def handle_event("a2ui:action", envelope, socket) do
+def handle_event("a2ui:message", message, socket) do
   surface = socket.assigns.dynamic_surface
 
   messages =
-    case AshA2ui.Dynamic.handle_action(surface, envelope,
+    case AshA2ui.Dynamic.handle_action(surface, message,
            actor: socket.assigns.current_user
          ) do
       {:ok, messages} -> messages

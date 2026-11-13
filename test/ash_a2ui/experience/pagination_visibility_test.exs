@@ -7,10 +7,11 @@ defmodule AshA2ui.Experience.PaginationVisibilityTest do
 
   use ExUnit.Case, async: false
 
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.Experience
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.Surface
 
   defp seed!(count) do
     for i <- 1..count do
@@ -20,22 +21,19 @@ defmodule AshA2ui.Experience.PaginationVisibilityTest do
     end
   end
 
-  defp data_model!(build_fun) do
-    case build_fun.() do
-      %{"updateDataModel" => %{"value" => model}} -> model
-      [_create, _components, %{"updateDataModel" => %{"value" => model}}] -> model
-    end
-  end
+  defp data_model!(build_fun), do: Surface.data_model(build_fun.())
 
   defp components_by_id(components_message) do
-    Map.new(components_message["updateComponents"]["components"], &{&1["id"], &1})
+    Surface.components_by_id(components_message)
   end
 
   describe "empty result sets" do
     @tag ac: "A2UI-101/AC-1"
     test "zero records hide pagination and show empty state" do
-      [create, components, data] = AshA2ui.Info.build_surface(Task)
-      model = data_model!(fn -> [create, components, data] end)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}} = create] =
+        AshA2ui.Info.build_surface(Task)
+
+      model = data_model!(fn -> create end)
       query = model["query"]
 
       # the pagination sentinel is empty: nothing prev/next/page is visible
@@ -57,7 +55,7 @@ defmodule AshA2ui.Experience.PaginationVisibilityTest do
       assert %{"children" => %{"path" => "/query/_pagination_visible"}} =
                comps["query_pagination"]
 
-      assert %{"text" => %{"path" => "/query/_range_text"}} = comps["query_page_text"]
+      assert %{"text" => %{"@path" => "/query/_range_text"}} = comps["query_page_text"]
     end
   end
 
@@ -101,7 +99,7 @@ defmodule AshA2ui.Experience.PaginationVisibilityTest do
 
       model =
         data_model!(fn ->
-          V0_9_1.encode_data_model(view, Enum.take(records, 2), query_state: state)
+          Encoder.encode_data_model(view, Enum.take(records, 2), query_state: state)
         end)
 
       query = model["query"]

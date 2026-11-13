@@ -65,14 +65,15 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
 
       for {path, plain, translated} <- changes do
         where = "#{@scenario_name} at #{inspect(path)}"
-        key = path |> Enum.filter(&is_binary/1) |> List.last()
+        keys = Enum.filter(path, &is_binary/1)
+        key = List.last(keys)
 
         # A required field's error is Ash's own msgid ("is required"), which
         # replaces the English sentence ("attribute name is required").
         if strip(translated) == "is required" do
           assert plain =~ "is required"
         else
-          assert display_key?(key), "#{where}: #{inspect(key)} is not display text"
+          assert display_key?(keys), "#{where}: #{inspect(key)} is not display text"
           assert strip(translated) == plain, "#{where}: #{inspect(translated)} changed wording"
         end
 
@@ -85,10 +86,14 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     end
   end
 
-  defp display_key?(key),
-    do:
+  # The words a renderer writes into /ui/feedback itself (pending, slow).
+  defp display_key?(keys) do
+    key = List.last(keys)
+
+    Enum.take(keys, -3) in [["ui", "feedback_text", "pending"], ["ui", "feedback_text", "slow"]] or
       key in @display_keys or key in @choice_cells or
-        String.starts_with?(key, @row_label_prefixes)
+      String.starts_with?(key, @row_label_prefixes)
+  end
 
   # Every host label the runtime translated is in the extracted catalog for
   # the scenario's surface; an initial build shows the whole catalog.

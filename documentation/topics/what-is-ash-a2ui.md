@@ -4,12 +4,11 @@ AshA2ui is an [Ash](https://hexdocs.pm/ash) extension that turns the
 declarative knowledge already inside your Ash resources — attributes, types,
 actions, policies — into
 [A2UI (Agent to UI)](https://github.com/a2ui-project/a2ui) protocol
-payloads — **v0.9.1** by default, **v1.0 (RC)** per surface — a standard,
-JSON-based description of a user interface that a remote renderer turns
-into live, interactive UI. To our knowledge it is the first framework with
-an executable A2UI 1.0 conformance suite: the spec's own schemas and test
-cases are vendored at a pinned RC commit and run in CI against every
-message the framework can emit (see [A2UI 1.0](a2ui-1-0.md)).
+payloads (protocol **1.0**) — a standard, JSON-based description of a user
+interface that a remote renderer turns into live, interactive UI. The
+spec's own schemas and test cases are vendored at a pinned commit, and the
+test suite validates every message the framework emits against them (see
+[The A2UI 1.0 wire contract](a2ui-1-0.md)).
 
 You write a small `a2ui` block describing *what* a surface shows; AshA2ui
 generates the wire messages, routes user interactions back into Ash actions,
@@ -21,9 +20,10 @@ Server-driven UI is old (every native app with a "backend-driven" home feed
 does it). What's new is *who renders*: agent canvases, chat surfaces, and
 embeddable web components now accept a standardized UI description and render
 it wherever the user happens to be. A2UI is Google's open protocol for exactly
-that: the server sends `createSurface` → `updateComponents` →
-`updateDataModel` messages (plus `deleteSurface`), and the client sends back a
-single `action` envelope when the user does something.
+that: the server sends a `createSurface` message carrying the components and
+the initial data model, then `updateDataModel` messages as data changes; the
+renderer sends back a `callAgentFunction` (or `action`) message when the user
+does something, and the agent answers with an `agentFunctionResponse`.
 
 Ash sits on the other end of a happy coincidence: an Ash resource is already
 the most machine-readable description of your domain that exists in your
@@ -35,12 +35,12 @@ Ash resource (+ a2ui DSL block)
       │  AshA2ui.ResolvedView.resolve/2   (normalization seam)
       ▼
 ResolvedView struct
-      │  AshA2ui.Encoder.V0_9_1 / .V1_0   (versioned encoders, per spec_version)
+      │  AshA2ui.Encoder   (A2UI 1.0)
       ▼
 A2UI messages  ──► any transport ──► any A2UI renderer
       ▲
-      │  AshA2ui.ActionHandler.handle/3   (action envelope → Ash action)
-      └────────────────  client `action` envelopes
+      │  AshA2ui.ActionHandler.handle/3   (renderer message → Ash action)
+      └────────────────  renderer messages (callAgentFunction, action)
 ```
 
 The protocol core (everything above) depends only on `ash`. Transports are
@@ -48,11 +48,11 @@ pluggable:
 
 - **`AshA2ui.LiveRenderer`** — a batteries-included LiveView transport
   (optional `phoenix_live_view` dependency) that pushes messages over the
-  LiveView socket to a JS hook hosting `<a2ui-surface>`, receives actions as
+  LiveView socket to a JS hook hosting `<a2ui-surface>`, receives renderer messages as
   LiveView events, and live-refreshes data via `Ash.Notifier.PubSub`.
 - **Plain JSON endpoints** — a controller returning
   `AshA2ui.Info.build_surface/2`'s message list is a complete read transport;
-  post `action` envelopes to `AshA2ui.ActionHandler.handle/3` for writes.
+  post the renderer's messages to `AshA2ui.ActionHandler.handle/3` for writes.
 
 See [Rendering Clients](rendering-clients.md) for both in detail.
 
@@ -77,9 +77,9 @@ See [Rendering Clients](rendering-clients.md) for both in detail.
   allowlists; see [Queries and Pagination](queries-and-pagination.md).
 - **Relationship rendering** — `belongs_to` form selects and `source` table
   columns; see [Relationship Rendering](relationships.md).
-- **A2UI v1.0 (RC)** — per-surface `spec_version "1.0"`: single-message
-  surfaces, the `actionResponse` per-action feedback contract, and an
-  executable conformance suite; see [A2UI 1.0](a2ui-1-0.md).
+- **A2UI 1.0** — single-message surfaces, correlated per-action feedback
+  (`ashAction` answered by `agentFunctionResponse`), and an executable
+  conformance suite; see [The A2UI 1.0 wire contract](a2ui-1-0.md).
 
 Everything else (overrides, custom catalogs, non-LiveView streaming
 transports…) is deliberately roadmap — see the
@@ -129,7 +129,7 @@ JSON controller, moduledocs included; see the coverage matrix in the
 [README](../../README.md)).
 
 One parity gap surfaced in the POC: the row action returns a secret into the
-client data model (`/ui/action_result`), but no catalog component displays
+client data model (`/ui/feedback/result`), but no catalog component displays
 it — the old page showed it in a selectable field. That's roadmap material
 (an action-result display component), not a backend workaround.
 

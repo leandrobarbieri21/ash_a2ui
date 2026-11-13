@@ -24,11 +24,12 @@ open it, these rules from it still apply:
 - The protocol core depends only on `ash`. The pipeline from the DSL to
   `ResolvedView`, the encoder, and `ActionHandler` is transport-agnostic plain
   functions. The LiveView transport is optional.
-- The vendored A2UI JSON Schemas in `priv/a2ui/v0_9_1/` and `priv/a2ui/v1_0/`
-  are the executable spec. Every change that produces a payload must keep the
-  schema-validation suite green.
-- A surface opts in to v1.0 with `spec_version "1.0"`. The v0.9.1 output stays
-  byte-identical.
+- The vendored A2UI JSON Schemas in `priv/a2ui/v1_0/` are the executable spec
+  (upstream pin in `priv/a2ui/v1_0/NOTES.md`). Every change that produces a
+  payload must keep the schema-validation suite green.
+- ash_a2ui speaks A2UI 1.0 only. There is no version option and no
+  compatibility layer for earlier protocol versions; a new protocol version
+  is a re-vendor of the schemas and one change to the encoder.
 - `usage-rules.md` and `usage-rules/` are the rules that this package ships to
   the applications that use it. They are not the rules for work in this
   repository.

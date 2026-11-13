@@ -18,6 +18,7 @@ defmodule AshA2ui.L10n.ReviewFindingsTest do
   alias AshA2ui.Test.Gettext, as: TestGettext
   alias AshA2ui.Test.HubUI
   alias AshA2ui.Test.L10nScenarios
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Minimal
   alias AshA2ui.Test.MinimalUI
   alias AshA2ui.Test.StringBadgeUI
@@ -30,16 +31,7 @@ defmodule AshA2ui.L10n.ReviewFindingsTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "experience_task",
-        "sourceComponentId" => "test_component",
-        "timestamp" => "2026-11-04T00:00:00Z",
-        "context" => context
-      }
-    }
+    Messages.call(name, "experience_task", context)
   end
 
   defp error_for(messages, field) do
@@ -144,7 +136,7 @@ defmodule AshA2ui.L10n.ReviewFindingsTest do
   end
 
   test "an admin filter hint is translated and extracted" do
-    pseudo = L10nScenarios.run(L10nScenarios.scenario("hub_build_v0_9_1_admin"), @pseudo)
+    pseudo = L10nScenarios.run(L10nScenarios.scenario("hub_build_admin"), @pseudo)
     assert pseudo =~ ~s("hint": "⟪Statuses update nightly.⟫")
     assert {nil, "Statuses update nightly."} in Metadata.surface_messages(HubUI)
   end

@@ -13,8 +13,10 @@ defmodule AshA2ui.QueryPresetPickerTest do
   alias AshA2ui.Test.{BulkPresetsUI, TabbedPresetsUI}
 
   defp components(ui) do
-    [_create, components, _data] = AshA2ui.Info.build_surface(ui, authorize?: false)
-    Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+    [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+      AshA2ui.Info.build_surface(ui, authorize?: false)
+
+    Map.new(components, &{&1["id"], &1})
   end
 
   test "the picker is emitted by default" do
@@ -52,8 +54,11 @@ defmodule AshA2ui.QueryPresetPickerTest do
 
     allowlist = Dynamic.allowlist([AshA2ui.Test.BulkTask])
     {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
-    [_create, message, _data] = Dynamic.build_surface(surface, authorize?: false)
-    ids = Enum.map(message["updateComponents"]["components"], & &1["id"])
+
+    [%{"createSurface" => %{"components" => message, "dataModel" => _data}}] =
+      Dynamic.build_surface(surface, authorize?: false)
+
+    ids = Enum.map(message, & &1["id"])
 
     assert "query_search_input" in ids
     refute "query_preset_picker" in ids

@@ -19,8 +19,8 @@ defmodule AshA2ui.Loading do
   fact as a zero-or-one list (`[%{"id" => "on"}]` while loading, `[]` otherwise)
   that the report's loading row is templated over, as the pagination sentinels
   are; `messages/3` writes both.
-  Client-initiated actions need no flag: the shipped hook already writes
-  `/ui/response = {status: "pending"}` for them (see the zero-jank rules).
+  The shipped hook sets both itself while a `query` or `report` call it sent
+  is unanswered (see the zero-jank rules).
   """
 
   alias AshA2ui.ResolvedView
@@ -33,8 +33,8 @@ defmodule AshA2ui.Loading do
   def path, do: @path
 
   @doc """
-  The wire messages that set the flag on `ui` (a surface module, or an already
-  resolved `AshA2ui.ResolvedView`), in the surface's own protocol version.
+  The `updateDataModel` messages that set the flag on `ui` (a surface module,
+  or an already resolved `AshA2ui.ResolvedView`).
 
   Options: `:actor` and `:tenant`, forwarded when `ui` has to be resolved.
   """
@@ -42,14 +42,12 @@ defmodule AshA2ui.Loading do
   def messages(ui, loading?, opts \\ [])
 
   def messages(%ResolvedView{} = view, loading?, _opts) when is_boolean(loading?) do
-    version = if(view.spec_version == :v1_0, do: "v1.0", else: "v0.9.1")
-
     for {path, value} <- [
           {@path, loading?},
           {@visible_path, if(loading?, do: [%{"id" => "on"}], else: [])}
         ] do
       %{
-        "version" => version,
+        "version" => "1.0",
         "updateDataModel" => %{"surfaceId" => view.surface_id, "path" => path, "value" => value}
       }
     end

@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
-      "surfaceId": "kitchen_sink"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
       "components": [
         {
           "children": [
@@ -25,8 +19,7 @@
         {
           "component": "Text",
           "id": "table_heading",
-          "text": "Kitchen sink",
-          "variant": "h2"
+          "text": "## Kitchen sink"
         },
         {
           "children": {
@@ -38,9 +31,14 @@
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -60,14 +58,14 @@
         },
         {
           "children": [
-            "table_cell_active",
-            "table_cell_count",
-            "table_cell_price",
-            "table_cell_birthday",
-            "table_cell_scheduled_at",
-            "table_cell_status",
-            "table_cell_name",
-            "table_cell_inserted_at",
+            "table_cell_active_row",
+            "table_cell_count_row",
+            "table_cell_price_row",
+            "table_cell_birthday_row",
+            "table_cell_scheduled_at_row",
+            "table_cell_status_row",
+            "table_cell_name_row",
+            "table_cell_inserted_at_row",
             "row_action_update_button",
             "row_action_destroy_button",
             "view_button",
@@ -82,7 +80,7 @@
             "table_cell_active_value"
           ],
           "component": "Row",
-          "id": "table_cell_active"
+          "id": "table_cell_active_row"
         },
         {
           "component": "Text",
@@ -94,7 +92,7 @@
           "component": "Text",
           "id": "table_cell_active_value",
           "text": {
-            "path": "active"
+            "@path": "active"
           }
         },
         {
@@ -103,7 +101,7 @@
             "table_cell_count_value"
           ],
           "component": "Row",
-          "id": "table_cell_count"
+          "id": "table_cell_count_row"
         },
         {
           "component": "Text",
@@ -115,7 +113,7 @@
           "component": "Text",
           "id": "table_cell_count_value",
           "text": {
-            "path": "count"
+            "@path": "count"
           }
         },
         {
@@ -124,7 +122,7 @@
             "table_cell_price_value"
           ],
           "component": "Row",
-          "id": "table_cell_price"
+          "id": "table_cell_price_row"
         },
         {
           "component": "Text",
@@ -136,7 +134,7 @@
           "component": "Text",
           "id": "table_cell_price_value",
           "text": {
-            "path": "price"
+            "@path": "price"
           }
         },
         {
@@ -145,7 +143,7 @@
             "table_cell_birthday_value"
           ],
           "component": "Row",
-          "id": "table_cell_birthday"
+          "id": "table_cell_birthday_row"
         },
         {
           "component": "Text",
@@ -157,7 +155,7 @@
           "component": "Text",
           "id": "table_cell_birthday_value",
           "text": {
-            "path": "birthday"
+            "@path": "birthday"
           }
         },
         {
@@ -166,7 +164,7 @@
             "table_cell_scheduled_at_value"
           ],
           "component": "Row",
-          "id": "table_cell_scheduled_at"
+          "id": "table_cell_scheduled_at_row"
         },
         {
           "component": "Text",
@@ -178,7 +176,7 @@
           "component": "Text",
           "id": "table_cell_scheduled_at_value",
           "text": {
-            "path": "scheduled_at"
+            "@path": "scheduled_at"
           }
         },
         {
@@ -187,7 +185,7 @@
             "table_cell_status_value"
           ],
           "component": "Row",
-          "id": "table_cell_status"
+          "id": "table_cell_status_row"
         },
         {
           "component": "Text",
@@ -199,7 +197,7 @@
           "component": "Text",
           "id": "table_cell_status_value",
           "text": {
-            "path": "status"
+            "@path": "status"
           }
         },
         {
@@ -208,7 +206,7 @@
             "table_cell_name_value"
           ],
           "component": "Row",
-          "id": "table_cell_name"
+          "id": "table_cell_name_row"
         },
         {
           "component": "Text",
@@ -220,7 +218,7 @@
           "component": "Text",
           "id": "table_cell_name_value",
           "text": {
-            "path": "name"
+            "@path": "name"
           }
         },
         {
@@ -229,7 +227,7 @@
             "table_cell_inserted_at_value"
           ],
           "component": "Row",
-          "id": "table_cell_inserted_at"
+          "id": "table_cell_inserted_at_row"
         },
         {
           "component": "Text",
@@ -241,27 +239,31 @@
           "component": "Text",
           "id": "table_cell_inserted_at_value",
           "text": {
+            "@call": "formatDate",
             "args": {
               "format": "MMM d, yyyy",
               "value": {
-                "path": "inserted_at"
+                "@path": "inserted_at"
               }
-            },
-            "call": "formatDate",
-            "returnType": "string"
+            }
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "action": "update",
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "update",
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "invoke",
+                "sourceComponentId": "row_action_update_button"
               },
-              "name": "invoke"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "row_action_update_text",
@@ -275,15 +277,20 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "action": "destroy",
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "destroy",
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "invoke",
+                "sourceComponentId": "row_action_destroy_button"
               },
-              "name": "invoke"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "row_action_destroy_text",
@@ -297,14 +304,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "view_record",
+                "sourceComponentId": "view_button"
               },
-              "name": "view_record"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "view_button_text",
@@ -318,14 +330,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "start_edit",
+                "sourceComponentId": "edit_button"
               },
-              "name": "start_edit"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "edit_button_text",
@@ -349,7 +366,7 @@
           "component": "Text",
           "id": "empty_state_text",
           "text": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
@@ -427,7 +444,7 @@
           "component": "Text",
           "id": "panel_view_active_value",
           "text": {
-            "path": "/ui/panel/record/active"
+            "@path": "/ui/panel/record/active"
           }
         },
         {
@@ -448,7 +465,7 @@
           "component": "Text",
           "id": "panel_view_count_value",
           "text": {
-            "path": "/ui/panel/record/count"
+            "@path": "/ui/panel/record/count"
           }
         },
         {
@@ -469,7 +486,7 @@
           "component": "Text",
           "id": "panel_view_price_value",
           "text": {
-            "path": "/ui/panel/record/price"
+            "@path": "/ui/panel/record/price"
           }
         },
         {
@@ -490,7 +507,7 @@
           "component": "Text",
           "id": "panel_view_birthday_value",
           "text": {
-            "path": "/ui/panel/record/birthday"
+            "@path": "/ui/panel/record/birthday"
           }
         },
         {
@@ -511,7 +528,7 @@
           "component": "Text",
           "id": "panel_view_scheduled_at_value",
           "text": {
-            "path": "/ui/panel/record/scheduled_at"
+            "@path": "/ui/panel/record/scheduled_at"
           }
         },
         {
@@ -532,7 +549,7 @@
           "component": "Text",
           "id": "panel_view_status_value",
           "text": {
-            "path": "/ui/panel/record/status"
+            "@path": "/ui/panel/record/status"
           }
         },
         {
@@ -553,7 +570,7 @@
           "component": "Text",
           "id": "panel_view_name_value",
           "text": {
-            "path": "/ui/panel/record/name"
+            "@path": "/ui/panel/record/name"
           }
         },
         {
@@ -589,7 +606,7 @@
           "id": "form_input_active",
           "label": "Active",
           "value": {
-            "path": "/form/active"
+            "@path": "/form/active"
           }
         },
         {
@@ -597,7 +614,7 @@
           "id": "form_input_count",
           "label": "Count",
           "value": {
-            "path": "/form/count"
+            "@path": "/form/count"
           },
           "variant": "number"
         },
@@ -606,7 +623,7 @@
           "id": "form_input_price",
           "label": "Price",
           "value": {
-            "path": "/form/price"
+            "@path": "/form/price"
           },
           "variant": "number"
         },
@@ -617,7 +634,7 @@
           "id": "form_input_birthday",
           "label": "Birthday",
           "value": {
-            "path": "/form/birthday"
+            "@path": "/form/birthday"
           }
         },
         {
@@ -627,7 +644,7 @@
           "id": "form_input_scheduled_at",
           "label": "Scheduled at",
           "value": {
-            "path": "/form/scheduled_at"
+            "@path": "/form/scheduled_at"
           }
         },
         {
@@ -649,7 +666,7 @@
             }
           ],
           "value": {
-            "path": "/form/status"
+            "@path": "/form/status"
           },
           "variant": "mutuallyExclusive"
         },
@@ -658,14 +675,14 @@
           "id": "form_input_name",
           "label": "Name",
           "value": {
-            "path": "/form/name"
+            "@path": "/form/name"
           }
         },
         {
           "component": "Text",
           "id": "form_error_active",
           "text": {
-            "path": "/errors/active"
+            "@path": "/errors/active"
           },
           "variant": "caption"
         },
@@ -673,7 +690,7 @@
           "component": "Text",
           "id": "form_error_count",
           "text": {
-            "path": "/errors/count"
+            "@path": "/errors/count"
           },
           "variant": "caption"
         },
@@ -681,7 +698,7 @@
           "component": "Text",
           "id": "form_error_price",
           "text": {
-            "path": "/errors/price"
+            "@path": "/errors/price"
           },
           "variant": "caption"
         },
@@ -689,7 +706,7 @@
           "component": "Text",
           "id": "form_error_birthday",
           "text": {
-            "path": "/errors/birthday"
+            "@path": "/errors/birthday"
           },
           "variant": "caption"
         },
@@ -697,7 +714,7 @@
           "component": "Text",
           "id": "form_error_scheduled_at",
           "text": {
-            "path": "/errors/scheduled_at"
+            "@path": "/errors/scheduled_at"
           },
           "variant": "caption"
         },
@@ -705,7 +722,7 @@
           "component": "Text",
           "id": "form_error_status",
           "text": {
-            "path": "/errors/status"
+            "@path": "/errors/status"
           },
           "variant": "caption"
         },
@@ -713,7 +730,7 @@
           "component": "Text",
           "id": "form_error_name",
           "text": {
-            "path": "/errors/name"
+            "@path": "/errors/name"
           },
           "variant": "caption"
         },
@@ -721,9 +738,11 @@
           "component": "Text",
           "id": "form_title",
           "text": {
-            "path": "/ui/panel/title"
-          },
-          "variant": "h3"
+            "@call": "formatString",
+            "args": {
+              "value": "### ${/ui/panel/title}"
+            }
+          }
         },
         {
           "children": {
@@ -735,16 +754,21 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "recordId": {
-                  "path": "/form/id"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "form_submit_button"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_submit_text",
@@ -756,14 +780,19 @@
           "component": "Text",
           "id": "form_submit_text",
           "text": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -779,7 +808,7 @@
           "component": "Text",
           "id": "status_text",
           "text": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
@@ -793,19 +822,11 @@
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "kitchen_sink"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "kitchen_sink",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Kitchen sink records yet.",
         "_empty_visible": [
           {
@@ -817,11 +838,17 @@
         "options": {},
         "records": [],
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -835,8 +862,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "kitchen_sink"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

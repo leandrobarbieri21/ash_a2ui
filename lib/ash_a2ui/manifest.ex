@@ -19,23 +19,23 @@ defmodule AshA2ui.Manifest do
 
   The options of `AshA2ui.Info.build_surface/2` that change what renders:
   `:catalog` (`:basic` or `:admin_v1`, defaulting to the configured catalog),
-  `:spec_version`, `:locale`, `:gettext_backend`, `:gettext_fn`,
+  `:locale`, `:gettext_backend`, `:gettext_fn`,
   `:metadata_domain`. Pass the ones the transport passes, so the labels are
   the ones the reader sees. Other options are accepted and ignored.
 
   ## Shape
 
-  Version 1 (`version/0`). Names of Ash things (actions, attributes,
+  Version 2 (`version/0`; version 1 also carried the surface's A2UI protocol
+  version, which is now always 1.0). Names of Ash things (actions, attributes,
   arguments, presets) are atoms; ids, labels and selectors are strings.
 
       %{
-        version: 1,
+        version: 2,
         surface_id: "referrals",
         module: MyApp.Referral,           # the resource or standalone UI module
         resource: MyApp.Referral,
         title: "Referral",                # the surface heading
         catalog: :admin_v1,
-        spec_version: "0.9.1",
         tables: [table],
         row_actions: [row_action],
         attributes: %{row_id: "data-a2ui-row-id", action: "data-a2ui-action",
@@ -136,14 +136,14 @@ defmodule AshA2ui.Manifest do
   import AshA2ui.Gettext, only: [msg: 1]
 
   alias Ash.Resource.Info, as: ResourceInfo
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.Experience
   alias AshA2ui.Gettext.Metadata
   alias AshA2ui.L10n
   alias AshA2ui.Label
   alias AshA2ui.ResolvedView
 
-  @version 1
+  @version 2
 
   @attributes %{
     row_id: "data-a2ui-row-id",
@@ -153,7 +153,6 @@ defmodule AshA2ui.Manifest do
 
   @resolve_opts [
     :catalog,
-    :spec_version,
     :locale,
     :gettext_backend,
     :gettext_fn,
@@ -219,7 +218,6 @@ defmodule AshA2ui.Manifest do
           resource: module,
           title: String.t(),
           catalog: :basic | :admin_v1,
-          spec_version: String.t(),
           tables: [table],
           row_actions: [row_action],
           attributes: %{row_id: String.t(), action: String.t(), component: String.t()}
@@ -246,7 +244,6 @@ defmodule AshA2ui.Manifest do
       resource: view.resource,
       title: Experience.surface_title(view),
       catalog: if(Experience.admin?(view), do: :admin_v1, else: :basic),
-      spec_version: spec_version(view),
       tables: tables,
       row_actions: Enum.flat_map(view.tables, &row_actions(view, &1)),
       attributes: @attributes
@@ -376,7 +373,7 @@ defmodule AshA2ui.Manifest do
   defp columns(view, table) do
     fields =
       if Experience.admin?(view),
-        do: V0_9_1.grid_column_fields(table),
+        do: Encoder.grid_column_fields(table),
         else: table.component.fields
 
     Enum.map(fields, &%{name: &1, label: view.fields[&1].label})
@@ -577,9 +574,4 @@ defmodule AshA2ui.Manifest do
   defp comparable(value) when is_binary(value), do: value
   defp comparable(%Ash.CiString{} = value), do: Ash.CiString.value(value)
   defp comparable(value), do: if(String.Chars.impl_for(value), do: to_string(value), else: value)
-
-  # --- helpers ------------------------------------------------------------------
-
-  defp spec_version(%{spec_version: :v1_0}), do: "1.0"
-  defp spec_version(_view), do: "0.9.1"
 end

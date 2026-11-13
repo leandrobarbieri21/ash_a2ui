@@ -105,7 +105,7 @@ action-result panel last.
   table's state map, and the response targets `/records/<name>` +
   `/query/<name>`.
 - The carried query state on `invoke`/`submit_form` contexts binds the whole
-  `/query` object (`{"path": "/query"}`), i.e. an object keyed by table
+  `/query` object (`{"@path": "/query"}`), i.e. an object keyed by table
   name on multi-table surfaces — success refreshes parse each table's entry
   and fall back to that query's defaults when missing or invalid.
 
@@ -127,7 +127,7 @@ end
   `/query/<name>`) messages are emitted. `/form`, `/errors`, and `/ui/*`
   follow-ups are unaffected.
 - An empty `refreshes []` means "refresh no table" — useful for actions whose
-  results only surface via `/ui/action_result`.
+  results only surface via `/ui/feedback/result`.
 
 ## PubSub live refresh
 
@@ -463,9 +463,9 @@ end
   the table's records are rewritten with the failing row carrying the
   submitted value (for in-place correction) and the message at
   `_error_<field>`.
-- On v1.0 surfaces the per-action `actionResponse` handshake gives each
-  cell pending→settled feedback (the shipped hook holds the pending state
-  per `actionId`).
+- A Save shows the surface's one pending state (`/ui/feedback`) while its
+  `ashAction` call is in flight, and the call's outcome settles it, as for
+  any other write. There is no per-cell pending state.
 - Not supported together with a `row_layout` (card rows render read-only
   meta values); every editable field must be a table field accepted by the
   update action (compile-time verified by

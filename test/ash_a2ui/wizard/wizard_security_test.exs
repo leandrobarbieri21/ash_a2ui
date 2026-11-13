@@ -13,11 +13,13 @@ defmodule AshA2ui.Wizard.WizardSecurityTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Enrollment
+  alias AshA2ui.Test.Messages
 
   defp handle(name, context) do
-    message = %{"version" => "v0.9.1", "action" => %{"name" => name, "context" => context}}
+    message = Messages.call(name, "test_surface", context)
+
     {tag, messages} = ActionHandler.handle(Enrollment, message)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     {tag, messages}
   end
 
@@ -146,10 +148,7 @@ defmodule AshA2ui.Wizard.WizardSecurityTest do
 
   @tag ac: "A2UI-106/AC-7"
   test "wizard actions are refused on forms without steps" do
-    message = %{
-      "version" => "v0.9.1",
-      "action" => %{"name" => "wizard_next", "context" => %{"index" => 0}}
-    }
+    message = Messages.call("wizard_next", "test_surface", %{"index" => 0})
 
     assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.Promotion, message)
     assert value_at(messages, "/ui/feedback")["message"] =~ "does not declare steps"

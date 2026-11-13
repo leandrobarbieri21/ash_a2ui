@@ -86,7 +86,7 @@ defmodule AshA2ui.Gettext.Metadata do
         |> ResolvedView.resolve(gettext_fn: {__MODULE__, :record})
         |> AshA2ui.Sections.expand_static()
 
-      AshA2ui.Info.encoder(view).encode_surface(view, no_records(view), [])
+      AshA2ui.Encoder.encode_surface(view, no_records(view), [])
       Enum.each(view.tables, &collect_table(&1, view.l10n))
       Enum.each(view.reports, &collect_report(&1, view.l10n))
       Enum.each(view.details, &collect_detail(&1, view))

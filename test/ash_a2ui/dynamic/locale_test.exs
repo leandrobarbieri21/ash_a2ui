@@ -26,22 +26,18 @@ defmodule AshA2ui.Dynamic.LocaleTest do
     }
   end
 
-  for version <- ["0.9.1", "1.0"] do
-    @version version
+  test "spec text is not translated, other labels are, once" do
+    {:ok, surface} = Dynamic.resolve(spec(), allowlist: @allowlist)
 
-    test "spec text is not translated, other labels are, once (#{version})" do
-      {:ok, surface} = Dynamic.resolve(spec(), allowlist: @allowlist, spec_version: @version)
+    plain = surface |> Dynamic.build_surface(authorize?: false) |> Jason.encode!()
+    pseudo = surface |> Dynamic.build_surface([authorize?: false] ++ @pseudo) |> Jason.encode!()
 
-      plain = surface |> Dynamic.build_surface(authorize?: false) |> Jason.encode!()
-      pseudo = surface |> Dynamic.build_surface([authorize?: false] ++ @pseudo) |> Jason.encode!()
-
-      assert plain =~ "Nom"
-      assert pseudo =~ ~s("Nom")
-      refute pseudo =~ "⟪Nom⟫"
-      refute pseudo =~ "⟪⟪"
-      assert pseudo =~ "⟪Id⟫"
-      assert plain =~ ~s("Id")
-    end
+    assert plain =~ "Nom"
+    assert pseudo =~ ~s("Nom")
+    refute pseudo =~ "⟪Nom⟫"
+    refute pseudo =~ "⟪⟪"
+    assert pseudo =~ "⟪Id⟫"
+    assert plain =~ ~s("Id")
   end
 
   test "spec_schema/2 tells the agent the locale; without it the schema is unchanged" do

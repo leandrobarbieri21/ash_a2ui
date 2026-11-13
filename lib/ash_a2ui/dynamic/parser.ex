@@ -3,7 +3,7 @@ defmodule AshA2ui.Dynamic.Parser do
   Turns a JSON-decoded surface spec (see `AshA2ui.Dynamic`) into the same
   entity structs the `a2ui` DSL compiles to.
 
-  Every entity is built through `Spark.Dsl.Entity.build/5` with the
+  Every entity is built through `Spark.Dsl.Entity.build` with the
   extension's own entity definitions, so Spark's option schemas (types,
   `one_of` values, required options, defaults) apply to dynamic specs exactly
   as they do to DSL blocks. The parser's own job is shape conversion —
@@ -903,7 +903,7 @@ defmodule AshA2ui.Dynamic.Parser do
   # --- generic option conversion ---------------------------------------------------
 
   # Converts a spec entry's JSON options into the keyword list
-  # `Spark.Dsl.Entity.build/5` expects, using the entity's own Spark schema
+  # `Spark.Dsl.Entity.build` expects, using the entity's own Spark schema
   # to pick the target shape per key. Unknown keys are rejected with the
   # supported vocabulary.
   defp convert_options(entry, key_mapping, nested_keys, path) do

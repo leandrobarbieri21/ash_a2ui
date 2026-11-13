@@ -98,11 +98,9 @@ defmodule AshA2ui.Info do
   end
 
   @doc """
-  Builds the ordered A2UI server->client message list for the surface, in
-  the protocol version the surface declares (`spec_version`, default
-  `"0.9.1"`): the v0.9.1 `createSurface` -> `updateComponents` ->
-  `updateDataModel` triple, or v1.0's single inline `createSurface` message
-  (components + data model in one payload — see `AshA2ui.Encoder.V1_0`).
+  Builds the A2UI agent-to-renderer messages for the surface: one inline
+  `createSurface` carrying the component tree and the initial data model
+  (see `AshA2ui.Encoder`).
 
   ## Options
 
@@ -122,10 +120,6 @@ defmodule AshA2ui.Info do
       filtered, `/detail/<context>` records re-fetch, and scoped tables
       keep their context filters (tables with an unmet `require_context`
       load no records).
-    * `:surface_properties` — v1.0 surfaces only: an optional map for the
-      `createSurface` payload's `surfaceProperties` (e.g.
-      `%{"agentDisplayName" => "Support Agent"}`). Ignored on v0.9.1
-      surfaces (the v0.9 `theme` block was never emitted).
     * `:as_of` — a `DateTime` to read every table, option list, context
       and detail at (Ash temporal resources' `as_of`; see `AshA2ui.AsOf`).
       Temporal resources return the version valid at that instant; other
@@ -192,13 +186,12 @@ defmodule AshA2ui.Info do
 
     {records, opts} = load_and_put_state!(resolved_view, opts)
 
-    encoder(resolved_view).encode_surface(resolved_view, records, opts)
+    AshA2ui.Encoder.encode_surface(resolved_view, records, opts)
   end
 
   @doc """
-  Builds a data-only refresh: the `updateDataModel` message for the surface
-  (in the surface's declared protocol version), used for PubSub-driven live
-  refreshes.
+  Builds a data-only refresh: the `updateDataModel` message for the surface,
+  used for PubSub-driven live refreshes.
 
   Takes the same options as `build_surface/2`.
   """
@@ -212,7 +205,7 @@ defmodule AshA2ui.Info do
 
     {records, opts} = load_and_put_state!(resolved_view, opts)
 
-    encoder(resolved_view).encode_data_model(resolved_view, records, opts)
+    AshA2ui.Encoder.encode_data_model(resolved_view, records, opts)
   end
 
   @doc """
@@ -282,14 +275,6 @@ defmodule AshA2ui.Info do
   defp view_only_when_pinned(view, opts) do
     if AshA2ui.AsOf.pinned?(opts), do: view_only(view), else: view
   end
-
-  @doc """
-  The versioned encoder module for a resolved view: `AshA2ui.Encoder.V0_9_1`
-  or `AshA2ui.Encoder.V1_0`, per the surface's `spec_version`.
-  """
-  @spec encoder(ResolvedView.t()) :: module
-  def encoder(%ResolvedView{spec_version: :v1_0}), do: AshA2ui.Encoder.V1_0
-  def encoder(%ResolvedView{}), do: AshA2ui.Encoder.V0_9_1
 
   # The shared loading pipeline: sanitize the carried /context state, load
   # records under its scope, load option lists (contexts included), fetch

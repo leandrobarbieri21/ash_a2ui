@@ -1,41 +1,55 @@
 # Rendering Clients
 
-AshA2ui's protocol core produces plain maps (A2UI v0.9.1 messages, string
-camelCase keys, ready for JSON encoding) and consumes plain maps (client
-`action` envelopes). *How* those maps travel between your server and a
-renderer is the transport's job. This guide covers the two supported
-transports and the browser-side renderers.
+AshA2ui's protocol core produces plain maps (A2UI 1.0 messages, string
+keys, ready for JSON encoding) and consumes plain maps (the renderer's
+messages back to the agent). *How* those maps travel between your server and
+a renderer is the transport's job. This guide covers the two supported
+transports and the browser-side renderers. The shapes themselves are in
+[The A2UI 1.0 wire contract](a2ui-1-0.md).
 
 ## The message contract (both directions)
 
-Server → client, in order on first render:
+Agent → renderer. A surface is one message:
 
 | Message | Purpose |
 |---|---|
-| `createSurface` | Announce the surface (`surfaceId`, `catalogId`) |
-| `updateComponents` | The full component list (one component has id `"root"`) |
-| `updateDataModel` | The data the components bind to (records, form state) |
+| `createSurface` | The whole surface: `surfaceId`, `catalogId`, the full `components` list (one has id `"root"`) and the initial `dataModel` |
+| `updateDataModel` | A data write at a `path` with a `value` (`null` deletes); every refresh is one |
+| `updateComponents` | Replace components of a live surface |
 | `deleteSurface` | Tear the surface down (supported by the encoder; rarely needed) |
+| `callRendererFunction` | Ask the renderer to run a function (the CSV export's `downloadFile`) |
+| `agentFunctionResponse` | The answer to a renderer's `callAgentFunction` |
 
 Data-only refreshes are a single `updateDataModel` message
 (`AshA2ui.Info.build_data_model/2`).
 
-Client → server is one envelope shape:
+Renderer → agent. The messages the handler accepts, each verbatim:
 
 ```json
 {
-  "version": "v0.9.1",
-  "action": {
-    "name": "submit_form",
+  "version": "1.0",
+  "callAgentFunction": {
     "surfaceId": "tickets",
-    "sourceComponentId": "form_submit",
-    "timestamp": "2026-07-10T12:00:00Z",
-    "context": { "...": "resolved data bindings" }
+    "functionCallId": "fc_1",
+    "callFunction": {
+      "@call": "ashAction",
+      "catalogId": "<ash_a2ui catalog id>",
+      "args": {
+        "name": "submit_form",
+        "sourceComponentId": "form_submit",
+        "context": { "...": "resolved data bindings" }
+      }
+    }
   }
 }
 ```
 
-The core `action.name` values AshA2ui emits and accepts are `"submit_form"`,
+Alongside it: `rendererFunctionResponse` (the answer to a
+`callRendererFunction`) and `error` (a renderer-side failure, logged). A
+plain `action` event is refused with an `UNKNOWN_FUNCTION` feedback error;
+the encoder never emits one.
+
+The core `args.name` values AshA2ui emits and accepts are `"submit_form"`,
 `"invoke"` (generic/row actions), `"prompt"`, `"query"` and the task-panel
 actions `"start_create"`, `"view_record"`, `"start_edit"` and
 `"cancel_record_task"`; feature-specific names exist only where a surface
@@ -62,9 +76,10 @@ What it does:
   `AshA2ui.Info.build_surface/2`, and pushes the messages to the JS hook via
   `push_event`. If the resource has `Ash.Notifier.PubSub` configured, it also
   subscribes to the relevant topics.
-- **`"a2ui:action"` events** — incoming client envelopes are routed through
-  `AshA2ui.ActionHandler.handle/3` with the mounted actor; follow-up messages
-  (refreshes, error payloads) are pushed back to the hook.
+- **`"a2ui:message"` events** — each renderer-to-agent message arrives as
+  this one event and is routed through `AshA2ui.ActionHandler.handle/3` with
+  the mounted actor; follow-up messages (refreshes, error payloads, and the
+  `agentFunctionResponse` last) are pushed back to the hook.
 - **PubSub notifications** — on record changes, it pushes a
   `AshA2ui.Info.build_data_model/2` refresh, so every mounted client stays
   live. Rapid notification bursts are debounced; the refresh is
@@ -78,25 +93,29 @@ of the generated LiveView when needed.
 The package ships the LiveView JS hook at `priv/js/ash_a2ui_hook.js`. It has
 **no bundled dependencies** — your app bundle imports the `@a2ui` renderer
 packages and hands the renderer classes to the hook via
-`configureAshA2ui({MessageProcessor, catalogs})` before the `LiveSocket`
+`configureAshA2ui({MessageProcessor, Catalog, catalogs})` before the `LiveSocket`
 mounts it:
 
-- Import **`@a2ui/lit/v0_9`** for its side effect: registering the
-  `<a2ui-surface>` custom element (and to get `basicCatalog`).
-- Import **`MessageProcessor` from `@a2ui/web_core/v0_9`** — message ingest
-  in the 0.10.x renderers is `new MessageProcessor(catalogs, actionHandler)`
-  + `processor.processMessages(messages)`; the `<a2ui-surface>` element
-  itself has **no ingest API** (it only accepts a `SurfaceModel` via its
-  `surface` property, which the hook wires up through
-  `processor.onSurfaceCreated`).
+- Import **`@a2ui/lit`** for its side effect: registering the
+  `<a2ui-surface>` custom element. `basicCatalog` comes from
+  `@a2ui/web_core/catalogs/basic/v1`.
+- Import **`MessageProcessor` and `Catalog` from `@a2ui/web_core`** — message
+  ingest is `new MessageProcessor(catalogs, actionHandler, {outboundListener})`
+  + `processor.processMessagesWithErrors(messages)`; the `<a2ui-surface>`
+  element itself has **no ingest API** (it only accepts a `SurfaceModel` via
+  its `surface` property, which the hook wires up through
+  `processor.onSurfaceCreated`). The hook builds the ash_a2ui function
+  catalog from `Catalog`.
 - Register the hook under the name **`AshA2ui`** in your `LiveSocket` hooks.
 - The LiveView renders a container `div` with `phx-hook="AshA2ui"` and
   `phx-update="ignore"`; the hook owns everything inside it.
 - Server→client messages arrive on the **`"a2ui:messages"`** `push_event`
   (payload `%{messages: [...]}`); the hook feeds them to the processor.
-- User interactions are delivered to the processor's action callback and
-  forwarded to the server as the **`"a2ui:action"`** LiveView event, wrapped
-  in the A2UI v0.9.1 client envelope.
+- Everything the processor sends to the agent (`callAgentFunction` for an
+  `ashAction`, `action`, `rendererFunctionResponse`) goes out through its
+  `outboundListener`, which pushes each message verbatim as the single
+  **`"a2ui:message"`** LiveView event. The `RendererErrorMessage`s that
+  `processMessagesWithErrors` returns are pushed the same way.
 - Reference-link activations (the admin catalog's `openSurface` function,
   raised as the bubbling, composed `"ash-a2ui:open-surface"` DOM event with
   `detail = {surface, recordId?, query?, href?, surfaceId}`) are forwarded
@@ -107,12 +126,12 @@ mounts it:
   client-side instead. Hosts that handle hook events themselves (not via
   `AshA2ui.LiveRenderer`) must add a `handle_event("a2ui:open_surface",
   …)` clause.
-- Basic-catalog reference links are ordinary `"a2ui:action"` envelopes
+- Basic-catalog reference links are ordinary `ashAction` calls
   named `"open_surface"` (context `{field, surface, recordId}`).
   `AshA2ui.LiveRenderer` passes them to the action handler and, once the
   handler accepted the field/surface pair, navigates through the same
   `:open_surface` / `:open_surface_url` path. Hosts with their own
-  `"a2ui:action"` handling do the same: call the handler, and on `{:ok,
+  `"a2ui:message"` handling do the same: call the handler, and on `{:ok,
   _}` for an `"open_surface"` action, navigate. The Buttons only render
   when the surface is built with `link_buttons: true`, which the
   LiveRenderer passes when it has `:open_surface` or `:open_surface_url`;
@@ -123,12 +142,12 @@ Wiring in `assets/js/app.js` (minimal — see the
 catalog and markdown renderer):
 
 ```javascript
-import "@a2ui/lit/v0_9"; // registers <a2ui-surface>
-import { basicCatalog } from "@a2ui/lit/v0_9";
-import { MessageProcessor } from "@a2ui/web_core/v0_9";
+import "@a2ui/lit"; // registers <a2ui-surface>
+import { Catalog, MessageProcessor } from "@a2ui/web_core";
+import { basicCatalog } from "@a2ui/web_core/catalogs/basic/v1";
 import { AshA2ui, configureAshA2ui } from "../../deps/ash_a2ui/priv/js/ash_a2ui_hook.js";
 
-configureAshA2ui({ MessageProcessor, catalogs: [basicCatalog] });
+configureAshA2ui({ MessageProcessor, Catalog, catalogs: [basicCatalog] });
 
 const liveSocket = new LiveSocket("/live", Socket, {
   hooks: { AshA2ui },
@@ -137,7 +156,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
 ```
 
 (Bundling the hook separately from your app code? Setting
-`globalThis.__ASH_A2UI_DEPS__ = {MessageProcessor, catalogs}` works as an
+`globalThis.__ASH_A2UI_DEPS__ = {MessageProcessor, Catalog, catalogs}` works as an
 alternative to calling `configureAshA2ui`.)
 
 `configureAshA2ui` also accepts an optional `markdown` entry
@@ -201,12 +220,12 @@ defmodule MyAppWeb.A2uiController do
 end
 ```
 
-For mutations, accept the client `action` envelope on a POST endpoint and
-hand it to the handler:
+For mutations, accept the renderer's message on a POST endpoint and hand it
+to the handler:
 
 ```elixir
-def action(conn, envelope) do
-  case AshA2ui.ActionHandler.handle(MyApp.UI.TicketUI, envelope,
+def message(conn, message) do
+  case AshA2ui.ActionHandler.handle(MyApp.UI.TicketUI, message,
          actor: conn.assigns.current_user
        ) do
     {:ok, messages} -> json(conn, messages)
@@ -215,22 +234,21 @@ def action(conn, envelope) do
 end
 ```
 
-Both branches return valid server→client A2UI messages — the error branch
+Both branches return valid agent→renderer A2UI messages — the error branch
 carries validation errors on the reserved `/errors/<field>` data-model paths
 (see [Data Model Conventions](data-model-conventions.md)), so the renderer
 treats them like any other data update.
 
 JSON endpoints don't get PubSub live refresh (there's no persistent
 connection); pair them with polling or use the LiveView transport when you
-need liveness. For serving surfaces to AG-UI clients (CopilotKit chat UIs
-and other external consumers) over SSE, see
+need liveness. For the designed A2A binding, see
 [External Transports](external-transports.md); raw WebSocket remains
 roadmap.
 
 ## Browser renderers: `@a2ui/lit` and `@a2ui/react`
 
-The published renderer packages are **0.10.x** and expose **`/v0_9` entry
-points** compatible with the v0.9.x protocol AshA2ui emits:
+The renderer packages publish version-agnostic root entry points that carry
+the 1.0 runtime:
 
 - [`@a2ui/lit`](https://www.npmjs.com/package/@a2ui/lit) — web components;
   the `<a2ui-surface>` element renders a surface from a message feed. This is
@@ -239,10 +257,15 @@ points** compatible with the v0.9.x protocol AshA2ui emits:
   bindings, useful when the consuming client is a React app talking to the
   JSON transport.
 
+The renderer release has to implement the specification text AshA2ui targets;
+published 0.15.0 predates the `@`-prefixed component keys the surfaces
+carry. [What the renderer must support](a2ui-1-0.md#what-the-renderer-must-support)
+has the list.
+
 Notes:
 
-- Check each package's README for the exact `/v0_9` import path in the
-  version you install — the packages version independently from the spec.
+- The packages version independently from the spec; check each package's
+  README for the entry points of the release you install.
 - `@a2ui/lit`'s `A2uiController` class is only needed for registering
   *custom* components; plain embedding is `<a2ui-surface>` plus the message
   feed.
@@ -254,5 +277,5 @@ Notes:
   DOM), and the package ships a starter theme plus a merged catalog with a
   `<select>`-based ChoicePicker — see [Theming](theming.md).
 
-Anything else that speaks A2UI v0.9.x — including agent canvases that accept
+Anything else that speaks A2UI 1.0 — including agent canvases that accept
 A2UI surfaces — can consume the same messages without changes on the server.

@@ -32,17 +32,23 @@ whatever authentication your transport applies (router pipelines,
 `live_session` mounts). Don't mistake the correct default posture for
 enforcement you haven't written.
 
-## Writing: the `action` envelope
+## Writing: the `ashAction` call
 
-Clients send a single envelope message; `AshA2ui.ActionHandler.handle/3`
-consumes it:
+Every server-handled control is an `ashAction` function call. The renderer
+sends one renderer-to-agent message (a `callAgentFunction`), and
+`AshA2ui.ActionHandler.handle/3` consumes it:
 
 ```elixir
-AshA2ui.ActionHandler.handle(MyApp.UI.TicketUI, envelope, actor: current_user)
+AshA2ui.ActionHandler.handle(MyApp.UI.TicketUI, message, actor: current_user)
 # => {:ok, messages} | {:error, messages}
 ```
 
-The v0 `action.name` vocabulary:
+For a `callAgentFunction` the reply ends with an `agentFunctionResponse`
+carrying the call's `functionCallId`: the settled `/ui/feedback` map as its
+`value` on success, or an `error` with `code` and `message`. See
+[The A2UI 1.0 wire contract](a2ui-1-0.md#how-an-action-s-outcome-reaches-the-user).
+
+The `action.name` vocabulary (for `ashAction`, `args.name`):
 
 | `action.name` | Meaning | Maps to |
 |---|---|---|
@@ -132,7 +138,7 @@ action (verified at compile time). The encoder then renders the action as a
 basic-catalog `Modal` instead of a bare button:
 
 - the row button becomes the Modal's `trigger` and dispatches the `"prompt"`
-  action (`{"action": "decline", "recordId": {"path": "id"}, "component":
+  action (`{"action": "decline", "recordId": {"@path": "id"}, "component":
   "table"}`); the server answers by pre-filling
   `/prompt/values/decline` (each field's current record value when it is a
   public attribute, `""` otherwise) and clearing `/errors`,
@@ -140,7 +146,7 @@ basic-catalog `Modal` instead of a bare button:
   field bound to `/prompt/values/decline/<field>`, a per-field error `Text`
   bound to `/errors/<field>`, and a **Confirm** button,
 - Confirm dispatches a regular `"invoke"` whose context carries
-  `"values": {"path": "/prompt/values/decline"}` alongside
+  `"values": {"@path": "/prompt/values/decline"}` alongside
   `"action"`/`"recordId"`.
 
 Each prompt input is the widget a form field of that type gets: a
@@ -176,7 +182,7 @@ render inside the open Modal. A success clears
 `/prompt/values/<action>`. For actions *without* `prompt_fields`, `"values"`
 is ignored entirely — the pre-Wave-4 empty-params behavior is unchanged.
 
-Protocol notes: Modal open/close is client-side (the v0.9.1 basic catalog
+Protocol notes: Modal open/close is client-side (the basic catalog
 has no server-controlled open state), so the server cannot force the Modal
 shut — the frozen contract is only the `prompt` pre-fill and the `invoke`
 `"values"` map. The AshA2ui catalogs close it themselves: their Modal
@@ -231,7 +237,7 @@ The scope stays server-authoritative:
   gets search controls; `option_search` searches within the scope and
   writes `/prompt/options/<action>/<field>`.
 - Each result dispatches `option_select` with `"prompt"` and
-  `"recordId": {"path": "/prompt/record/<action>"}`; the server re-reads the
+  `"recordId": {"@path": "/prompt/record/<action>"}`; the server re-reads the
   row and the picked value through the scope before writing
   `/prompt/values/<action>/<field>`. `invoke` re-reads every picked value
   through the scope of the row it is invoked on, so a spoofed or stale
@@ -288,7 +294,7 @@ Two halves, with different guarantees:
   condition calculations) and re-evaluates the conditions. A non-visible
   action is rejected with an `/ui/feedback` error before touching the write —
   regardless of what the client rendered.
-- **Rendering (best-effort):** the v0.9.1 basic catalog has no `visible`
+- **Rendering (best-effort):** the basic catalog has no `visible`
   property or template conditionals, so visibility is server-computed data:
   each row gains `"_actions"` (the visible action names) and a
   `"_visible_<action>"` list (`[{"id": <record id>}]` or `[]`), and the
@@ -314,11 +320,11 @@ component :table do
 end
 ```
 
-`ActionHandler` rejects any `invoke` envelope naming an action outside the
-declared `row_actions` — *before* touching Ash. (`submit_form` envelopes
+`ActionHandler` rejects any `invoke` message naming an action outside the
+declared `row_actions` — *before* touching Ash. (`submit_form` calls
 carry no action name at all: the server always runs the view's declared
 create/update action, so there is nothing for a client to redirect.)
-A malicious client editing the envelope cannot reach `:destroy` if you didn't
+A malicious client editing the message cannot reach `:destroy` if you didn't
 declare it. Corollary: **declare `row_actions` explicitly and minimally**;
 never expose an action through the surface just because it exists.
 

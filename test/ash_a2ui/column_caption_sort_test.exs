@@ -17,9 +17,11 @@ defmodule AshA2ui.ColumnCaptionSortTest do
   end
 
   defp surface(resource) do
-    [_create, components, data] = AshA2ui.Info.build_surface(resource, authorize?: false)
-    by_id = Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
-    {by_id, data["updateDataModel"]["value"]}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(resource, authorize?: false)
+
+    by_id = Map.new(components, &{&1["id"], &1})
+    {by_id, data}
   end
 
   defp columns(components),

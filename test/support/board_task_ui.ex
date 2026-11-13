@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.BoardTaskUI do
   @moduledoc """
-  Fixture board (v0.9.1): `:board` is a `display :board` table whose lanes
+  Fixture board: `:board` is a `display :board` table whose lanes
   are three of `status`'s enumerated values, in a custom order with one
   overridden heading. Cards move through the `:claim` / `:complete`
   transition row actions, which refresh the template key (every lane).
@@ -49,10 +49,10 @@ defmodule AshA2ui.Test.BoardTaskUI do
   end
 end
 
-defmodule AshA2ui.Test.BoardTaskV1UI do
+defmodule AshA2ui.Test.BoardTaskUnqueriedUI do
   @moduledoc """
-  The `AshA2ui.Test.BoardTaskUI` board with `spec_version "1.0"` and no
-  query (lane totals from the row count, no pagination).
+  The `AshA2ui.Test.BoardTaskUI` board with no query (lane totals from the
+  row count, no pagination).
   """
 
   use AshA2ui.Standalone
@@ -60,7 +60,6 @@ defmodule AshA2ui.Test.BoardTaskV1UI do
   a2ui do
     for_resource AshA2ui.Test.BoardTask
     surface_id "board_tasks_v1"
-    spec_version "1.0"
 
     component :table, :board do
       fields [:name, :priority, :status]
@@ -132,7 +131,7 @@ end
 
 defmodule AshA2ui.Test.SwimlaneBoardUI do
   @moduledoc """
-  Fixture swimlaned board (v0.9.1): the `AshA2ui.Test.BoardTaskUI` lanes
+  Fixture swimlaned board: the `AshA2ui.Test.BoardTaskUI` lanes
   (three of `status`'s values) split into swimlanes by `severity` (an
   `Ash.Type.Enum`), two of its values in a custom order with one overridden
   heading and a tone each. The lane query filters on both axes, for the
@@ -186,10 +185,10 @@ defmodule AshA2ui.Test.SwimlaneBoardUI do
   end
 end
 
-defmodule AshA2ui.Test.SwimlaneBoardV1UI do
+defmodule AshA2ui.Test.SwimlaneBoardUnqueriedUI do
   @moduledoc """
-  A swimlaned board with `spec_version "1.0"` and no query (cell totals from
-  the row count, no pagination); every `severity` is a swimlane, `medium`
+  A swimlaned board with no query (cell totals from the row count, no
+  pagination); every `severity` is a swimlane, `medium`
   without a tone (neutral).
   """
 
@@ -198,7 +197,6 @@ defmodule AshA2ui.Test.SwimlaneBoardV1UI do
   a2ui do
     for_resource AshA2ui.Test.BoardTask
     surface_id "swimlane_tasks_v1"
-    spec_version "1.0"
 
     component :table, :board do
       fields [:name, :status, :severity]

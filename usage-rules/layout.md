@@ -304,7 +304,8 @@ topics for the full contracts.
   only when declared. The stock renderer draws the grid as one card, the
   header on top and the caption muted under it, in every layout (table,
   rows, cards) and above the empty state when there are no rows. The basic
-  catalog draws an `h3` Text and a caption Text just before the table.
+  catalog draws a level-3 Markdown heading Text and a caption Text just
+  before the table.
 - Tables only, and not on a board (a lane has no card): elsewhere they do
   not compile.
 

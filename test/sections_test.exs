@@ -5,7 +5,7 @@ defmodule AshA2ui.SectionsTest do
   runtime names, scoped `/records/<name>` + `/query/<name>` paths, section
   labels as headings, per-section scoped reads, template-key `refreshes`
   fan-out, and the multi-table `"query"` action against runtime names.
-  Schema-validated on both v0.9.1 and v1.0.
+  Schema-validated against the vendored A2UI 1.0 schemas.
   """
 
   use ExUnit.Case, async: false
@@ -19,28 +19,20 @@ defmodule AshA2ui.SectionsTest do
   alias AshA2ui.Test.BucketWord
   alias AshA2ui.Test.BucketWordsUI
   alias AshA2ui.Test.BucketWordsV1UI
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
-  defp envelope(name, context, version \\ "v0.9.1", surface \\ "bucket_words") do
-    %{
-      "version" => version,
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
-  end
+  defp envelope(name, context), do: Messages.call(name, "bucket_words", context)
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _ -> nil
     end)
   end
 
-  defp paths(messages), do: Enum.map(messages, & &1["updateDataModel"]["path"])
+  defp paths(messages), do: for(%{"updateDataModel" => %{"path" => path}} <- messages, do: path)
 
   defp create_bucket!(name) do
     Ash.create!(Bucket, %{name: name}, authorize?: false)
@@ -165,7 +157,7 @@ defmodule AshA2ui.SectionsTest do
     end
   end
 
-  describe "encoder (v0.9.1)" do
+  describe "encoder" do
     setup do
       alpha = create_bucket!("Alpha")
       zebra = create_bucket!("Zebra")
@@ -179,12 +171,11 @@ defmodule AshA2ui.SectionsTest do
 
     test "the surface renders one suffixed section per bucket, headed by its label", ctx do
       messages = AshA2ui.Info.build_surface(BucketWordsUI, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       components =
         messages
-        |> Enum.find_value(& &1["updateComponents"])
-        |> Map.fetch!("components")
+        |> Surface.components()
         |> Map.new(&{&1["id"], &1})
 
       alpha_sfx = "_#{runtime_name(ctx.alpha)}"
@@ -208,8 +199,8 @@ defmodule AshA2ui.SectionsTest do
                "action_result_panel"
              ]
 
-      assert components["table_heading#{alpha_sfx}"]["text"] == "Alpha"
-      assert components["table_heading#{zebra_sfx}"]["text"] == "Zebra"
+      assert components["table_heading#{alpha_sfx}"]["text"] == "## Alpha"
+      assert components["table_heading#{zebra_sfx}"]["text"] == "## Zebra"
 
       assert components["records_list#{alpha_sfx}"]["children"]["path"] ==
                "/records/#{runtime_name(ctx.alpha)}"
@@ -220,6 +211,7 @@ defmodule AshA2ui.SectionsTest do
 
       data_model =
         Enum.find_value(messages, fn
+          %{"createSurface" => %{"dataModel" => value}} -> value
           %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
           _ -> nil
         end)
@@ -256,7 +248,7 @@ defmodule AshA2ui.SectionsTest do
         })
 
       assert {:ok, messages} = ActionHandler.handle(BucketWordsUI, message, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       records_path = "/records/#{runtime_name(ctx.alpha)}"
       assert [%{"word" => "apple"}] = value_at(messages, records_path)
@@ -278,7 +270,7 @@ defmodule AshA2ui.SectionsTest do
       message = envelope("invoke", %{"action" => "approve", "recordId" => ctx.fresh.id})
 
       assert {:ok, messages} = ActionHandler.handle(BucketWordsUI, message, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       emitted = paths(messages)
 
@@ -301,7 +293,7 @@ defmodule AshA2ui.SectionsTest do
     end
   end
 
-  describe "v1.0" do
+  describe "ashAction calls" do
     setup do
       alpha = create_bucket!("Alpha")
       apple = bucketed_word!("apple", alpha)
@@ -310,7 +302,7 @@ defmodule AshA2ui.SectionsTest do
 
     test "the surface bootstraps as one schema-valid inline createSurface", ctx do
       assert [message] = AshA2ui.Info.build_surface(BucketWordsV1UI, authorize?: false)
-      assert_valid_server_message(message, :v1_0)
+      assert_valid_agent_message(message)
 
       create = message["createSurface"]
       assert [%{"word" => "apple"}] = create["dataModel"]["records"][runtime_name(ctx.alpha)]
@@ -321,176 +313,23 @@ defmodule AshA2ui.SectionsTest do
       assert heading["text"] == "## Alpha"
     end
 
-    test "an actionId'd invoke on a section row is answered with an actionResponse", ctx do
-      message = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "invoke",
-          "surfaceId" => "bucket_words_v1",
-          "actionId" => "act_1",
-          "context" => %{"action" => "destroy", "recordId" => ctx.apple.id}
-        }
-      }
+    test "an ashAction invoke on a section row is answered after its refresh", ctx do
+      message =
+        Messages.call(
+          "invoke",
+          "bucket_words_v1",
+          %{"action" => "destroy", "recordId" => ctx.apple.id},
+          id: "act_1"
+        )
 
-      assert {:ok, [response | followups]} =
-               ActionHandler.handle(BucketWordsV1UI, message, authorize?: false)
+      assert {:ok, messages} = ActionHandler.handle(BucketWordsV1UI, message, authorize?: false)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      assert response["actionId"] == "act_1"
-      assert %{"value" => %{"status" => "ok"}} = response["actionResponse"]
-      assert_valid_server_message(response, :v1_0)
+      assert %{"agentFunctionResponse" => %{"functionCallId" => "act_1", "value" => value}} =
+               List.last(messages)
 
-      assert value_at(followups, "/records/#{runtime_name(ctx.alpha)}") == []
+      assert value["kind"] == "success"
+      assert value_at(messages, "/records/#{runtime_name(ctx.alpha)}") == []
     end
-  end
-end
-
-defmodule AshA2ui.SectionsVerifierTest do
-  @moduledoc """
-  Compile-time failure tests for `AshA2ui.Verifiers.VerifySections`, using
-  the `capture_io(:stderr)` + regex pattern from the existing verifier
-  suites.
-  """
-
-  # Not async: capture_io(:stderr) captures a global device.
-  use ExUnit.Case
-
-  import ExUnit.CaptureIO
-
-  test "sections on a non-table component does not compile cleanly" do
-    result =
-      capture_io(:stderr, fn ->
-        defmodule FormSections do
-          @moduledoc false
-          use AshA2ui.Standalone
-
-          a2ui do
-            for_resource AshA2ui.Test.BucketWord
-
-            component :form do
-              fields [:word]
-
-              sections do
-                source AshA2ui.Test.Bucket
-                scope_by :bucket_id
-              end
-            end
-          end
-        end
-      end)
-
-    assert result =~ ~r/component :form cannot declare a sections block/
-    assert result =~ ~r/only supported on :table components/
-  end
-
-  test "a sections block combined with select_context does not compile cleanly" do
-    result =
-      capture_io(:stderr, fn ->
-        defmodule SectionsWithSelectContext do
-          @moduledoc false
-          use AshA2ui.Standalone
-
-          a2ui do
-            for_resource AshA2ui.Test.BucketWord
-
-            context :word do
-              resource AshA2ui.Test.BucketWord
-              option_label :word
-            end
-
-            component :table, :per_bucket do
-              fields [:word]
-              read_action :bucketed
-              select_context :word
-
-              sections do
-                source AshA2ui.Test.Bucket
-                scope_by :bucket_id
-              end
-            end
-          end
-        end
-      end)
-
-    assert result =~ ~r/cannot combine a sections block with select_context/
-  end
-
-  test "scope_by must be a public attribute of the table's resource" do
-    result =
-      capture_io(:stderr, fn ->
-        defmodule BadScopeBy do
-          @moduledoc false
-          use AshA2ui.Standalone
-
-          a2ui do
-            for_resource AshA2ui.Test.BucketWord
-
-            component :table, :per_bucket do
-              fields [:word]
-              read_action :bucketed
-
-              sections do
-                source AshA2ui.Test.Bucket
-                scope_by :nope
-              end
-            end
-          end
-        end
-      end)
-
-    assert result =~ ~r/scope_by :nope is not a public attribute/
-  end
-
-  test "label must be a public attribute of the section source" do
-    result =
-      capture_io(:stderr, fn ->
-        defmodule BadLabel do
-          @moduledoc false
-          use AshA2ui.Standalone
-
-          a2ui do
-            for_resource AshA2ui.Test.BucketWord
-
-            component :table, :per_bucket do
-              fields [:word]
-              read_action :bucketed
-
-              sections do
-                source AshA2ui.Test.Bucket
-                scope_by :bucket_id
-                label :nope
-              end
-            end
-          end
-        end
-      end)
-
-    assert result =~ ~r/label :nope is not a public attribute of the section source/
-  end
-
-  test "read_action must be a read action of the section source" do
-    result =
-      capture_io(:stderr, fn ->
-        defmodule BadReadAction do
-          @moduledoc false
-          use AshA2ui.Standalone
-
-          a2ui do
-            for_resource AshA2ui.Test.BucketWord
-
-            component :table, :per_bucket do
-              fields [:word]
-              read_action :bucketed
-
-              sections do
-                source AshA2ui.Test.Bucket
-                scope_by :bucket_id
-                read_action :nope
-              end
-            end
-          end
-        end
-      end)
-
-    assert result =~ ~r/read_action :nope is not a read action of the section source/
   end
 end

@@ -216,29 +216,3 @@ defmodule AshA2ui.Test.PromptScope.SearchTasksUI do
     end
   end
 end
-
-defmodule AshA2ui.Test.PromptScope.TasksV1UI do
-  @moduledoc "The scoped prompt on the A2UI 1.0 wire."
-
-  use AshA2ui.Standalone
-
-  a2ui do
-    for_resource AshA2ui.Test.PromptScope.Task
-    surface_id "scoped_tasks_v1"
-    spec_version "1.0"
-
-    component :table do
-      fields [:title]
-      row_actions [:delegate]
-    end
-
-    action :delegate do
-      prompt_fields [:principal_id]
-
-      prompt_options :principal_id do
-        read_action :candidates_for_task
-        record_argument :task_id
-      end
-    end
-  end
-end

@@ -4,7 +4,7 @@ defmodule AshA2ui.ReportTest do
   action whose computed row maps render as a table-like section with param
   inputs and a Run button — data under the reserved `/report/<name>` paths,
   the `"report"` client action invoking the allowlisted action actor-scoped.
-  Schema-validated on both v0.9.1 and v1.0.
+  Schema-validated against the vendored A2UI 1.0 schemas.
   """
 
   use ExUnit.Case, async: true
@@ -12,26 +12,21 @@ defmodule AshA2ui.ReportTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.ActionHandler
+  alias AshA2ui.Experience
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.BucketWord
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
   alias AshA2ui.Test.WordReportUI
   alias AshA2ui.Test.WordReportV1UI
 
   defp envelope(name, context, surface \\ "word_report") do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, surface, context)
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _ -> nil
     end)
@@ -83,19 +78,19 @@ defmodule AshA2ui.ReportTest do
     end
   end
 
-  describe "encoder (v0.9.1)" do
+  describe "encoder" do
     setup do
       messages = AshA2ui.Info.build_surface(WordReportUI, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       components =
         messages
-        |> Enum.find_value(& &1["updateComponents"])
-        |> Map.fetch!("components")
+        |> Surface.components()
         |> Map.new(&{&1["id"], &1})
 
       data_model =
         Enum.find_value(messages, fn
+          %{"createSurface" => %{"dataModel" => value}} -> value
           %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
           _ -> nil
         end)
@@ -128,14 +123,14 @@ defmodule AshA2ui.ReportTest do
 
       param = components["report_lengths_param_min_length"]
       assert param["component"] == "TextField"
-      assert param["value"] == %{"path" => "/report/lengths/params/min_length"}
+      assert param["value"] == %{"@path" => "/report/lengths/params/min_length"}
 
-      event = components["report_lengths_run_button"]["action"]["event"]
+      event = components["report_lengths_run_button"]["action"]["functionCall"]["args"]
       assert event["name"] == "report"
 
       assert event["context"] == %{
                "component" => "lengths",
-               "params" => %{"path" => "/report/lengths/params"}
+               "params" => %{"@path" => "/report/lengths/params"}
              }
 
       assert components["report_lengths_list"]["children"] == %{
@@ -149,7 +144,7 @@ defmodule AshA2ui.ReportTest do
                "report_lengths_cell_state"
              ]
 
-      assert components["report_lengths_cell_length_value"]["text"] == %{"path" => "length"}
+      assert components["report_lengths_cell_length_value"]["text"] == %{"@path" => "length"}
     end
 
     test "the initial data model carries the reserved /report region", %{
@@ -172,7 +167,7 @@ defmodule AshA2ui.ReportTest do
       message = envelope("report", %{"params" => %{"min_length" => "3"}})
 
       assert {:ok, messages} = ActionHandler.handle(WordReportUI, message, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/report/lengths/rows") == [
                %{"word" => "abcdef", "length" => 6, "state" => "new"}
@@ -238,7 +233,7 @@ defmodule AshA2ui.ReportTest do
     end
   end
 
-  describe "v1.0" do
+  describe "ashAction calls" do
     setup do
       create_word!("abcdef")
       :ok
@@ -246,7 +241,7 @@ defmodule AshA2ui.ReportTest do
 
     test "the surface bootstraps as one schema-valid inline createSurface" do
       assert [message] = AshA2ui.Info.build_surface(WordReportV1UI, authorize?: false)
-      assert_valid_server_message(message, :v1_0)
+      assert_valid_agent_message(message)
 
       assert message["createSurface"]["dataModel"]["report"] == %{
                "lengths" => %{"params" => %{"min_length" => ""}, "rows" => []}
@@ -258,38 +253,30 @@ defmodule AshA2ui.ReportTest do
           &(&1["id"] == "report_lengths_run_button")
         )
 
-      assert run["action"]["event"]["wantResponse"] == true
+      assert run["action"]["functionCall"]["@call"] == "ashAction"
     end
 
-    test "a report run answers its actionId with the structured result" do
-      message = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "report",
-          "surfaceId" => "word_report_v1",
-          "actionId" => "run_1",
-          "context" => %{"params" => %{"min_length" => "1"}}
-        }
-      }
+    test "a report run called as ashAction answers with the structured result" do
+      message =
+        Messages.call("report", "word_report_v1", %{"params" => %{"min_length" => "1"}},
+          id: "run_1"
+        )
 
-      assert {:ok, [response | followups]} =
-               ActionHandler.handle(WordReportV1UI, message, authorize?: false)
+      assert {:ok, messages} = ActionHandler.handle(WordReportV1UI, message, authorize?: false)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      assert response["actionId"] == "run_1"
+      assert %{"agentFunctionResponse" => %{"functionCallId" => "run_1", "value" => value}} =
+               List.last(messages)
 
-      assert %{"value" => %{"status" => "ok", "result" => %{"count" => 1}}} =
-               response["actionResponse"]
+      assert %{"kind" => "success", "result" => %{"count" => 1}} = value
+      assert [%{"word" => "abcdef"}] = value_at(messages, "/report/lengths/rows")
 
-      assert_valid_server_message(response, :v1_0)
-      Enum.each(followups, &assert_valid_server_message(&1, :v1_0))
-
-      assert [%{"word" => "abcdef"}] = value_at(followups, "/report/lengths/rows")
-
-      # the status Text binds /ui/feedback/message on v1.0 too
-      assert value_at(followups, "/ui/feedback") == %{
-               "kind" => "success",
-               "message" => "Report complete: 1 row."
-             }
+      # the status Text binds /ui/feedback/message
+      assert value_at(messages, "/ui/feedback") ==
+               Experience.feedback("success", "Report complete: 1 row.", %{
+                 "functionCallId" => "run_1",
+                 "result" => %{"count" => 1}
+               })
     end
   end
 end

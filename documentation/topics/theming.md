@@ -28,7 +28,7 @@ Two tiers of variables:
   `--a2ui-card-box-shadow`, `--a2ui-button-padding`,
   `--a2ui-tabs-header-background-active`,
   `--a2ui-textfield-border-radius`. See the JSDoc on each component in
-  `@a2ui/lit/src/v0_9/catalogs/basic/components/` for the full list.
+  the `@a2ui/lit` basic catalog components for the full list.
 
 Colors in the default theme use `light-dark()` and follow the user's
 `prefers-color-scheme`; add the `a2ui-dark` or `a2ui-light` class to your
@@ -113,13 +113,12 @@ passes the renderer classes in:
 
 ```javascript
 import {html, css, nothing} from "lit";
-import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
-import {Catalog} from "@a2ui/web_core/v0_9";
-import {ChoicePickerApi, ColumnApi} from "@a2ui/web_core/v0_9/basic_catalog";
+import {A2uiLitElement, A2uiController} from "@a2ui/lit";
+import {Catalog, MessageProcessor} from "@a2ui/web_core";
+import {basicCatalog, ChoicePickerApi, ColumnApi} from "@a2ui/web_core/catalogs/basic/v1";
 import {createAshA2uiCatalog} from "../../deps/ash_a2ui/priv/js/ash_a2ui_catalog.js";
 
 const catalog = createAshA2uiCatalog({
-  Catalog,
   basicCatalog,
   ChoicePickerApi,
   ColumnApi, // optional: omit to keep the stock Column (no combobox)
@@ -128,7 +127,7 @@ const catalog = createAshA2uiCatalog({
   lit: {html, css, nothing},
 });
 
-configureAshA2ui({MessageProcessor, catalogs: [catalog]});
+configureAshA2ui({MessageProcessor, Catalog, catalogs: [catalog]});
 ```
 
 Pass **only** the merged catalog — it answers for the basic catalog id, so
@@ -160,11 +159,11 @@ check its contrast against the surfaces it sits on, in every theme.
 
 ### Markdown rendering (fixes literal `##` headings)
 
-The basic Text component turns `variant: "h2"` into the markdown string
-`## Title` and needs a markdown renderer injected via Lit context — without
-one it prints the raw string (upstream design decision,
-[google/A2UI#1226](https://github.com/google/A2UI/issues/1226)). Install
-the official renderer and hand it to the hook:
+The 1.0 basic catalog has no heading variants (`Text.variant` is `caption`
+or `body`), so AshA2ui writes headings as markdown strings (`## Title`) and
+the Text component needs a markdown renderer injected via Lit context —
+without one it prints the raw string. Install the official renderer and hand
+it to the hook:
 
 ```bash
 npm install @a2ui/markdown-it --prefix assets
@@ -172,11 +171,12 @@ npm install @a2ui/markdown-it --prefix assets
 
 ```javascript
 import {ContextProvider} from "@lit/context";
-import {Context} from "@a2ui/lit/v0_9";
+import {Context} from "@a2ui/web_core/catalogs/basic/v1";
 import {renderMarkdown} from "@a2ui/markdown-it";
 
 configureAshA2ui({
   MessageProcessor,
+  Catalog,
   catalogs: [catalog],
   markdown: {ContextProvider, context: Context.markdown, render: renderMarkdown},
 });
@@ -213,7 +213,7 @@ A neobrutalist host, for instance, sets `--ash-admin-border-width: 2px`,
 
 ## What the encoder does for you
 
-Since v0.9.1 encoder updates, each record in a table renders as a `Card`
+Each record in a table renders as a `Card`
 (`record_row`) wrapping a `Row` of labeled cells — every cell is a caption
 `Text` with the humanized field name next to the bound value `Text` — so
 themed surfaces get card chrome and readable "Label: value" rows without

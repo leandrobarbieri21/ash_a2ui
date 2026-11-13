@@ -3,8 +3,9 @@ defmodule AshA2ui.EditableTest do
   Inline cell editing: `editable` blocks render allowlisted table fields as
   in-row TextField + Save cells committing per cell through the
   `"edit_cell"` client action, with validation errors mirrored into the
-  failing row's reserved `_error_<field>` key and — on v1.0 — the per-cell
-  `actionResponse` handshake. Schema-validated on both v0.9.1 and v1.0.
+  failing row's reserved `_error_<field>` key. A cell's Save called as an
+  `ashAction` function is answered with its feedback. Schema-validated
+  against A2UI 1.0.
   """
 
   use ExUnit.Case, async: true
@@ -18,22 +19,16 @@ defmodule AshA2ui.EditableTest do
   alias AshA2ui.Test.BucketWordsUI
   alias AshA2ui.Test.EditableWordsUI
   alias AshA2ui.Test.EditableWordsV1UI
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   defp envelope(name, context, surface \\ "editable_words") do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, surface, context)
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _ -> nil
     end)
@@ -66,16 +61,15 @@ defmodule AshA2ui.EditableTest do
     end
   end
 
-  describe "encoder (v0.9.1)" do
+  describe "encoder" do
     setup do
       create_word!("teh", replacement: "the")
       messages = AshA2ui.Info.build_surface(EditableWordsUI, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       components =
         messages
-        |> Enum.find_value(& &1["updateComponents"])
-        |> Map.fetch!("components")
+        |> Surface.components()
         |> Map.new(&{&1["id"], &1})
 
       %{components: components}
@@ -84,7 +78,7 @@ defmodule AshA2ui.EditableTest do
     test "an editable cell is a TextField + Save button + error mirror", %{
       components: components
     } do
-      assert components["table_cell_replacement"]["children"] == [
+      assert components["table_cell_replacement_row"]["children"] == [
                "table_cell_replacement_input",
                "table_cell_replacement_save_button",
                "table_cell_replacement_error"
@@ -92,29 +86,29 @@ defmodule AshA2ui.EditableTest do
 
       input = components["table_cell_replacement_input"]
       assert input["component"] == "TextField"
-      assert input["value"] == %{"path" => "replacement"}
+      assert input["value"] == %{"@path" => "replacement"}
 
       error = components["table_cell_replacement_error"]
-      assert error["text"] == %{"path" => "_error_replacement"}
+      assert error["text"] == %{"@path" => "_error_replacement"}
     end
 
     test "the Save button dispatches edit_cell with the row id, field and value", %{
       components: components
     } do
-      event = components["table_cell_replacement_save_button"]["action"]["event"]
+      event = components["table_cell_replacement_save_button"]["action"]["functionCall"]["args"]
 
       assert event["name"] == "edit_cell"
 
       assert event["context"] == %{
-               "recordId" => %{"path" => "id"},
+               "recordId" => %{"@path" => "id"},
                "component" => "table",
                "field" => "replacement",
-               "value" => %{"path" => "replacement"}
+               "value" => %{"@path" => "replacement"}
              }
     end
 
     test "non-editable columns keep the plain label/value cell", %{components: components} do
-      assert components["table_cell_word"]["children"] == [
+      assert components["table_cell_word_row"]["children"] == [
                "table_cell_word_label",
                "table_cell_word_value"
              ]
@@ -135,7 +129,7 @@ defmodule AshA2ui.EditableTest do
         })
 
       assert {:ok, messages} = ActionHandler.handle(EditableWordsUI, message, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [%{"replacement" => "their"}] = value_at(messages, "/records")
       assert Ash.get!(BucketWord, word.id, authorize?: false).replacement == "their"
@@ -154,7 +148,7 @@ defmodule AshA2ui.EditableTest do
       assert {:error, messages} =
                ActionHandler.handle(EditableWordsUI, message, authorize?: false)
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/errors/replacement") =~ "lowercase"
 
@@ -219,14 +213,14 @@ defmodule AshA2ui.EditableTest do
     end
   end
 
-  describe "v1.0" do
+  describe "ashAction calls" do
     setup do
       %{word: create_word!("teh", replacement: "the")}
     end
 
-    test "editable cells carry wantResponse on their Save action", %{word: _word} do
+    test "an editable cell's Save button calls ashAction edit_cell", %{word: _word} do
       assert [message] = AshA2ui.Info.build_surface(EditableWordsV1UI, authorize?: false)
-      assert_valid_server_message(message, :v1_0)
+      assert_valid_agent_message(message)
 
       save =
         Enum.find(
@@ -234,61 +228,50 @@ defmodule AshA2ui.EditableTest do
           &(&1["id"] == "table_cell_replacement_save_button")
         )
 
-      assert save["action"]["event"]["wantResponse"] == true
-      assert save["action"]["event"]["name"] == "edit_cell"
+      assert save["action"]["functionCall"]["@call"] == "ashAction"
+      assert save["action"]["functionCall"]["args"]["name"] == "edit_cell"
     end
 
-    test "a successful commit answers the cell's actionId with an ok actionResponse", %{
+    test "a successful commit called as ashAction is answered with its feedback", %{
       word: word
     } do
-      message = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "edit_cell",
-          "surfaceId" => "editable_words_v1",
-          "actionId" => "cell_1",
-          "context" => %{
-            "recordId" => word.id,
-            "field" => "replacement",
-            "value" => "their"
-          }
-        }
-      }
+      message =
+        Messages.call(
+          "edit_cell",
+          "editable_words_v1",
+          %{"recordId" => word.id, "field" => "replacement", "value" => "their"},
+          id: "cell_1"
+        )
 
-      assert {:ok, [response | followups]} =
-               ActionHandler.handle(EditableWordsV1UI, message, authorize?: false)
+      assert {:ok, messages} = ActionHandler.handle(EditableWordsV1UI, message, authorize?: false)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      assert response["actionId"] == "cell_1"
-      assert %{"value" => %{"status" => "ok"}} = response["actionResponse"]
-      assert_valid_server_message(response, :v1_0)
-      Enum.each(followups, &assert_valid_server_message(&1, :v1_0))
+      assert %{"functionCallId" => "cell_1", "value" => %{"kind" => "success"}} =
+               Messages.response(messages)
+
+      assert %{"agentFunctionResponse" => _} = List.last(messages)
     end
 
-    test "a failed commit answers with an error actionResponse and the row mirror", %{
+    test "a failed commit is answered with VALIDATION_FAILED and the row mirror", %{
       word: word
     } do
-      message = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "edit_cell",
-          "surfaceId" => "editable_words_v1",
-          "actionId" => "cell_2",
-          "context" => %{
-            "recordId" => word.id,
-            "field" => "replacement",
-            "value" => "NOT LOWERCASE"
-          }
-        }
-      }
+      message =
+        Messages.call(
+          "edit_cell",
+          "editable_words_v1",
+          %{"recordId" => word.id, "field" => "replacement", "value" => "NOT LOWERCASE"},
+          id: "cell_2"
+        )
 
-      assert {:error, [response | followups]} =
+      assert {:error, messages} =
                ActionHandler.handle(EditableWordsV1UI, message, authorize?: false)
 
-      assert response["actionId"] == "cell_2"
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      assert %{"error" => %{"code" => "VALIDATION_FAILED"}} = response["actionResponse"]
+      assert %{"functionCallId" => "cell_2", "error" => %{"code" => "VALIDATION_FAILED"}} =
+               Messages.response(messages)
 
-      rows = value_at(followups, "/records")
+      rows = value_at(messages, "/records")
       assert [%{"_error_replacement" => error_text}] = rows
       assert error_text =~ "lowercase"
     end

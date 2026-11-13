@@ -1,34 +1,70 @@
 defmodule AshA2ui.ActionHandler do
   @moduledoc """
-  Consumes A2UI client->server `action` envelope messages and invokes the
+  Consumes A2UI 1.0 renderer-to-agent messages and invokes the
   corresponding Ash actions (actor-aware, `authorize?: true` by default).
 
-  FROZEN CONTRACT — the `handle/3` signature is the interface every parallel
-  track codes against; do not change outside an integration commit.
+  ## Accepted messages
 
-  ## Accepted message shapes
+  `handle/3` takes one decoded renderer-to-agent message
+  (`priv/a2ui/v1_0/json/renderer_to_agent.json`): `"version" => "1.0"` and
+  exactly one of the four message keys.
 
-  The full client->server envelope from the A2UI v0.9.1 spec
-  (`priv/a2ui/v0_9_1/client_to_server.json`):
+    * `callAgentFunction` calling the ash_a2ui catalog's `ashAction`
+      function, which is how every server-handled control the encoder
+      emits reaches the agent (see `AshA2ui.Encoder.ash_action/3`):
 
-      %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => "submit_form",
-          "surfaceId" => "...",
-          "sourceComponentId" => "...",
-          "timestamp" => "...",
-          "context" => %{...}
-        }
-      }
+          %{
+            "version" => "1.0",
+            "callAgentFunction" => %{
+              "surfaceId" => "...",
+              "functionCallId" => "...",
+              "callFunction" => %{
+                "@call" => "ashAction",
+                "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+                "args" => %{
+                  "name" => "submit_form",
+                  "sourceComponentId" => "...",
+                  "context" => %{...}
+                }
+              }
+            }
+          }
 
-  Be liberal in what you accept: a bare inner action map
-  (`%{"name" => ..., "context" => ...}`) is also handled, for transports that
-  unwrap the envelope before dispatching. Only `"name"` and `"context"` are
-  consumed; the `surfaceId` on every follow-up message always comes from the
-  resolved view, never from the incoming message.
+      `args.name` and `args.context` dispatch as described below. The
+      follow-ups end with one `agentFunctionResponse` carrying the same
+      `functionCallId`: `value` is the settled `/ui/feedback` map on
+      success (an empty map for a quiet action, which leaves it alone),
+      `error` (`code`, `message`) on failure. Any other function,
+      or `ashAction` under another catalog id, is answered with
+      `UNKNOWN_FUNCTION`. A call that fails the `callAgentFunction` or the
+      `ashAction` argument schema is answered with `INVALID_FUNCTION_CALL`.
+      Both refusals settle `/ui/feedback` too. A call without a
+      `functionCallId` cannot be answered and is refused like any other
+      malformed message.
 
-  ## Supported `action.name` values
+    * `action`, a plain event, is refused. The encoder never emits an
+      event action, so a surface's controls only ever send `ashAction`
+      calls. The refusal is logged and settles `/ui/feedback` with an
+      `UNKNOWN_FUNCTION` error (the code the spec gives an agent for a
+      request it does not run); there is no call to answer.
+
+    * `rendererFunctionResponse`, the renderer's answer to a
+      `callRendererFunction` (an export's `downloadFile`). It is validated
+      and handed to the `:on_function_response` callback. No follow-ups.
+
+    * `error`, a renderer-side error: `VALIDATION_FAILED`,
+      `UNALLOWED_PARENT` or `UNALLOWED_CHILD` with `surfaceId` and `path`,
+      or any other code with exactly one of `surfaceId` and
+      `functionCallId`. It is logged at warning level with its code,
+      surface, path and call id, never its message (which can quote data
+      values). No follow-ups.
+
+  Anything else (a `version` other than `"1.0"`, a missing or extra
+  top-level key, a malformed body) returns `{:error, []}` and is logged.
+  The `surfaceId` on every follow-up always comes from the resolved view,
+  never from the incoming message.
+
+  ## Supported action names
 
     * `"submit_form"` — context
       `%{"values" => %{field => value}, "recordId" => id | nil}`. Without
@@ -61,10 +97,11 @@ defmodule AshA2ui.ActionHandler do
       action's `/prompt/values/<action>` state. For generic
       actions that define a `:record_id` argument, the context's `"recordId"`
       is passed through. A generic action returning a map has its raw result
-      placed at `/ui/action_result` and a human-readable rendering (one
-      "Humanized key: value" line per key) at `/ui/action_result_text`
-      (handler-defined conventions, not part of the A2UI spec). Both paths
-      are cleared by every subsequent successful action. When the action's
+      placed in the success feedback's `result` and a human-readable
+      rendering (one "Humanized key: value" line per key) in its
+      `resultText` (handler-defined conventions, not part of the A2UI
+      spec). Every later outcome rewrites the whole feedback map, so a
+      stale result never outlives its action. When the action's
       `action` entity declares `via`, the dispatch is delegated to the
       host-provided MFA instead of running the Ash action (see the `via`
       option docs on `AshA2ui`): the record is fetched as the direct path
@@ -76,7 +113,7 @@ defmodule AshA2ui.ActionHandler do
       client neither knows nor needs to know `via` exists.
 
     * `"prompt"` — context `%{"action" => name, "recordId" => id}`. Sent by
-      the trigger button of a prompt Modal (see `AshA2ui.Encoder.V0_9_1`)
+      the trigger button of a prompt Modal (see `AshA2ui.Encoder`)
       when it opens. The action must be an allowlisted row action declaring
       `prompt_fields`, and its `visible_when` conditions (if any) are
       enforced against the identified record. On success returns
@@ -154,7 +191,7 @@ defmodule AshA2ui.ActionHandler do
 
     * `"open_surface"` — context `%{"field" => name, "surface" => key,
       "recordId" => id}`, sent by the basic catalog's reference-link
-      Buttons (see `AshA2ui.Encoder.V0_9_1`). Accepted when `field` is a
+      Buttons (see `AshA2ui.Encoder`). Accepted when `field` is a
       to-one link field (`link :relationship` or `link {surface, id_path}`)
       of one of the surface's tables or details and the
       `AshA2ui.LinkResolver` resolves it, for this actor, to `surface`;
@@ -198,39 +235,49 @@ defmodule AshA2ui.ActionHandler do
   `require_context` render no records (no read executes), and
   `context_filter` entries become equality filters ANDed onto the read.
 
-  Unknown action names (including the removed `"select_row"`) and malformed
-  messages return `{:error, [updateDataModel]}` with an error outcome.
+  Unknown action names (including the removed `"select_row"`) get an
+  `UNKNOWN_ACTION` error outcome.
 
   ## Follow-up messages
 
-  All returned messages are A2UI `updateDataModel` server messages using the
-  reserved data-model paths (see `topics/data-model-conventions`). Every
-  outcome — success, validation failure, rejection, refusal — is written
-  as typed feedback to `/ui/feedback` (`%{"kind" => "success" | "warning" |
-  "error", "message" => text}`), the path the status Text and the admin
-  statusBanner bind:
+  The follow-ups are A2UI `updateDataModel` agent messages on the reserved
+  data-model paths (see `topics/data-model-conventions`), plus an export's
+  `callRendererFunction` and, for a function call, the final
+  `agentFunctionResponse`. Every outcome (success, validation failure,
+  rejection, refusal) writes one whole `/ui/feedback` map, the path the
+  status Text and the admin statusBanner bind (see
+  `AshA2ui.Experience.feedback/3`): `kind` (`"success"`, `"warning"`,
+  `"error"`, or `""` when idle), `message`, `code` (`""` unless an error),
+  `functionCallId` (the call's id, `""` when no call is answered), `result` and
+  `resultText`.
 
     * on success: `/records` (re-read row maps, each including `"id"`;
       `source` columns are re-loaded and walked), `/form` cleared to `%{}`,
-      `/errors` cleared to `%{}`, `/ui/feedback` set to a success value, and
-      `/ui/action_result` + `/ui/action_result_text` cleared — then set for
-      map-returning generic actions. On query-enabled surfaces the re-read
-      runs through
+      `/errors` cleared to `%{}`, and a success `/ui/feedback` (its
+      `result` and `resultText` carry a map-returning generic action's
+      result, a report's row count, or an export's filename and row
+      count). On query-enabled surfaces the re-read runs through
       the query (`submit_form`/`invoke` contexts may carry the current
       `/query` map under `"query"`; missing or invalid state falls back to
       the query's defaults) and a `/query` state message is included;
-    * on validation errors: `/errors/<field>` per failing field and an
-      `/ui/feedback` error;
-    * on `Ash.Error.Forbidden`: only an `/ui/feedback` "not authorized" error
+    * on validation errors: `/errors/<field>` per failing field and a
+      `VALIDATION_FAILED` error;
+    * on `Ash.Error.Forbidden`: only a `FORBIDDEN` "not authorized" error
       (no field errors, to avoid leaking policy details);
-    * on any other error without a field: its message when it was written
-      for the user (a string, an Invalid-class error), else "The action
-      failed." with the error's text sent to `Logger.error/1` only (a raw
-      exception or data-layer error can carry row values).
+    * on any other error without a field: `ACTION_FAILED` with its message
+      when it was written for the user (a string, an Invalid-class error),
+      else "The action failed." with the error's text sent to
+      `Logger.error/1` only (a raw exception or data-layer error can carry
+      row values);
+    * on a refused dispatch: `INVALID_ACTION` (a malformed context, an
+      action outside the allowlist), `UNKNOWN_ACTION` (an unknown name) or
+      `READ_ONLY_AS_OF` (a write on a surface pinned to an instant).
 
-  On v1.0 surfaces the outcome is additionally the structured `/ui/response`
-  object and the `actionResponse` handshake (see `AshA2ui.Encoder.V1_0`);
-  `/ui/feedback` carries the same message.
+  The quiet actions (`quiet_actions/0`: reads, searches, picker and panel
+  steps) leave `/ui/feedback` as it was unless they fail, and their
+  function call is answered with an empty `value`. A renderer shows no
+  pending state for them, so a page turn or a search keystroke never
+  replaces the last outcome.
 
   Values are serialized JSON-safe (dates/datetimes to ISO 8601, decimals to
   strings, atoms to strings).
@@ -250,18 +297,30 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.Conditions
   alias AshA2ui.ContextRunner
   alias AshA2ui.Csv
-  alias AshA2ui.Encoder.V0_9_1
-  alias AshA2ui.Encoder.V1_0
+  alias AshA2ui.Encoder
   alias AshA2ui.Experience
   alias AshA2ui.L10n
   alias AshA2ui.Label
   alias AshA2ui.QueryRunner
   alias AshA2ui.ResolvedView
 
-  @version "v0.9.1"
+  # The ash_a2ui catalog function every server-handled control calls.
+  @ash_action "ashAction"
+
+  # The feedback a plain `action` event gets: the encoder never emits one.
+  @event_refusal "ash_a2ui runs ashAction function calls, not action events."
+
+  # Renderer error codes that point into a payload (with surfaceId and path).
+  @path_error_codes ~w(VALIDATION_FAILED UNALLOWED_PARENT UNALLOWED_CHILD)
 
   # The field error a relationship prompt value the actor cannot read gets.
   @unavailable "is not one of the available options"
+
+  # Actions that report no outcome of their own: reads, searches, picker and
+  # panel steps. The renderer shows no pending state for them and the
+  # handler leaves /ui/feedback as it was (see quiet_actions/0).
+  @quiet_actions ~w(query option_search context_search option_select nested_add nested_remove
+                    bulk_select prompt wizard_next wizard_back open_surface)
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
@@ -273,14 +332,31 @@ defmodule AshA2ui.ActionHandler do
                   )
 
   @doc """
-  Handles an A2UI client `action` envelope for the surface declared on
+  The action names that report no outcome of their own: reads, searches,
+  pickers and panel steps (`query`, `option_search`, `context_search`,
+  `option_select`, `nested_add`, `nested_remove`, `bulk_select`, `prompt`,
+  `wizard_next`, `wizard_back`, `open_surface`).
+
+  A renderer writes no pending feedback for an `ashAction` call to one of
+  them, and the handler leaves `/ui/feedback` as it was unless the action
+  fails, so a page turn or a search keystroke never replaces the last
+  outcome. The shipped hook carries the same list (`QUIET_ACTIONS` in
+  `priv/js/ash_a2ui_protocol.js`).
+  """
+  @spec quiet_actions() :: [String.t()]
+  def quiet_actions, do: @quiet_actions
+
+  @doc """
+  Handles one A2UI 1.0 renderer-to-agent message for the surface declared on
   `resource_or_ui_module` (an `Ash.Resource` using the `AshA2ui` extension,
   or an `AshA2ui.Standalone` UI module).
 
-  Returns `{:ok, messages}` with follow-up server->client messages or
-  `{:error, messages}` carrying error information on the reserved
-  `/errors/<field>` and `/ui/feedback` data-model paths. See the moduledoc for
-  the accepted message shapes and emitted messages.
+  Returns `{:ok, messages}` or `{:error, messages}`, the agent-to-renderer
+  follow-ups. An action outcome's messages carry the reserved
+  `/errors/<field>` and `/ui/feedback` writes, and a function call's end with
+  its `agentFunctionResponse`. A `rendererFunctionResponse` or an `error`
+  returns `{:ok, []}`; a malformed message returns `{:error, []}`. See the
+  moduledoc for the accepted messages and the follow-ups.
 
   ## Options
 
@@ -299,131 +375,311 @@ defmodule AshA2ui.ActionHandler do
       built with.
     * `:catalog` — the catalog the surface was built with (see
       `AshA2ui.Info.build_surface/2`); omitted, the configured one.
+    * `:on_function_response` — a 1-arity function called with the body of
+      a valid `rendererFunctionResponse` (`%{"functionCallId" => id,
+      "value" => value}` or `%{"functionCallId" => id, "error" => %{"code"
+      => code, "message" => message}}`). Correlating the id with the call
+      that asked for it is the transport's job; `AshA2ui.LiveRenderer`
+      does it for the calls it pushed.
   """
-  @spec handle(module | Spark.Dsl.t(), action_message :: map, opts :: keyword) ::
+  @spec handle(module | Spark.Dsl.t(), message :: map, opts :: keyword) ::
           {:ok, [map]} | {:error, [map]}
-  def handle(resource_or_ui_module, action_message, opts \\ []) do
+  def handle(resource_or_ui_module, message, opts \\ []) do
+    case parse(message) do
+      {:call, call_id, name, context} ->
+        run(resource_or_ui_module, name, context, call_id, opts)
+
+      :refuse_event ->
+        Logger.warning(
+          "Refused an A2UI action event: ash_a2ui answers ashAction function calls only."
+        )
+
+        view = ResolvedView.resolve(resource_or_ui_module, opts)
+        {:error, [status(view, @event_refusal, "UNKNOWN_FUNCTION")]}
+
+      {:refuse_call, call_id, code, text} ->
+        Logger.warning("Refused A2UI callAgentFunction #{call_id} (#{code}): #{text}")
+        view = ResolvedView.resolve(resource_or_ui_module, opts)
+        settle({:error, [status(view, text, code)]}, view, call_id, nil)
+
+      {:function_response, response} ->
+        callback = opts[:on_function_response]
+        if is_function(callback, 1), do: callback.(response)
+        {:ok, []}
+
+      {:renderer_error, error} ->
+        log_renderer_error(error)
+        {:ok, []}
+
+      {:invalid, reason} ->
+        Logger.warning("Refused an A2UI renderer message: #{reason}.")
+        {:error, []}
+    end
+  end
+
+  defp run(resource_or_ui_module, name, context, call_id, opts) do
     view = ResolvedView.resolve(resource_or_ui_module, opts)
-    ash_opts = ash_opts(view, opts)
 
-    case parse(action_message) do
-      {:ok, name, _context, action_id} when name in @writes ->
-        if AshA2ui.AsOf.pinned?(opts) do
-          {:error, [status(view, t(view, @pinned_refusal), "READ_ONLY_AS_OF")]}
-          |> put_feedback(view)
-          |> attach_action_response(view, action_id)
-        else
-          handle_parsed(view, ash_opts, parse(action_message))
-        end
-
-      parsed ->
-        handle_parsed(view, ash_opts, parsed)
-    end
-  end
-
-  defp handle_parsed(view, ash_opts, parsed) do
-    case parsed do
-      {:ok, name, context, action_id} ->
-        case AshA2ui.Sections.expand(view, ash_opts) do
-          {:ok, view} ->
-            env = %{
-              view: view,
-              ash_opts: ash_opts,
-              refresh: refresh_params(view, context),
-              selected: AshA2ui.ContextRunner.selected(view, Map.get(context, "contexts"))
-            }
-
-            name
-            |> dispatch(context, env)
-            |> put_feedback(view)
-            |> attach_action_response(view, action_id)
-
-          {:error, error} ->
-            {:error, error_messages(view, error)}
-            |> put_feedback(view)
-            |> attach_action_response(view, action_id)
-        end
-
-      {:error, action_id} ->
-        {:error, [status(view, "Malformed action message: expected an A2UI action envelope.")]}
-        |> put_feedback(view)
-        |> attach_action_response(view, action_id)
-    end
-  end
-
-  # Every outcome reaches the typed /ui/feedback — the path the status Text
-  # and the admin statusBanner bind (and the admin catalog's busy buttons
-  # settle on). Failed actions get an error whatever the rejection path: on
-  # v0.9.1 status/3 already writes it; on v1.0 the outcome lives in the
-  # structured /ui/response object (the actionResponse contract), and this
-  # mirrors its message. A v1.0 success that wrote only an "ok" /ui/response
-  # with a message (report, export) is mirrored as a success the same way.
-  defp put_feedback({tag, messages} = result, view) do
-    cond do
-      Enum.any?(messages, &match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, &1)) ->
-        result
-
-      tag == :error ->
-        feedback = Experience.feedback("error", feedback_message(messages))
-        {:error, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
-
-      true ->
-        case find_response_write(messages) do
-          %{"status" => "ok", "message" => message} when is_binary(message) and message != "" ->
-            feedback = Experience.feedback("success", message)
-            {:ok, messages ++ [update_data_model(view, "/ui/feedback", feedback)]}
-
-          _no_outcome ->
-            result
-        end
-    end
-  end
-
-  # --- v1.0 actionResponse ----------------------------------------------------
-
-  # On a v1.0 surface, an action that carried an `actionId` (the client set
-  # `wantResponse: true` — every action event the v1.0 encoder emits does)
-  # gets a synchronous `actionResponse` message prepended to the follow-ups:
-  # `{"value": <the /ui/response object>}` on success, `{"error": {code,
-  # message}}` on failure. The response mirrors the reserved `/ui/response`
-  # data-model write when the batch contains one (see the moduledoc), so
-  # programmatic consumers get the exact per-action result without scraping
-  # the data model. v0.9.1 surfaces (and v1.0 actions without an actionId)
-  # are byte-identical to before.
-  defp attach_action_response({tag, messages}, %{spec_version: :v1_0} = view, action_id)
-       when is_binary(action_id) and action_id != "" do
-    response =
-      case {tag, find_response_write(messages)} do
-        {:ok, nil} ->
-          %{"value" => %{"status" => "ok", "message" => ""}}
-
-        {:ok, response} ->
-          %{"value" => response}
-
-        {:error, %{"code" => code, "message" => message}} ->
-          %{"error" => %{"code" => code, "message" => message}}
-
-        {:error, _no_structured_write} ->
-          %{
-            "error" => %{
-              "code" => "ACTION_FAILED",
-              "message" => t(view, msg("The action failed."))
-            }
-          }
+    result =
+      if name in @writes and AshA2ui.AsOf.pinned?(opts) do
+        {:error, [status(view, t(view, @pinned_refusal), "READ_ONLY_AS_OF")]}
+      else
+        expand_and_dispatch(view, ash_opts(view, opts), name, context)
       end
 
-    message = %{"version" => "v1.0", "actionId" => action_id, "actionResponse" => response}
-
-    {tag, [message | messages]}
+    settle(result, view, call_id, name)
   end
 
-  defp attach_action_response(result, _view, _action_id), do: result
+  defp expand_and_dispatch(view, ash_opts, name, context) do
+    case AshA2ui.Sections.expand(view, ash_opts) do
+      {:ok, view} ->
+        env = %{
+          view: view,
+          ash_opts: ash_opts,
+          refresh: refresh_params(view, context),
+          selected: ContextRunner.selected(view, Map.get(context, "contexts"))
+        }
 
-  defp find_response_write(messages) do
-    Enum.find_value(messages, fn
-      %{"updateDataModel" => %{"path" => "/ui/response", "value" => value}} -> value
-      _other -> nil
-    end)
+        dispatch(name, context, env)
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
+  # --- settling an outcome -----------------------------------------------------
+
+  # Every failure settles /ui/feedback, the one path the status Text and the
+  # admin statusBanner bind: one without a feedback write gets the generic
+  # one. A quiet action's success leaves the feedback as it was. Every other
+  # action writes its outcome; should one not, the call settles the feedback
+  # to idle, since the renderer showed a pending state under the call's id
+  # and that state must not outlive the call.
+  #
+  # Every feedback write carries the call's id, and the agentFunctionResponse
+  # goes last, so the data model (feedback included) is settled before the
+  # renderer resolves the call: `value` is the final feedback map (an empty
+  # map when the call left the feedback alone), `error` its code and
+  # message.
+  defp settle({tag, messages}, view, call_id, name) do
+    messages =
+      cond do
+        Enum.any?(messages, &feedback_write?/1) ->
+          messages
+
+        tag == :error ->
+          messages ++ [status(view, t(view, msg("The action failed.")), "ACTION_FAILED")]
+
+        name not in @quiet_actions ->
+          messages ++ [update_data_model(view, "/ui/feedback", Experience.clear_feedback())]
+
+        true ->
+          messages
+      end
+
+    messages = Enum.map(messages, &stamp_call_id(&1, call_id))
+    feedback = messages |> Enum.filter(&feedback_write?/1) |> List.last()
+    {tag, messages ++ [function_response(tag, view, call_id, feedback_value(feedback))]}
+  end
+
+  defp feedback_write?(message),
+    do: match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, message)
+
+  defp feedback_value(%{"updateDataModel" => %{"value" => value}}), do: value
+  defp feedback_value(nil), do: %{}
+
+  defp stamp_call_id(
+         %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => value} = update} = message,
+         call_id
+       ),
+       do: %{
+         message
+         | "updateDataModel" => %{update | "value" => Map.put(value, "functionCallId", call_id)}
+       }
+
+  defp stamp_call_id(message, _call_id), do: message
+
+  defp function_response(:ok, _view, call_id, feedback),
+    do: Encoder.agent_function_response(call_id, {:ok, feedback})
+
+  defp function_response(:error, view, call_id, feedback) do
+    code = non_empty(feedback["code"]) || "ACTION_FAILED"
+    message = non_empty(feedback["message"]) || t(view, msg("The action failed."))
+    Encoder.agent_function_response(call_id, {:error, code, message})
+  end
+
+  defp non_empty(value) when is_binary(value) and value != "", do: value
+  defp non_empty(_value), do: nil
+
+  # --- parsing renderer messages ---------------------------------------------
+
+  # A renderer-to-agent message is "version" => "1.0" plus exactly one of the
+  # four message keys (renderer_to_agent.json). The version is checked first,
+  # for every kind of message. Returns:
+  #
+  #   * {:call, call_id, name, context} — dispatch;
+  #   * :refuse_event — a plain `action` event, which ash_a2ui does not run;
+  #   * {:refuse_call, call_id, code, text} — a function call that can be
+  #     answered, with an error (UNKNOWN_FUNCTION, INVALID_FUNCTION_CALL);
+  #   * {:function_response, body} / {:renderer_error, body} — no follow-ups;
+  #   * {:invalid, reason} — nothing to answer; the reason is logged and
+  #     names fields, never their values.
+  defp parse(%{"version" => "1.0"} = message) when map_size(message) == 2 do
+    case message |> Map.delete("version") |> Map.to_list() do
+      [{"action", _body}] -> :refuse_event
+      [{"callAgentFunction", body}] -> parse_call(body)
+      [{"rendererFunctionResponse", body}] -> parse_function_response(body)
+      [{"error", body}] -> parse_renderer_error(body)
+      [{_key, _body}] -> {:invalid, "not a renderer-to-agent message"}
+    end
+  end
+
+  defp parse(%{"version" => "1.0"}),
+    do: {:invalid, ~s(expected "version" and exactly one message key)}
+
+  defp parse(%{"version" => _version}), do: {:invalid, ~s(version is not "1.0")}
+  defp parse(%{}), do: {:invalid, ~s(no "version")}
+  defp parse(_message), do: {:invalid, "not a JSON object"}
+
+  # A call without a functionCallId cannot be answered, since the response
+  # must copy it; anything else wrong with the call is answered.
+  defp parse_call(%{"functionCallId" => call_id} = body)
+       when is_binary(call_id) and call_id != "" do
+    case call_function(body) do
+      {:ok, name, context} -> {:call, call_id, name, context}
+      {:error, code, text} -> {:refuse_call, call_id, code, text}
+    end
+  end
+
+  defp parse_call(_body),
+    do: {:invalid, "callAgentFunction without a functionCallId cannot be answered"}
+
+  defp call_function(body) do
+    with :ok <- only_keys(body, ~w(surfaceId functionCallId callFunction), "callAgentFunction"),
+         :ok <- non_empty_string(body, "surfaceId", "callAgentFunction"),
+         {:ok, call} <- object(body, "callFunction", "callAgentFunction"),
+         :ok <- non_empty_string(call, "@call", "callFunction"),
+         :ok <- only_keys(call, ~w(@call catalogId args), "callFunction"),
+         :ok <- agent_function(call) do
+      ash_action_args(Map.get(call, "args"))
+    end
+  end
+
+  # The agent's only function is ashAction in the ash_a2ui catalog. A call
+  # naming no catalog resolves to it by name; a renderer function (any basic
+  # catalog function, the agentOnly downloadFile) is not an agent function.
+  defp agent_function(%{"@call" => name} = call) do
+    catalog_id = Map.get(call, "catalogId", Encoder.ash_catalog_id())
+
+    cond do
+      not is_binary(catalog_id) ->
+        {:error, "INVALID_FUNCTION_CALL", ~s(callFunction "catalogId" must be a string.)}
+
+      name == @ash_action and catalog_id == Encoder.ash_catalog_id() ->
+        :ok
+
+      true ->
+        {:error, "UNKNOWN_FUNCTION",
+         "#{inspect(String.slice(name, 0, 64))} is not a function this agent runs."}
+    end
+  end
+
+  defp ash_action_args(args) when is_map(args) do
+    with :ok <- only_keys(args, ~w(name sourceComponentId context), "ashAction args"),
+         :ok <- non_empty_string(args, "name", "ashAction args"),
+         true <-
+           optional?(args, "sourceComponentId", &is_binary/1) ||
+             invalid_arg("sourceComponentId", "a string"),
+         true <- optional?(args, "context", &is_map/1) || invalid_arg("context", "an object") do
+      {:ok, args["name"], Map.get(args, "context", %{})}
+    end
+  end
+
+  defp ash_action_args(_args),
+    do: {:error, "INVALID_FUNCTION_CALL", ~s(ashAction needs an "args" object.)}
+
+  defp invalid_arg(key, type),
+    do: {:error, "INVALID_FUNCTION_CALL", ~s(ashAction args "#{key}" must be #{type}.)}
+
+  defp only_keys(map, allowed, where) do
+    case Map.keys(map) -- allowed do
+      [] -> :ok
+      _extra -> {:error, "INVALID_FUNCTION_CALL", "#{where} has an undeclared key."}
+    end
+  end
+
+  defp non_empty_string(map, key, where) do
+    case Map.get(map, key) do
+      value when is_binary(value) and value != "" ->
+        :ok
+
+      _other ->
+        {:error, "INVALID_FUNCTION_CALL", ~s(#{where} "#{key}" must be a non-empty string.)}
+    end
+  end
+
+  defp object(map, key, where) do
+    case Map.get(map, key) do
+      value when is_map(value) -> {:ok, value}
+      _other -> {:error, "INVALID_FUNCTION_CALL", ~s(#{where} "#{key}" must be an object.)}
+    end
+  end
+
+  defp optional?(map, key, valid?), do: not Map.has_key?(map, key) or valid?.(map[key])
+
+  # FunctionResponse: a non-empty functionCallId (nothing correlates an
+  # empty one) and exactly one of value or error {code, message}.
+  defp parse_function_response(%{"functionCallId" => call_id} = body)
+       when is_binary(call_id) and call_id != "" do
+    case Map.delete(body, "functionCallId") do
+      %{"value" => _value} = rest when map_size(rest) == 1 ->
+        {:function_response, body}
+
+      %{"error" => %{"code" => code, "message" => message} = error} = rest
+      when map_size(rest) == 1 and map_size(error) == 2 and is_binary(code) and
+             is_binary(message) ->
+        {:function_response, body}
+
+      _other ->
+        {:invalid, "rendererFunctionResponse needs exactly one of value or error {code, message}"}
+    end
+  end
+
+  defp parse_function_response(_body),
+    do: {:invalid, "rendererFunctionResponse needs a non-empty functionCallId"}
+
+  # A path error (VALIDATION_FAILED, UNALLOWED_PARENT, UNALLOWED_CHILD)
+  # carries exactly code, message, surfaceId and path; any other code
+  # carries exactly one of surfaceId and functionCallId.
+  defp parse_renderer_error(%{"code" => code, "message" => message} = error)
+       when code in @path_error_codes and is_binary(message) do
+    if Map.keys(error) -- ~w(code message surfaceId path) == [] and
+         is_binary(error["surfaceId"]) and is_binary(error["path"]) do
+      {:renderer_error, error}
+    else
+      {:invalid, "a #{code} error needs exactly code, message, surfaceId and path"}
+    end
+  end
+
+  defp parse_renderer_error(%{"code" => code, "message" => message} = error)
+       when is_binary(code) and is_binary(message) do
+    case {Map.fetch(error, "surfaceId"), Map.fetch(error, "functionCallId")} do
+      {{:ok, surface_id}, :error} when is_binary(surface_id) -> {:renderer_error, error}
+      {:error, {:ok, call_id}} when is_binary(call_id) -> {:renderer_error, error}
+      _neither_or_both -> {:invalid, "an error needs exactly one of surfaceId and functionCallId"}
+    end
+  end
+
+  defp parse_renderer_error(_error), do: {:invalid, "an error needs a string code and message"}
+
+  # The renderer's message can quote data values, so it stays out of the log.
+  defp log_renderer_error(error) do
+    fields =
+      for key <- ~w(surfaceId path functionCallId), Map.has_key?(error, key) do
+        "#{key}=#{inspect(error[key])}"
+      end
+
+    Logger.warning(Enum.join(["A2UI renderer error #{error["code"]}" | fields], " "))
   end
 
   # Success refreshes respect the client's current query state when a table
@@ -454,28 +710,6 @@ defmodule AshA2ui.ActionHandler do
     case QueryRunner.parse(table, %{"query" => state}) do
       {:ok, params} -> params
       {:error, _reason} -> QueryRunner.default_params(table)
-    end
-  end
-
-  # Parses the envelope into {:ok, name, context, action_id} (action_id is
-  # the v1.0 per-call response correlation id, nil when absent) or
-  # {:error, action_id} for malformed messages — the id is still extracted
-  # best-effort so a v1.0 client's pending action can be answered with an
-  # error response instead of hanging.
-  defp parse(%{"action" => %{"name" => name} = action}) when is_binary(name),
-    do: {:ok, name, Map.get(action, "context") || %{}, action_id(action)}
-
-  defp parse(%{"name" => name} = action) when is_binary(name),
-    do: {:ok, name, Map.get(action, "context") || %{}, action_id(action)}
-
-  defp parse(%{"action" => %{} = action}), do: {:error, action_id(action)}
-  defp parse(%{} = action), do: {:error, action_id(action)}
-  defp parse(_action_message), do: {:error, nil}
-
-  defp action_id(action) do
-    case Map.get(action, "actionId") do
-      id when is_binary(id) -> id
-      _absent_or_invalid -> nil
     end
   end
 
@@ -812,7 +1046,7 @@ defmodule AshA2ui.ActionHandler do
   end
 
   # A reference-link activation (the basic catalog's link Buttons, see
-  # AshA2ui.Encoder.V0_9_1): accepted only for a to-one link field of this
+  # AshA2ui.Encoder): accepted only for a to-one link field of this
   # view whose LinkResolver answer, for this actor, is the requested
   # surface — compared as strings, nothing from the client becomes an
   # atom. No follow-ups: navigating is the transport's job
@@ -888,7 +1122,7 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp unknown_action(view, name) do
-    {:error, [status(view, "Unknown action #{inspect(name)}.")]}
+    {:error, [status(view, "Unknown action #{inspect(name)}.", "UNKNOWN_ACTION")]}
   end
 
   defp invoke_dispatch(context, %{view: view} = env) do
@@ -1960,22 +2194,12 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp generic_result({:ok, result}, %{view: %{spec_version: :v1_0}} = env, status_text)
+  defp generic_result({:ok, result}, env, status_text)
        when is_map(result) and not is_struct(result) do
     success(env, status_text, %{
       "result" => json_map(result),
       "resultText" => action_result_text(result)
     })
-  end
-
-  defp generic_result({:ok, result}, %{view: view} = env, status_text)
-       when is_map(result) and not is_struct(result) do
-    extra = [
-      update_data_model(view, "/ui/action_result", json_map(result)),
-      update_data_model(view, "/ui/action_result_text", action_result_text(result))
-    ]
-
-    success(env, status_text, extra)
   end
 
   defp generic_result({:error, error}, %{view: view} = env, _status_text) do
@@ -2100,7 +2324,7 @@ defmodule AshA2ui.ActionHandler do
   defp bulk_error_text(view, error) do
     case field_errors(view.l10n, error) do
       [] ->
-        view |> error_messages(error) |> feedback_message()
+        view |> error_messages(error) |> List.last() |> feedback_value() |> Map.fetch!("message")
 
       fields ->
         view.l10n
@@ -2138,9 +2362,8 @@ defmodule AshA2ui.ActionHandler do
       {:error, [result_write, status(view, text, "ACTION_FAILED")]}
     else
       env = Map.put(env, :feedback_kind, Bulk.feedback_kind(selected, result))
-      extra = if view.spec_version == :v1_0, do: %{"result" => result}, else: []
 
-      case success(env, text, extra) do
+      case success(env, text, %{"result" => result}) do
         {:ok, messages} -> {:ok, [result_write | messages]}
         {:error, messages} -> {:error, messages}
       end
@@ -2191,20 +2414,8 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # An informational outcome on an otherwise successful action: a typed
-  # "warning" /ui/feedback (plus, on v1.0, an "ok" /ui/response carrying the
-  # text — the action succeeded, so its actionResponse must not read error).
-  defp notice(%{spec_version: :v1_0} = view, text),
-    do: [
-      update_data_model(view, "/ui/response", %{
-        "status" => "ok",
-        "message" => text,
-        "result" => %{},
-        "resultText" => ""
-      }),
-      update_data_model(view, "/ui/feedback", Experience.feedback("warning", text))
-    ]
-
+  # An informational outcome on an otherwise successful action: "warning"
+  # feedback. The action succeeded, so a function call's response is a value.
   defp notice(view, text),
     do: [update_data_model(view, "/ui/feedback", Experience.feedback("warning", text))]
 
@@ -2430,20 +2641,13 @@ defmodule AshA2ui.ActionHandler do
     Map.new(report.fields, &{Atom.to_string(&1), ""})
   end
 
-  defp report_status(%{spec_version: :v1_0} = view, count) do
-    update_data_model(view, "/ui/response", %{
-      "status" => "ok",
-      "message" => report_status_text(view, count),
-      "result" => %{"count" => count},
-      "resultText" => ""
-    })
-  end
-
   defp report_status(view, count) do
     update_data_model(
       view,
       "/ui/feedback",
-      Experience.feedback("success", report_status_text(view, count))
+      Experience.feedback("success", report_status_text(view, count), %{
+        "result" => %{"count" => count}
+      })
     )
   end
 
@@ -2455,7 +2659,7 @@ defmodule AshA2ui.ActionHandler do
         count
       )
 
-  # --- export (CSV file export, v1.0-only — see AshA2ui.Export) ----------------
+  # --- export (CSV file export, see AshA2ui.Export) ---------------------------
 
   # The table or report an "export" action targets: the only exporting
   # component when there is exactly one; otherwise the context must carry
@@ -2563,9 +2767,8 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # The delivery: one `downloadFile` callFunction carrying the CSV as a
-  # base64 data URL (the frozen wire contract — see AshA2ui.Export), plus
-  # the structured success write (mirrored into the actionResponse).
+  # The delivery: one `downloadFile` callRendererFunction carrying the CSV
+  # as a base64 data URL (see AshA2ui.Export), then the success feedback.
   defp deliver_export(view, target, columns, row_maps) do
     headers = Enum.map(columns, &export_header(view, &1))
     cells = Enum.map(row_maps, fn row -> Enum.map(columns, &Map.get(row, to_string(&1))) end)
@@ -2573,30 +2776,30 @@ defmodule AshA2ui.ActionHandler do
     filename = target.export.filename
 
     call =
-      V1_0.call_function("downloadFile", %{
-        "filename" => filename,
-        "mimeType" => "text/csv",
-        "dataUrl" => Csv.data_url(csv)
+      Encoder.call_renderer_function(
+        view.surface_id,
+        "downloadFile",
+        %{"filename" => filename, "mimeType" => "text/csv", "dataUrl" => Csv.data_url(csv)},
+        []
+      )
+
+    text =
+      L10n.tn(
+        view.l10n,
+        msg_plural(
+          "Exported %{filename} (%{count} rows).",
+          "Exported %{filename} (%{count} rows)."
+        ),
+        length(cells),
+        filename: filename
+      )
+
+    feedback =
+      Experience.feedback("success", text, %{
+        "result" => %{"filename" => filename, "rows" => length(cells)}
       })
 
-    response =
-      update_data_model(view, "/ui/response", %{
-        "status" => "ok",
-        "message" =>
-          L10n.tn(
-            view.l10n,
-            msg_plural(
-              "Exported %{filename} (%{count} rows).",
-              "Exported %{filename} (%{count} rows)."
-            ),
-            length(cells),
-            filename: filename
-          ),
-        "result" => %{"filename" => filename, "rows" => length(cells)},
-        "resultText" => ""
-      })
-
-    {:ok, [call, response]}
+    {:ok, [call, update_data_model(view, "/ui/feedback", feedback)]}
   end
 
   defp export_header(view, column) do
@@ -2879,59 +3082,22 @@ defmodule AshA2ui.ActionHandler do
   #
   # Targets default to *every* table; an `action` entity
   # (`action :approve do refreshes [:new_items] end`) limits the refresh to
-  # the named table components. /ui/action_result and /ui/action_result_text
-  # are cleared on every successful action before any `extra` writes, so a
-  # stale result never outlives the action that produced it (a map-returning
-  # generic action clears and then sets them in the same batch).
-  defp success(env, status_text, extra \\ [])
-
-  # v1.0 success: the status trio collapses into one structured
-  # `/ui/response` write ({"status": "ok", "message": ..., "result": ...,
-  # "resultText": ...}); `extra` is the response-object override a
-  # map-returning generic action merges in (a map instead of a message
-  # list — see generic_result/3). Everything else (refreshes, /form and
-  # /errors clears, /select and /prompt resets) is identical to v0.9.1.
-  defp success(%{view: %{spec_version: :v1_0} = view} = env, status_text, extra) do
-    response =
-      %{"status" => "ok", "message" => status_text, "result" => %{}, "resultText" => ""}
-      |> Map.merge((is_map(extra) && extra) || %{})
-
+  # the named table components. `extra` is merged into the success
+  # feedback: a map-returning generic action's `result` and `resultText`, a
+  # bulk run's `result`.
+  defp success(%{view: view} = env, status_text, extra \\ %{}) do
     case refresh_messages(env) do
       {:ok, refresh} ->
         {:ok,
          refresh ++
            [
              update_data_model(view, "/form", ResolvedView.initial_form(view)),
-             update_data_model(view, "/errors", %{}),
-             update_data_model(view, "/ui/response", response)
+             update_data_model(view, "/errors", %{})
            ] ++
            select_clear(view) ++
            prompt_clear(env) ++
            task_success(env, status_text) ++
-           success_feedback(env, status_text) ++
-           wizard_success_reset(env)}
-
-      {:error, error} ->
-        {:error, error_messages(view, error)}
-    end
-  end
-
-  defp success(%{view: view} = env, status_text, extra) do
-    case refresh_messages(env) do
-      {:ok, refresh} ->
-        {:ok,
-         refresh ++
-           [
-             update_data_model(view, "/form", ResolvedView.initial_form(view)),
-             update_data_model(view, "/errors", %{}),
-             update_data_model(view, "/ui/action_result", %{}),
-             update_data_model(view, "/ui/action_result_text", "")
-           ] ++
-           select_clear(view) ++
-           prompt_clear(env) ++
-           extra ++
-           task_success(env, status_text) ++
-           success_feedback(env, status_text) ++
+           success_feedback(env, status_text, extra) ++
            wizard_success_reset(env)}
 
       {:error, error} ->
@@ -2951,29 +3117,13 @@ defmodule AshA2ui.ActionHandler do
 
   defp task_success(_env, _status_text), do: []
 
-  # Typed feedback for EVERY successful outcome, invoke and submit alike:
-  # the /ui/feedback success value is what the status Text and the admin
+  # Feedback for EVERY successful outcome, invoke and submit alike: the
+  # /ui/feedback success value is what the status Text and the admin
   # statusBanner bind. A bulk run passes `:feedback_kind` ("warning" on
-  # partial success). Failures get theirs from status/3 (v0.9.1) or
-  # put_feedback/2 (v1.0).
-  defp success_feedback(%{view: view} = env, status_text) do
+  # partial success). Failures get theirs from status/3.
+  defp success_feedback(%{view: view} = env, status_text, extra) do
     kind = Map.get(env, :feedback_kind, "success")
-    [update_data_model(view, "/ui/feedback", Experience.feedback(kind, status_text))]
-  end
-
-  # The human-readable text of the batch's outcome write — the /ui/feedback
-  # value (v0.9.1) or the /ui/response object (v1.0).
-  defp feedback_message(messages) do
-    Enum.find_value(messages, "", fn
-      %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => message}}} ->
-        message
-
-      %{"updateDataModel" => %{"path" => "/ui/response", "value" => %{"message" => message}}} ->
-        message
-
-      _other ->
-        nil
-    end)
+    [update_data_model(view, "/ui/feedback", Experience.feedback(kind, status_text, extra))]
   end
 
   # Surfaces with searchable selects / pick_existing pickers reset their
@@ -3130,7 +3280,11 @@ defmodule AshA2ui.ActionHandler do
   defp matrix_messages(view, table, rows) do
     if AshA2ui.Matrix.matrix?(table),
       do: [
-        update_data_model(view, AshA2ui.Matrix.path(table), V0_9_1.matrix_data(view, table, rows))
+        update_data_model(
+          view,
+          AshA2ui.Matrix.path(table),
+          Encoder.matrix_data(view, table, rows)
+        )
       ],
       else: []
   end
@@ -3180,7 +3334,7 @@ defmodule AshA2ui.ActionHandler do
   # `_selected` flag.
   defp rows(view, table, records, ash_opts) do
     links = AshA2ui.Links.context(table.resource, view.fields, table_fields(table), ash_opts)
-    Enum.map(records, &V0_9_1.serialize_row(view, table, &1, links))
+    Enum.map(records, &Encoder.serialize_row(view, table, &1, links))
   end
 
   # Human-readable, selectable text for a map-returning generic action:
@@ -3319,7 +3473,7 @@ defmodule AshA2ui.ActionHandler do
         status(
           view,
           t(view, msg("You are not authorized to perform this action.")),
-          "UNAUTHORIZED"
+          "FORBIDDEN"
         )
       ]
     else
@@ -3591,44 +3745,19 @@ defmodule AshA2ui.ActionHandler do
 
   # --- message + value construction ------------------------------------------
 
-  # An error/rejection status: the typed `/ui/feedback` error (v0.9.1 — the
-  # path the status Text and the admin statusBanner bind), or (v1.0) the
-  # structured `/ui/response` object whose `code` also drives the
-  # actionResponse error (see attach_action_response/3; put_feedback/2
-  # mirrors it into /ui/feedback). Dispatch rejections default to
-  # "INVALID_ACTION"; error_messages/2 passes the mapped code.
-  defp status(view, text, code \\ "INVALID_ACTION")
+  # An error/rejection status: the whole /ui/feedback error map. Dispatch
+  # rejections default to "INVALID_ACTION"; error_messages/3 passes the
+  # mapped code.
+  defp status(view, text, code \\ "INVALID_ACTION"),
+    do:
+      update_data_model(
+        view,
+        "/ui/feedback",
+        Experience.feedback("error", text, %{"code" => code})
+      )
 
-  defp status(%{spec_version: :v1_0} = view, text, code) do
-    update_data_model(
-      view,
-      "/ui/response",
-      %{
-        "status" => "error",
-        "code" => code,
-        "message" => text,
-        "result" => %{},
-        "resultText" => ""
-      }
-    )
-  end
-
-  defp status(view, text, _code),
-    do: update_data_model(view, "/ui/feedback", Experience.feedback("error", text))
-
-  defp update_data_model(view, path, value) do
-    %{
-      "version" => version_string(view),
-      "updateDataModel" => %{
-        "surfaceId" => view.surface_id,
-        "path" => path,
-        "value" => value
-      }
-    }
-  end
-
-  defp version_string(%{spec_version: :v1_0}), do: "v1.0"
-  defp version_string(_view), do: @version
+  defp update_data_model(view, path, value),
+    do: Encoder.update_data_model(view.surface_id, path, value)
 
   defp record_values(view, record, fields) do
     fields

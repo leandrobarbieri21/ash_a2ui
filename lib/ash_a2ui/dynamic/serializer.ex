@@ -14,8 +14,7 @@ defmodule AshA2ui.Dynamic.Serializer do
   version-control diffs of stored specs are all stable.
 
   `spec_format` versions the *envelope and spec vocabulary*, independent of
-  the A2UI protocol version a surface is served with (`:spec_version` on
-  `AshA2ui.Dynamic.resolve/2`). Readers reject formats they don't know with a
+  the A2UI protocol version. Readers reject formats they don't know with a
   structured error instead of misinterpreting them.
 
   Use through `AshA2ui.Dynamic.serialize/1` / `deserialize/2` /

@@ -7,13 +7,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # share the app-wide test endpoint/PubSub.
     use ExUnit.Case, async: false
 
+    import ExUnit.CaptureLog
     import Phoenix.Component, only: [sigil_H: 2]
     import Phoenix.ConnTest
     import Phoenix.LiveViewTest
 
     alias AshA2ui.Test.Links.NotesUI
     alias AshA2ui.Test.LiveRendererFixtures, as: Fixtures
-    alias AshA2ui.Test.{MinimalUI, SchemaHelper}
+    alias AshA2ui.Test.{Messages, MinimalUI, SchemaHelper, Surface}
     alias Plug.Conn.Query
 
     @endpoint AshA2ui.Test.Endpoint
@@ -36,14 +37,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # a generous window on slow CI.
         assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
 
-        assert length(messages) == 3
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
-
-        assert [
-                 %{"createSurface" => _},
-                 %{"updateComponents" => _},
-                 %{"updateDataModel" => _}
-               ] = messages
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
+        assert [%{"createSurface" => %{"components" => [_ | _], "dataModel" => _}}] = messages
       end
 
       test "static render outputs the hook container without building the surface", %{conn: conn} do
@@ -99,7 +94,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert opts[:gettext_fn] == {AshA2ui.Test.PseudoLocale, :translate}
 
         envelope = Fixtures.action_envelope()
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_receive {:action_fn, MinimalUI, ^envelope, opts}
         assert opts[:locale] == "pseudo"
@@ -114,13 +109,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    describe "a2ui:action round-trip" do
+    describe "a2ui:message round-trip" do
       test "routes the envelope through action_fn and pushes the ok messages", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/stubbed")
         envelope = Fixtures.action_envelope()
-        SchemaHelper.assert_valid_client_message(envelope)
+        SchemaHelper.assert_valid_renderer_message(envelope)
 
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_receive {:action_fn, MinimalUI, ^envelope, opts}
         assert opts[:actor] == :stub_actor
@@ -139,14 +134,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             ] = messages
         })
 
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
       end
 
       test "an error tuple from action_fn also pushes its messages", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/stubbed")
         envelope = Fixtures.action_envelope("invoke", %{"fail" => true})
 
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_receive {:action_fn, MinimalUI, ^envelope, _opts}
 
@@ -154,7 +149,98 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           messages: [%{"updateDataModel" => %{"path" => "/errors/name"}} | _] = messages
         })
 
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
+      end
+    end
+
+    describe "renderer function calls" do
+      setup %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/function-call")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        export = Fixtures.action_envelope("export", %{"export" => "fc_export"})
+        render_hook(view, "a2ui:message", export)
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [%{"callRendererFunction" => %{"functionCallId" => "fc_export"}} = call]
+        })
+
+        SchemaHelper.assert_valid_agent_message(call, catalogs: Messages.catalogs())
+        [view: view]
+      end
+
+      defp pending_calls(view), do: :sys.get_state(view.pid).socket.assigns.ash_a2ui_pending_calls
+
+      test "a pushed callRendererFunction is pending until its response settles it", %{
+        view: view
+      } do
+        assert pending_calls(view) == %{"fc_export" => "downloadFile"}
+
+        response = Fixtures.function_response("fc_export")
+        SchemaHelper.assert_valid_renderer_message(response)
+        render_hook(view, "a2ui:message", response)
+
+        assert_receive {:on_function_response, "downloadFile",
+                        %{"functionCallId" => "fc_export", "value" => nil}}
+
+        assert pending_calls(view) == %{}
+      end
+
+      test "an error response is logged and handed to the callback", %{view: view} do
+        log =
+          capture_log(fn ->
+            render_hook(
+              view,
+              "a2ui:message",
+              Fixtures.function_response("fc_export", {:error, "QUOTA"})
+            )
+
+            _ = :sys.get_state(view.pid)
+          end)
+
+        assert log =~ "downloadFile"
+        assert log =~ "QUOTA"
+        assert_receive {:on_function_response, "downloadFile", %{"error" => %{"code" => "QUOTA"}}}
+      end
+
+      test "a duplicate response is dropped", %{view: view} do
+        render_hook(view, "a2ui:message", Fixtures.function_response("fc_export"))
+        assert_receive {:on_function_response, "downloadFile", _response}
+
+        log =
+          capture_log(fn ->
+            render_hook(view, "a2ui:message", Fixtures.function_response("fc_export"))
+            _ = :sys.get_state(view.pid)
+          end)
+
+        assert log =~ "no pending call has that id"
+        refute_receive {:on_function_response, _name, _response}, 100
+      end
+
+      test "a response to an id this LiveView never sent is dropped", %{view: view} do
+        capture_log(fn ->
+          render_hook(view, "a2ui:message", Fixtures.function_response("fc_unknown"))
+          _ = :sys.get_state(view.pid)
+        end)
+
+        refute_receive {:on_function_response, _name, _response}, 100
+        assert pending_calls(view) == %{"fc_export" => "downloadFile"}
+      end
+
+      test "a malformed response settles nothing and pushes nothing", %{view: view} do
+        malformed = %{
+          "version" => "1.0",
+          "rendererFunctionResponse" => %{"functionCallId" => "fc_export"}
+        }
+
+        capture_log(fn ->
+          render_hook(view, "a2ui:message", malformed)
+          _ = :sys.get_state(view.pid)
+        end)
+
+        refute_receive {:on_function_response, _name, _response}, 100
+        refute_push_event(view, "a2ui:messages", %{messages: _messages}, 100)
+        assert pending_calls(view) == %{"fc_export" => "downloadFile"}
       end
     end
 
@@ -174,7 +260,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert_receive {:data_model_fn, MinimalUI, _opts}, 1_000
 
         assert_push_event(view, "a2ui:messages", %{messages: [message]}, 1_000)
-        SchemaHelper.assert_valid_server_message(message)
+        SchemaHelper.assert_valid_agent_message(message)
         assert %{"updateDataModel" => %{"path" => "/records"}} = message
       end
 
@@ -225,34 +311,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
         assert messages != []
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
       end
 
       test "a query action round-trips through the LiveView transport", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/query")
         assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
 
-        envelope = %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "query",
-            "surfaceId" => "paginated",
-            "sourceComponentId" => "query_apply_button",
-            "timestamp" => "2026-07-10T12:00:00Z",
-            "context" => %{"query" => %{"search" => "nothing matches this"}, "page" => 1}
-          }
-        }
+        envelope =
+          Messages.call(
+            "query",
+            "paginated",
+            %{"query" => %{"search" => "nothing matches this"}, "page" => 1},
+            source: "query_apply_button"
+          )
 
-        SchemaHelper.assert_valid_client_message(envelope)
-        render_hook(view, "a2ui:action", envelope)
+        SchemaHelper.assert_valid_renderer_message(envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_push_event(view, "a2ui:messages", %{messages: messages})
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
 
         assert [
                  %{"updateDataModel" => %{"path" => "/records", "value" => []}},
                  %{"updateDataModel" => %{"path" => "/_empty_visible", "value" => [_on]}},
-                 %{"updateDataModel" => %{"path" => "/query", "value" => query_state}}
+                 %{"updateDataModel" => %{"path" => "/query", "value" => query_state}},
+                 %{"agentFunctionResponse" => %{"value" => %{}}}
                ] = messages
 
         assert %{
@@ -263,25 +347,63 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
                } = query_state
       end
 
+      test "a quiet ashAction function call round-trips and is answered last", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/query")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        call =
+          Messages.call("query", "paginated", %{"query" => %{"search" => "x"}}, id: "fc_query")
+
+        SchemaHelper.assert_valid_renderer_message(call,
+          catalogs: Messages.catalogs()
+        )
+
+        render_hook(view, "a2ui:message", call)
+
+        assert_push_event(view, "a2ui:messages", %{messages: messages})
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
+
+        # A query is quiet: it leaves /ui/feedback alone and answers with
+        # an empty value.
+        assert %{"agentFunctionResponse" => %{"functionCallId" => "fc_query", "value" => %{}}} =
+                 List.last(messages)
+
+        refute Enum.any?(
+                 messages,
+                 &match?(%{"updateDataModel" => %{"path" => "/ui/feedback"}}, &1)
+               )
+
+        assert %{"search" => "x"} = :sys.get_state(view.pid).socket.assigns.ash_a2ui_query_state
+      end
+
+      test "a malformed message pushes nothing", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/query")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        capture_log(fn ->
+          render_hook(view, "a2ui:message", %{"version" => "v1.0", "callAgentFunction" => %{}})
+          _ = :sys.get_state(view.pid)
+        end)
+
+        refute_push_event(view, "a2ui:messages", %{messages: _messages}, 100)
+      end
+
       test "a PubSub refresh re-runs the client's last query state, not the defaults", %{
         conn: conn
       } do
         {:ok, view, _html} = live(conn, "/live-renderer/query-pubsub")
         assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
 
-        envelope = %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "query",
-            "surfaceId" => "paginated",
-            "sourceComponentId" => "query_apply_button",
-            "timestamp" => "2026-07-10T12:00:00Z",
-            "context" => %{"query" => %{"search" => "needle"}, "page" => 1}
-          }
-        }
+        envelope =
+          Messages.call("query", "paginated", %{"query" => %{"search" => "needle"}, "page" => 1},
+            source: "query_apply_button"
+          )
 
-        render_hook(view, "a2ui:action", envelope)
-        assert_push_event(view, "a2ui:messages", %{messages: [_records, _empty_state, _query]})
+        render_hook(view, "a2ui:message", envelope)
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [_records, _empty_state, _query, _response]
+        })
 
         Phoenix.PubSub.broadcast(
           AshA2ui.Test.PubSub,
@@ -307,19 +429,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = live(conn, "/live-renderer/context-pubsub")
         assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
 
-        envelope = %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "context_select",
-            "surfaceId" => Fixtures.surface_id(),
-            "sourceComponentId" => "context_owner_option_button",
-            "timestamp" => "2026-07-10T12:00:00Z",
-            "context" => %{"context" => "owner", "value" => "o-1", "contexts" => %{}}
-          }
-        }
+        envelope =
+          Messages.call(
+            "context_select",
+            Fixtures.surface_id(),
+            %{"context" => "owner", "value" => "o-1", "contexts" => %{}},
+            source: "context_owner_option_button"
+          )
 
-        SchemaHelper.assert_valid_client_message(envelope)
-        render_hook(view, "a2ui:action", envelope)
+        SchemaHelper.assert_valid_renderer_message(envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         # The stub's follow-up rewrites /context; the LiveRenderer must
         # track it and hand it to the next refresh as :context_state.
@@ -349,7 +468,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         )
 
         assert_push_event(view, "a2ui:messages", %{messages: [message]}, 1_000)
-        SchemaHelper.assert_valid_server_message(message)
+        SchemaHelper.assert_valid_agent_message(message)
 
         assert %{"updateDataModel" => %{"path" => "/", "value" => value}} = message
         assert %{"new_items" => _, "done_items" => _} = value["records"]
@@ -407,16 +526,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = live(conn, "/live-renderer/deep-link?tab=notes")
         assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
 
-        render_hook(view, "a2ui:action", %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "context_select",
-            "surfaceId" => "notes",
-            "sourceComponentId" => "row_select",
-            "timestamp" => "2026-10-12T12:00:00Z",
-            "context" => %{"context" => "person", "value" => ada.id}
-          }
-        })
+        render_hook(
+          view,
+          "a2ui:message",
+          Messages.call("context_select", "notes", %{"context" => "person", "value" => ada.id},
+            source: "row_select"
+          )
+        )
 
         path = assert_patch(view)
         %URI{path: "/live-renderer/deep-link", query: query} = URI.parse(path)
@@ -449,18 +565,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link?ctx[person]=#{ada.id}")
         assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
-        Enum.each(messages, &SchemaHelper.assert_valid_server_message/1)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
 
-        pushed = List.last(messages)["updateDataModel"]["value"]["records"]
+        pushed = Surface.data_model(messages)["records"]
 
         state = AshA2ui.Info.context_state_for(AshA2ui.Test.Links.PeopleUI, %{"person" => ada.id})
 
         built =
           AshA2ui.Test.Links.PeopleUI
           |> AshA2ui.Info.build_surface(context_state: state)
-          |> List.last()
+          |> Surface.data_model()
 
-        assert pushed == built["updateDataModel"]["value"]["records"]
+        assert pushed == built["records"]
         assert [%{"status" => "Open"}] = pushed["their_notes"]
 
         assert [%{"_links" => %{"note_title" => %{"surface" => "note"}}}] =
@@ -480,25 +596,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         # the real build got link_buttons: true from the URL template
         assert Enum.any?(initial, fn message ->
                  message
-                 |> get_in(["updateComponents", "components"])
+                 |> get_in(["createSurface", "components"])
                  |> List.wrap()
                  |> Enum.any?(&(&1["id"] == "table_cell_participations_note_title_value_link"))
                end)
 
-        render_hook(view, "a2ui:action", %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "open_surface",
-            "surfaceId" => "people",
-            "sourceComponentId" => "table_cell_participations_note_title_value_link",
-            "timestamp" => "2026-10-16T12:00:00Z",
-            "context" => %{
+        render_hook(
+          view,
+          "a2ui:message",
+          Messages.call(
+            "open_surface",
+            "people",
+            %{
               "field" => "note_title",
               "surface" => "note",
               "recordId" => kickoff.id
-            }
-          }
-        })
+            },
+            source: "table_cell_participations_note_title_value_link"
+          )
+        )
+
+        assert_redirect(view, "/app/r/note/#{kickoff.id}")
+      end
+
+      test "an ashAction open_surface call navigates once accepted", %{conn: conn, ada: ada} do
+        alias AshA2ui.Test.Links.{Note, Participant}
+
+        kickoff = Ash.create!(Note, %{title: "Kickoff", person_id: ada.id}, authorize?: false)
+        Ash.create!(Participant, %{note_id: kickoff.id, person_id: ada.id}, authorize?: false)
+
+        {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        call =
+          Messages.call("open_surface", "people", %{
+            "field" => "note_title",
+            "surface" => "note",
+            "recordId" => kickoff.id
+          })
+
+        render_hook(view, "a2ui:message", call)
 
         assert_redirect(view, "/app/r/note/#{kickoff.id}")
       end
@@ -507,16 +644,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = live(conn, "/live-renderer/people-deep-link")
         assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
 
-        render_hook(view, "a2ui:action", %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "open_surface",
-            "surfaceId" => "people",
-            "sourceComponentId" => "forged",
-            "timestamp" => "2026-10-16T12:00:00Z",
-            "context" => %{"field" => "note_title", "surface" => "admin", "recordId" => "x"}
-          }
-        })
+        render_hook(
+          view,
+          "a2ui:message",
+          Messages.call(
+            "open_surface",
+            "people",
+            %{"field" => "note_title", "surface" => "admin", "recordId" => "x"},
+            source: "forged"
+          )
+        )
 
         assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
 
@@ -610,7 +747,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           1_000
         )
 
-        Enum.each(main ++ notes, &SchemaHelper.assert_valid_server_message/1)
+        SchemaHelper.assert_valid_agent_messages(main ++ notes)
         assert Enum.all?(notes, &(surface_id_of(&1) == "notes"))
 
         assert_receive {:surface_fn, MinimalUI, main_opts}, 1_000
@@ -649,7 +786,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         before = :sys.get_state(view.pid).socket.assigns
 
         envelope = context_select("notes", ada.id)
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_receive {:action_fn, NotesUI, ^envelope, opts}
         assert opts[:actor] == :stub_actor
@@ -673,7 +810,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         before = :sys.get_state(view.pid).socket.assigns.ash_a2ui_surfaces
 
         envelope = Fixtures.action_envelope()
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
 
         assert_receive {:action_fn, MinimalUI, ^envelope, _opts}
         refute_receive {:action_fn, NotesUI, _, _}, 50
@@ -689,7 +826,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         {:ok, view, _html} = live(conn, "/live-renderer/surfaces")
         await_bootstraps(view)
 
-        render_hook(view, "a2ui:action", context_select("notes", ada.id))
+        render_hook(view, "a2ui:message", context_select("notes", ada.id))
         assert_push_event(view, "a2ui:messages", %{messages: [_context]})
 
         Phoenix.PubSub.broadcast(
@@ -746,7 +883,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert :sys.get_state(view.pid).socket.assigns.ash_a2ui_surfaces == %{}
 
         envelope = Fixtures.action_envelope()
-        render_hook(view, "a2ui:action", envelope)
+        render_hook(view, "a2ui:message", envelope)
         assert_push_event(view, "a2ui:messages", payload)
         assert payload == %{messages: Fixtures.action_ok_messages()}
       end
@@ -777,16 +914,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
 
       defp context_select(surface_id, value) do
-        %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "context_select",
-            "surfaceId" => surface_id,
-            "sourceComponentId" => "person_picker",
-            "timestamp" => "2026-11-12T12:00:00Z",
-            "context" => %{"context" => "person", "value" => value}
-          }
-        }
+        Messages.call("context_select", surface_id, %{"context" => "person", "value" => value},
+          source: "person_picker"
+        )
       end
 
       defp surface_id_of(message) do

@@ -26,8 +26,8 @@
  *
  *     node priv/js/probe/link_buttons_probe.mjs [--node-modules DIR] [--port N]
  *
- * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.10.x or
- * 0.11.x and lit 3. Chrome comes from $CHROME, Playwright from
+ * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.15.0 or
+ * later and lit 3. Chrome comes from $CHROME, Playwright from
  * $PLAYWRIGHT_NODE_MODULES. Exit code is the verdict.
  */
 

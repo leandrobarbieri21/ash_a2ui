@@ -28,7 +28,7 @@ criteria:
       and config catalog: :admin_v1"
     when: the surface is encoded
     then: >-
-      createSurface carries catalogId https://ash-a2ui.dev/catalogs/admin/v1,
+      createSurface carries catalogId https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2,
       the root component is EntityPage, and the semantic subtree contains
       DataGrid, RecordPanel, and StatusBanner — with no form-slot List
       composition, no sentinel-bound pagination row, and no standalone

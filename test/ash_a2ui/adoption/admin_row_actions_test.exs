@@ -18,6 +18,8 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Adoption.{Job, JobsUI}
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.SchemaHelper
 
   @red %{id: "u-red", team: "red"}
 
@@ -38,9 +40,11 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
   end
 
   defp surface do
-    [_create, components, data] = AshA2ui.Info.build_surface(JobsUI, actor: @red)
-    by_id = Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
-    {by_id, data["updateDataModel"]["value"]}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(JobsUI, actor: @red)
+
+    by_id = Map.new(components, &{&1["id"], &1})
+    {by_id, data}
   end
 
   defp entry(grid, action) do
@@ -48,16 +52,7 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "adoption_jobs",
-        "sourceComponentId" => "data_grid",
-        "timestamp" => "2026-10-16T00:00:00Z",
-        "context" => context
-      }
-    }
+    Messages.call(name, "adoption_jobs", context, source: "data_grid")
   end
 
   # Resolves a rowActions context against one row and the data model, the
@@ -65,8 +60,8 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
   # against the data model.
   defp resolve(context, row, data) do
     Map.new(context, fn
-      {key, %{"path" => "/" <> _ = path}} -> {key, get_in(data, path_keys(path))}
-      {key, %{"path" => path}} -> {key, get_in(row, path_keys(path))}
+      {key, %{"@path" => "/" <> _ = path}} -> {key, get_in(data, path_keys(path))}
+      {key, %{"@path" => path}} -> {key, get_in(row, path_keys(path))}
       {key, value} -> {key, value}
     end)
   end
@@ -96,7 +91,7 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
              "action" => "prompt",
              "context" => %{
                "action" => "annotate",
-               "recordId" => %{"path" => "id"},
+               "recordId" => %{"@path" => "id"},
                "component" => "table"
              }
            }
@@ -106,7 +101,7 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
 
     bound =
       for id <- by_id[content]["children"],
-          %{"value" => %{"path" => path}} <- [by_id[id]],
+          %{"value" => %{"@path" => path}} <- [by_id[id]],
           do: path
 
     assert "/prompt/values/annotate/note" in bound
@@ -137,11 +132,11 @@ defmodule AshA2ui.Adoption.AdminRowActionsTest do
     {by_id, _data} = surface()
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    schema =
-      catalog["components"]["dataGrid"]
-      |> Map.put("$defs", catalog["$defs"] || %{})
-      |> ExJsonSchema.Schema.resolve()
-
-    assert ExJsonSchema.Validator.validate(schema, by_id["data_grid"]) == :ok
+    assert SchemaHelper.validate_catalog_component(
+             catalog,
+             "dataGrid",
+             by_id["data_grid"]
+           ) ==
+             :ok
   end
 end

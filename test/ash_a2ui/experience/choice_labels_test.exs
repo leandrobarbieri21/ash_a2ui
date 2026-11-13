@@ -17,13 +17,13 @@ defmodule AshA2ui.Experience.ChoiceLabelsTest do
 
   use ExUnit.Case, async: false
 
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.KitchenSink
 
   defp records!(record) do
     view = ResolvedView.resolve(KitchenSink)
-    message = V0_9_1.encode_data_model(view, [record], [])
+    message = Encoder.encode_data_model(view, [record], [])
     message["updateDataModel"]["value"]["records"]
   end
 

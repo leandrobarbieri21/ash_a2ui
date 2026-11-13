@@ -10,20 +10,14 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.ActionHandler
+  alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.NoUpdate
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   defp envelope(name, context \\ %{}) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "experience_task",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "experience_task", context, id: "call-1")
   end
 
   defp by_path(messages) do
@@ -35,10 +29,12 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
   describe "initial state" do
     @tag ac: "A2UI-101/AC-6"
     test "initial surface is browse with hidden panel" do
-      [create, components, data] = AshA2ui.Info.build_surface(Task)
-      Enum.each([create, components, data], &assert_valid_server_message/1)
+      [%{"createSurface" => %{"components" => components, "dataModel" => data}} = create] =
+        AshA2ui.Info.build_surface(Task)
 
-      %{"updateDataModel" => %{"value" => model}} = data
+      assert_valid_agent_message(create)
+
+      model = data
       ui = model["ui"]
 
       assert ui["intent"] == "browse"
@@ -68,7 +64,7 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
       # near-action home above the tables, so invoke successes and refusals
       # render on screen instead of at the page bottom (the audit's
       # offscreen-feedback finding)
-      assert %{"component" => "Text", "text" => %{"path" => "/ui/feedback/message"}} =
+      assert %{"component" => "Text", "text" => %{"@path" => "/ui/feedback/message"}} =
                comps["status_text"]
 
       assert Enum.at(comps["root"]["children"], 1) == "status_text"
@@ -76,21 +72,20 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
     end
 
     @tag ac: "A2UI-101/AC-6"
-    test "initial v1.0 surface keeps the ui state through the response collapse" do
-      [%{"createSurface" => create}] = AshA2ui.Info.build_surface(Task, spec_version: "1.0")
+    test "the initial ui state carries the idle feedback and no retired result paths" do
+      [%{"createSurface" => create}] = AshA2ui.Info.build_surface(Task)
 
       ui = create["dataModel"]["ui"]
 
-      # the /ui/response collapse does not drop the experience-layer state
       assert ui["intent"] == "browse"
       assert ui["panel"]["visible"] == []
       assert ui["panel"]["submit_visible"] == []
       assert ui["panel"]["form_visible"] == []
       assert ui["panel"]["view_visible"] == []
-      assert ui["feedback"] == %{"kind" => nil, "message" => ""}
+      assert ui["feedback"] == Experience.clear_feedback()
 
-      assert %{"status" => "", "message" => "", "result" => %{}, "resultText" => ""} =
-               ui["response"]
+      for retired <- ["response", "action_result", "action_result_text"],
+          do: refute(Map.has_key?(ui, retired))
     end
   end
 
@@ -127,16 +122,18 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
 
       # the form is reset to its initial (empty) values and feedback cleared
       assert values["/form"] == %{}
-      assert values["/ui/feedback"] == %{"kind" => nil, "message" => ""}
+
+      assert values["/ui/feedback"] ==
+               Experience.feedback("", "", %{"functionCallId" => "call-1"})
+
       assert values["/errors"] == %{}
     end
 
     @tag ac: "A2UI-101/AC-7"
-    test "start_create speaks v1.0 on a v1.0 surface" do
-      assert {:ok, messages} =
-               ActionHandler.handle(Task, envelope("start_create"), spec_version: "1.0")
+    test "start_create answers in schema-valid 1.0 messages" do
+      assert {:ok, messages} = ActionHandler.handle(Task, envelope("start_create"))
 
-      assert Enum.all?(messages, &(&1["version"] == "v1.0"))
+      assert_valid_agent_messages(messages)
 
       values = by_path(messages)
       assert values["/ui/intent"] == "create"
@@ -255,20 +252,22 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
       assert panel["view_visible"] == []
 
       assert values["/form"] == %{}
-      assert values["/ui/feedback"] == %{"kind" => nil, "message" => ""}
+
+      assert values["/ui/feedback"] ==
+               Experience.feedback("", "", %{"functionCallId" => "call-1"})
     end
   end
 
   defp components_by_id(components_message) do
-    Map.new(components_message["updateComponents"]["components"], &{&1["id"], &1})
+    Surface.components_by_id(components_message)
   end
 
   describe "CLIN-10 surface anatomy (title + carded form panel)" do
     test "a declared title becomes the surface's first root child" do
       messages = AshA2ui.Info.build_surface(AshA2ui.Test.Experience.EstateUser)
-      comps = components_by_id(Enum.find(messages, &Map.has_key?(&1, "updateComponents")))
+      comps = components_by_id(messages)
 
-      assert %{"component" => "Text", "text" => "Legacy users", "variant" => "h1"} =
+      assert %{"component" => "Text", "text" => "# Legacy users"} =
                comps["surface_title"]
 
       # Title first, then the gated panel, then the feedback region —
@@ -279,7 +278,7 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
 
     test "an untitled surface emits no title component at all" do
       messages = AshA2ui.Info.build_surface(Task)
-      comps = components_by_id(Enum.find(messages, &Map.has_key?(&1, "updateComponents")))
+      comps = components_by_id(messages)
 
       refute Map.has_key?(comps, "surface_title")
       assert hd(comps["root"]["children"]) == "form_slot"
@@ -287,7 +286,7 @@ defmodule AshA2ui.Experience.ModeStateMachineTest do
 
     test "the form panel is carded with a footer zone" do
       messages = AshA2ui.Info.build_surface(Task)
-      comps = components_by_id(Enum.find(messages, &Map.has_key?(&1, "updateComponents")))
+      comps = components_by_id(messages)
 
       # The form keeps its id (the hook's panel-reveal contract) but gains
       # the Card anatomy: content under a form_body Column, submit/cancel

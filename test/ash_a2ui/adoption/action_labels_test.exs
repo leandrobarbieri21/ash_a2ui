@@ -13,7 +13,10 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Dynamic
   alias AshA2ui.Dynamic.Importer
+  alias AshA2ui.Experience
   alias AshA2ui.Test.Adoption.{Job, LabelledBulkJobsUI, LabelledJobsUI}
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   @red %{id: "u-red", team: "red"}
 
@@ -22,15 +25,14 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
     %{job: Ash.create!(Job, %{title: "Open job", team: "red"}, authorize?: false)}
   end
 
-  # The basic emission validates against the vendored v0.9.1 schemas; the
+  # The basic emission validates against the vendored A2UI 1.0 schemas; the
   # admin emission's custom kinds are pinned by the admin catalog instead.
   defp components(ui \\ LabelledJobsUI) do
     messages = AshA2ui.Info.build_surface(ui, actor: @red)
-    unless AshA2ui.Experience.admin?(), do: Enum.each(messages, &assert_valid_server_message/1)
+    unless AshA2ui.Experience.admin?(), do: Enum.each(messages, &assert_valid_agent_message/1)
 
     messages
-    |> Enum.find_value(& &1["updateComponents"])
-    |> Map.fetch!("components")
+    |> Surface.components()
     |> Map.new(&{&1["id"], &1})
   end
 
@@ -39,7 +41,7 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
 
     assert by_id["row_action_claim_text"]["text"] == "Take it"
     assert by_id["row_action_assign_text"]["text"] == "Assign clerk"
-    assert by_id["row_action_assign_prompt_title"]["text"] == "Assign clerk"
+    assert by_id["row_action_assign_prompt_title"]["text"] == "### Assign clerk"
     assert components(LabelledBulkJobsUI)["bulk_action_claim_text"]["text"] == "Take it"
     # No label: the humanized action name, as before.
     assert by_id["row_action_lock_text"]["text"] == "Lock"
@@ -63,20 +65,17 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
   end
 
   test "the bulk run's status line uses the label", %{job: job} do
-    envelope = %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "bulk_invoke",
-        "surfaceId" => "adoption_labelled_bulk_jobs",
-        "sourceComponentId" => "test",
-        "timestamp" => "2026-10-16T00:00:00Z",
-        "context" => %{
+    envelope =
+      Messages.call(
+        "bulk_invoke",
+        "adoption_labelled_bulk_jobs",
+        %{
           "action" => "claim",
           "component" => "table",
           "records" => [%{"id" => job.id, "_selected" => true}]
-        }
-      }
-    }
+        },
+        source: "test"
+      )
 
     assert {:ok, messages} = ActionHandler.handle(LabelledBulkJobsUI, envelope, actor: @red)
 
@@ -93,16 +92,13 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
     invoke = fn ui, surface_id, action ->
       ActionHandler.handle(
         ui,
-        %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "invoke",
-            "surfaceId" => surface_id,
-            "sourceComponentId" => "test",
-            "timestamp" => "2026-10-16T00:00:00Z",
-            "context" => %{"action" => action, "recordId" => job.id, "component" => "table"}
-          }
-        },
+        Messages.call(
+          "invoke",
+          surface_id,
+          %{"action" => action, "recordId" => job.id, "component" => "table"},
+          source: "test",
+          id: "call-1"
+        ),
         actor: @red
       )
     end
@@ -115,7 +111,9 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
     end
 
     assert {:ok, messages} = invoke.(LabelledJobsUI, "adoption_labelled_jobs", "claim")
-    assert feedback.(messages) == %{"kind" => "success", "message" => "Take it: done."}
+
+    assert feedback.(messages) ==
+             Experience.feedback("success", "Take it: done.", %{"functionCallId" => "call-1"})
   end
 
   test "the dynamic spec carries the label: resolve, import and promote" do
@@ -129,11 +127,12 @@ defmodule AshA2ui.Adoption.ActionLabelsTest do
 
     assert {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
 
-    [_create, components, _data] = Dynamic.build_surface(surface, actor: @red)
+    [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+      Dynamic.build_surface(surface, actor: @red)
 
     text =
       Enum.find(
-        components["updateComponents"]["components"],
+        components,
         &(&1["id"] == "row_action_claim_text")
       )
 

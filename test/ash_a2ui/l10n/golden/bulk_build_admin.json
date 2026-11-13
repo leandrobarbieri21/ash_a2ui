@@ -1,0 +1,870 @@
+[
+  {
+    "createSurface": {
+      "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
+      "components": [
+        {
+          "children": [
+            "status_banner",
+            "context_project",
+            "table_heading",
+            "query_controls",
+            "bulk_toolbar",
+            "records_list",
+            "empty_state",
+            "query_pagination",
+            "action_result_panel"
+          ],
+          "component": "entityPage",
+          "id": "root",
+          "title": "Bulk task"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "child": "context_project_body",
+          "component": "Card",
+          "id": "context_project"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "context_project_label",
+            "context_project_selected_row",
+            "context_project_options"
+          ],
+          "component": "Column",
+          "id": "context_project_body"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "context_project_label",
+          "text": "### Project"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "context_project_selected",
+            "context_project_clear_button"
+          ],
+          "component": "Row",
+          "id": "context_project_selected_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "context_project_selected",
+          "text": {
+            "@path": "/context/project/label"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "context": "project",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "context_clear",
+                "sourceComponentId": "context_project_clear_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "context_project_clear_text",
+          "component": "Button",
+          "id": "context_project_clear_button",
+          "variant": "borderless"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "context_project_clear_text",
+          "text": "Clear"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "context_project_option_button",
+            "path": "/options/project"
+          },
+          "component": "List",
+          "id": "context_project_options"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "context": "project",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "value": {
+                    "@path": "value"
+                  }
+                },
+                "name": "context_select",
+                "sourceComponentId": "context_project_option_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "context_project_option_text",
+          "component": "Button",
+          "id": "context_project_option_button",
+          "variant": "borderless"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "context_project_option_text",
+          "text": {
+            "@path": "label"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_heading",
+          "text": "## Bulk task"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "record_row",
+            "path": "/records"
+          },
+          "component": "List",
+          "id": "records_list"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "align": "center",
+          "children": [
+            "bulk_action_approve_button",
+            "bulk_action_reject_button",
+            "bulk_action_destroy_button",
+            "bulk_select_page_button",
+            "bulk_clear_button"
+          ],
+          "component": "Row",
+          "id": "bulk_toolbar"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "approve",
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "records": {
+                    "@path": "/records"
+                  }
+                },
+                "name": "bulk_invoke",
+                "sourceComponentId": "bulk_action_approve_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "bulk_action_approve_text",
+          "component": "Button",
+          "id": "bulk_action_approve_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "bulk_action_approve_text",
+          "text": "Approve"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "reject",
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "records": {
+                    "@path": "/records"
+                  }
+                },
+                "name": "bulk_invoke",
+                "sourceComponentId": "bulk_action_reject_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "bulk_action_reject_text",
+          "component": "Button",
+          "id": "bulk_action_reject_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "bulk_action_reject_text",
+          "text": "Reject"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "destroy",
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "records": {
+                    "@path": "/records"
+                  }
+                },
+                "name": "bulk_invoke",
+                "sourceComponentId": "bulk_action_destroy_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "bulk_action_destroy_text",
+          "component": "Button",
+          "id": "bulk_action_destroy_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "bulk_action_destroy_text",
+          "text": "Destroy"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "records": {
+                    "@path": "/records"
+                  },
+                  "selected": true
+                },
+                "name": "bulk_select",
+                "sourceComponentId": "bulk_select_page_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "bulk_select_page_text",
+          "component": "Button",
+          "id": "bulk_select_page_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "bulk_select_page_text",
+          "text": "Select page"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "records": {
+                    "@path": "/records"
+                  },
+                  "selected": false
+                },
+                "name": "bulk_select",
+                "sourceComponentId": "bulk_clear_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "bulk_clear_text",
+          "component": "Button",
+          "id": "bulk_clear_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "bulk_clear_text",
+          "text": "Clear"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "child": "query_controls_body",
+          "component": "Card",
+          "id": "query_controls"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "align": "end",
+          "children": [
+            "query_search_input",
+            "query_apply_button"
+          ],
+          "component": "Row",
+          "id": "query_controls_body"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "TextField",
+          "id": "query_search_input",
+          "label": "Search",
+          "value": {
+            "@path": "/query/search"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "page": 1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_apply_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "query_apply_text",
+          "component": "Button",
+          "id": "query_apply_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "query_apply_text",
+          "text": "Apply"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "query_pagination_row",
+            "path": "/query/_pagination_visible"
+          },
+          "component": "List",
+          "id": "query_pagination"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "query_prev_slot",
+            "query_page_text",
+            "query_next_slot"
+          ],
+          "component": "Row",
+          "id": "query_pagination_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "query_prev_button",
+            "path": "/query/_previous_visible"
+          },
+          "component": "List",
+          "id": "query_prev_slot"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "pageDelta": -1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_prev_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "query_prev_text",
+          "component": "Button",
+          "id": "query_prev_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "query_prev_text",
+          "text": "Previous"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "query_page_text",
+          "text": {
+            "@path": "/query/_range_text"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "query_next_button",
+            "path": "/query/_next_visible"
+          },
+          "component": "List",
+          "id": "query_next_slot"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "pageDelta": 1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_next_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "query_next_text",
+          "component": "Button",
+          "id": "query_next_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "query_next_text",
+          "text": "Next"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "child": "record_row_content",
+          "component": "Card",
+          "id": "record_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "record_row_selected",
+            "table_cell_title_row",
+            "table_cell_status_row",
+            "table_cell_score_row",
+            "row_action_approve_slot",
+            "row_action_flag_button"
+          ],
+          "component": "Row",
+          "id": "record_row_content"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "table_cell_title_label",
+            "table_cell_title_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_title_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_title_label",
+          "text": "Title",
+          "variant": "caption"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_title_value",
+          "text": {
+            "@path": "title"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "table_cell_status_label",
+            "table_cell_status_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_status_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_status_label",
+          "text": "Status",
+          "variant": "caption"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_status_value",
+          "text": {
+            "@path": "status"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "table_cell_score_label",
+            "table_cell_score_value"
+          ],
+          "component": "Row",
+          "id": "table_cell_score_row"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_score_label",
+          "text": "Score",
+          "variant": "caption"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "table_cell_score_value",
+          "text": {
+            "@path": "score"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "CheckBox",
+          "id": "record_row_selected",
+          "label": "Select",
+          "value": {
+            "@path": "_selected"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "approve",
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "invoke",
+                "sourceComponentId": "row_action_approve_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "row_action_approve_text",
+          "component": "Button",
+          "id": "row_action_approve_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "row_action_approve_text",
+          "text": "Approve"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "row_action_approve_button",
+            "path": "_visible_approve"
+          },
+          "component": "List",
+          "id": "row_action_approve_slot"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "flag",
+                  "component": "table",
+                  "contexts": {
+                    "@path": "/context"
+                  },
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "invoke",
+                "sourceComponentId": "row_action_flag_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+            }
+          },
+          "child": "row_action_flag_text",
+          "component": "Button",
+          "id": "row_action_flag_button"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "row_action_flag_text",
+          "text": "Flag"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": {
+            "componentId": "empty_state_text",
+            "path": "/_empty_visible"
+          },
+          "component": "List",
+          "id": "empty_state"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "empty_state_text",
+          "text": {
+            "@path": "_empty_message"
+          }
+        },
+        {
+          "component": "statusBanner",
+          "id": "status_banner",
+          "kind": {
+            "@path": "/ui/feedback/kind"
+          },
+          "message": {
+            "@path": "/ui/feedback/message"
+          }
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "children": [
+            "action_result_text"
+          ],
+          "component": "Column",
+          "id": "action_result_panel"
+        },
+        {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+          "component": "Text",
+          "id": "action_result_text",
+          "text": {
+            "@path": "/ui/feedback/resultText"
+          }
+        }
+      ],
+      "dataModel": {
+        "_empty_message": "No Bulk task records yet.",
+        "_empty_visible": [],
+        "bulk": {
+          "table": {
+            "result": {
+              "errors": [],
+              "failed": 0,
+              "ok": 0,
+              "refused": 0,
+              "skipped": 0
+            }
+          }
+        },
+        "context": {
+          "project": {
+            "label": "Apollo",
+            "search": "",
+            "value": "PROJECT_APOLLO"
+          }
+        },
+        "errors": {},
+        "form": {},
+        "options": {
+          "project": [
+            {
+              "label": "Apollo",
+              "value": "PROJECT_APOLLO"
+            }
+          ]
+        },
+        "query": {
+          "_next_visible": [],
+          "_pagination_visible": [],
+          "_previous_visible": [],
+          "_range_text": "1–3 of 3",
+          "filters": {},
+          "hasMore": false,
+          "nextVisible": false,
+          "page": 1,
+          "pageSize": 5,
+          "paginationVisible": false,
+          "previousVisible": false,
+          "search": "",
+          "sort": {
+            "dir": "asc",
+            "field": "title"
+          },
+          "totalCount": 3
+        },
+        "records": [
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_ALPHA"
+              }
+            ],
+            "id": "TASK_ALPHA",
+            "score": 1,
+            "status": "Open",
+            "title": "alpha"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_BRAVO"
+              }
+            ],
+            "id": "TASK_BRAVO",
+            "score": -1,
+            "status": "Open",
+            "title": "bravo"
+          },
+          {
+            "_actions": [
+              "approve",
+              "flag"
+            ],
+            "_selected": false,
+            "_values": {
+              "status": "open"
+            },
+            "_visible_approve": [
+              {
+                "id": "TASK_CHARLIE"
+              }
+            ],
+            "id": "TASK_CHARLIE",
+            "score": 2,
+            "status": "Open",
+            "title": "charlie"
+          }
+        ],
+        "ui": {
+          "feedback": {
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
+          },
+          "intent": "browse",
+          "panel": {
+            "form_visible": [],
+            "mode": null,
+            "primary_label": "",
+            "record_id": null,
+            "submit_visible": [],
+            "title": "",
+            "view_visible": [],
+            "visible": []
+          }
+        }
+      },
+      "surfaceId": "bulk_tasks"
+    },
+    "version": "1.0"
+  }
+]

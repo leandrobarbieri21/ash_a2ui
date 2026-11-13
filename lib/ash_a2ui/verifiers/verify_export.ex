@@ -3,9 +3,6 @@ defmodule AshA2ui.Verifiers.VerifyExport do
   Verifies at compile time that `export` blocks (CSV file export) are sound:
 
     * only `:table` and `:report` components may declare an `export` block,
-    * export is **v1.0-only** — the surface must declare `spec_version "1.0"`
-      (delivery rides the `callFunction` channel, which does not exist in
-      0.9.1; see `AshA2ui.Export`),
     * declared `columns` are a subset of the component's declared `fields`
       (when both are declared — inferred table fields degrade gracefully).
 
@@ -30,18 +27,17 @@ defmodule AshA2ui.Verifiers.VerifyExport do
     components
     |> Enum.filter(& &1.export)
     |> Enum.reduce_while(:ok, fn component, :ok ->
-      case verify_component(component, dsl_state, module) do
+      case verify_component(component, module) do
         :ok -> {:cont, :ok}
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
   end
 
-  defp verify_component(component, dsl_state, module) do
+  defp verify_component(component, module) do
     key = AshA2ui.Component.key(component)
 
-    with :ok <- verify_kind(component, key, module),
-         :ok <- verify_spec_version(dsl_state, key, module) do
+    with :ok <- verify_kind(component, key, module) do
       verify_columns(component, key, module)
     end
   end
@@ -57,23 +53,6 @@ defmodule AshA2ui.Verifiers.VerifyExport do
          "component #{inspect(key)} cannot declare an export block: CSV export is only " <>
            "supported on :table and :report components"
      )}
-  end
-
-  defp verify_spec_version(dsl_state, key, module) do
-    case Verifier.get_option(dsl_state, [:a2ui], :spec_version) do
-      "1.0" ->
-        :ok
-
-      other ->
-        {:error,
-         DslError.exception(
-           module: module,
-           path: [:a2ui, :component, key, :export],
-           message:
-             "export is v1.0-only (delivery rides the callFunction channel): declare " <>
-               "spec_version \"1.0\" on this surface (it declares #{inspect(other)})"
-         )}
-    end
   end
 
   defp verify_columns(%{export: %{columns: nil}}, _key, _module), do: :ok

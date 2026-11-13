@@ -8,18 +8,16 @@
  * (searchable `author_id`) and `AshA2ui.Test.Post` (plain ChoicePicker).
  * Fixtures are re-recorded with:
  *
- *     MIX_ENV=test mix run -e '
- *       Jason.encode!(%{messages: AshA2ui.Info.build_surface(AshA2ui.Test.TicketSearchUI)})
- *       |> then(&File.write!("priv/js/probe/fixtures/ticket_search_payload.json", &1))'
+ *     MIX_ENV=test mix run priv/js/probe/record_forms.exs
  *
- * (plus the start_create ActionHandler reply for the _open_ fixture and
+ * (each surface plus the start_create reply for its _open_ fixture, and
  * `AshA2ui.Test.Post` for the plain path).
  *
  * Run:
  *
  *     node priv/js/probe/picker_probe.mjs [--node-modules DIR] [--port N]
  *
- * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.10.x and
+ * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.15.0 or later and
  * lit 3 (defaults to a sibling clinic-demo checkout — the versions the
  * integration runs against). Chrome comes from $CHROME.
  *
@@ -259,7 +257,7 @@ async function main() {
     await page.evaluate((surfaceId) => {
       window.__feed([
         {
-          version: "v0.9.1",
+          version: "1.0",
           updateDataModel: {
             surfaceId,
             path: "/options/author_id",
@@ -318,8 +316,8 @@ async function main() {
     await page.evaluate(async () => {
       const surfaceId = window.__surfaceId;
       window.__feed([
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/form/author_id", value: "33333333-3333-3333-3333-333333333333"}},
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/select/author_id/label", value: "Alan Turing"}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/form/author_id", value: "33333333-3333-3333-3333-333333333333"}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/select/author_id/label", value: "Alan Turing"}},
       ]);
     });
     await page.waitForTimeout(250);

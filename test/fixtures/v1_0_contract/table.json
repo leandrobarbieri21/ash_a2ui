@@ -1,0 +1,260 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "contract_table",
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+      "components": [
+        {
+          "id": "root",
+          "component": "Column",
+          "children": [
+            "title",
+            "header",
+            "rows",
+            "pager"
+          ]
+        },
+        {
+          "id": "title",
+          "component": "Text",
+          "text": "## Tasks"
+        },
+        {
+          "id": "header",
+          "component": "Row",
+          "children": [
+            "h_title",
+            "h_status",
+            "h_due",
+            "h_actions"
+          ]
+        },
+        {
+          "id": "h_title",
+          "component": "Text",
+          "text": "**Title**",
+          "weight": 3
+        },
+        {
+          "id": "h_status",
+          "component": "Text",
+          "text": "**Status**",
+          "weight": 1
+        },
+        {
+          "id": "h_due",
+          "component": "Text",
+          "text": "**Due**",
+          "weight": 1
+        },
+        {
+          "id": "h_actions",
+          "component": "Text",
+          "text": " ",
+          "weight": 1
+        },
+        {
+          "id": "rows",
+          "component": "List",
+          "direction": "vertical",
+          "children": {
+            "componentId": "row",
+            "path": "/records"
+          }
+        },
+        {
+          "id": "row",
+          "component": "Row",
+          "children": [
+            "cell_title",
+            "cell_status",
+            "cell_due",
+            "row_view"
+          ],
+          "align": "center",
+          "@accessibility": {
+            "label": {
+              "@path": "title"
+            }
+          }
+        },
+        {
+          "id": "cell_title",
+          "component": "Text",
+          "text": {
+            "@path": "title"
+          },
+          "weight": 3
+        },
+        {
+          "id": "cell_status",
+          "component": "Text",
+          "text": {
+            "@path": "status_text"
+          },
+          "weight": 1
+        },
+        {
+          "id": "cell_due",
+          "component": "Text",
+          "weight": 1,
+          "text": {
+            "@call": "formatDate",
+            "args": {
+              "value": {
+                "@path": "due_on"
+              },
+              "format": "yyyy-MM-dd"
+            }
+          }
+        },
+        {
+          "id": "row_view",
+          "component": "Button",
+          "variant": "borderless",
+          "child": "row_view_label",
+          "weight": 1,
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "view_record",
+                "sourceComponentId": "row_view",
+                "context": {
+                  "id": {
+                    "@path": "id"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "row_view_label",
+          "component": "Text",
+          "text": "View"
+        },
+        {
+          "id": "pager",
+          "component": "Row",
+          "justify": "spaceBetween",
+          "children": [
+            "page_prev",
+            "page_info",
+            "page_next"
+          ]
+        },
+        {
+          "id": "page_prev",
+          "component": "Button",
+          "child": "page_prev_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "paginate",
+                "sourceComponentId": "page_prev",
+                "context": {
+                  "page": "prev"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "page_prev_label",
+          "component": "Text",
+          "text": "Previous"
+        },
+        {
+          "id": "page_info",
+          "component": "Text",
+          "text": {
+            "@call": "formatString",
+            "args": {
+              "value": "Page ${/page/number} of ${/page/count}"
+            }
+          }
+        },
+        {
+          "id": "page_next",
+          "component": "Button",
+          "child": "page_next_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "paginate",
+                "sourceComponentId": "page_next",
+                "context": {
+                  "page": "next"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "page_next_label",
+          "component": "Text",
+          "text": "Next"
+        }
+      ],
+      "dataModel": {
+        "records": [
+          {
+            "id": "t1",
+            "title": "Write the spec",
+            "status_text": "Open",
+            "due_on": "2026-11-20"
+          },
+          {
+            "id": "t2",
+            "title": "Review the encoder",
+            "status_text": "Done",
+            "due_on": "2026-11-21"
+          }
+        ],
+        "page": {
+          "number": 1,
+          "count": 2,
+          "stale": true
+        }
+      }
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_table",
+      "path": "/records",
+      "value": [
+        {
+          "id": "t3",
+          "title": "Ship 1.0",
+          "status_text": "Open",
+          "due_on": "2026-11-30"
+        }
+      ]
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_table",
+      "path": "/page/number",
+      "value": 2
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_table",
+      "path": "/page/stale",
+      "value": null
+    }
+  }
+]

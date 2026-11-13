@@ -17,6 +17,8 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
   alias AshA2ui.Dynamic.Error
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.ResolvedView
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
   alias AshA2ui.Test.TableDisplays.{ArmMatrixUI, MatrixUI, Result}
 
   @allowlist Dynamic.allowlist([Result])
@@ -50,13 +52,14 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
 
   defp parts(ui) do
     messages = AshA2ui.Info.build_surface(ui, authorize?: false)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -109,11 +112,11 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
              }
     end
 
-    test "an enumerated column keeps every declared value, empty ones too (v1.0)" do
+    test "an enumerated column keeps every declared value, empty ones too" do
       seed()
 
       assert [message] = AshA2ui.Info.build_surface(ArmMatrixUI, authorize?: false)
-      assert_valid_server_message(message, :v1_0)
+      assert_valid_agent_message(message)
 
       grid = message["createSurface"]["dataModel"]["_matrix_results"]
       assert texts(grid["columns"]) == ["Case name", "Baseline", "Candidate", "Shadow"]
@@ -148,10 +151,10 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
       assert components["matrix_row"]["children"] ==
                %{"componentId" => "matrix_cell", "path" => "cells"}
 
-      assert components["matrix_cell"]["text"] == %{"path" => "text"}
+      assert components["matrix_cell"]["text"] == %{"@path" => "text"}
 
       basic =
-        "priv/a2ui/v0_9_1/catalogs/basic/catalog.json"
+        "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json"
         |> File.read!()
         |> Jason.decode!()
         |> Map.fetch!("components")
@@ -169,8 +172,7 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
       by_id =
         MatrixUI
         |> AshA2ui.Info.build_surface(authorize?: false)
-        |> Enum.find_value(& &1["updateComponents"])
-        |> Map.fetch!("components")
+        |> Surface.components()
         |> components_by_id()
 
       refute Enum.any?(Map.values(by_id), &(&1["component"] == "dataGrid"))
@@ -183,22 +185,14 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
       seed()
       {_components, value} = parts(MatrixUI)
 
-      envelope = %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => "query",
-          "surfaceId" => "result_matrix",
-          "sourceComponentId" => "test_component",
-          "timestamp" => "2026-10-21T00:00:00Z",
-          "context" => %{
-            "component" => "results",
-            "query" => Map.put(value["query"], "search", "allergy")
-          }
-        }
-      }
+      envelope =
+        Messages.call("query", "result_matrix", %{
+          "component" => "results",
+          "query" => Map.put(value["query"], "search", "allergy")
+        })
 
       assert {:ok, messages} = ActionHandler.handle(MatrixUI, envelope, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       grid =
         Enum.find_value(messages, fn
@@ -337,8 +331,8 @@ defmodule AshA2ui.TableDisplays.MatrixTest do
                ResolvedView.resolve(surface.dsl_state).tables
 
       messages = Dynamic.build_surface(surface, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
-      value = Enum.find_value(messages, &get_in(&1, ["updateDataModel", "value"]))
+      Enum.each(messages, &assert_valid_agent_message/1)
+      value = Surface.data_model(messages)
       assert length(value["_matrix_results"]["rows"]) == 3
 
       without_cell =

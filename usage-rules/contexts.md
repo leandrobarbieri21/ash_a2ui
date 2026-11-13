@@ -84,7 +84,7 @@ end
   (shared `/options` namespace — names must not collide with searchable
   select fields or nested-form arguments), `/detail/<context>`. Action
   contexts on context-enabled surfaces additively carry
-  `"contexts": {"path": "/context"}`.
+  `"contexts": {"@path": "/context"}`.
 - PubSub refreshes through `AshA2ui.LiveRenderer` preserve selections (the
   renderer tracks the last `/context` it pushed and passes it to
   `AshA2ui.Info.build_data_model/2` as `:context_state`). Custom

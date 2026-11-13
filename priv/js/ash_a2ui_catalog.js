@@ -68,13 +68,11 @@
  * passes the classes in:
  *
  *     import {html, css, nothing} from "lit";
- *     import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
- *     import {Catalog} from "@a2ui/web_core/v0_9";
- *     import {ChoicePickerApi, ColumnApi} from "@a2ui/web_core/v0_9/basic_catalog";
+ *     import {A2uiLitElement, A2uiController} from "@a2ui/lit";
+ *     import {basicCatalog, ChoicePickerApi, ColumnApi} from "@a2ui/web_core/catalogs/basic/v1";
  *     import {createAshA2uiCatalog} from "../../deps/ash_a2ui/priv/js/ash_a2ui_catalog.js";
  *
  *     const catalog = createAshA2uiCatalog({
- *       Catalog,
  *       basicCatalog,
  *       ChoicePickerApi,
  *       ColumnApi, // optional: omit to keep the stock Column (no combobox)
@@ -82,32 +80,35 @@
  *       A2uiController,
  *       lit: {html, css, nothing},
  *     });
- *     configureAshA2ui({MessageProcessor, catalogs: [catalog]});
+ *     configureAshA2ui({MessageProcessor, Catalog, catalogs: [catalog]});
  *
- * The anatomy overrides subclass the upstream Text and Button elements.
- * No published `@a2ui/web_core` or `@a2ui/lit` entry point exports those
- * classes, so they are resolved at RUNTIME from the basic catalog's entry:
- * its `element` on @a2ui 0.12+, where the renderer defines a basic element
- * on first render rather than on import, and otherwise the custom-element
- * registry under its `tagName`, which importing `@a2ui/lit/v0_9` fills on
- * 0.10 and 0.11. Subclassing keeps markdown rendering, controller wiring, action
- * dispatch and `renderNode` semantics correct BY CONSTRUCTION — the
- * overrides layer styles and id-keyed anatomy on top, and anything they do
- * not match renders exactly upstream. If an upstream element is not
- * registered, that override is skipped with a console warning and the
- * stock element renders.
+ * The anatomy overrides subclass the upstream Text, Button, Row, TextField
+ * and Modal elements, taken from the basic catalog's entries (`element`).
+ * Subclassing keeps markdown rendering, controller wiring, action dispatch
+ * and `renderNode` semantics correct BY CONSTRUCTION: the overrides layer
+ * styles and id-keyed anatomy on top, and anything they do not match
+ * renders exactly upstream. If an upstream element is missing, that
+ * override is skipped with a console warning and the stock element renders.
  *
- * Verified against @a2ui/lit 0.10.1 / @a2ui/web_core 0.10.4 (the
- * reference-link tier and the banner teardown also against @a2ui/lit +
- * @a2ui/web_core 0.11.0, where the basic components render into light DOM
- * and web_core's A2uiLitElement scopes `static styles` to the tag), and the
- * probes against 0.11 and 0.12: a Catalog (`catalogLike`, below) takes
- * `{...ComponentApi, tagName, element}` entries; the renderer resolves
- * `createSurface.catalogId` by exact string match and renders each
- * component type via `catalog.components.get(type).tagName`. Custom
- * elements reach the surface state through `this.context`
- * (`componentModel.id`, `dataContext.surface.{dataModel,componentsModel,
- * dispatchAction}`) — the same seams the basic catalog uses.
+ * ## Actions
+ *
+ * AshA2ui sends every server-handled action as an `ashAction` function call
+ * against the ash_a2ui catalog (see `ash_a2ui_hook.js`). The elements here
+ * that read or send an action themselves (the combobox, auto-apply, the
+ * prompt Modal, row markers) read it through `actionSpec` and send it back
+ * as the same call through `dispatchActionSpec`. Bindings are
+ * `{"@path": ...}`.
+ *
+ * Written against @a2ui/lit + @a2ui/web_core 0.15.0 (see the hook's note
+ * on the spec envelope keys that release refuses), where the basic
+ * elements render into Light DOM and A2uiLitElement scopes `static styles`
+ * to the tag: a Catalog takes `{...ComponentApi, tagName, element}` entries
+ * (`retagged`, below); the renderer resolves `createSurface.catalogId` by
+ * exact string match and renders each component type with its entry's
+ * `element` under its `tagName`. Custom elements reach the surface state
+ * through `this.context` (`componentModel`, `dataContext` with its
+ * `surface.{dataModel, componentsModel}` and
+ * `resolveAction`), the same seams the basic catalog uses.
  */
 
 const CHOICEPICKER_TAG = "ash-a2ui-choicepicker";
@@ -126,11 +127,9 @@ const TEXTFIELD_TAG = "ash-a2ui-textfield";
  *   Column) replaced.
  */
 export function createAshA2uiCatalog(deps) {
-  const {Catalog, basicCatalog, ChoicePickerApi, ColumnApi, A2uiLitElement, A2uiController, lit} =
-    deps;
+  const {basicCatalog, ChoicePickerApi, ColumnApi, A2uiLitElement, A2uiController, lit} = deps;
 
   if (
-    !Catalog ||
     !basicCatalog ||
     !ChoicePickerApi ||
     !A2uiLitElement ||
@@ -138,7 +137,7 @@ export function createAshA2uiCatalog(deps) {
     !lit
   ) {
     throw new Error(
-      "createAshA2uiCatalog: missing deps. Pass {Catalog, basicCatalog, " +
+      "createAshA2uiCatalog: missing deps. Pass {basicCatalog, " +
         "ChoicePickerApi, A2uiLitElement, A2uiController, lit: {html, css, nothing}} " +
         "(plus ColumnApi for the search-picker combobox).",
     );
@@ -168,52 +167,104 @@ export function createAshA2uiCatalog(deps) {
     (component) => overrides.get(component.name) || component,
   );
 
-  return catalogLike(Catalog, basicCatalog, basicCatalog.id, components, [
-    ...basicCatalog.functions.values(),
-  ]);
+  return basicCatalog.withEntries(components, [...basicCatalog.functions.values()]);
 }
 
 /**
- * A catalog entry drawn by the element defined under `tagName`. From @a2ui
- * 0.12 the renderer defines an entry's `element` under its `tagName` on first
+ * A catalog entry drawn by the element defined under `tagName`. The
+ * renderer defines an entry's `element` under its `tagName` on first
  * render, so an entry that kept the stock `element` under another tag would
- * collide with the element defined for that tag; it carries that one instead.
- * Shared with `createAshAdminCatalog`.
+ * collide with the element defined for that tag; it carries that one
+ * instead. Shared with `createAshAdminCatalog`.
  */
 export function retagged(api, tagName) {
   return {...api, tagName, element: customElements.get(tagName)};
 }
 
-/**
- * A new Catalog built the way `base` was. @a2ui 0.12 added the protocol
- * version as the constructor's second argument (and a catalog carries it);
- * 0.10 and 0.11 take `(id, components, functions, themeSchema)`. Shared with
- * `createAshAdminCatalog`.
- */
-export function catalogLike(Catalog, base, id, components, functions) {
-  return base.protocolVersion
-    ? new Catalog(id, base.protocolVersion, components, functions, base.themeSchema, base.instructions)
-    : new Catalog(id, components, functions, base.themeSchema);
+// --- shared helpers: bindings and actions (A2UI 1.0) ------------------------
+
+/** The data-model path a `{"@path": ...}` binding names, or null. */
+export function bindingPath(value) {
+  return value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof value["@path"] === "string"
+    ? value["@path"]
+    : null;
 }
 
-// --- shared helpers ---------------------------------------------------------
-
-// Resolves an A2UI data binding leaf ({"path": ...}) against the surface
-// data model; relative paths resolve under basePath (the option row's
-// template scope). Non-binding values pass through, matching the
-// GenericBinder's action-context resolution semantics.
-function resolveEventContext(value, dataModel, basePath) {
+/**
+ * Resolves the `{"@path": ...}` bindings in an action context against the
+ * surface data model; relative paths resolve under `basePath` (a template
+ * row's scope). Non-binding values pass through, as in the data context's
+ * own action resolution. Shared with `createAshAdminCatalog`.
+ */
+export function resolveEventContext(value, dataModel, basePath = "/") {
   if (value === null || typeof value !== "object") return value;
-  if (typeof value.path === "string" && Object.keys(value).length === 1) {
-    const abs = value.path.startsWith("/")
-      ? value.path
-      : `${basePath.replace(/\/$/, "")}/${value.path}`;
+  const path = bindingPath(value);
+  if (path !== null && Object.keys(value).length === 1) {
+    const abs = path.startsWith("/") ? path : `${basePath.replace(/\/$/, "")}/${path}`;
     return dataModel.get(abs);
   }
   if (Array.isArray(value)) return value.map((v) => resolveEventContext(v, dataModel, basePath));
   const out = {};
   for (const [k, v] of Object.entries(value)) out[k] = resolveEventContext(v, dataModel, basePath);
   return out;
+}
+
+/**
+ * The name and context of a component's `ashAction` function call
+ * (`{functionCall: {"@call": "ashAction", catalogId, args: {name,
+ * context}}}`, how AshA2ui sends every server-handled action). Returns
+ * `{name, context, catalogId}` (`catalogId` null when the call names none),
+ * or null for any other action: an event action is not sent, since the
+ * agent answers ashAction calls only. Shared with `createAshAdminCatalog`.
+ */
+export function actionSpec(action) {
+  if (!action || typeof action !== "object") return null;
+  const call = action.functionCall;
+  const args = call && call.args;
+  if (call && call["@call"] === "ashAction" && args && typeof args.name === "string") {
+    return {name: args.name, context: args.context || {}, catalogId: call.catalogId ?? null};
+  }
+  return null;
+}
+
+/** The `actionSpec` of a component model's `action` property. */
+export function componentActionSpec(componentModel) {
+  try {
+    return actionSpec(componentModel?.properties?.action);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sends `spec` (an `actionSpec`) as the component would: an `ashAction`
+ * call through the data context's function resolution (the ash_a2ui
+ * catalog's `ashAction` writes the pending feedback and calls the agent).
+ * Its context's bindings are
+ * resolved first, under `basePath`; `update(context)`, when given, returns
+ * the context to send from the resolved one. `componentContext` is the
+ * element's `this.context`, and the action's source is its component.
+ * Returns the action's promise. Shared with `createAshAdminCatalog`.
+ */
+export function dispatchActionSpec(
+  componentContext,
+  spec,
+  {basePath = "/", update, sourceComponentId} = {},
+) {
+  const {dataContext, componentModel} = componentContext;
+  const source = sourceComponentId ?? componentModel.id;
+  const resolved = resolveEventContext(spec.context || {}, dataContext.surface.dataModel, basePath);
+  const context = update ? update(resolved) : resolved;
+
+  const functionCall = {
+    "@call": "ashAction",
+    args: {name: spec.name, sourceComponentId: source, context},
+  };
+  if (spec.catalogId) functionCall.catalogId = spec.catalogId;
+  return Promise.resolve(dataContext.resolveAction({functionCall}, {userActivation: true}));
 }
 
 // --- ChoicePicker override ---------------------------------------------------
@@ -525,7 +576,7 @@ function markRowAction(element) {
   let name = null;
   if (/(^|_)row_action_.*_button$/.test(id) && !id.endsWith("_confirm_button") && !id.includes("_prompt_")) {
     try {
-      const action = element.context?.componentModel?.properties?.action?.event?.context?.action;
+      const action = componentActionSpec(element.context?.componentModel)?.context?.action;
       if (typeof action === "string" && action !== "") name = action;
     } catch {
       // No component model yet.
@@ -538,10 +589,23 @@ function markRowAction(element) {
   }
 }
 
+// Defines a subclass of a basic-catalog element under its own tag. The
+// basic elements render into Light DOM, where A2uiLitElement scopes
+// `static styles` to the element's tag and caches the scoped sheet on the
+// constructor; a subclass would inherit the cache scoped to the upstream
+// tag, and none of its rules (nor upstream's) would match its own tag.
+// Clearing the cache on the subclass makes it scope its own.
+function defineSubclassElement(tag, elementClass) {
+  for (const key of ["_processedSheet", "_processedCss", "_processedStyle", "_adoptedRoots"]) {
+    elementClass[key] = undefined;
+  }
+  customElements.define(tag, elementClass);
+}
+
 // The upstream element class for a basic-catalog component type: the entry's
-// `element` (@a2ui 0.12+), or the custom-element registry under the tag the
-// basic catalog renders it with (0.10, 0.11). Returns undefined when the type
-// or its element is not there.
+// `element`, or, for an entry without one, the element the custom-element
+// registry holds under its tag. Returns undefined when the type or its
+// element is not there.
 function upstreamElementClass(basicCatalog, type) {
   const api = basicCatalog?.components?.get(type);
   if (typeof api?.element === "function") return api.element;
@@ -557,7 +621,7 @@ function defineAnatomyElements({lit, basicCatalog}) {
   if (!A2uiBasicTextElement || !A2uiBasicButtonElement) {
     console.warn(
       "createAshA2uiCatalog: the upstream Text/Button elements are not registered " +
-        "(import @a2ui/lit/v0_9 first); the anatomy overrides are skipped.",
+        "(pass the @a2ui/web_core basic catalog); the anatomy overrides are skipped.",
     );
     return;
   }
@@ -1082,13 +1146,13 @@ function defineAnatomyElements({lit, basicCatalog}) {
         /(^|_)row_action_.*_button$/.test(id) ||
         id.endsWith("_prev_button") ||
         id.endsWith("_next_button") ||
-        /^calendar(_.+)?_(today|all|day)_button$/.test(id)
+        (/^calendar(_.+)?_(today|all|day)_button$/.test(id) && !id.includes("_granularity_"))
       );
     }
   }
 
-  if (!customElements.get(TEXT_TAG)) customElements.define(TEXT_TAG, AshA2uiTextElement);
-  if (!customElements.get(BUTTON_TAG)) customElements.define(BUTTON_TAG, AshA2uiButtonElement);
+  if (!customElements.get(TEXT_TAG)) defineSubclassElement(TEXT_TAG, AshA2uiTextElement);
+  if (!customElements.get(BUTTON_TAG)) defineSubclassElement(BUTTON_TAG, AshA2uiButtonElement);
 
   defineRowElement(basicCatalog);
   defineTextFieldElement(basicCatalog);
@@ -1123,7 +1187,7 @@ function defineRowElement(basicCatalog) {
     }
   }
 
-  customElements.define(ROW_TAG, AshA2uiRowElement);
+  defineSubclassElement(ROW_TAG, AshA2uiRowElement);
 }
 
 // The basic TextField draws its label as a <label> beside the <input> with
@@ -1148,7 +1212,7 @@ function defineTextFieldElement(basicCatalog) {
     }
   }
 
-  customElements.define(TEXTFIELD_TAG, AshA2uiTextFieldElement);
+  defineSubclassElement(TEXTFIELD_TAG, AshA2uiTextFieldElement);
 }
 
 // --- Apply on change -----------------------------------------------------------
@@ -1166,17 +1230,16 @@ function defineTextFieldElement(basicCatalog) {
 // replacing the whole data model (a PubSub refresh) resets the baseline
 // without applying. A renderer without this keeps showing Apply.
 //
-// Exported for priv/js/probe/auto_apply_probe.mjs.
+// Exported for test/js/ash_a2ui_auto_apply.test.mjs.
 
 const AUTO_APPLY_KEYS = ["search", "preset", "filters", "ranges"];
 
 // The query path an Apply button applies, or null for any other button.
 function autoApplyQueryPath(element) {
   try {
-    const event = element.context?.componentModel?.properties?.action?.event;
-    if (event?.name !== "query" || event.context?.page !== 1) return null;
-    const path = event.context?.query?.path;
-    return typeof path === "string" ? path : null;
+    const spec = componentActionSpec(element.context?.componentModel);
+    if (spec?.name !== "query" || spec.context?.page !== 1) return null;
+    return bindingPath(spec.context?.query);
   } catch {
     return null;
   }
@@ -1276,50 +1339,47 @@ export function unwatchAutoApply(element) {
 // --- Action outcomes ------------------------------------------------------------
 //
 // Every AshA2ui action reply writes its outcome as a path write at
-// /ui/feedback (both wire versions) and, on v1.0, /ui/response.
-// Subscribing to those OBJECT paths fires on every such write, also one
-// that leaves the value unchanged: the data model hands an object signal a
-// fresh copy on every write at, above or below it.
+// /ui/feedback. Subscribing to that OBJECT path fires on every such write,
+// also one that leaves the value unchanged: the data model hands an object
+// signal a fresh copy on every write at, above or below it.
 //
-// It also fires when the whole data model is replaced. A LiveRenderer
-// PubSub refresh or URL-state change writes `path: "/"`, which resets
-// /ui/feedback to clear. That write is not the dispatched action's outcome,
-// and one queued ahead of the reply would otherwise end the wait early.
-// The root object tells them apart: a path write changes the model in
-// place, a root write swaps the root.
+// Two other writes reach the path and are not outcomes. The LiveView hook
+// writes `kind: "pending"` the moment an `ashAction` call goes out. And a
+// LiveRenderer PubSub refresh or URL-state change writes `path: "/"`, which
+// resets /ui/feedback to clear; one queued ahead of the reply would
+// otherwise end the wait early. The root object tells it apart: a path
+// write changes the model in place, a root write swaps the root.
+
+/** The data-model path of the feedback map every surface carries. */
+const FEEDBACK_PATH = "/ui/feedback";
 
 /**
- * Calls `onOutcome()` on each path write at or below one of `paths`, and
- * skips writes that replace the data model's root. Each path gets its own
- * data-model subscription, and each skips a root write on its own. Returns
- * the subscriptions (each with `unsubscribe()`); see
- * `unsubscribeActionOutcomes`.
+ * Calls `onOutcome()` on each settled write at or below /ui/feedback (not
+ * a pending write, not a write replacing the data model's root). Returns
+ * the subscription, for `unsubscribeActionOutcomes`.
  *
  * Shared with `createAshAdminCatalog` (its busy buttons' settle).
  */
-export function subscribeActionOutcomes(dataModel, paths, onOutcome) {
-  return paths.map((path) => {
-    let root = dataModel.get("/");
-    return dataModel.subscribe(path, () => {
-      const current = dataModel.get("/");
-      if (current !== root) {
-        root = current;
-        return;
-      }
-      onOutcome();
-    });
+export function subscribeActionOutcomes(dataModel, onOutcome) {
+  let root = dataModel.get("/");
+  return dataModel.subscribe(FEEDBACK_PATH, () => {
+    const current = dataModel.get("/");
+    if (current !== root) {
+      root = current;
+      return;
+    }
+    if (dataModel.get(`${FEEDBACK_PATH}/kind`) === "pending") return;
+    onOutcome();
   });
 }
 
-/** Releases the subscriptions `subscribeActionOutcomes` returned. */
-export function unsubscribeActionOutcomes(subscriptions) {
-  for (const subscription of subscriptions || []) {
-    try {
-      // DataModel.subscribe returns {value, unsubscribe()}, not a function.
-      subscription.unsubscribe();
-    } catch {
-      // The data model may already be gone (surface torn down).
-    }
+/** Releases the subscription `subscribeActionOutcomes` returned. */
+export function unsubscribeActionOutcomes(subscription) {
+  try {
+    // DataModel.subscribe returns {value, unsubscribe()}, not a function.
+    subscription?.unsubscribe();
+  } catch {
+    // The data model may already be gone (surface torn down).
   }
 }
 
@@ -1328,13 +1388,14 @@ export function unsubscribeActionOutcomes(subscriptions) {
 // A row action declaring `prompt_fields` renders, in the basic composition
 // (tables and every board, under both catalogs), as a Modal whose content
 // ends in a Confirm Button dispatching `invoke`. The stock Modal opens on
-// its trigger and closes only through its own × button: after a successful
+// its trigger and closes only through its own × button or its overlay:
+// after a successful
 // Confirm the server resets /prompt/values/<action>, so the dialog stayed
 // open over cleared fields (clinic-demo's board Complete / Delegate).
 //
 // <ash-a2ui-modal> subclasses the upstream Modal (resolved from the
-// custom-element registry, like the anatomy overrides). A click on a
-// Button inside the open dialog whose action is an `invoke` event makes
+// basic catalog, like the anatomy overrides). A click on a Button inside
+// the open dialog whose action is an `invoke` makes
 // the dialog wait for that outcome: the next path write to /ui/feedback
 // (see "Action outcomes" — a whole-model refresh in between is skipped)
 // that carries a `kind` settles it. `kind == "success"` closes the dialog.
@@ -1347,7 +1408,6 @@ export function unsubscribeActionOutcomes(subscriptions) {
 // unchanged, and the emitted tree stays basic catalog: a stock renderer
 // still shows the stock Modal.
 
-const PROMPT_SETTLE_PATH = "/ui/feedback";
 const PROMPT_ERROR_CLASS = "ash-a2ui-prompt-error";
 
 function definePromptModalElement(basicCatalog) {
@@ -1359,23 +1419,16 @@ function definePromptModalElement(basicCatalog) {
     constructor() {
       super();
       this._ashPromptSubscriptions = null;
-      this._ashOnDialogClick = (event) => this.onDialogClick(event);
-      this._ashOnDialogClose = () => this.onDialogClose();
-      this._ashDialog = null;
       this._ashErrorEl = null;
+      // The content stops a click's propagation (so it does not close the
+      // overlay), so the click is seen on the way down.
+      this.addEventListener("click", (event) => this.onDialogClick(event), true);
     }
 
     updated(changed) {
       super.updated?.(changed);
-      const dialog = this.dialog;
-      if (dialog === this._ashDialog) return;
-      this._ashDialog?.removeEventListener("click", this._ashOnDialogClick);
-      this._ashDialog?.removeEventListener("close", this._ashOnDialogClose);
-      this._ashErrorEl?.remove();
-      this._ashErrorEl = null;
-      this._ashDialog = dialog || null;
-      this._ashDialog?.addEventListener("click", this._ashOnDialogClick);
-      this._ashDialog?.addEventListener("close", this._ashOnDialogClose);
+      // Closed by ×, the overlay or a success: the next opening starts clean.
+      if (changed.has("isOpen") && !this.isOpen && changed.get("isOpen")) this.onDialogClose();
     }
 
     disconnectedCallback() {
@@ -1383,12 +1436,20 @@ function definePromptModalElement(basicCatalog) {
       this.dropPromptSubscription();
     }
 
+    dialogContent() {
+      return this.isOpen ? this.renderRoot.querySelector(".a2ui-modal-content") : null;
+    }
+
     // The Button component a click inside the dialog landed on, read from
     // the composed path (the button's element carries its component model;
     // a click on its label first crosses the label Text's element).
     clickedButtonModel(event) {
-      for (const node of event.composedPath()) {
-        if (node === this._ashDialog) return null;
+      const content = this.dialogContent();
+      if (!content) return null;
+      const path = event.composedPath();
+      if (!path.includes(content)) return null;
+      for (const node of path) {
+        if (node === content) return null;
         const model = node?.context?.componentModel;
         if (model?.type === "Button") return model;
       }
@@ -1396,40 +1457,37 @@ function definePromptModalElement(basicCatalog) {
     }
 
     onDialogClick(event) {
-      if (!this._ashDialog?.open) return;
       const model = this.clickedButtonModel(event);
-      if (model?.properties?.action?.event?.name !== "invoke") return;
+      if (componentActionSpec(model)?.name !== "invoke") return;
       this.showPromptError("");
       this.awaitPromptOutcome();
     }
 
-    // Closed by ×, Escape or a success: the next opening starts clean.
     onDialogClose() {
       this.dropPromptSubscription();
-      this.showPromptError("");
+      this._ashErrorEl = null;
     }
 
     awaitPromptOutcome() {
       const dataModel = this.context?.dataContext?.surface?.dataModel;
       if (!dataModel || typeof dataModel.subscribe !== "function") return;
       this.dropPromptSubscription();
-      const subscriptions = subscribeActionOutcomes(dataModel, [PROMPT_SETTLE_PATH], () => {
-        // Read once the whole outcome batch has landed (a v1.0 reply
-        // writes /ui/response before its /ui/feedback mirror).
+      const subscription = subscribeActionOutcomes(dataModel, () => {
+        // Read once the whole outcome batch has landed.
         Promise.resolve().then(() => {
-          if (this._ashPromptSubscriptions !== subscriptions) return;
-          const feedback = dataModel.get(PROMPT_SETTLE_PATH) || {};
+          if (this._ashPromptSubscriptions !== subscription) return;
+          const feedback = dataModel.get(FEEDBACK_PATH) || {};
           // A write that leaves the feedback clear is not this outcome.
           if (feedback.kind === undefined || feedback.kind === null || feedback.kind === "") return;
           this.dropPromptSubscription();
           if (feedback.kind === "success") {
-            if (this._ashDialog?.open) this._ashDialog.close();
+            if (this.isOpen) this.closeModal();
           } else {
             this.showPromptError(typeof feedback.message === "string" ? feedback.message : "");
           }
         });
       });
-      this._ashPromptSubscriptions = subscriptions;
+      this._ashPromptSubscriptions = subscription;
     }
 
     dropPromptSubscription() {
@@ -1438,19 +1496,20 @@ function definePromptModalElement(basicCatalog) {
       this._ashPromptSubscriptions = null;
     }
 
-    // The outcome message line, appended to the dialog after the content
-    // (outside lit's rendered parts, which leave unknown nodes alone).
+    // The outcome message line, appended to the dialog content after the
+    // prompt (outside lit's rendered parts, which leave unknown nodes
+    // alone). Closing the dialog removes the content, and the line with it.
     showPromptError(message) {
-      const dialog = this._ashDialog;
-      if (!dialog) return;
-      if (!this._ashErrorEl) {
+      const content = this.dialogContent();
+      if (!content) return;
+      if (!this._ashErrorEl || !content.contains(this._ashErrorEl)) {
         if (!message) return;
         const line = document.createElement("p");
         line.className = PROMPT_ERROR_CLASS;
         line.setAttribute("role", "alert");
         line.style.cssText =
           "margin: 12px 0 0; color: var(--ash-admin-error, #c22c33); font-size: 0.875em;";
-        dialog.appendChild(line);
+        content.appendChild(line);
         this._ashErrorEl = line;
       }
       this._ashErrorEl.textContent = message;
@@ -1458,7 +1517,7 @@ function definePromptModalElement(basicCatalog) {
     }
   }
 
-  customElements.define(MODAL_TAG, AshA2uiModalElement);
+  defineSubclassElement(MODAL_TAG, AshA2uiModalElement);
   return true;
 }
 
@@ -1536,9 +1595,9 @@ function detectPicker(surface, id) {
     if (options.type !== "List") missing.push("_options is not a List");
     if (typeof options.properties?.children?.path !== "string")
       missing.push("_options has no templated children path");
-    if (typeof optionButton.properties?.action?.event?.name !== "string")
-      missing.push("_option_button has no action event");
-    if (typeof selected.properties?.text?.path !== "string")
+    if (!componentActionSpec(optionButton))
+      missing.push("_option_button has no action");
+    if (bindingPath(selected.properties?.text) === null)
       missing.push("_selected has no bound text path");
     if (typeof label.properties?.text !== "string")
       missing.push("_label has no literal text");
@@ -1547,30 +1606,30 @@ function detectPicker(surface, id) {
 
   const searchInput = get("_search_input");
   const searchButton = get("_search_button");
-  const searchPath = searchInput?.properties?.value?.path;
-  const searchEvent = searchButton?.properties?.action?.event;
-  const searchable =
-    typeof searchPath === "string" && typeof searchEvent?.name === "string";
+  const searchPath = bindingPath(searchInput?.properties?.value);
+  const searchEvent = componentActionSpec(searchButton);
+  const searchable = searchPath !== null && searchEvent !== null;
 
-  const clearEvent = get("_clear_button")?.properties?.action?.event;
+  const clearEvent = componentActionSpec(get("_clear_button"));
+  const labelPath = bindingPath(selected.properties.text);
 
   return {
     base,
-    // The v1.0 encoder emits heading Texts as Markdown ("### User"); the
+    // The encoder emits heading Texts as Markdown ("### User"); the
     // picker renders its label as plain inline text, so strip the marker.
     label: label.properties.text.replace(/^#{1,6}\s+/, ""),
-    labelPath: selected.properties.text.path,
+    labelPath,
     // The picker's selected value lives next to its label in the reserved
     // state shape ({value, label, search}).
-    valuePath: selected.properties.text.path.replace(/\/label$/, "/value"),
+    valuePath: labelPath.replace(/\/label$/, "/value"),
     optionsPath: options.properties.children.path,
-    optionEvent: optionButton.properties.action.event,
+    optionEvent: componentActionSpec(optionButton),
     optionButtonId: `${base}_option_button`,
     searchable,
     searchPath: searchable ? searchPath : null,
     searchEvent: searchable ? searchEvent : null,
     searchButtonId: searchable ? `${base}_search_button` : null,
-    clearEvent: clearEvent && typeof clearEvent.name === "string" ? clearEvent : null,
+    clearEvent,
     clearButtonId: `${base}_clear_button`,
   };
 }
@@ -1942,7 +2001,7 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
     // the board's line colour, and `--a2ui-swimlane-ink` for the texts on
     // the band (the merged Text override reads it). The tone is data the
     // server writes once with the surface; the subscription re-paints when
-    // it arrives after the components (v0.9.1 sends the data model last).
+    // it arrives after the components.
     paintSwimlane() {
       const name = this.swimlaneName();
       if (name === null) {
@@ -2015,10 +2074,8 @@ function defineColumnElement({A2uiLitElement, A2uiController, ColumnApi, lit}) {
       }
     }
 
-    dispatch(event, sourceComponentId, basePath = "/") {
-      const {dataModel} = this.surface;
-      const context = resolveEventContext(event.context || {}, dataModel, basePath);
-      this.surface.dispatchAction({event: {name: event.name, context}}, sourceComponentId);
+    dispatch(spec, sourceComponentId, basePath = "/") {
+      dispatchActionSpec(this.context, spec, {sourceComponentId, basePath});
     }
 
     readPickerState() {

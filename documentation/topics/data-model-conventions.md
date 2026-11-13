@@ -18,12 +18,10 @@ custom hooks, and tests can rely on them.
 | `/errors/<argument>/<index>/<field>` | Validation error text for one field of one nested-form row (index into the submitted array) | A submit with nested rows fails validation |
 | `/options/<name>` | The option list of a relationship-backed form select **or** a pick_existing nested form (keyed by field / argument name) | Initial render; full data-model refreshes; every `option_search` |
 | `/select/<name>` | Client-side state of searchable selects (`{"search", "label"}`) and pick_existing pickers (`{"search", "picked"}`) | Initial render (only on surfaces using them); `option_select`; `start_edit`; after submit |
-| `/ui/feedback` | The typed outcome of the last action: `{"kind", "message"}`, kind `"success"` / `"warning"` / `"error"` (`null` when cleared) — the flash-equivalent | After every handled action (success, rejection, validation failure, refusal); cleared by task open/cancel |
+| `/ui/feedback` | The typed outcome of the last action, always the whole map `{"kind", "message", "code", "functionCallId", "result", "resultText"}`; `kind` is `"success"` / `"warning"` / `"error"` / `"pending"`, and `""` when idle — the flash-equivalent | After every handled action (success, rejection, validation failure, refusal); cleared by task open/cancel |
 | `/ui/intent` | The task the surface is in: `"browse"`, `"create"`, `"view"` or `"edit"` | Initial render (`"browse"`); every task-panel action; a successful `submit_form` (back to `"browse"`) |
 | `/ui/panel` | The task panel: `visible`, `mode`, `title`, `primary_label`, `record_id`, the `submit_visible` / `form_visible` / `view_visible` sentinels, and `record` (the read-only display values of a `view_record`) | Same as `/ui/intent`; `wizard_next`/`wizard_back` rewrite `primary_label` and `submit_visible` |
 | `/_empty_visible` / `/_empty_message` | A table's empty-state sentinel (`[]` while records exist) and its text (multi-table: `/_empty_visible_<table>`, `/_empty_message_<table>`) | Initial render; every records rewrite |
-| `/ui/action_result` | The raw map returned by a map-returning generic action | An `invoke`d generic action returns a plain map (cleared by every subsequent successful action) |
-| `/ui/action_result_text` | The human-readable rendering of `/ui/action_result` | Same as `/ui/action_result` |
 | `/query` | The current search/filter/preset/sort/pagination state of a query-enabled table (multi-table surfaces: an object keyed by table component name) | Initial render; after every `query` action; alongside query-aware success refreshes |
 | `/query/<component_name>` | One table's query state on a **multi-table** surface | Same as `/query`, per table |
 | `/_lane_total_<lane>` | A board lane's total as a string (`"3"`, `"5+"`) — only on surfaces with `display :board` tables | Initial render; action refreshes and `query` actions on that lane. A `scope: :records` push leaves it untouched |
@@ -51,7 +49,7 @@ LiveView transport's PubSub subscription — is one message:
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "tickets",
     "path": "/records",
@@ -69,7 +67,7 @@ LiveView transport's PubSub subscription — is one message:
 
 A field with declared choices (an atom with a `one_of` constraint, or an
 `Ash.Type.Enum`) reaches the row as its label, the same words its form picker
-shows: `Ash.Type.Enum.label/1` when the enum declares one, the humanized value
+shows: the enum's `label/1` callback when it declares one, the humanized value
 otherwise. The row also carries the value itself at the reserved
 `_values/<field>` key, for a client that keys its own words by value (a
 translated label, a detail line per state). Only fields whose value was
@@ -106,7 +104,7 @@ component (named via `component :table, :some_name` — see
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "review",
     "path": "/records/new_items",
@@ -195,7 +193,7 @@ error's field to its reserved path and pushes the message text:
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "tickets",
     "path": "/errors/subject",
@@ -228,19 +226,35 @@ message types needed.
 ## `/ui/feedback` — the flash-equivalent
 
 Stateless protocols have no "flash" concept, so AshA2ui reserves
-`/ui/feedback` for the typed outcome of every action. The message is
-display-ready text; the kind says what happened:
+`/ui/feedback` for the outcome of every action. It is **one map**, always
+written whole, and `createSurface.dataModel` starts it idle:
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "tickets",
     "path": "/ui/feedback",
-    "value": { "kind": "success", "message": "Created successfully." }
+    "value": {
+      "kind": "success",
+      "message": "Created successfully.",
+      "code": "",
+      "functionCallId": "fc_1",
+      "result": {},
+      "resultText": ""
+    }
   }
 }
 ```
+
+| Key | Meaning |
+|---|---|
+| `kind` | `"success"`, `"warning"`, `"error"`, `"pending"` (written by the hook while a call is in flight), or `""` (idle) |
+| `message` | Display-ready text |
+| `code` | `""` on success and idle, otherwise the error code (`VALIDATION_FAILED`, `FORBIDDEN`, `ACTION_FAILED`, ...); `"TIMEOUT"` on a pending map the hook rewrote because the call has gone unanswered past its watchdog |
+| `functionCallId` | The call this outcome answers, `""` when it answers none (a refused `action` event, a host's own write) |
+| `result` | The serialized map a map-returning generic action returned (`{}` otherwise) |
+| `resultText` | The same result as display-ready text: one `Humanized key: value` line per key, sorted by key (`""` otherwise) |
 
 `AshA2ui.ActionHandler` writes it after every outcome-bearing action — a
 success text on completion (submits, invokes, report runs, CSV exports),
@@ -254,65 +268,59 @@ failed." and is only logged). Field errors on fields the action shows no
 input for are named in
 it as "<Label>: <message>" (see
 [Actions and Authorization](actions-and-authorization.md)). Task open/cancel and context
-select/clear clear it (`kind: null`, `message: ""`). Actions that only fetch
-data for the client (`query`, `option_search`, `context_search`) leave it
-untouched. The emitted surface binds its `status_text` Text to
+select/clear reset it to idle. The quiet actions, which report no outcome of
+their own (`query`, `option_search`, `context_search`, `option_select`,
+`nested_add`, `nested_remove`, `bulk_select`, `prompt`, `wizard_next`,
+`wizard_back`, `open_surface`; `AshA2ui.ActionHandler.quiet_actions/0`),
+leave it untouched unless they fail, and the hook shows no pending state for
+them. The pending and slow messages the hook writes come from
+`/ui/feedback_text/pending` and `/ui/feedback_text/slow`, which the server
+writes in the surface's language. The emitted surface binds its `status_text` Text to
 `/ui/feedback/message` (right under the task panel, above the tables), and
-the admin catalog's `statusBanner` binds both keys. On v1.0 surfaces the
-same outcome is also the structured `/ui/response` object (see
-[A2UI 1.0](a2ui-1-0.md)).
+the admin catalog's `statusBanner` binds the whole map. When the trigger was
+an `ashAction` call, the same value is the `agentFunctionResponse` (see
+[The A2UI 1.0 wire contract](a2ui-1-0.md)).
 
-There is no `/ui/status`: it was removed with the pre-experience
-composition. Consumers that read it move to `/ui/feedback/message`.
+The map is replaced wholesale, never written at a sub-path, so a stale
+`pending` cannot outlive the settled write. Field errors are the exception
+to "one path": they stay at `/errors/<field>`.
 
-## `/ui/action_result` and `/ui/action_result_text` — generic action results
+## `/ui/feedback/result` and `/ui/feedback/resultText` — generic action results
 
 Row actions (`invoke`) may target **generic actions** — think "generate an
-API secret" or "recompute stats". Three handler conventions apply (all are
+API secret" or "recompute stats". Two handler conventions apply (both are
 AshA2ui conventions layered on the protocol, not part of the A2UI spec):
 
 - **`:record_id` pass-through** — if the generic action declares a
   `:record_id` argument, the `invoke` context's `"recordId"` is passed to it,
   so row-scoped generic actions know which record they were invoked on.
-- **`/ui/action_result`** — when the action returns a plain map, the handler
-  serializes it (JSON-safe values, string keys) and writes it to
-  `/ui/action_result` alongside the usual success follow-ups. This is the
-  raw result, for programmatic consumers:
+- **Map results** — when the action returns a plain map, the handler
+  serializes it (JSON-safe values, string keys) into `result`, the raw
+  result for programmatic consumers, and renders it into `resultText`,
+  display-ready selectable text. The emitted surface always includes an
+  `action_result_panel` (a `Column` wrapping a `Text` bound to
+  `/ui/feedback/resultText`), so a generic action returning
+  `%{secret: "abc"}` produces visible, selectable `Secret: abc` text with
+  no custom renderer work:
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "tickets",
-    "path": "/ui/action_result",
-    "value": { "secret": "s3cr3t", "record_id": "…" }
+    "path": "/ui/feedback",
+    "value": {
+      "kind": "success", "message": "Done.", "code": "", "functionCallId": "fc_2",
+      "result": { "secret": "s3cr3t", "record_id": "…" },
+      "resultText": "Record id: …\nSecret: s3cr3t"
+    }
   }
 }
 ```
 
-- **`/ui/action_result_text`** — the same result rendered as display-ready,
-  selectable text: one `Humanized key: value` line per key, sorted by key
-  (non-string values are JSON-encoded). The emitted surface always includes
-  an `action_result_panel` (a `Column` wrapping a `Text` bound to this
-  path), so a generic action returning `%{secret: "abc"}` produces visible,
-  selectable `Secret: abc` text with no custom renderer work:
-
-```json
-{
-  "version": "v0.9.1",
-  "updateDataModel": {
-    "surfaceId": "tickets",
-    "path": "/ui/action_result_text",
-    "value": "Record id: …\nSecret: s3cr3t"
-  }
-}
-```
-
-Both paths are **cleared** (`{}` / `""`) at the start of every subsequent
-successful action's follow-up batch, so a stale result never outlives the
-action that produced it (a map-returning action clears and then sets them in
-the same batch — apply messages in order). Non-map results (`:ok`, records)
-emit no extra message beyond the clears.
+A subsequent action writes a new whole map, so a stale result never
+outlives the action that produced it. Non-map results (`:ok`, records) leave
+`result` and `resultText` empty.
 
 ## `/options/<name>` — relationship select and picker options
 
@@ -325,7 +333,7 @@ nested forms get the same treatment, keyed by the **argument** name:
 
 ```json
 {
-  "version": "v0.9.1",
+  "version": "1.0",
   "updateDataModel": {
     "surfaceId": "posts",
     "path": "/options/author_id",
@@ -349,7 +357,7 @@ Conventions:
   one `/options/<name>` list on demand (searchable selects and searchable
   pick_existing pickers only; see
   [Relationship Rendering](relationships.md)).
-- Because the v0.9.1 basic-catalog `ChoicePicker` only accepts a literal
+- Because the basic-catalog `ChoicePicker` only accepts a literal
   inline options array (each option's `value` is a plain string — no data
   binding), the emitted picker carries the same list **inline** in
   `updateComponents`; `/options/<field>` is the stable, programmatic mirror
@@ -440,7 +448,7 @@ shared across rows (only one Modal is open at a time). Conventions:
   `/prompt/values/<action>` with the record's current values (public
   attributes; `""` for pure arguments) and clears `/errors`.
 - The Modal's Confirm sends `"invoke"` with
-  `"values": {"path": "/prompt/values/<action>"}`; a success clears the
+  `"values": {"@path": "/prompt/values/<action>"}`; a success clears the
   action's values map back to `{}`, a validation failure writes
   `/errors/<field>` (rendered inside the Modal).
 - A relationship field scoped per row (`prompt_options`) adds
@@ -463,7 +471,7 @@ rendered by `:detail` components — the same JSON-safe map shape as a
 `/records` row, `{}` while the context is unselected.
 
 Every action context on a context-enabled surface additively carries
-`"contexts": {"path": "/context"}`, so server reads (refreshes, `query`,
+`"contexts": {"@path": "/context"}`, so server reads (refreshes, `query`,
 cascades) run under the client's current selections. Carried context values
 are **scoping input, not authority**: the changed context's value always
 round-trips through an authorized read, and scoped table reads run with the
@@ -486,7 +494,7 @@ Present **only** on surfaces whose form declares `step` entities (see
 
 The server rewrites the whole `/ui/wizard` value on every move. `/form` is
 carried across steps unchanged: the `wizard_next` / `wizard_back` contexts
-carry `"index": {"path": "/ui/wizard/index"}` (and Next the
+carry `"index": {"@path": "/ui/wizard/index"}` (and Next the
 `/form` values), and the server re-checks both — keys outside the form's
 fields are dropped and the index is clamped into the step range.
 
@@ -539,7 +547,7 @@ here), but existing paths won't change meaning within a major version.
 >
 > The exact grouping of these writes (single message vs. one per path, order
 > relative to `/records` refreshes) is pinned down by the encoder/handler
-> test suites rather than this document — the vendored v0.9.1 JSON Schemas
-> in `priv/a2ui/v0_9_1/` validate every emitted message. Treat the *paths and
+> test suites rather than this document — the vendored 1.0 JSON Schemas
+> in `priv/a2ui/v1_0/` validate every emitted message. Treat the *paths and
 > meanings* above as frozen, and the message batching as an implementation
 > detail.

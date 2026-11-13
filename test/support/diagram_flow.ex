@@ -113,7 +113,7 @@ end
 
 defmodule AshA2ui.Test.Diagram.FlowUI do
   @moduledoc """
-  A v0.9.1 surface with a live diagram (module source) above a visits
+  A surface with a live diagram (module source) above a visits
   table.
   """
 
@@ -137,7 +137,7 @@ end
 
 defmodule AshA2ui.Test.Diagram.FlowV1UI do
   @moduledoc """
-  A v1.0 diagram-only surface whose source is `{module, function, args}`,
+  A diagram-only surface whose source is `{module, function, args}`,
   plus a diagram whose source fails.
   """
 
@@ -146,7 +146,6 @@ defmodule AshA2ui.Test.Diagram.FlowV1UI do
   a2ui do
     for_resource AshA2ui.Test.Diagram.Visit
     surface_id "visit_flow_v1"
-    spec_version "1.0"
 
     diagram :flow do
       source {AshA2ui.Test.Diagram.Flow, :diagram_for, [:v1]}

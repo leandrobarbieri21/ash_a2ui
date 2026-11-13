@@ -1,20 +1,34 @@
 defmodule AshA2ui.EncoderTest do
   @moduledoc """
-  `AshA2ui.Encoder.V0_9_1` payload tests: every message is validated against
-  the vendored v0.9.1 schemas via `SchemaHelper.assert_valid_server_message/1`,
+  `AshA2ui.Encoder` payload tests: every message is validated against
+  the vendored A2UI 1.0 schemas via `SchemaHelper.assert_valid_agent_message/2`,
   plus targeted structural assertions on the emitted component tree, the
-  frozen action-wire contract, and record serialization.
+  action contract, and record serialization. The rules the schemas cannot
+  express are asserted directly:
+
+    * `updateDataModel` always carries `"value"` (an omitted value deletes
+      the key at path);
+    * no wire function call carries `returnType`;
+    * every generated component id, action name and function name is a
+      UAX #31 identifier (asserted against the ASCII subset
+      `^[A-Za-z_][A-Za-z0-9_]*$`; generated identifiers are ASCII
+      snake_case).
   """
 
   use ExUnit.Case, async: false
 
   import AshA2ui.Test.SchemaHelper
+  import AshA2ui.Test.Surface
 
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{KitchenSink, Minimal}
 
-  @catalog_id "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+  @catalog_id "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
+  @ash_catalog_id "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+
+  # ASCII subset of UAX #31's ^[\p{XID_Start}_][\p{XID_Continue}]*$
+  @identifier ~r/^[A-Za-z_][A-Za-z0-9_]*$/
 
   # A struct with NO Jason implementation anywhere — what a custom Ash type
   # (or a host lib's value type) might drop into an attribute.
@@ -53,29 +67,79 @@ defmodule AshA2ui.EncoderTest do
   end
 
   defp encode_kitchen_sink(records \\ []) do
-    KitchenSink |> ResolvedView.resolve() |> V0_9_1.encode_surface(records, [])
+    KitchenSink |> ResolvedView.resolve() |> Encoder.encode_surface(records, [])
   end
 
-  defp components_by_id(messages) do
-    update = Enum.find(messages, &Map.has_key?(&1, "updateComponents"))
-    Map.new(update["updateComponents"]["components"], &{&1["id"], &1})
+  # Depth-first walk over every map in a message tree, collecting what
+  # `picker` returns.
+  defp collect(value, picker) when is_map(value) do
+    List.wrap(picker.(value)) ++
+      Enum.flat_map(value, fn {_key, child} -> collect(child, picker) end)
+  end
+
+  defp collect(value, picker) when is_list(value), do: Enum.flat_map(value, &collect(&1, picker))
+  defp collect(_scalar, _picker), do: []
+
+  defp calls(tree) do
+    collect(tree, fn
+      %{"@call" => _} = call -> call
+      _other -> nil
+    end)
   end
 
   describe "encode_surface/3 envelope" do
-    test "returns createSurface -> updateComponents -> updateDataModel, all schema-valid" do
-      messages = encode_kitchen_sink()
+    test "returns one schema-valid inline createSurface with components and data model" do
+      assert [message] = encode_kitchen_sink()
+      assert_valid_agent_message(message)
 
-      assert [
-               %{"createSurface" => create},
-               %{"updateComponents" => update},
-               %{"updateDataModel" => data}
-             ] = Enum.map(messages, &assert_valid_server_message/1)
-
-      assert Enum.all?(messages, &(&1["version"] == "v0.9.1"))
+      assert %{"version" => "1.0", "createSurface" => create} = message
       assert create["surfaceId"] == "kitchen_sink"
       assert create["catalogId"] == @catalog_id
-      assert update["surfaceId"] == "kitchen_sink"
-      assert data["surfaceId"] == "kitchen_sink"
+      assert [_ | _] = create["components"]
+      assert is_map(create["dataModel"])
+      refute Map.has_key?(create, "theme")
+      refute Map.has_key?(create, "surfaceProperties")
+    end
+
+    test "every action is an ashAction call in the ash_a2ui catalog naming its source" do
+      components = encode_kitchen_sink() |> components()
+
+      actions =
+        collect(components, fn
+          %{"id" => id, "action" => action} -> {id, action}
+          _other -> nil
+        end)
+
+      assert actions != []
+
+      for {id, action} <- actions do
+        assert %{
+                 "functionCall" => %{
+                   "@call" => "ashAction",
+                   "catalogId" => @ash_catalog_id,
+                   "args" => %{"name" => name, "sourceComponentId" => ^id, "context" => _}
+                 }
+               } = action
+
+        assert name =~ @identifier
+      end
+    end
+
+    test "no wire function call carries returnType" do
+      calls = encode_kitchen_sink() |> components() |> calls()
+
+      # the KitchenSink fixture formats :inserted_at as a date
+      assert Enum.any?(calls, &(&1["@call"] == "formatDate"))
+      refute Enum.any?(calls, &Map.has_key?(&1, "returnType"))
+    end
+
+    test "every component id and function name is a UAX #31 identifier" do
+      components = encode_kitchen_sink() |> components()
+
+      for %{"id" => id} <- components, do: assert(id =~ @identifier, "component id #{id}")
+
+      for %{"@call" => call} <- calls(components),
+          do: assert(call =~ @identifier, "function name #{call}")
     end
 
     test "a component with id root is present and references only ids as children" do
@@ -98,8 +162,8 @@ defmodule AshA2ui.EncoderTest do
     end
 
     test "a table-only surface omits the form section" do
-      messages = Minimal |> ResolvedView.resolve() |> V0_9_1.encode_surface([], [])
-      Enum.each(messages, &assert_valid_server_message/1)
+      messages = Minimal |> ResolvedView.resolve() |> Encoder.encode_surface([], [])
+      assert_valid_agent_message(hd(messages))
 
       components = components_by_id(messages)
 
@@ -137,14 +201,14 @@ defmodule AshA2ui.EncoderTest do
 
       assert row_children ==
                [
-                 "table_cell_active",
-                 "table_cell_count",
-                 "table_cell_price",
-                 "table_cell_birthday",
-                 "table_cell_scheduled_at",
-                 "table_cell_status",
-                 "table_cell_name",
-                 "table_cell_inserted_at"
+                 "table_cell_active_row",
+                 "table_cell_count_row",
+                 "table_cell_price_row",
+                 "table_cell_birthday_row",
+                 "table_cell_scheduled_at_row",
+                 "table_cell_status_row",
+                 "table_cell_name_row",
+                 "table_cell_inserted_at_row"
                ] ++
                  [
                    "row_action_update_button",
@@ -160,15 +224,15 @@ defmodule AshA2ui.EncoderTest do
       assert %{
                "component" => "Row",
                "children" => ["table_cell_name_label", "table_cell_name_value"]
-             } = components["table_cell_name"]
+             } = components["table_cell_name_row"]
 
       assert %{"component" => "Text", "text" => "Name", "variant" => "caption"} =
                components["table_cell_name_label"]
 
-      assert %{"component" => "Text", "text" => %{"path" => "name"}} =
+      assert %{"component" => "Text", "text" => %{"@path" => "name"}} =
                components["table_cell_name_value"]
 
-      assert %{"component" => "Text", "text" => %{"path" => "status"}} =
+      assert %{"component" => "Text", "text" => %{"@path" => "status"}} =
                components["table_cell_status_value"]
     end
 
@@ -178,33 +242,30 @@ defmodule AshA2ui.EncoderTest do
       assert %{
                "component" => "Text",
                "text" => %{
-                 "call" => "formatDate",
-                 "args" => %{"value" => %{"path" => "inserted_at"}, "format" => format},
-                 "returnType" => "string"
+                 "@call" => "formatDate",
+                 "args" => %{"value" => %{"@path" => "inserted_at"}, "format" => format}
                }
              } = components["table_cell_inserted_at_value"]
 
       assert is_binary(format)
     end
 
-    test "row-action buttons carry the frozen invoke contract" do
+    test "row-action buttons carry the invoke contract" do
       components = encode_kitchen_sink() |> components_by_id()
 
+      assert %{"component" => "Button", "child" => "row_action_update_text"} =
+               components["row_action_update_button"]
+
       assert %{
-               "component" => "Button",
-               "child" => "row_action_update_text",
-               "action" => %{
-                 "event" => %{
-                   "name" => "invoke",
-                   "context" => %{"action" => "update", "recordId" => %{"path" => "id"}}
-                 }
-               }
-             } = components["row_action_update_button"]
+               "name" => "invoke",
+               "sourceComponentId" => "row_action_update_button",
+               "context" => %{"action" => "update", "recordId" => %{"@path" => "id"}}
+             } = event(components["row_action_update_button"])
 
       assert %{"component" => "Text", "text" => "Update"} = components["row_action_update_text"]
 
-      assert %{"event" => %{"name" => "invoke", "context" => %{"action" => "destroy"}}} =
-               components["row_action_destroy_button"]["action"]
+      assert %{"name" => "invoke", "context" => %{"action" => "destroy"}} =
+               event(components["row_action_destroy_button"])
     end
 
     test "the View and Edit row controls carry the task-panel contract" do
@@ -214,16 +275,12 @@ defmodule AshA2ui.EncoderTest do
             {"view_button", "view_record", "View"},
             {"edit_button", "start_edit", "Edit"}
           ] do
+        assert %{"component" => "Button", "child" => child} = components[id]
+
         assert %{
-                 "component" => "Button",
-                 "child" => child,
-                 "action" => %{
-                   "event" => %{
-                     "name" => ^event,
-                     "context" => %{"recordId" => %{"path" => "id"}, "component" => "table"}
-                   }
-                 }
-               } = components[id]
+                 "name" => ^event,
+                 "context" => %{"recordId" => %{"@path" => "id"}, "component" => "table"}
+               } = event(components[id])
 
         assert components[child]["text"] == label
       end
@@ -231,22 +288,19 @@ defmodule AshA2ui.EncoderTest do
       refute Map.has_key?(components, "row_select_button")
     end
 
-    test "the table heading is a humanized resource name" do
+    test "the table heading is a humanized resource name, as a Markdown heading" do
       components = encode_kitchen_sink() |> components_by_id()
 
-      assert %{"component" => "Text", "text" => "Kitchen sink", "variant" => "h2"} =
-               components["table_heading"]
+      # 1.0's basic Text has no heading variants: a heading is Markdown
+      assert %{"component" => "Text", "text" => "## Kitchen sink"} = components["table_heading"]
+      refute Map.has_key?(components["table_heading"], "variant")
     end
 
-    test "headings use the Text variant hint, never literal markdown prefixes" do
-      components = encode_kitchen_sink() |> components_by_id()
+    test "no Text uses a variant outside the basic catalog's caption and body" do
+      components = encode_kitchen_sink() |> components()
 
-      literal_texts =
-        for {_id, %{"component" => "Text", "text" => text}} <- components,
-            is_binary(text),
-            do: text
-
-      refute Enum.any?(literal_texts, &String.starts_with?(&1, "#"))
+      for %{"component" => "Text", "variant" => variant} <- components,
+          do: assert(variant in ["caption", "body"])
     end
   end
 
@@ -274,7 +328,7 @@ defmodule AshA2ui.EncoderTest do
                "path" => "/ui/panel/submit_visible"
              }
 
-      assert components["form_submit_text"]["text"] == %{"path" => "/ui/panel/primary_label"}
+      assert components["form_submit_text"]["text"] == %{"@path" => "/ui/panel/primary_label"}
     end
 
     test "inputs use the resolved widget and bind values into /form/<field>" do
@@ -283,19 +337,19 @@ defmodule AshA2ui.EncoderTest do
       assert %{
                "component" => "TextField",
                "label" => "Name",
-               "value" => %{"path" => "/form/name"}
+               "value" => %{"@path" => "/form/name"}
              } = components["form_input_name"]
 
       assert %{
                "component" => "CheckBox",
                "label" => "Active",
-               "value" => %{"path" => "/form/active"}
+               "value" => %{"@path" => "/form/active"}
              } = components["form_input_active"]
 
       assert %{
                "component" => "ChoicePicker",
                "label" => "Status",
-               "value" => %{"path" => "/form/status"},
+               "value" => %{"@path" => "/form/status"},
                "variant" => "mutuallyExclusive",
                "options" => [
                  %{"label" => "Draft", "value" => "draft"},
@@ -318,14 +372,14 @@ defmodule AshA2ui.EncoderTest do
 
       assert %{
                "component" => "DateTimeInput",
-               "value" => %{"path" => "/form/birthday"},
+               "value" => %{"@path" => "/form/birthday"},
                "enableDate" => true,
                "enableTime" => false
              } = components["form_input_birthday"]
 
       assert %{
                "component" => "DateTimeInput",
-               "value" => %{"path" => "/form/scheduled_at"},
+               "value" => %{"@path" => "/form/scheduled_at"},
                "enableDate" => true,
                "enableTime" => true
              } = components["form_input_scheduled_at"]
@@ -336,28 +390,25 @@ defmodule AshA2ui.EncoderTest do
 
       assert %{
                "component" => "Text",
-               "text" => %{"path" => "/errors/name"},
+               "text" => %{"@path" => "/errors/name"},
                "variant" => "caption"
              } = components["form_error_name"]
     end
 
-    test "the submit button carries the frozen submit_form contract" do
+    test "the submit button carries the submit_form contract" do
       components = encode_kitchen_sink() |> components_by_id()
 
+      assert %{"component" => "Button", "variant" => "primary", "child" => "form_submit_text"} =
+               components["form_submit_button"]
+
       assert %{
-               "component" => "Button",
-               "variant" => "primary",
-               "child" => "form_submit_text",
-               "action" => %{
-                 "event" => %{
-                   "name" => "submit_form",
-                   "context" => %{
-                     "values" => %{"path" => "/form"},
-                     "recordId" => %{"path" => "/form/id"}
-                   }
-                 }
+               "name" => "submit_form",
+               "sourceComponentId" => "form_submit_button",
+               "context" => %{
+                 "values" => %{"@path" => "/form"},
+                 "recordId" => %{"@path" => "/form/id"}
                }
-             } = components["form_submit_button"]
+             } = event(components["form_submit_button"])
     end
   end
 
@@ -365,50 +416,50 @@ defmodule AshA2ui.EncoderTest do
     test "a status Text bound to the typed feedback message is always present" do
       components = encode_kitchen_sink() |> components_by_id()
 
-      assert %{"component" => "Text", "text" => %{"path" => "/ui/feedback/message"}} =
+      assert %{"component" => "Text", "text" => %{"@path" => "/ui/feedback/message"}} =
                components["status_text"]
     end
   end
 
   describe "action result panel" do
-    test "a Column wrapping a Text bound to /ui/action_result_text is always present" do
+    test "a Column wrapping a Text bound to /ui/feedback/resultText is always present" do
       components = encode_kitchen_sink() |> components_by_id()
 
       assert %{"component" => "Column", "children" => ["action_result_text"]} =
                components["action_result_panel"]
 
-      assert %{"component" => "Text", "text" => %{"path" => "/ui/action_result_text"}} =
+      assert %{"component" => "Text", "text" => %{"@path" => "/ui/feedback/resultText"}} =
                components["action_result_text"]
     end
   end
 
   describe "data model + record serialization" do
-    test "the bootstrap updateDataModel carries the full reserved-path value shape" do
-      assert [_, _, message] = encode_kitchen_sink()
+    test "the initial data model carries the full reserved-path value shape" do
+      data_model = encode_kitchen_sink() |> data_model()
 
       assert %{
-               "updateDataModel" => %{
-                 "surfaceId" => "kitchen_sink",
-                 "path" => "/",
-                 "value" => %{
-                   "records" => [],
-                   "form" => %{},
-                   "errors" => %{},
-                   "options" => %{},
-                   "_empty_visible" => [%{"id" => "on"}],
-                   "_empty_message" => "No Kitchen sink records yet.",
-                   "ui" => %{
-                     "action_result" => %{},
-                     "action_result_text" => "",
-                     "intent" => "browse",
-                     "feedback" => %{"kind" => nil, "message" => ""},
-                     "panel" => %{"visible" => [], "mode" => nil}
-                   }
-                 }
+               "records" => [],
+               "form" => %{},
+               "errors" => %{},
+               "options" => %{},
+               "_empty_visible" => [%{"id" => "on"}],
+               "_empty_message" => "No Kitchen sink records yet.",
+               "ui" => %{
+                 "intent" => "browse",
+                 "feedback" => %{
+                   "kind" => "",
+                   "message" => "",
+                   "code" => "",
+                   "functionCallId" => "",
+                   "result" => %{},
+                   "resultText" => ""
+                 },
+                 "panel" => %{"visible" => [], "mode" => nil}
                }
-             } = message
+             } = data_model
 
-      refute Map.has_key?(message["updateDataModel"]["value"]["ui"], "status")
+      for retired <- ["status", "action_result", "action_result_text", "response"],
+          do: refute(Map.has_key?(data_model["ui"], retired))
     end
 
     test "records are serialized to JSON-safe maps with stringified values" do
@@ -425,10 +476,10 @@ defmodule AshA2ui.EncoderTest do
         updated_at: ~U[2026-07-10 12:00:00.000000Z]
       }
 
-      [_, _, message] = encode_kitchen_sink([record])
-      assert_valid_server_message(message)
+      [message] = encode_kitchen_sink([record])
+      assert_valid_agent_message(message)
 
-      assert [row] = message["updateDataModel"]["value"]["records"]
+      assert [row] = data_model(message)["records"]
 
       assert row == %{
                "id" => "018f0000-0000-7000-8000-000000000001",
@@ -457,11 +508,11 @@ defmodule AshA2ui.EncoderTest do
         count: {:from, :to}
       }
 
-      [_, _, message] = encode_kitchen_sink([record])
+      [message] = encode_kitchen_sink([record])
       # the placeholder is a plain string, so the message stays schema-valid
-      assert_valid_server_message(message)
+      assert_valid_agent_message(message)
 
-      assert [row] = message["updateDataModel"]["value"]["records"]
+      assert [row] = data_model(message)["records"]
       assert row["name"] == "unsupported type: UnsupportedValue"
       assert row["count"] == "unsupported type: tuple"
     end
@@ -470,9 +521,9 @@ defmodule AshA2ui.EncoderTest do
       ordered = Jason.OrderedObject.new([{"kept", "as-is"}])
       record = %KitchenSink{id: "018f0000-0000-7000-8000-000000000003", name: ordered}
 
-      [_, _, message] = encode_kitchen_sink([record])
+      [message] = encode_kitchen_sink([record])
 
-      assert [row] = message["updateDataModel"]["value"]["records"]
+      assert [row] = data_model(message)["records"]
       assert row["name"] == ordered
     end
 
@@ -480,8 +531,8 @@ defmodule AshA2ui.EncoderTest do
       view = ResolvedView.resolve(KitchenSink)
       record = %KitchenSink{id: "x", name: "A"}
 
-      message = V0_9_1.encode_data_model(view, [record], [])
-      assert_valid_server_message(message)
+      message = Encoder.encode_data_model(view, [record], [])
+      assert_valid_agent_message(message)
 
       assert %{
                "updateDataModel" => %{
@@ -492,18 +543,26 @@ defmodule AshA2ui.EncoderTest do
                    "form" => %{},
                    "errors" => %{},
                    "_empty_visible" => [],
-                   "ui" => %{"feedback" => %{"kind" => nil, "message" => ""}}
+                   "ui" => %{"feedback" => %{"kind" => "", "message" => ""}}
                  }
                }
              } = message
+    end
+
+    test "encode_data_model/3 matches the initial data model of encode_surface/3" do
+      view = ResolvedView.resolve(KitchenSink)
+      record = %KitchenSink{id: "x", name: "A"}
+
+      assert Encoder.encode_data_model(view, [record], [])["updateDataModel"]["value"] ==
+               view |> Encoder.encode_surface([record], []) |> data_model()
     end
 
     test "encode_data_model/3 with scope: :records only replaces /records" do
       view = ResolvedView.resolve(KitchenSink)
       record = %KitchenSink{id: "x", name: "A"}
 
-      message = V0_9_1.encode_data_model(view, [record], scope: :records)
-      assert_valid_server_message(message)
+      message = Encoder.encode_data_model(view, [record], scope: :records)
+      assert_valid_agent_message(message)
 
       assert %{
                "updateDataModel" => %{
@@ -512,6 +571,107 @@ defmodule AshA2ui.EncoderTest do
                  "value" => [%{"id" => "x", "name" => "A"}]
                }
              } = message
+    end
+  end
+
+  describe "wire builders" do
+    test "update_data_model/3 always carries value; nil deletes the key at path" do
+      message = Encoder.update_data_model("kitchen_sink", "/form/name", nil)
+      assert_valid_agent_message(message)
+
+      assert message["updateDataModel"] == %{
+               "surfaceId" => "kitchen_sink",
+               "path" => "/form/name",
+               "value" => nil
+             }
+    end
+
+    test "call_renderer_function/4 names the function's catalog and a fresh call id" do
+      message =
+        Encoder.call_renderer_function("kitchen_sink", "downloadFile", %{
+          "filename" => "a.csv",
+          "mimeType" => "text/csv",
+          "dataUrl" => "data:text/csv;base64,YSxi"
+        })
+
+      assert_valid_agent_message(message)
+
+      assert %{
+               "version" => "1.0",
+               "callRendererFunction" => %{
+                 "surfaceId" => "kitchen_sink",
+                 "functionCallId" => "fc_" <> _,
+                 "callFunction" => %{"@call" => "downloadFile", "catalogId" => @ash_catalog_id}
+               }
+             } = message
+
+      other = Encoder.call_renderer_function("kitchen_sink", "downloadFile", %{})
+
+      refute other["callRendererFunction"]["functionCallId"] ==
+               message["callRendererFunction"]["functionCallId"]
+    end
+
+    test "call_renderer_function/4 honours catalog_id and function_call_id" do
+      message =
+        Encoder.call_renderer_function("kitchen_sink", "openUrl", %{"url" => "https://a.example"},
+          catalog_id: @catalog_id,
+          function_call_id: "fc_1"
+        )
+
+      assert_valid_agent_message(message)
+      assert message["callRendererFunction"]["functionCallId"] == "fc_1"
+      assert message["callRendererFunction"]["callFunction"]["catalogId"] == @catalog_id
+    end
+
+    test "agent_function_response/2 carries a value or an error" do
+      ok = Encoder.agent_function_response("fc_1", {:ok, %{"done" => true}})
+      assert_valid_agent_message(ok)
+
+      assert ok["agentFunctionResponse"] == %{
+               "functionCallId" => "fc_1",
+               "value" => %{"done" => true}
+             }
+
+      error = Encoder.agent_function_response("fc_2", {:error, "forbidden", "Not allowed."})
+      assert_valid_agent_message(error)
+
+      assert error["agentFunctionResponse"] == %{
+               "functionCallId" => "fc_2",
+               "error" => %{"code" => "forbidden", "message" => "Not allowed."}
+             }
+    end
+
+    test "with_catalog/2 qualifies a component from another catalog and its calls" do
+      admin = AshA2ui.Experience.admin_catalog_id()
+
+      text = %{
+        "id" => "cell",
+        "component" => "Text",
+        "text" => %{"@call" => "formatDate", "args" => %{"value" => %{"@path" => "at"}}}
+      }
+
+      assert %{
+               "@catalogId" => @catalog_id,
+               "text" => %{"@call" => "formatDate", "catalogId" => @catalog_id}
+             } = Encoder.with_catalog(text, admin)
+
+      assert Encoder.with_catalog(text, @catalog_id) == text
+
+      page = %{"id" => "root", "component" => "entityPage", "title" => "T", "children" => []}
+      assert Encoder.with_catalog(page, admin) == page
+      assert Encoder.with_catalog(page, @catalog_id)["@catalogId"] == admin
+    end
+
+    test "with_catalog/2 leaves a call that names its catalog alone" do
+      button = %{
+        "id" => "b",
+        "component" => "Button",
+        "child" => "t",
+        "action" => Encoder.ash_action("go", %{}, "b")
+      }
+
+      assert Encoder.with_catalog(button, AshA2ui.Experience.admin_catalog_id())["action"] ==
+               button["action"]
     end
   end
 
@@ -533,13 +693,10 @@ defmodule AshA2ui.EncoderTest do
 
       Ash.create!(KitchenSink, %{name: "Second", status: :archived}, authorize?: false)
 
-      messages = AshA2ui.Info.build_surface(KitchenSink, actor: nil)
-      Enum.each(messages, &assert_valid_server_message/1)
+      assert [message] = AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+      assert_valid_agent_message(message)
 
-      assert [%{"createSurface" => _}, %{"updateComponents" => _}, %{"updateDataModel" => data}] =
-               messages
-
-      records = data["value"]["records"]
+      records = data_model(message)["records"]
       assert length(records) == 2
 
       first = Enum.find(records, &(&1["name"] == "First"))
@@ -557,7 +714,7 @@ defmodule AshA2ui.EncoderTest do
       Ash.create!(KitchenSink, %{name: "Only", status: :draft}, authorize?: false)
 
       message = AshA2ui.Info.build_data_model(KitchenSink, actor: nil)
-      assert_valid_server_message(message)
+      assert_valid_agent_message(message)
 
       assert [%{"name" => "Only"}] =
                Enum.filter(

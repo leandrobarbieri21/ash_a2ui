@@ -11,7 +11,7 @@ defmodule AshA2ui.ListRowsTest do
   import ExUnit.CaptureIO
 
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.OwnerVisitsUI
+  alias AshA2ui.Test.{OwnerVisitsUI, SchemaHelper, Surface}
 
   setup do
     on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
@@ -19,8 +19,12 @@ defmodule AshA2ui.ListRowsTest do
 
   defp surface(catalog) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
-    [_create, components, _data] = AshA2ui.Info.build_surface(OwnerVisitsUI, authorize?: false)
-    Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+    opts = if catalog == :admin_v1, do: [catalogs: SchemaHelper.admin_catalogs()], else: []
+
+    OwnerVisitsUI
+    |> AshA2ui.Info.build_surface(authorize?: false)
+    |> SchemaHelper.assert_valid_agent_messages(opts)
+    |> Surface.components_by_id()
   end
 
   test "the admin grid asks for rows and places the trailing and expand columns" do
@@ -58,10 +62,12 @@ defmodule AshA2ui.ListRowsTest do
   test "a plain list keeps its grid" do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
-    [_create, components, _data] =
-      AshA2ui.Info.build_surface(AshA2ui.Test.RecordPageUI, authorize?: false)
+    grid =
+      AshA2ui.Test.RecordPageUI
+      |> AshA2ui.Info.build_surface(authorize?: false)
+      |> Surface.components_by_id()
+      |> Map.fetch!("data_grid")
 
-    grid = Enum.find(components["updateComponents"]["components"], &(&1["id"] == "data_grid"))
     refute Map.has_key?(grid, "layout")
   end
 

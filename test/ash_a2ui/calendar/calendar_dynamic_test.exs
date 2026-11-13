@@ -16,6 +16,8 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
   alias AshA2ui.Dynamic.Error
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.Test.Calendar.{Event, MonthUI}
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   @allowlist Dynamic.allowlist([Event])
 
@@ -50,6 +52,7 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)
@@ -84,30 +87,27 @@ defmodule AshA2ui.Calendar.CalendarDynamicTest do
         query_state: %{"window" => %{"anchor" => "2026-10-14"}}
       )
 
-    Enum.each(messages, &assert_valid_server_message/1)
-    data = Enum.find_value(messages, &get_in(&1, ["updateDataModel", "value"]))
+    Enum.each(messages, &assert_valid_agent_message/1)
+    data = Surface.data_model(messages)
 
     assert data["query"]["window"]["from"] == "2026-10-12"
     assert Enum.map(data["records"], & &1["title"]) == ["Red Mon"]
 
-    components = Enum.find_value(messages, &get_in(&1, ["updateComponents", "components"]))
+    components = Surface.components(messages)
     assert Enum.any?(components, &(&1["id"] == "calendar_nav"))
 
     # The window action is the standard query, served on the held surface.
-    envelope = %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "surfaceId" => surface.surface_id,
-        "sourceComponentId" => "calendar_next_button",
-        "timestamp" => "2026-10-17T00:00:00Z",
-        "context" => %{
+    envelope =
+      Messages.call(
+        "query",
+        surface.surface_id,
+        %{
           "component" => "schedule",
           "query" => data["query"],
           "windowDelta" => 1
-        }
-      }
-    }
+        },
+        source: "calendar_next_button"
+      )
 
     assert {:ok, reply} = Dynamic.handle_action(surface, envelope, actor: red, authorize?: false)
     assert value_at(reply, "/query")["window"]["from"] == "2026-10-19"

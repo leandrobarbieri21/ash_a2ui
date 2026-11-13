@@ -271,8 +271,7 @@ defmodule AshA2ui.Matrix do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => %{"path" => "text"},
-        "variant" => "h5"
+        "text" => AshA2ui.Encoder.heading(5, %{"@path" => "text"})
       },
       %{
         "id" => "#{base}_body",
@@ -284,7 +283,7 @@ defmodule AshA2ui.Matrix do
         "component" => "Row",
         "children" => %{"componentId" => "#{base}_cell", "path" => "cells"}
       },
-      %{"id" => "#{base}_cell", "component" => "Text", "text" => %{"path" => "text"}}
+      %{"id" => "#{base}_cell", "component" => "Text", "text" => %{"@path" => "text"}}
     ]
   end
 end

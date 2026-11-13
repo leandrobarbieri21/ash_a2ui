@@ -153,14 +153,17 @@ Try it in IEx:
 ```elixir
 iex> AshA2ui.Info.build_surface(MyApp.Support.Ticket, actor: some_admin)
 [
-  %{"version" => "v0.9.1", "createSurface" => %{"surfaceId" => "tickets", "catalogId" => ...}},
-  %{"version" => "v0.9.1", "updateComponents" => %{"surfaceId" => "tickets", "components" => [...]}},
-  %{"version" => "v0.9.1", "updateDataModel" => %{"surfaceId" => "tickets", ...}}
+  %{"version" => "1.0",
+    "createSurface" => %{
+      "surfaceId" => "tickets",
+      "catalogId" => "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+      "components" => [...],
+      "dataModel" => %{"records" => [...], ...}
+    }}
 ]
 ```
 
-That ordered message list *is* the UI: any A2UI v0.9.1 renderer can consume
-it. Records are loaded through the resource's read action with
+That one message *is* the UI: any A2UI 1.0 renderer can consume it. Records are loaded through the resource's read action with
 `authorize?: true` and your `actor:` — policies apply. There's also
 `AshA2ui.Info.build_data_model/2` for data-only refreshes (a single
 `updateDataModel` message).
@@ -207,15 +210,15 @@ Then register the shipped hook and hand it the renderer classes in your app
 bundle (`assets/js/app.js`), alongside your existing hooks:
 
 ```javascript
-// Registers the <a2ui-surface> custom element and exports the basic catalog:
-import "@a2ui/lit/v0_9";
-import { basicCatalog } from "@a2ui/lit/v0_9";
-// The protocol message processor:
-import { MessageProcessor } from "@a2ui/web_core/v0_9";
+// Registers the <a2ui-surface> custom element:
+import "@a2ui/lit";
+// The protocol message processor, the Catalog class and the basic catalog:
+import { Catalog, MessageProcessor } from "@a2ui/web_core";
+import { basicCatalog } from "@a2ui/web_core/catalogs/basic/v1";
 // The hook shipped inside the ash_a2ui package:
 import { AshA2ui, configureAshA2ui } from "../../deps/ash_a2ui/priv/js/ash_a2ui_hook.js";
 
-configureAshA2ui({ MessageProcessor, catalogs: [basicCatalog] });
+configureAshA2ui({ MessageProcessor, Catalog, catalogs: [basicCatalog] });
 
 const liveSocket = new LiveSocket("/live", Socket, {
   hooks: { AshA2ui /* , ...your other hooks */ },
@@ -225,14 +228,18 @@ const liveSocket = new LiveSocket("/live", Socket, {
 
 > #### Renderer versions {: .info}
 >
-> The published `@a2ui/lit` and `@a2ui/react` packages are 0.10.x and expose
-> `/v0_9` entry points that speak the v0.9.x protocol AshA2ui emits. Check the
-> package README for the exact import path for your installed version.
+> AshA2ui emits the A2UI 1.0 protocol, and the `@a2ui/lit` and
+> `@a2ui/web_core` root entry points carry its runtime. The surfaces use
+> features that the published 0.15.0 release predates (the `@`-prefixed
+> component keys, for one), so use a release that implements the pinned
+> specification text. [The A2UI 1.0 wire contract](../topics/a2ui-1-0.md#what-the-renderer-must-support)
+> lists exactly what to look for.
 
 That's all the client code. The `LiveRenderer` renders a container `div` with
 `phx-hook="AshA2ui"`; the hook mounts an `<a2ui-surface>` element inside it,
-feeds it every A2UI message the server pushes, and forwards the renderer's
-`action` envelopes back to the server as the `"a2ui:action"` LiveView event.
+feeds it every A2UI message the server pushes, and forwards each message
+the renderer sends back (`callAgentFunction`, `action`, `rendererFunctionResponse`,
+`error`) to the server as the `"a2ui:message"` LiveView event.
 
 Out of the box the basic catalog looks like unstyled browser defaults —
 before shipping, follow the [Theming](../topics/theming.md) guide to import
@@ -244,9 +251,10 @@ headings render as headings.
 
 You already did — there's no step 5 code to write.
 
-When a user submits the form or clicks a row button, the renderer emits an
-A2UI `action` envelope, the hook forwards it as `"a2ui:action"`, and
-`AshA2ui.LiveRenderer` routes it through `AshA2ui.ActionHandler`, which:
+When a user submits the form or clicks a row button, the renderer sends a
+`callAgentFunction` for the `ashAction` function, the hook forwards it as
+`"a2ui:message"`, and `AshA2ui.LiveRenderer` routes it through
+`AshA2ui.ActionHandler`, which:
 
 1. Validates the action name against what the surface declared
    (`row_actions`, the form's `create_action`/`update_action`) — the DSL is
@@ -257,6 +265,8 @@ A2UI `action` envelope, the hook forwards it as `"a2ui:action"`, and
    `/ui/feedback` outcome).
 4. On validation errors, pushes the error text onto the reserved
    `/errors/<field>` data-model paths so the renderer can show them inline.
+5. Ends its reply with an `agentFunctionResponse` for the call, so the
+   renderer knows which click the outcome belongs to.
 
 See [Actions and Authorization](../topics/actions-and-authorization.md) for
 the details, and

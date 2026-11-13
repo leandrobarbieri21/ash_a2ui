@@ -14,7 +14,7 @@ defmodule AshA2ui.Dynamic.Importer do
   Import is honest about the spec's boundaries: a declared feature with no
   spec vocabulary (inline editing, file export, wizard steps, bulk actions,
   boards, plus the section options that live outside the spec —
-  `surface_id`, `record_label`, `spec_version`) becomes a **visible
+  `surface_id`, `record_label`) becomes a **visible
   rejection** carrying the reason, never a silent drop. The composer shows
   rejections in the inspector; the spec itself contains exactly what the
   dynamic stack can honor.
@@ -124,23 +124,19 @@ defmodule AshA2ui.Dynamic.Importer do
   end
 
   defp section_rejections(module) do
-    # Section options live outside the spec vocabulary. `spec_version` has a
-    # schema default ("0.9.1"), so only a value that differs from the default
-    # is a real declaration worth rejecting — the default is silence.
+    # Section options live outside the spec vocabulary.
     notes = [
       {:surface_id, Extension.get_opt(module, [:a2ui], :surface_id, nil),
        "surface ids are resolve/deploy metadata — pass it as the resolve :surface_id option"},
       {:record_label, Extension.get_opt(module, [:a2ui], :record_label, nil),
        "record labels drive the task-panel labels and have no spec key — keep them in the promoted module"},
-      {:spec_version, Extension.get_opt(module, [:a2ui], :spec_version, "0.9.1"),
-       "the wire version is a resolve option (:spec_version), not part of the spec"},
       {:component_order, Extension.get_opt(module, [:a2ui], :component_order, :kind),
        "the admin catalog's section order has no spec key — keep it in the promoted module"}
     ]
 
     for {option, value, note} <- notes,
         not is_nil(value),
-        {option, value} not in [{:spec_version, "0.9.1"}, {:component_order, :kind}] do
+        {option, value} != {:component_order, :kind} do
       Rejection.new(
         "a2ui.#{option}",
         to_string(option),

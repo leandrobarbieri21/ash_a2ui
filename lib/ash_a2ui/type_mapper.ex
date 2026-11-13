@@ -7,7 +7,7 @@ defmodule AshA2ui.TypeMapper do
   the encoder). Unknown types fall back to `:text_field`.
 
   The widget atom -> catalog component name mapping (`:text_field` ->
-  `"TextField"`, ...) lives in the encoder (`AshA2ui.Encoder.V0_9_1`).
+  `"TextField"`, ...) lives in the encoder (`AshA2ui.Encoder`).
   """
 
   alias Ash.Resource.Info, as: ResourceInfo

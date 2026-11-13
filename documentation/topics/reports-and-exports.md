@@ -3,7 +3,8 @@
 Two features for surfaces that are *not* projections of resource rows:
 `:report` components render the computed rows of a generic Ash action
 (group-bys, aggregates, cross-resource stats), and `export` blocks deliver
-server-generated CSV files through the v1.0 `callFunction` channel.
+server-generated CSV files as a `callRendererFunction` of the ash_a2ui
+catalog's `downloadFile`.
 
 ## `:report` components — aggregate/report queries
 
@@ -53,10 +54,9 @@ allowlist (blank inputs are unset), casts them against the action's
 arguments, and runs the action **actor-scoped and authorized like any other
 invocation**. Returned rows are serialized down to the declared `fields`
 (atom or string keys accepted; values JSON-serialized like record fields)
-and written wholesale to `/report/<name>/rows`. On v0.9.1 the outcome text
-lands in the typed `/ui/feedback`; on v1.0 the structured `/ui/response` carries
-`{"status": "ok", "result": {"count": n}}` and mirrors into the
-`actionResponse`.
+and written wholesale to `/report/<name>/rows`. The outcome lands
+in the typed `/ui/feedback` (its `result` holds `{"count": n}`) and is the
+`agentFunctionResponse` value.
 
 The trust model is unchanged: the client only ever references the declared
 report by name — the action, the params it may set, and the columns it sees
@@ -66,7 +66,7 @@ of the resource, `params` must name its arguments, `fields` is required
 (report columns are row-map keys and cannot be inferred), and reports
 cannot carry table/form options.
 
-## `export` — CSV file export (v1.0-only)
+## `export` — CSV file export
 
 An `export` block on a `:table` or `:report` component renders an **Export
 CSV** button; the server generates the file and delivers it through a
@@ -86,34 +86,37 @@ end
 
 ### The frozen `downloadFile` wire contract
 
-A successful `"export"` action emits one `callFunction` message:
+A successful `"export"` action emits one `callRendererFunction` message,
+after the usual data-model follow-ups:
 
 ```json
 {
-  "version": "v1.0",
-  "functionCallId": "fc_…",
-  "callFunction": {
-    "call": "downloadFile",
-    "args": {
-      "filename": "usage.csv",
-      "mimeType": "text/csv",
-      "dataUrl": "data:text/csv;base64,…"
+  "version": "1.0",
+  "callRendererFunction": {
+    "surfaceId": "usage",
+    "functionCallId": "fc_…",
+    "callFunction": {
+      "@call": "downloadFile",
+      "catalogId": "<AshA2ui.Encoder.ash_catalog_id()>",
+      "args": {
+        "filename": "usage.csv",
+        "mimeType": "text/csv",
+        "dataUrl": "data:text/csv;base64,…"
+      }
     }
   }
 }
 ```
 
-The shipped hook registers `downloadFile` as a built-in (a transient anchor
-click on `dataUrl`, falling back to an `url` arg for hosts that upload the
-file and pass a signed URL instead). The function is declared by the
-shipped **AshA2ui extension catalog**
-(`priv/a2ui/v1_0/catalogs/ash_a2ui/catalog.json`) — load it alongside the
-basic catalog on renderers that validate function calls.
-
-**Export is v1.0-only.** 0.9.1 has no server→client RPC channel to carry a
-download, and encoding files into the data model would abuse the protocol —
-so declaring `export` on a `spec_version "0.9.1"` surface is a compile-time
-error (`AshA2ui.Verifiers.VerifyExport`). There is no 0.9.1 fallback.
+The shipped hook registers `downloadFile` in the ash_a2ui catalog (a
+transient anchor click on `dataUrl`, falling back to an `url` arg for hosts
+that upload the file and pass a signed URL instead) and answers with a
+`rendererFunctionResponse`. The function is declared by the shipped
+**ash_a2ui catalog** (`priv/a2ui/v1_0/catalogs/ash_a2ui/catalog.json`) as
+`agentOnly`: load it alongside the basic catalog on renderers that validate
+function calls. Encoding the file into the data model would abuse the
+protocol; a file download is imperative, which is what a renderer function
+call is for.
 
 ### What gets exported
 

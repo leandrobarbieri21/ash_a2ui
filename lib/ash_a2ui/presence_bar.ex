@@ -13,7 +13,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     Renders an overlapping avatar stack — initials circles in the shared
     neobrutalist vocabulary (2px borders, hard shadows, `--a2ui-*` tokens
-    with fallbacks, zero host CSS), one per presence row (`AshA2ui.list/2`
+    with fallbacks, zero host CSS), one per presence row (`AshA2ui.list`
     rows: `%{key: ..., label: ...}`), each with an aria-label naming the
     person. More than `max_visible` (default 5) collapses into a "+N"
     chip whose aria-label counts the hidden visitors.

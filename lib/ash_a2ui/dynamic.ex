@@ -102,7 +102,7 @@ defmodule AshA2ui.Dynamic do
   alias AshA2ui.Transformers.InferFields
   alias Spark.Dsl.Extension
 
-  @resolve_opts [:allowlist, :surface_id, :spec_version, :via_allowlist, :imported?]
+  @resolve_opts [:allowlist, :surface_id, :via_allowlist, :imported?]
 
   # The cell cap of a composed board; see max_composed_cells/0.
   @max_composed_cells 12
@@ -118,12 +118,6 @@ defmodule AshA2ui.Dynamic do
     * `:surface_id` — the A2UI surface id. Defaults to a generated
       `"dyn_<resource>_<hex>"` id, unique per resolve, so a newly composed
       surface always replaces a previous one client-side.
-    * `:spec_version` — the A2UI protocol version the surface speaks:
-      `"0.9.1"` (the default) or `"1.0"`. Host configuration (matched to the
-      renderer's capability), not part of the LLM-facing spec. A v1.0
-      dynamic surface bootstraps as a *single* inline `createSurface`
-      message — exactly what agent-panel transports want (see the A2UI 1.0
-      topic).
     * `:via_allowlist` — the modules a spec's `via`-delegated row actions
       may dispatch to (default: none — a spec carrying `via` is rejected
       unless the host passes this). Via delegates run host code, so — unlike
@@ -144,13 +138,7 @@ defmodule AshA2ui.Dynamic do
   def resolve(spec, opts) do
     Keyword.validate!(opts, @resolve_opts)
     allowlist = Keyword.fetch!(opts, :allowlist)
-    spec_version = Keyword.get(opts, :spec_version, "0.9.1")
     via_allowlist = Keyword.get(opts, :via_allowlist, [])
-
-    unless spec_version in ["0.9.1", "1.0"] do
-      raise ArgumentError,
-            "spec_version must be \"0.9.1\" or \"1.0\", got: #{inspect(spec_version)}"
-    end
 
     with {:ok, resource} <- spec_resource(spec, allowlist),
          {:ok, title} <- spec_title(spec),
@@ -160,7 +148,7 @@ defmodule AshA2ui.Dynamic do
          surface_id =
            Keyword.get_lazy(opts, :surface_id, fn -> generate_surface_id(resource) end),
          {:ok, dsl_state} <-
-           infer_fields(synthetic_dsl_state(resource, surface_id, spec_version, entities)),
+           infer_fields(synthetic_dsl_state(resource, surface_id, entities)),
          :ok <- run_verifiers(dsl_state),
          :ok <- validate_composed_sections(dsl_state, resource) do
       {:ok,
@@ -176,10 +164,8 @@ defmodule AshA2ui.Dynamic do
   end
 
   @doc """
-  Builds the surface's A2UI message list through
-  `AshA2ui.Info.build_surface/2`: the v0.9.1 `createSurface` →
-  `updateComponents` → `updateDataModel` triple, or (for surfaces resolved
-  with `spec_version: "1.0"`) a single inline `createSurface` message.
+  Builds the surface's A2UI messages through `AshA2ui.Info.build_surface/2`:
+  one inline `createSurface` message.
 
   Takes the same options (`:actor`, `:tenant`, `:authorize?`, `:domain`,
   `:query_state`, `:context_state`, and the localization options of
@@ -326,21 +312,19 @@ defmodule AshA2ui.Dynamic do
     * `:surface_id` — the surface id declared in the generated block.
       Defaults to the underscored last segment of `:module` (a promoted
       surface should have a stable id, not a per-resolve `dyn_` one).
-    * `:spec_version` — as `resolve/2`; declared in the generated block
-      when not the default.
     * `:via_allowlist` — as `resolve/2`; required for specs whose actions
       declare `via`, since promotion re-resolves the spec first.
   """
   @spec to_dsl_source(map | Surface.t(), keyword) :: {:ok, String.t()} | {:error, [Error.t()]}
   def to_dsl_source(spec_or_surface, opts) do
-    Keyword.validate!(opts, [:module, :allowlist, :surface_id, :spec_version, :via_allowlist])
+    Keyword.validate!(opts, [:module, :allowlist, :surface_id, :via_allowlist])
     module = Keyword.fetch!(opts, :module)
     allowlist = Keyword.fetch!(opts, :allowlist)
     spec = to_spec!(spec_or_surface)
 
     resolve_opts =
       opts
-      |> Keyword.take([:allowlist, :spec_version, :via_allowlist])
+      |> Keyword.take([:allowlist, :via_allowlist])
       |> Keyword.put(:surface_id, "promotion_check")
 
     with {:ok, surface} <- resolve(spec, resolve_opts) do
@@ -350,7 +334,7 @@ defmodule AshA2ui.Dynamic do
          module,
          surface.resource,
          allowlist,
-         Keyword.take(opts, [:surface_id, :spec_version])
+         Keyword.take(opts, [:surface_id])
        )}
     end
   end
@@ -1366,11 +1350,11 @@ defmodule AshA2ui.Dynamic do
   # The synthetic standalone-style DSL state the shared transformers,
   # verifiers, ResolvedView, Info, and ActionHandler all consume — the same
   # map shape Spark hands them at compile time, minus a real module.
-  defp synthetic_dsl_state(resource, surface_id, spec_version, entities) do
+  defp synthetic_dsl_state(resource, surface_id, entities) do
     %{
       [:a2ui] => %{
         entities: entities,
-        opts: [for_resource: resource, surface_id: surface_id, spec_version: spec_version]
+        opts: [for_resource: resource, surface_id: surface_id]
       },
       :persist => %{module: __MODULE__, extensions: []}
     }

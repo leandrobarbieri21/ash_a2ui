@@ -12,7 +12,7 @@ defmodule AshA2ui.TableHeadingTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{Appointment, Clinic, HeadedVisitsUI, Owner, RecordPageUI}
+  alias AshA2ui.Test.{Appointment, Clinic, HeadedVisitsUI, Owner, RecordPageUI, SchemaHelper}
 
   setup do
     on_exit(fn ->
@@ -27,13 +27,16 @@ defmodule AshA2ui.TableHeadingTest do
   defp build(ui, catalog, owner) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, _data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(ui,
         authorize?: false,
         context_state: %{"owner" => %{"search" => "", "value" => owner.id, "label" => "x"}}
       )
 
-    Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+    catalogs = if catalog == :admin_v1, do: SchemaHelper.admin_catalogs()
+    SchemaHelper.assert_valid_agent_message(message, catalogs: catalogs)
+
+    Map.new(surface["components"], &{&1["id"], &1})
   end
 
   test "a declared heading and description ride on the grid, empty or not", %{owner: owner} do
@@ -69,8 +72,7 @@ defmodule AshA2ui.TableHeadingTest do
     assert components["table_visits_card_heading"] == %{
              "id" => "table_visits_card_heading",
              "component" => "Text",
-             "text" => "Visit history",
-             "variant" => "h3"
+             "text" => "### Visit history"
            }
 
     assert components["table_visits_card_description"]["text"] ==

@@ -1,48 +1,56 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "title": "AshA2ui Admin Catalog v1",
-  "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
-  "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.18.0",
-  "x-changelog": {
-    "1.18.0": "Additive: table card headers. dataGrid gains an optional heading (the header of the table's own card, translated, present only when the table declares one; label stays the collection's accessible name and is not a heading) and an optional description (a one-line caption under the heading, above the rows, translated). A renderer draws both inside the table's card in every layout, and above the empty state when there are no rows. Renderers that ignore them leave them out. The catalogId is unchanged.",
-    "1.17.0": "Additive: step fields. fieldDisplay gains an optional steps (a binding to a steps field's steps, /detail/<context>/_steps_<field>: a list of {number, label, text?, note?, state, stateLabel, line} objects, state one of complete, current, upcoming or overdue and stateLabel its words, translated), drawn as a numbered stepper. Renderers that ignore it draw the value. The catalogId is unchanged.",
-    "1.16.0": "Additive: card rows. dataGrid layout gains cards (one card per row: the title and badge head it, the other columns are labeled rows, and expand columns fold under a disclosure), the dataGrid an optional expandLabel (the words on that disclosure, translated) and columns an optional pairs (true: the value is a list of {term, value} objects, drawn as one labeled row each). Renderers that ignore them draw the grid. The catalogId is unchanged.",
-    "1.15.0": "Additive: document rows and table footers. dataGrid columns gain the placement leading (a short code drawn before the row's title, such as a file's type); a plain link object may carry download: true (the address is a file to download, not a page to open); the dataGrid gains an optional footerNote (a binding to a line of text drawn under the rows, inside the table's card) and footerLink ({href, label}: a link beside it). Renderers that ignore them draw the column as any other, follow the link, and leave the footer out. The catalogId is unchanged.",
-    "1.14.0": "Additive: grouped list rows. dataGrid columns gain the placements group (the value heading a group of consecutive rows) and groupSubtitle (the line under that heading, from the group's first row), and the dataGrid an optional groupIcon (an icon name for the group headers, resolved in the renderer's own icon set). Columns gain an optional emptyText (the field's empty_text: the muted words a list-rows renderer shows when the row's value is empty). A list-rows renderer starts a new group wherever the group value changes; renderers that ignore them draw the columns as any other. The catalogId is unchanged.",
-    "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
-    "1.12.0": "Additive: record pages. fieldDisplay gains optional badge, badgeTone and badgeHelp (bindings to the field's _badge_<field>, _badge_tone_<field> and _badge_help_<field> under its /detail/<context> path: the value drawn as a pill with that tone and one-line tooltip), note (a few words beside the label saying how the value came to be), emptyText (the muted words shown when the value is empty) and hideWhenEmpty (true: an empty value draws no row at all). dataGrid gains an optional layout (rows: list rows instead of a grid) and columns an optional placement (trailing or expand: where a list-rows renderer draws them). Renderers that ignore them draw the plain value and the grid. The catalogId is unchanged.",
-    "1.11.0": "Additive: the table's cells and sort. A badge column's badge gains an optional helpPath (row-relative, the _badge_help_<field> key: the pill's one-line tooltip, empty for none). dataGrid columns gain an optional caption ({path, text?}: a third line under the value and its subtitle, the text's {date} filled with the path's value formatted as a date and {value} with it as is; without text the line is the value) and sortFirst (desc when the header's first click sorts descending). The dataGrid's sort gains an optional reset: true, a header's third click then sends a null sort (the query's default order) instead of toggling back. Renderers that ignore them draw the pill without a tooltip, no third line, and toggle. The catalogId is unchanged.",
-    "1.10.0": "Additive: the filter bar and the table header. dataGrid columns gain optional help ({title, body}: header help opened from an info mark; body paragraphs separated by blank lines, a line `**Term** — text` a definition) and sortField (the field a sortable header sorts by when it is not the column's path); a column's detail gains an optional helpPath (row-relative, the _detail_help_<column> key: an info mark with a tooltip after the line). dataGrid columns also gain optional width (px) and moreNoun, more gains valuesPath (the row's list of all the values), and rowClick an optional width. emptyState gains optional title, icon (inbox | search | archive), clearAction ({label, action}) and clearVisible. pagination gains optional pageSizeOptions (the sizes offered) and pageSizeAction (the query envelope sent with the picked pageSize and page 1). The basic inputs this catalog replaces accept more keys: ChoicePicker hint (a footer under the options), counts (a binding to a value → count map), dynamicOptions (a binding to an option list) and options carrying parent (their group's value) or group: true (a group: picking it picks all its leaves; only leaf values are written); TextField placeholder. An empty statusBanner takes no layout space. Badge and icon tones gain pending and gray. The catalogId is unchanged.",
-    "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope; the rowActions entry the row click mirrors is then left out. Without these the row click and rowActions are unchanged. The catalogId is unchanged.",
-    "1.8.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?, iconPath?, iconTonePath?}: a detail line under the value, {date} filled in by the renderer, after an optional icon). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
-    "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
-    "1.6.0": "Additive: entityPage gains an optional headerVisible boolean. false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true. The title stays required. The catalogId is unchanged.",
-    "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
-    "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
-    "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
-    "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
-    "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
-    "1.0.0": "The ten-component contract (notes/2026-09-07-admin-catalog-contract.md)."
+  "$id": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
+  "protocolVersion": "1.0",
+  "title": "AshA2ui Admin Catalog v2",
+  "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md): the page shell, collection, task panel and feedback components. An admin surface names this catalog as its catalogId; the basic inputs, buttons and pickers inside it carry the basic catalog's id as @catalogId. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Dynamic properties are literals, {\"@path\": ...} bindings or function calls. The admin envelopes (row actions, row click, sort, pagination, calendar window) name an ash_a2ui action and its context; the renderer sends them as the ashAction function of the ash_a2ui catalog.",
+  "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
+  "metadata": {
+    "extensions": {
+      "ash_a2ui": {
+        "version": "2.0.0",
+        "changelog": {
+          "2.0.0": "Breaking: the A2UI 1.0 wire (protocolVersion \"1.0\"). Bindings are {\"@path\": ...} and function calls {\"@call\": ...}; an admin surface names this catalog as its catalogId and its basic components carry the basic catalog's id as @catalogId; every envelope (row actions, row click, sort, pagination, calendar window) is sent as the ash_a2ui catalog's ashAction function. The catalogId moves to https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2, and this contract metadata moves under metadata.extensions.ash_a2ui. New: filterPicker, a query filter's picker (the ChoicePicker with hint, counts, dynamicOptions and grouped options). dataGrid columns' more declares textPath, captionPath and labelPath (the server-written tag text, list caption and accessible label). 2.0.0 includes every 1.x addition, up to and including 1.12 (record pages), 1.13 (plain links), 1.14 (grouped list rows), 1.15 (document rows and table footers), 1.16 (card rows), 1.17 (step fields) and 1.18 (table card headers).",
+          "1.18.0": "Additive: table card headers. dataGrid gains an optional heading (the header of the table's own card, translated, present only when the table declares one; label stays the collection's accessible name and is not a heading) and an optional description (a one-line caption under the heading, above the rows, translated). A renderer draws both inside the table's card in every layout, and above the empty state when there are no rows. Renderers that ignore them leave them out. The catalogId is unchanged.",
+          "1.17.0": "Additive: step fields. fieldDisplay gains an optional steps (a binding to a steps field's steps, /detail/<context>/_steps_<field>: a list of {number, label, text?, note?, state, stateLabel, line} objects, state one of complete, current, upcoming or overdue and stateLabel its words, translated), drawn as a numbered stepper. Renderers that ignore it draw the value. The catalogId is unchanged.",
+          "1.16.0": "Additive: card rows. dataGrid layout gains cards (one card per row: the title and badge head it, the other columns are labeled rows, and expand columns fold under a disclosure), the dataGrid an optional expandLabel (the words on that disclosure, translated) and columns an optional pairs (true: the value is a list of {term, value} objects, drawn as one labeled row each). Renderers that ignore them draw the grid. The catalogId is unchanged.",
+          "1.15.0": "Additive: document rows and table footers. dataGrid columns gain the placement leading (a short code drawn before the row's title, such as a file's type); a plain link object may carry download: true (the address is a file to download, not a page to open); the dataGrid gains an optional footerNote (a binding to a line of text drawn under the rows, inside the table's card) and footerLink ({href, label}: a link beside it). Renderers that ignore them draw the column as any other, follow the link, and leave the footer out. The catalogId is unchanged.",
+          "1.14.0": "Additive: grouped list rows. dataGrid columns gain the placements group (the value heading a group of consecutive rows) and groupSubtitle (the line under that heading, from the group's first row), and the dataGrid an optional groupIcon (an icon name for the group headers, resolved in the renderer's own icon set). Columns gain an optional emptyText (the field's empty_text: the muted words a list-rows renderer shows when the row's value is empty). A list-rows renderer starts a new group wherever the group value changes; renderers that ignore them draw the columns as any other. The catalogId is unchanged.",
+          "1.13.0": "Additive: plain links. A link object may be {href, label} with no surface (a field's link_url): a page or address, followed as an ordinary link rather than opened as a surface. Renderers that require a surface skip it and draw the plain value. The catalogId is unchanged.",
+          "1.12.0": "Additive: record pages. fieldDisplay gains optional badge, badgeTone and badgeHelp (bindings to the field's _badge_<field>, _badge_tone_<field> and _badge_help_<field> under its /detail/<context> path: the value drawn as a pill with that tone and one-line tooltip), note (a few words beside the label saying how the value came to be), emptyText (the muted words shown when the value is empty) and hideWhenEmpty (true: an empty value draws no row at all). dataGrid gains an optional layout (rows: list rows instead of a grid) and columns an optional placement (trailing or expand: where a list-rows renderer draws them). Renderers that ignore them draw the plain value and the grid. The catalogId is unchanged.",
+          "1.11.0": "Additive: the table's cells and sort. A badge column's badge gains an optional helpPath (row-relative, the _badge_help_<field> key: the pill's one-line tooltip, empty for none). dataGrid columns gain an optional caption ({path, text?}: a third line under the value and its subtitle, the text's {date} filled with the path's value formatted as a date and {value} with it as is; without text the line is the value) and sortFirst (desc when the header's first click sorts descending). The dataGrid's sort gains an optional reset: true, a header's third click then sends a null sort (the query's default order) instead of toggling back. Renderers that ignore them draw the pill without a tooltip, no third line, and toggle. The catalogId is unchanged.",
+          "1.10.0": "Additive: the filter bar and the table header. dataGrid columns gain optional help ({title, body}: header help opened from an info mark; body paragraphs separated by blank lines, a line `**Term** — text` a definition) and sortField (the field a sortable header sorts by when it is not the column's path); a column's detail gains an optional helpPath (row-relative, the _detail_help_<column> key: an info mark with a tooltip after the line). dataGrid columns also gain optional width (px) and moreNoun, more gains valuesPath (the row's list of all the values), and rowClick an optional width. emptyState gains optional title, icon (inbox | search | archive), clearAction ({label, action}) and clearVisible. pagination gains optional pageSizeOptions (the sizes offered) and pageSizeAction (the query envelope sent with the picked pageSize and page 1). The basic inputs this catalog replaces accept more keys: ChoicePicker hint (a footer under the options), counts (a binding to a value → count map), dynamicOptions (a binding to an option list) and options carrying parent (their group's value) or group: true (a group: picking it picks all its leaves; only leaf values are written); TextField placeholder. An empty statusBanner takes no layout space. Badge and icon tones gain pending and gray. The catalogId is unchanged.",
+          "1.9.0": "Additive: dataGrid rowClick gains optional labelPath and variantPath (row-relative: the row's _primary_label and _primary_variant keys) and inline. With inline the renderer also draws the row click as one button per row in a final column, its label and Button variant (default | primary | borderless) read from the row, dispatching the same envelope; the rowActions entry the row click mirrors is then left out. Without these the row click and rowActions are unchanged. The catalogId is unchanged.",
+          "1.8.0": "Additive: dataGrid columns gain optional subtitle ({path}: a second line under the value), icon ({path, labelPath, tonePath?}: a leading icon picked per row from a small generic vocabulary), more ({path}: a count; 2 or more adds a \"+N more\" tag) and detail ({path, datePath?, iconPath?, iconTonePath?}: a detail line under the value, {date} filled in by the renderer, after an optional icon). The fields they read from ride in the row and are not columns of their own. Renderers that ignore them draw the plain value. The catalogId is unchanged.",
+          "1.7.0": "Additive: sortable headers. dataGrid columns gain an optional sortable flag (the field is in the table query's sortable allowlist), and the dataGrid an optional sort: the binding to the current sort ({field, dir} or null) and the query envelope a header click dispatches with the new sort. The catalogId is unchanged.",
+          "1.6.0": "Additive: entityPage gains an optional headerVisible boolean. false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true. The title stays required. The catalogId is unchanged.",
+          "1.5.0": "Additive: calendarView gains an optional granularities list (the window sizes the user may switch between); the renderer offers a switch and dispatches windowAction with granularity added. The window state carries the size it shows. The catalogId is unchanged.",
+          "1.4.0": "Additive: the liveDiagram component (diagram entities): a mermaid diagram (static source) with markers bound by node id, and the node list a renderer without mermaid shows instead. The catalogId is unchanged.",
+          "1.3.0": "Additive: the calendarView component (display :calendar tables): the table's query window as a month or week grid, or one day, with the days that hold records marked, wrapping the table's dataGrid. The catalogId is unchanged.",
+          "1.2.0": "Additive: dataGrid rowActions entries gain an optional visiblePath (per-row visibility of visible_when actions) and an optional prompt (prompt_fields actions collect their values in a dialog over a grid child before the invoke). The catalogId is unchanged.",
+          "1.1.0": "Additive: dataGrid columns gain optional format/align/mono/badge/link and the grid an optional rowClick envelope; fieldDisplay gains an optional link binding; the openSurface client function. Renderers that read only columns[label, path] are unaffected; the catalogId is unchanged (no breaking change).",
+          "1.0.0": "The ten-component contract (notes/2026-09-07-admin-catalog-contract.md)."
+        }
+      }
+    }
   },
   "components": {
     "entityPage": {
       "type": "object",
+      "allowedParents": ["Surface"],
       "description": "Page shell for an admin resource surface: title, optional description, and the page body (context pickers, query controls, DataGrid, RecordPanel, StatusBanner).",
       "properties": {
         "component": {"const": "entityPage"},
         "title": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Page title: a literal string or a data-model path binding."
         },
         "description": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Optional page description: a literal string or a data-model path binding."
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "Ids of the page body components, in order."
         },
         "headerVisible": {
@@ -50,8 +58,7 @@
           "description": "Optional (1.6). false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true."
         }
       },
-      "required": ["component", "title", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "title", "children"]
     },
     "dataGrid": {
       "type": "object",
@@ -111,8 +118,14 @@
               },
               "more": {
                 "type": "object",
-                "description": "Optional (1.8): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1). valuesPath (optional, 1.10) names the row's list of all the values (the _more_values_<column> key, strings), for a list of them.",
-                "properties": {"path": {"type": "string"}, "valuesPath": {"type": "string"}},
+                "description": "Optional (1.8): row-relative binding to how many values the cell's field has. When it is 2 or more the renderer adds a tag counting the rest (\"+N more\", N = count - 1). valuesPath (optional, 1.10) names the row's list of all the values (the _more_values_<column> key, strings), for a list of them. textPath, captionPath and labelPath (row-relative, optional) name the server-written words: the tag's text (the _more_text_<column> key, pluralized for the reader), the list's caption (_more_caption_<column>) and the tag's accessible label (_more_label_<column>).",
+                "properties": {
+                  "path": {"type": "string"},
+                  "valuesPath": {"type": "string"},
+                  "textPath": {"type": "string"},
+                  "captionPath": {"type": "string"},
+                  "labelPath": {"type": "string"}
+                },
                 "required": ["path"],
                 "additionalProperties": false
               },
@@ -180,8 +193,8 @@
           }
         },
         "rows": {
-          "type": "object",
-          "description": "Binding to the table's records list path (e.g. {\"path\": \"/records\"})."
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Binding to the table's records list path (e.g. {\"@path\": \"/records\"})."
         },
         "layout": {
           "type": "string",
@@ -201,7 +214,7 @@
           "description": "Optional (1.16): the words on the disclosure that opens a row's expand columns (\"Show notes\"), translated."
         },
         "footerNote": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DataBinding",
           "description": "Optional (1.15): binding to a line of text a renderer draws under the rows, inside the table's card (a field of the table's context record, at /detail/<context>/<field>)."
         },
         "footerLink": {
@@ -231,7 +244,7 @@
             "properties": {
               "label": {"type": "string"},
               "action": {"type": "string", "description": "The client action name dispatched (view_record, start_edit, or invoke)."},
-              "context": {"type": "object", "description": "The action context: literal values and {\"path\": ...} refs resolved against the row (recordId, component, action, values)."},
+              "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}, "description": "The action context: literal values and {\"@path\": ...} bindings resolved against the row (recordId, component, action, values)."},
               "destructive": {"type": "boolean", "description": "true when dispatch must be confirmed through ConfirmDialog (destroy actions)."},
               "visiblePath": {"type": "string", "description": "Optional (1.2): row-relative path of the action's per-row visibility (the server-computed _visible_<action> key of a visible_when action). The renderer offers the action only on rows where the value is a non-empty list (or true); absent means always offered. Enforcement stays server-side."},
               "prompt": {
@@ -246,7 +259,7 @@
                     "description": "The prompt pre-fill envelope, in the flat rowActions shape ({action: \"prompt\", context}), resolved against the row.",
                     "properties": {
                       "action": {"type": "string"},
-                      "context": {"type": "object"}
+                      "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}}
                     },
                     "required": ["action", "context"],
                     "additionalProperties": false
@@ -266,7 +279,7 @@
           "properties": {
             "label": {"type": "string"},
             "action": {"type": "string"},
-            "context": {"type": "object"},
+            "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}},
             "labelPath": {
               "type": "string",
               "description": "Optional (1.9): row-relative path of the row's button label (the _primary_label key); label when absent on a row."
@@ -293,12 +306,7 @@
           "description": "Optional (1.7), present when a column is sortable: path binds the table's current sort ({field, dir} with dir asc | desc, or null; e.g. {\"path\": \"/query/sort\"}); action is the query envelope ({name: \"query\", context}, the Apply envelope with page 1) a sortable header dispatches after setting sort in the resolved query state to {field: <column path>, dir}. The renderer marks the sorted column (aria-sort) and toggles asc/desc on repeat clicks. The server validates the sort against the same allowlist.",
           "properties": {
             "path": {"type": "string"},
-            "action": {
-              "type": "object",
-              "properties": {"name": {"type": "string"}, "context": {"type": "object"}},
-              "required": ["name", "context"],
-              "additionalProperties": false
-            },
+            "action": {"$ref": "#/$defs/actionEvent"},
             "reset": {
               "type": "boolean",
               "description": "Optional (1.11): a header's clicks cycle first direction, the other, then back to the query's default order (the action sent with sort null)."
@@ -308,70 +316,68 @@
           "additionalProperties": false
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "At most one emptyState and at most one pagination child."
         }
       },
-      "required": ["component", "columns", "rows", "rowId", "label", "rowActions", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "columns", "rows", "rowId", "label", "rowActions", "children"]
     },
     "emptyState": {
       "type": "object",
+      "allowedParents": ["dataGrid"],
       "description": "Zero-results state for a DataGrid. The renderer shows it only while the grid's bound rows list is empty — no sentinel prop.",
       "properties": {
         "component": {"const": "emptyState"},
         "message": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "The empty-state text (e.g. \"No Tasks records yet.\"): a literal string or a data-model path binding."
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "Optional hint / action button."
         },
         "title": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Optional (1.10): the empty state's heading, a literal or a binding (the query state's emptyState/title)."
         },
         "icon": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Optional (1.10): inbox | search | archive, a literal or a binding (emptyState/icon)."
         },
         "clearAction": {
           "type": "object",
           "description": "Optional (1.10): {label, action}: a button that clears the query state's search, filters and ranges at action.context.query.path, then dispatches action (the query envelope at page 1).",
-          "properties": {"label": {"type": "string"}, "action": {"type": "object"}},
+          "properties": {"label": {"type": "string"}, "action": {"$ref": "#/$defs/actionEvent"}},
           "required": ["label", "action"],
           "additionalProperties": false
         },
         "clearVisible": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicBoolean",
           "description": "Optional (1.10): whether the clear action shows (bound to emptyState/clear: true while search or filters are active)."
         }
       },
-      "required": ["component", "message", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "message", "children"]
     },
     "pagination": {
       "type": "object",
+      "allowedParents": ["dataGrid"],
       "description": "Conditional pagination navigation. All data props are plain values or bindings — no zero-or-one sentinel lists. Visibility is decided server-side (the query state's boolean keys); the renderer hides the whole bar when visible is false.",
       "properties": {
         "component": {"const": "pagination"},
-        "page": {"type": "object", "description": "Current 1-based page (bound to the query state)."},
-        "pageSize": {"type": "object", "description": "Page size (bound to the query state)."},
-        "total": {"type": "object", "description": "Total matching records when known, null otherwise (bound)."},
-        "hasNext": {"type": "object", "description": "Whether a further page exists (bound)."},
-        "visible": {"type": "object", "description": "Whether the bar renders at all: page > 1 or hasNext (bound to the query state's paginationVisible)."},
-        "previousVisible": {"type": "object", "description": "Whether the previous affordance renders (bound to previousVisible)."},
-        "nextVisible": {"type": "object", "description": "Whether the next affordance renders (bound to nextVisible)."},
-        "rangeText": {"type": "object", "description": "Result range text, \"1–5 of 42\" / \"Showing 1–5\" (bound to _range_text)."},
+        "page": {"$ref": "common_types.json#/$defs/DynamicNumber", "description": "Current 1-based page (bound to the query state)."},
+        "pageSize": {"$ref": "common_types.json#/$defs/DynamicNumber", "description": "Page size (bound to the query state)."},
+        "total": {"$ref": "common_types.json#/$defs/DynamicNumber", "description": "Total matching records when known, null otherwise (bound)."},
+        "hasNext": {"$ref": "common_types.json#/$defs/DynamicBoolean", "description": "Whether a further page exists (bound)."},
+        "visible": {"$ref": "common_types.json#/$defs/DynamicBoolean", "description": "Whether the bar renders at all: page > 1 or hasNext (bound to the query state's paginationVisible)."},
+        "previousVisible": {"$ref": "common_types.json#/$defs/DynamicBoolean", "description": "Whether the previous affordance renders (bound to previousVisible)."},
+        "nextVisible": {"$ref": "common_types.json#/$defs/DynamicBoolean", "description": "Whether the next affordance renders (bound to nextVisible)."},
+        "rangeText": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Result range text, \"1–5 of 42\" / \"Showing 1–5\" (bound to _range_text)."},
         "previousAction": {
-          "type": "object",
+          "$ref": "#/$defs/actionEvent",
           "description": "The previous-page action envelope: the existing `query` action with pageDelta -1."
         },
         "nextAction": {
-          "type": "object",
+          "$ref": "#/$defs/actionEvent",
           "description": "The next-page action envelope: the existing `query` action with pageDelta 1."
         },
         "pageSizeOptions": {
@@ -380,7 +386,7 @@
           "description": "Optional (1.10): the page sizes the reader may pick (the query's page_size_options)."
         },
         "pageSizeAction": {
-          "type": "object",
+          "$ref": "#/$defs/actionEvent",
           "description": "Optional (1.10): the `query` action envelope (page 1) the renderer dispatches with the picked size as the query state's pageSize."
         }
       },
@@ -396,25 +402,23 @@
         "rangeText",
         "previousAction",
         "nextAction"
-      ],
-      "unevaluatedProperties": false
+      ]
     },
     "recordPanel": {
       "type": "object",
+      "allowedParents": ["entityPage"],
       "description": "Explicit task panel for one record. Hidden while the bound mode is null (renderer concern). The renderer shows the fieldDisplay children in view mode and the formSection + actionBar children in create/edit mode.",
       "properties": {
         "component": {"const": "recordPanel"},
-        "mode": {"type": "object", "description": "Bound to /ui/panel/mode: \"create\", \"view\", \"edit\", or null (closed)."},
-        "title": {"type": "object", "description": "Bound to /ui/panel/title (e.g. \"Edit Tasks\")."},
-        "recordId": {"type": "object", "description": "Bound to /ui/panel/record_id."},
+        "mode": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Bound to /ui/panel/mode: \"create\", \"view\", \"edit\", or null (closed)."},
+        "title": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Bound to /ui/panel/title (e.g. \"Edit Tasks\")."},
+        "recordId": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Bound to /ui/panel/record_id."},
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "One fieldDisplay per field, then the formSection and actionBar."
         }
       },
-      "required": ["component", "mode", "title", "recordId", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "mode", "title", "recordId", "children"]
     },
     "fieldDisplay": {
       "type": "object",
@@ -422,61 +426,46 @@
       "properties": {
         "component": {"const": "fieldDisplay"},
         "label": {"type": "string", "description": "The field's resolved label."},
-        "value": {"type": "object", "description": "Binding to the field's /form/<field> value."},
+        "value": {"$ref": "common_types.json#/$defs/DynamicValue", "description": "Binding to the field's /form/<field> value."},
         "format": {
           "type": "string",
           "enum": ["text", "datetime", "boolean", "number"],
           "description": "Optional value formatting hint; text when omitted. Text values that are lists (arrays, or multi-line text whose lines are bulleted with -, * or •) render as lists."
         },
         "link": {
-          "type": "object",
-          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface (1.15: with download: true when the address is a file to download), or a list of them (e.g. {\"path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function; when the bound value is absent the plain value renders.",
-          "properties": {"path": {"type": "string"}},
-          "required": ["path"],
-          "additionalProperties": false
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (1.1): binding to the field's reference link(s) — a link object {surface, recordId, label[, href]}, or (1.13) a plain link {href, label} with no surface (1.15: with download: true when the address is a file to download), or a list of them (e.g. {\"@path\": \"/detail/<context>/_links/<field>\"}). When present the value renders as link(s) activating the openSurface function (a plain link is followed); when the bound value is absent the plain value renders."
         },
         "badge": {
-          "type": "object",
-          "description": "Optional (1.12): binding to the badge text of a badge field (/detail/<context>/_badge_<field>): the value is drawn as a pill with this text.",
-          "properties": {"path": {"type": "string"}},
-          "required": ["path"],
-          "additionalProperties": false
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (1.12): binding to the badge text of a badge field (/detail/<context>/_badge_<field>): the value is drawn as a pill with this text."
         },
         "badgeTone": {
-          "type": "object",
-          "description": "Optional (1.12): binding to the badge tone (/detail/<context>/_badge_tone_<field>): neutral, info, success, warning, danger, accent, pending or gray.",
-          "properties": {"path": {"type": "string"}},
-          "required": ["path"],
-          "additionalProperties": false
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (1.12): binding to the badge tone (/detail/<context>/_badge_tone_<field>): neutral, info, success, warning, danger, accent, pending or gray."
         },
         "badgeHelp": {
-          "type": "object",
-          "description": "Optional (1.12): binding to the badge's one-line tooltip (/detail/<context>/_badge_help_<field>); empty for none.",
-          "properties": {"path": {"type": "string"}},
-          "required": ["path"],
-          "additionalProperties": false
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (1.12): binding to the badge's one-line tooltip (/detail/<context>/_badge_help_<field>); empty for none."
         },
         "note": {"type": "string", "description": "Optional (1.12): a few words beside the label saying how the value came to be (\"Calculated\"), translated."},
         "emptyText": {"type": "string", "description": "Optional (1.12): the muted words shown in place of an empty value (null or \"\"), translated."},
         "hideWhenEmpty": {"type": "boolean", "description": "Optional (1.12): true when an empty value (null or \"\") draws no row at all."},
         "steps": {
-          "type": "object",
-          "description": "Optional (1.17): binding to a steps field's steps (/detail/<context>/_steps_<field>), a list of {number, label, text?, note?, state, stateLabel, line}: number is the step's place (from 1), text the line under the label, note a smaller line, state one of complete, current, upcoming or overdue, stateLabel the state in words (translated) and line the whole step as one line of text. When present the value draws as a numbered stepper with each step's state written out, not only coloured; an empty list is an empty value (emptyText, hideWhenEmpty).",
-          "properties": {"path": {"type": "string"}},
-          "required": ["path"],
-          "additionalProperties": false
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (1.17): binding to a steps field's steps (/detail/<context>/_steps_<field>), a list of {number, label, text?, note?, state, stateLabel, line}: number is the step's place (from 1), text the line under the label, note a smaller line, state one of complete, current, upcoming or overdue, stateLabel the state in words (translated) and line the whole step as one line of text. When present the value draws as a numbered stepper with each step's state written out, not only coloured; an empty list is an empty value (emptyText, hideWhenEmpty)."
         }
       },
-      "required": ["component", "label", "value"],
-      "unevaluatedProperties": false
+      "required": ["component", "label", "value"]
     },
     "formSection": {
       "type": "object",
+      "allowedParents": ["recordPanel"],
       "description": "Labeled field grouping for create/edit mode. Children are basic-catalog input components (text_field, check_box, choice_picker, date_time_input) with the exact per-field bindings and /errors/<field> associations the basic form emission produces.",
       "properties": {
         "component": {"const": "formSection"},
         "title": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Optional section title."
         },
         "columns": {
@@ -484,25 +473,24 @@
           "description": "Field layout columns (default 1)."
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "Ids of the basic inputs, their error texts, and any basic group cards."
         }
       },
-      "required": ["component", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "children"]
     },
     "actionBar": {
       "type": "object",
+      "allowedParents": ["recordPanel"],
       "description": "Action hierarchy for the record panel: the primary action (hidden while the bound primaryLabel is empty) plus secondary buttons. The primary dispatches the existing submit_form envelope; secondaries are basic buttons (Cancel dispatches cancel_record_task).",
       "properties": {
         "component": {"const": "actionBar"},
         "primaryLabel": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Bound to /ui/panel/primary_label — empty means the primary action is hidden."
         },
         "busy": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicBoolean",
           "description": "Reserved for pending-state binding; false for now."
         },
         "destructive": {
@@ -510,44 +498,40 @@
           "description": "Styles the primary action as destructive (default false)."
         },
         "action": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/Action",
           "description": "The primary action envelope: the existing submit_form event."
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "Ids of the secondary basic buttons."
         }
       },
-      "required": ["component", "primaryLabel", "busy", "action", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "primaryLabel", "busy", "action", "children"]
     },
     "statusBanner": {
       "type": "object",
       "description": "Typed feedback banner. Renders nothing while the bound kind is null (renderer concern; success and warning → role=status, error → role=alert).",
       "properties": {
         "component": {"const": "statusBanner"},
-        "kind": {"type": "object", "description": "Bound to /ui/feedback/kind: \"success\", \"warning\" (partial success of a bulk run), \"error\", or null."},
-        "message": {"type": "object", "description": "Bound to /ui/feedback/message."}
+        "kind": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Bound to /ui/feedback/kind: \"success\", \"warning\" (partial success of a bulk run), \"error\", or null."},
+        "message": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Bound to /ui/feedback/message."}
       },
-      "required": ["component", "kind", "message"],
-      "unevaluatedProperties": false
+      "required": ["component", "kind", "message"]
     },
     "confirmDialog": {
       "type": "object",
       "description": "Destructive-action confirmation. Declared in the catalog vocabulary and rendered by the DataGrid renderer when a rowAction envelope carries destructive: true; confirming dispatches the original envelope unchanged — the server never sees a new action name. Confirm/cancel are handled client-side before dispatch.",
       "properties": {
         "component": {"const": "confirmDialog"},
-        "title": {"type": "object", "description": "Dialog title."},
-        "body": {"type": "object", "description": "Dialog body text."},
-        "confirmLabel": {"type": "object", "description": "Confirm button label."},
+        "title": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Dialog title."},
+        "body": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Dialog body text."},
+        "confirmLabel": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Confirm button label."},
         "destructive": {
           "type": "boolean",
           "description": "Styles the confirm action as destructive (default true)."
         }
       },
-      "required": ["component", "title", "body", "confirmLabel"],
-      "unevaluatedProperties": false
+      "required": ["component", "title", "body", "confirmLabel"]
     },
     "calendarView": {
       "type": "object",
@@ -562,27 +546,25 @@
           "description": "Optional (1.5): the window sizes the user may switch between. With more than one the renderer offers a switch that dispatches windowAction with granularity (one of these) added."
         },
         "window": {
-          "type": "object",
-          "description": "Binding to the table's window state ({\"path\": \"/query/<table>/window\"}): {granularity, anchor, from, to, selected, label, scopeLabel, marks: [{date, count, label}]}."
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Binding to the table's window state ({\"@path\": \"/query/<table>/window\"}): {granularity, anchor, from, to, selected, label, scopeLabel, marks: [{date, count, label}]}."
         },
         "windowAction": {
           "type": "object",
           "description": "The query envelope {name: \"query\", context: {query: {path}, component, contexts?}} the calendar dispatches with anchor or date added.",
           "properties": {
             "name": {"const": "query"},
-            "context": {"type": "object"}
+            "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}}
           },
           "required": ["name"]
         },
         "children": {
-          "type": "array",
-          "items": {"type": "string"},
+          "$ref": "common_types.json#/$defs/ChildList",
           "description": "The id of the table's dataGrid."
         },
         "weight": {"type": "number"}
       },
-      "required": ["component", "granularity", "window", "windowAction", "children"],
-      "unevaluatedProperties": false
+      "required": ["component", "granularity", "window", "windowAction", "children"]
     },
     "liveDiagram": {
       "type": "object",
@@ -593,21 +575,55 @@
         "description": {"type": "string", "description": "Optional help text under the heading."},
         "source": {"type": "string", "description": "The mermaid diagram source (static)."},
         "markers": {
-          "type": "object",
-          "description": "Binding to the markers keyed by node id ({\"path\": \"/diagram/<name>/markers\"}): {<nodeId>: [{id, nodeId, nodeLabel, label, initials, status: active|executing|waiting|failed|done, statusLabel, tone: neutral|info|success|warning|danger|accent, link?: {surface, recordId, label, href?}}]}."
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Binding to the markers keyed by node id ({\"@path\": \"/diagram/<name>/markers\"}): {<nodeId>: [{id, nodeId, nodeLabel, label, initials, status: active|executing|waiting|failed|done, statusLabel, tone: neutral|info|success|warning|danger|accent, link?: {surface, recordId, label, href?}}]}."
         },
         "nodes": {
-          "type": "object",
-          "description": "Binding to the node list ({\"path\": \"/diagram/<name>/nodes\"}): [{id, label, count, markers}], the nodes that hold markers."
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Binding to the node list ({\"@path\": \"/diagram/<name>/nodes\"}): [{id, label, count, markers}], the nodes that hold markers."
         },
         "error": {
-          "type": "object",
+          "$ref": "common_types.json#/$defs/DynamicString",
           "description": "Binding to the unavailable message (\"\" when the diagram loaded)."
         },
         "weight": {"type": "number"}
       },
-      "required": ["component", "source", "markers"],
-      "unevaluatedProperties": false
+      "required": ["component", "source", "markers"]
+    },
+    "filterPicker": {
+      "type": "object",
+      "description": "A query filter's picker: the basic ChoicePicker plus what an admin filter carries. hint is a line of help under the picker; counts binds a value-to-count map (the filter's facet counts); dynamicOptions binds an option list from the query state (a path filter's options, shown after the static ones); an option may be a group (group: true) or a group's leaf (parent: the group's value). The value binds the query state's filter (a string list, or a scalar the renderer reads as a one-item list).",
+      "allOf": [
+        {"$ref": "common_types.json#/$defs/Checkable"},
+        {
+          "type": "object",
+          "properties": {
+            "component": {"const": "filterPicker"},
+            "label": {"$ref": "common_types.json#/$defs/DynamicString", "description": "The filter's label."},
+            "variant": {"type": "string", "enum": ["multipleSelection", "mutuallyExclusive"], "default": "mutuallyExclusive"},
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {"$ref": "common_types.json#/$defs/DynamicString"},
+                  "value": {"type": "string"},
+                  "parent": {"type": "string", "description": "The value of the group this option belongs to."},
+                  "group": {"type": "boolean", "description": "true for a group heading option."}
+                },
+                "required": ["label", "value"],
+                "additionalProperties": false
+              }
+            },
+            "value": {"$ref": "common_types.json#/$defs/DynamicStringList", "description": "The selected values (bound to /query/filters/<name>)."},
+            "hint": {"type": "string", "description": "A line of help shown under the picker."},
+            "counts": {"$ref": "common_types.json#/$defs/DataBinding", "description": "Binding to the filter's facet counts ({value: count})."},
+            "dynamicOptions": {"$ref": "common_types.json#/$defs/DataBinding", "description": "Binding to options read from the query state ([{label, value}])."},
+            "weight": {"type": "number"}
+          },
+          "required": ["component", "options", "value"]
+        }
+      ]
     }
   },
   "functions": {
@@ -615,8 +631,9 @@
       "type": "object",
       "description": "Opens another surface on a record — the reference-link navigation. The client decides how (the web renderer hands it to the host: by default the LiveView navigates to the configured open_surface_url; other clients may stack the surface and return with a back key). No return value.",
       "returnType": "void",
+      "requiresUserActivation": true,
       "properties": {
-        "call": {"const": "openSurface"},
+        "@call": {"const": "openSurface"},
         "args": {
           "type": "object",
           "properties": {
@@ -628,9 +645,25 @@
           "additionalProperties": false
         }
       },
-      "required": ["call", "args"],
-      "unevaluatedProperties": false
+      "required": ["@call", "args"]
     }
   },
-  "$defs": {}
+  "$defs": {
+    "actionEvent": {
+      "type": "object",
+      "description": "An ash_a2ui action the renderer sends as ashAction: its name and its context, whose bindings resolve against the data model (row-relative inside a dataGrid row).",
+      "properties": {
+        "name": {"type": "string"},
+        "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}}
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    },
+    "anyComponent": {
+      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/filterPicker"}]
+    },
+    "anyFunction": {
+      "oneOf": [{"$ref": "#/functions/openSurface"}]
+    }
+  }
 }

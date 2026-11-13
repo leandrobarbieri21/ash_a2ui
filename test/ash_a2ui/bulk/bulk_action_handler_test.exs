@@ -13,7 +13,8 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
   import AshA2ui.Test.BulkHelpers
 
   alias AshA2ui.ActionHandler
-  alias AshA2ui.Test.{BulkCardsUI, BulkPresetsUI, BulkTasksUI}
+  alias AshA2ui.Experience
+  alias AshA2ui.Test.{BulkCardsUI, BulkPresetsUI, BulkTasksUI, Messages}
 
   setup do
     reset!()
@@ -40,7 +41,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
           do: task!(title, %{project_id: project.id})
 
     assert {:ok, messages} = bulk_invoke("approve", rows([a, b, c, d], [a, b, c]), project)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     # each selected record went through the action as the actor
     assert Enum.map([a, b, c, d], &reload!(&1).status) == [:approved, :approved, :approved, :open]
@@ -105,7 +106,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
 
     tasks = [good_one, bad, good_two]
     assert {:ok, messages} = bulk_invoke("approve", rows(tasks, tasks), project)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     assert reload!(good_one).status == :approved
     assert reload!(good_two).status == :approved
@@ -125,10 +126,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     assert value_at(messages, "/ui/feedback")["message"] ==
              "Approve: 2 of 3 selected records done; 1 failed."
 
-    assert value_at(messages, "/ui/feedback") == %{
-             "kind" => "warning",
-             "message" => "Approve: 2 of 3 selected records done; 1 failed."
-           }
+    assert value_at(messages, "/ui/feedback")["kind"] == "warning"
   end
 
   test "a run that writes nothing is an error and refreshes nothing", %{project: project} do
@@ -141,24 +139,24 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     assert value_at(messages, "/ui/feedback")["kind"] == "error"
   end
 
-  test "a v1.0 run answers with the result in the action response", %{project: project} do
+  test "a run called as ashAction answers with the result", %{project: project} do
     a = task!("Alpha", %{project_id: project.id})
 
     message =
-      envelope("bulk_invoke", %{
-        "action" => "reject",
-        "component" => "table",
-        "records" => rows([a], [a])
-      })
-      |> put_in(["action", "actionId"], "act-1")
+      Messages.call(
+        "bulk_invoke",
+        "bulk_tasks",
+        %{"action" => "reject", "component" => "table", "records" => rows([a], [a])},
+        id: "act-1"
+      )
 
-    assert {:ok, [response | messages]} =
-             ActionHandler.handle(BulkTasksUI, message, actor: actor(), spec_version: "1.0")
+    assert {:ok, messages} = ActionHandler.handle(BulkTasksUI, message, actor: actor())
+    Enum.each(messages, &assert_valid_agent_message/1)
 
-    Enum.each([response | messages], &assert_valid_server_message(&1, :v1_0))
+    assert %{"agentFunctionResponse" => %{"functionCallId" => "act-1", "value" => value}} =
+             List.last(messages)
 
-    assert %{"value" => %{"status" => "ok", "result" => %{"ok" => 1}}} =
-             response["actionResponse"]
+    assert %{"kind" => "success", "result" => %{"ok" => 1}} = value
 
     assert reload!(a).status == :rejected
   end
@@ -183,7 +181,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
     end
 
     assert {:ok, messages} = select.(true)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     records = value_at(messages, "/records")
 
@@ -215,7 +213,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
                actor: actor()
              )
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     # :stamp sets the score of the record its :record_id names: each call
     # got its own record, the unselected one was not touched
@@ -257,7 +255,7 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
                  actor: actor()
                )
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       rows = inbox_rows(messages)
       assert length(rows) == cap + 1
@@ -282,29 +280,24 @@ defmodule AshA2ui.Bulk.BulkActionHandlerTest do
       assert %{"ok" => 250, "refused" => 0} = value_at(messages, "/bulk/inbox/result")
     end
 
-    test "on v1.0 the capped-selection notice answers ok, with a warning feedback" do
+    test "called as ashAction, the capped-selection notice answers ok with a warning" do
       cap = AshA2ui.Bulk.cap(inbox_table())
       for n <- 1..(cap + 1), do: task!("Task #{String.pad_leading(to_string(n), 3, "0")}")
 
-      message = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "bulk_select",
-          "surfaceId" => "bulk_cards",
-          "actionId" => "sel_1",
-          "context" => %{"component" => "inbox", "selected" => true}
-        }
-      }
+      message =
+        Messages.call("bulk_select", "bulk_cards", %{"component" => "inbox", "selected" => true},
+          id: "sel_1"
+        )
 
-      assert {:ok, [response | followups]} =
-               ActionHandler.handle(BulkCardsUI, message, actor: actor(), spec_version: "1.0")
+      assert {:ok, messages} = ActionHandler.handle(BulkCardsUI, message, actor: actor())
 
       text = "Selected the first 250 of 251 records: a bulk action runs on at most 250 records."
+      warning = Experience.feedback("warning", text, %{"functionCallId" => "sel_1"})
 
-      assert response["actionId"] == "sel_1"
-      assert %{"value" => %{"status" => "ok", "message" => ^text}} = response["actionResponse"]
-      assert %{"status" => "ok", "message" => ^text} = value_at(followups, "/ui/response")
-      assert value_at(followups, "/ui/feedback") == %{"kind" => "warning", "message" => text}
+      assert value_at(messages, "/ui/feedback") == warning
+
+      assert %{"agentFunctionResponse" => %{"functionCallId" => "sel_1", "value" => ^warning}} =
+               List.last(messages)
     end
   end
 end

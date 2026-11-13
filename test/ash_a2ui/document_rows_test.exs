@@ -13,7 +13,7 @@ defmodule AshA2ui.DocumentRowsTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{Appointment, Clinic, DocumentVisitsUI, Owner}
+  alias AshA2ui.Test.{Appointment, Clinic, DocumentVisitsUI, Owner, SchemaHelper}
 
   setup do
     on_exit(fn ->
@@ -35,14 +35,16 @@ defmodule AshA2ui.DocumentRowsTest do
   defp build(catalog, owner) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(DocumentVisitsUI,
         authorize?: false,
         context_state: %{"owner" => %{"search" => "", "value" => owner.id, "label" => "x"}}
       )
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
+    catalogs = if catalog == :admin_v1, do: SchemaHelper.admin_catalogs()
+    SchemaHelper.assert_valid_agent_message(message, catalogs: catalogs)
+
+    {Map.new(surface["components"], &{&1["id"], &1}), surface["dataModel"]}
   end
 
   test "the leading field is placed, and leaves the default meta", %{owner: owner} do
@@ -74,7 +76,7 @@ defmodule AshA2ui.DocumentRowsTest do
     {components, data} = build(:admin_v1, owner)
     grid = components["data_grid"]
 
-    assert grid["footerNote"] == %{"path" => "/detail/owner/name"}
+    assert grid["footerNote"] == %{"@path" => "/detail/owner/name"}
     assert grid["footerLink"] == %{"href" => "#all", "label" => "All visits"}
     assert data["detail"]["owner"]["name"] == "Ada"
   end

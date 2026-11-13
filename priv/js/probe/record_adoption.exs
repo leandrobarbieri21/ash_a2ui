@@ -31,13 +31,19 @@ write = fn name, messages -> File.write!(Path.join(out, name), Jason.encode!(%{m
 
 envelope = fn surface, name, context ->
   %{
-    "version" => "v0.9.1",
-    "action" => %{
-      "name" => name,
+    "version" => "1.0",
+    "callAgentFunction" => %{
       "surfaceId" => surface,
-      "sourceComponentId" => "data_grid",
-      "timestamp" => "2026-10-16T00:00:00Z",
-      "context" => context
+      "functionCallId" => "probe-call",
+      "callFunction" => %{
+        "@call" => "ashAction",
+        "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+        "args" => %{
+          "name" => name,
+          "sourceComponentId" => "data_grid",
+          "context" => context
+        }
+      }
     }
   }
 end

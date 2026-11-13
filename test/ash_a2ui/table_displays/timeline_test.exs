@@ -15,6 +15,8 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
   alias AshA2ui.Dynamic.Error
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.ResolvedView
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
   alias AshA2ui.Test.TableDisplays.{TimelineUI, Visit}
 
   @allowlist Dynamic.allowlist([Visit])
@@ -59,13 +61,14 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
 
   defp parts(ui, opts \\ []) do
     messages = AshA2ui.Info.build_surface(ui, [authorize?: false] ++ opts)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -74,16 +77,7 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
   end
 
   defp envelope(context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "surfaceId" => "visit_timeline",
-        "sourceComponentId" => "test_component",
-        "timestamp" => "2026-10-21T00:00:00Z",
-        "context" => context
-      }
-    }
+    Messages.call("query", "visit_timeline", context)
   end
 
   describe "encoding" do
@@ -110,17 +104,17 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
       assert components["record_row_when"] == %{
                "id" => "record_row_when",
                "component" => "Text",
-               "text" => %{"path" => "_timeline_when"},
+               "text" => %{"@path" => "_timeline_when"},
                "variant" => "caption"
              }
     end
 
-    test "is basic catalog only, on v1.0 too" do
+    test "is basic catalog only" do
       seed()
       {components, _value} = parts(TimelineUI)
 
       basic =
-        "priv/a2ui/v0_9_1/catalogs/basic/catalog.json"
+        "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json"
         |> File.read!()
         |> Jason.decode!()
         |> Map.fetch!("components")
@@ -131,10 +125,10 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
       assert MapSet.subset?(kinds, basic), inspect(MapSet.difference(kinds, basic))
 
       assert {:ok, v1} =
-               Dynamic.resolve(spec(%{}), allowlist: @allowlist, spec_version: "1.0")
+               Dynamic.resolve(spec(%{}), allowlist: @allowlist)
 
       assert [message] = Dynamic.build_surface(v1, authorize?: false)
-      assert_valid_server_message(message, :v1_0)
+      assert_valid_agent_message(message)
 
       record = hd(message["createSurface"]["dataModel"]["records"])
       assert record["_timeline_when"] == "2026-10-01 08:30"
@@ -148,12 +142,11 @@ defmodule AshA2ui.TableDisplays.TimelineTest do
 
       by_id =
         messages
-        |> Enum.find_value(& &1["updateComponents"])
-        |> Map.fetch!("components")
+        |> Surface.components()
         |> components_by_id()
 
       refute Enum.any?(Map.values(by_id), &(&1["component"] == "dataGrid"))
-      assert by_id["record_row_when"]["text"] == %{"path" => "_timeline_when"}
+      assert by_id["record_row_when"]["text"] == %{"@path" => "_timeline_when"}
     end
   end
 

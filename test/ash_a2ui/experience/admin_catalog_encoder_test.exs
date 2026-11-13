@@ -15,6 +15,8 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
   alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.{ReadOnly, Task}
   alias AshA2ui.Test.KitchenSink
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   setup do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
@@ -27,26 +29,18 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
   end
 
   defp envelope(name, context \\ %{}) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "experience_task",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "experience_task", context)
   end
 
   defp components_by_id(components_message) do
-    Map.new(components_message["updateComponents"]["components"], &{&1["id"], &1})
+    Surface.components_by_id(components_message)
   end
 
   describe "semantic core subtree" do
     @tag ac: "A2UI-101B/AC-2"
     test "admin surface uses semantic components" do
-      [create, components, _data] = AshA2ui.Info.build_surface(Task, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}} = create] =
+        AshA2ui.Info.build_surface(Task, actor: nil)
 
       assert create["createSurface"]["catalogId"] == Experience.admin_catalog_id()
 
@@ -89,7 +83,9 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
   describe "DataGrid derivation" do
     @tag ac: "A2UI-101B/AC-3"
     test "data grid derives columns and row actions" do
-      [_create, components, _data] = AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+        AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+
       grid = components_by_id(components)["data_grid"]
 
       # one column per visible field, in the resolved field order (the same
@@ -112,7 +108,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
              ]
 
       # rows/rowId/label bindings
-      assert grid["rows"] == %{"path" => "/records"}
+      assert grid["rows"] == %{"@path" => "/records"}
       assert grid["rowId"] == "id"
       assert grid["label"] == "Kitchen sink"
 
@@ -132,7 +128,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       # basic record controls emit
       assert %{
                "context" => %{
-                 "recordId" => %{"path" => "id"},
+                 "recordId" => %{"@path" => "id"},
                  "component" => "table"
                }
              } = hd(actions)
@@ -142,7 +138,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       assert %{
                "context" => %{
                  "action" => "destroy",
-                 "recordId" => %{"path" => "id"},
+                 "recordId" => %{"@path" => "id"},
                  "component" => "table"
                },
                "destructive" => true
@@ -153,7 +149,9 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       # formless read-only surface variant: no row actions at all — View
       # needs a record panel to open, and ReadOnly has no form component
       # (the audit's dead-button finding)
-      [_create, components, _data] = AshA2ui.Info.build_surface(ReadOnly, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+        AshA2ui.Info.build_surface(ReadOnly, actor: nil)
+
       grid = components_by_id(components)["data_grid"]
 
       assert grid["rowActions"] == []
@@ -162,7 +160,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
 
   describe "sortable headers (1.7)" do
     test "a query's sortable columns are marked, and the grid carries the sort binding" do
-      [_create, components, _data] =
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
         AshA2ui.Info.build_surface(AshA2ui.Test.Links.PagedNotesUI, actor: nil)
 
       grid = components_by_id(components)["data_grid"]
@@ -179,7 +177,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
                "action" => %{
                  "name" => "query",
                  "context" => %{
-                   "query" => %{"path" => "/query"},
+                   "query" => %{"@path" => "/query"},
                    "page" => 1,
                    "component" => "table"
                  }
@@ -193,22 +191,21 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       for title <- ["Alpha", "Beta"],
           do: Ash.create!(Note, %{title: title}, authorize?: false)
 
-      [_create, components, data] = AshA2ui.Info.build_surface(PagedNotesUI, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+        AshA2ui.Info.build_surface(PagedNotesUI, actor: nil)
+
       %{"action" => %{"context" => context}} = components_by_id(components)["data_grid"]["sort"]
 
       # what the renderer sends: the resolved query state, its sort replaced
       query =
-        Map.put(data["updateDataModel"]["value"]["query"], "sort", %{
+        Map.put(data["query"], "sort", %{
           "field" => "title",
           "dir" => "desc"
         })
 
       context = Map.put(context, "query", query)
 
-      envelope = %{
-        "version" => "v0.9.1",
-        "action" => %{"name" => "query", "surfaceId" => "paged_notes", "context" => context}
-      }
+      envelope = Messages.call("query", "paged_notes", context)
 
       assert {:ok, messages} = ActionHandler.handle(PagedNotesUI, envelope, actor: nil)
 
@@ -221,7 +218,9 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
     end
 
     test "a grid without a query, or with nothing sortable, has neither" do
-      [_create, components, _data] = AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+        AshA2ui.Info.build_surface(KitchenSink, actor: nil)
+
       grid = components_by_id(components)["data_grid"]
 
       refute Map.has_key?(grid, "sort")
@@ -231,7 +230,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
 
   describe "master/detail on admin grids" do
     test "a select_context table carries the context_select row action" do
-      [_create, components, _data] =
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
         AshA2ui.Info.build_surface(AshA2ui.Test.AppointmentsUI, actor: nil)
 
       grid = components_by_id(components)["data_grid"]
@@ -242,16 +241,16 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
                  "action" => "context_select",
                  "context" => %{
                    "context" => "appointment",
-                   "value" => %{"path" => "id"},
+                   "value" => %{"@path" => "id"},
                    "component" => "table",
-                   "contexts" => %{"path" => "/context"}
+                   "contexts" => %{"@path" => "/context"}
                  }
                }
              ] = grid["rowActions"]
     end
 
     test "the dispatched envelope selects the row into the context" do
-      [_create, components, _data] =
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
         AshA2ui.Info.build_surface(AshA2ui.Test.AppointmentsUI, actor: nil)
 
       [%{"action" => name, "context" => context}] =
@@ -276,26 +275,28 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
     test "pagination component receives boolean props" do
       for i <- 1..3, do: Ash.create!(Task, %{name: "Item #{i}"}, authorize?: false)
 
-      [_create, components, data] = AshA2ui.Info.build_surface(Task, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+        AshA2ui.Info.build_surface(Task, actor: nil)
+
       pagination = components_by_id(components)["pagination"]
 
       assert pagination["component"] == "pagination"
 
       # plain bindings to the boolean query-state keys
-      assert pagination["visible"] == %{"path" => "/query/paginationVisible"}
-      assert pagination["previousVisible"] == %{"path" => "/query/previousVisible"}
-      assert pagination["nextVisible"] == %{"path" => "/query/nextVisible"}
+      assert pagination["visible"] == %{"@path" => "/query/paginationVisible"}
+      assert pagination["previousVisible"] == %{"@path" => "/query/previousVisible"}
+      assert pagination["nextVisible"] == %{"@path" => "/query/nextVisible"}
 
-      assert pagination["page"] == %{"path" => "/query/page"}
-      assert pagination["pageSize"] == %{"path" => "/query/pageSize"}
-      assert pagination["total"] == %{"path" => "/query/totalCount"}
-      assert pagination["hasNext"] == %{"path" => "/query/hasMore"}
-      assert pagination["rangeText"] == %{"path" => "/query/_range_text"}
+      assert pagination["page"] == %{"@path" => "/query/page"}
+      assert pagination["pageSize"] == %{"@path" => "/query/pageSize"}
+      assert pagination["total"] == %{"@path" => "/query/totalCount"}
+      assert pagination["hasNext"] == %{"@path" => "/query/hasMore"}
+      assert pagination["rangeText"] == %{"@path" => "/query/_range_text"}
 
       # prev/next dispatch the existing query envelope (pageDelta -1/+1)
       assert pagination["previousAction"]["name"] == "query"
       assert pagination["previousAction"]["context"]["pageDelta"] == -1
-      assert pagination["previousAction"]["context"]["query"] == %{"path" => "/query"}
+      assert pagination["previousAction"]["context"]["query"] == %{"@path" => "/query"}
       assert pagination["nextAction"]["name"] == "query"
       assert pagination["nextAction"]["context"]["pageDelta"] == 1
 
@@ -303,12 +304,12 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       refute Enum.any?(Map.values(pagination), &is_list(&1))
 
       refute Enum.any?(Map.values(pagination), fn
-               %{"path" => path} -> path =~ "_visible"
+               %{"@path" => path} -> path =~ "_visible"
                _other -> false
              end)
 
       # the data model carries the plain booleans alongside the pagination sentinels
-      %{"updateDataModel" => %{"value" => model}} = data
+      model = data
       query = model["query"]
 
       assert query["paginationVisible"] == true
@@ -322,14 +323,16 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
   describe "RecordPanel" do
     @tag ac: "A2UI-101B/AC-5"
     test "record panel binds mode and declares mode children" do
-      [_create, components, _data] = AshA2ui.Info.build_surface(Task, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+        AshA2ui.Info.build_surface(Task, actor: nil)
+
       comps = components_by_id(components)
 
       panel = comps["record_panel"]
 
-      assert panel["mode"] == %{"path" => "/ui/panel/mode"}
-      assert panel["title"] == %{"path" => "/ui/panel/title"}
-      assert panel["recordId"] == %{"path" => "/ui/panel/record_id"}
+      assert panel["mode"] == %{"@path" => "/ui/panel/mode"}
+      assert panel["title"] == %{"@path" => "/ui/panel/title"}
+      assert panel["recordId"] == %{"@path" => "/ui/panel/record_id"}
 
       # view-mode children (field displays) plus create/edit children
       # (FormSection + ActionBar)
@@ -340,7 +343,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
                "label" => "Name",
                # the view task's read-only display values — /form is the edit
                # buffer and is never written in view mode
-               "value" => %{"path" => "/ui/panel/record/name"}
+               "value" => %{"@path" => "/ui/panel/record/name"}
              } = comps["field_display_name"]
 
       assert %{"children" => form_children} = comps["form_section"]
@@ -348,33 +351,43 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       assert "form_error_name" in form_children
 
       # the input inside FormSection keeps the exact basic binding
-      assert comps["form_input_name"]["value"] == %{"path" => "/form/name"}
-      assert comps["form_error_name"]["text"] == %{"path" => "/errors/name"}
+      assert comps["form_input_name"]["value"] == %{"@path" => "/form/name"}
+      assert comps["form_error_name"]["text"] == %{"@path" => "/errors/name"}
 
       # ActionBar: primary label bound (empty = hidden), reserved busy,
       # existing submit_form envelope, Cancel as a secondary basic button
       action_bar = comps["action_bar"]
 
-      assert action_bar["primaryLabel"] == %{"path" => "/ui/panel/primary_label"}
+      assert action_bar["primaryLabel"] == %{"@path" => "/ui/panel/primary_label"}
       assert action_bar["busy"] == false
-      assert action_bar["action"]["event"]["name"] == "submit_form"
-      assert action_bar["action"]["event"]["context"]["values"] == %{"path" => "/form"}
-      assert action_bar["action"]["event"]["context"]["recordId"] == %{"path" => "/form/id"}
+      assert action_bar["action"]["functionCall"]["args"]["name"] == "submit_form"
+
+      assert action_bar["action"]["functionCall"]["args"]["context"]["values"] == %{
+               "@path" => "/form"
+             }
+
+      assert action_bar["action"]["functionCall"]["args"]["context"]["recordId"] == %{
+               "@path" => "/form/id"
+             }
+
       assert action_bar["children"] == ["form_cancel_button"]
 
-      assert comps["form_cancel_button"]["action"]["event"]["name"] == "cancel_record_task"
+      assert comps["form_cancel_button"]["action"]["functionCall"]["args"]["name"] ==
+               "cancel_record_task"
     end
   end
 
   describe "StatusBanner" do
     @tag ac: "A2UI-101B/AC-6"
     test "status banner binds typed feedback" do
-      [_create, components, _data] = AshA2ui.Info.build_surface(Task, actor: nil)
+      [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+        AshA2ui.Info.build_surface(Task, actor: nil)
+
       banner = components_by_id(components)["status_banner"]
 
       assert banner["component"] == "statusBanner"
-      assert banner["kind"] == %{"path" => "/ui/feedback/kind"}
-      assert banner["message"] == %{"path" => "/ui/feedback/message"}
+      assert banner["kind"] == %{"@path" => "/ui/feedback/kind"}
+      assert banner["message"] == %{"@path" => "/ui/feedback/message"}
     end
   end
 

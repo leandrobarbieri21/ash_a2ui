@@ -20,8 +20,10 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
   end
 
   defp components(opts) do
-    [_create, components, _data] = AshA2ui.Info.build_surface(EstateUser, [actor: nil] ++ opts)
-    components["updateComponents"]["components"]
+    [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+      AshA2ui.Info.build_surface(EstateUser, [actor: nil] ++ opts)
+
+    components
   end
 
   defp by_id(components), do: Map.new(components, &{&1["id"], &1})
@@ -30,7 +32,7 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
     test "the surface title is the root's first child by default" do
       components = by_id(components([]))
 
-      assert %{"component" => "Text", "variant" => "h1"} = components["surface_title"]
+      assert %{"component" => "Text", "text" => "# " <> _} = components["surface_title"]
       assert "surface_title" in components["root"]["children"]
     end
 
@@ -41,10 +43,10 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
       refute Map.has_key?(ids, "surface_title")
       refute "surface_title" in ids["root"]["children"]
 
-      [_create, message, _data] =
+      [message] =
         AshA2ui.Info.build_surface(EstateUser, actor: nil, header: false)
 
-      SchemaHelper.assert_valid_server_message(message)
+      SchemaHelper.assert_valid_agent_message(message)
     end
 
     test "header: false changes nothing else" do
@@ -87,16 +89,12 @@ defmodule AshA2ui.Experience.SurfaceHeaderTest do
 
       catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-      schema =
-        catalog["components"]["entityPage"]
-        |> Map.put("$defs", catalog["$defs"] || %{})
-        |> ExJsonSchema.Schema.resolve()
+      validate = &SchemaHelper.validate_catalog_component(catalog, "entityPage", &1)
 
       # headerVisible adds no schema error. (The literal string title is
       # reported against the catalog's object-typed title on the default
       # page too; that predates this option.)
-      assert ExJsonSchema.Validator.validate(schema, page) ==
-               ExJsonSchema.Validator.validate(schema, default)
+      assert validate.(page) == validate.(default)
     end
 
     test "header: false changes nothing but the entityPage" do

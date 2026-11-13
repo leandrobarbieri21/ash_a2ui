@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.BucketWordsUI do
   @moduledoc """
-  Fixture surface for dynamic table sets (v0.9.1): a static `:new_words`
+  Fixture surface for dynamic table sets: a static `:new_words`
   table plus a sectioned `:per_bucket` template expanded at runtime into one
   table per `AshA2ui.Test.Bucket` — the misspellings-buckets proving case.
   """
@@ -59,9 +59,8 @@ end
 
 defmodule AshA2ui.Test.BucketWordsV1UI do
   @moduledoc """
-  The same dynamic-table-set fixture surface as `AshA2ui.Test.BucketWordsUI`,
-  but with `spec_version "1.0"` — validates section expansion against the
-  v1.0 schemas and the actionResponse handshake.
+  A second surface over the dynamic-table-set fixture of
+  `AshA2ui.Test.BucketWordsUI`, under its own surface id.
   """
 
   use AshA2ui.Standalone
@@ -69,7 +68,6 @@ defmodule AshA2ui.Test.BucketWordsV1UI do
   a2ui do
     for_resource AshA2ui.Test.BucketWord
     surface_id "bucket_words_v1"
-    spec_version "1.0"
 
     query :word_q do
       search_fields [:word]

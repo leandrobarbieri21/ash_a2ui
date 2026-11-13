@@ -109,7 +109,7 @@ zero-or-one lists, the same technique as the `/ui/panel/*_visible` flags
 
 The basic catalog has no stepper (the upstream request was closed in favor
 of custom catalogs), so the wizard is composed from basic components and
-works on v0.9.1 and v1.0 alike:
+works with any basic-catalog renderer:
 
 - `form_wizard` — a `Column` that replaces the form's field children:
   - `form_wizard_progress` — a horizontal `List` templated over

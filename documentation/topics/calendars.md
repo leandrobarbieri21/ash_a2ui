@@ -99,7 +99,7 @@ Without a `default_sort` (and with no sort requested), a calendar reads in
 ## Moving the window and picking a day
 
 Both are the ordinary `"query"` action. Next to the usual
-`"query": {"path": ...}` binding, the context may carry:
+`"query": {"@path": ...}` binding, the context may carry:
 
 | Key | Meaning |
 |---|---|
@@ -225,10 +225,10 @@ table is emitted as a `calendarView` wrapping the table's `dataGrid`:
   "component": "calendarView",
   "label": "Event",
   "granularity": "month",
-  "window": {"path": "/query/window"},
+  "window": {"@path": "/query/window"},
   "windowAction": {
     "name": "query",
-    "context": {"query": {"path": "/query"}, "component": "schedule"}
+    "context": {"query": {"@path": "/query"}, "component": "schedule"}
   },
   "children": ["data_grid"]
 }
@@ -239,7 +239,7 @@ day calendars) with the marked days, beside the `dataGrid`. The grid keeps
 its row actions, prompts, badges, links, empty state and pagination.
 
 The renderer follows zero-jank rules. When the user moves the window or
-picks a day, the grid changes at once, and the envelope carries the date
+picks a day, the grid changes at once, and the call carries the date
 the grid now shows (`anchor` or `date`), never a delta. While requests are
 in flight, replies to earlier requests do not move the grid back. The reply
 to the latest request matches what is on screen.

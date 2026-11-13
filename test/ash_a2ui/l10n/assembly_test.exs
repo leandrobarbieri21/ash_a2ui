@@ -39,40 +39,36 @@ defmodule AshA2ui.L10n.AssemblyTest do
              "Approve: 2 of 5 selected records done; 1 refused, 2 failed."
   end
 
-  for spec <- ["0.9.1", "1.0"] do
-    @spec_version spec
+  test "a bulk failure's Ash message is translated in the errors domain" do
+    reset!()
+    project = project!("Apollo")
+    bad = task!("Bravo", %{project_id: project.id, score: -1})
 
-    test "a bulk failure's Ash message is translated in the errors domain (#{spec})" do
-      reset!()
-      project = project!("Apollo")
-      bad = task!("Bravo", %{project_id: project.id, score: -1})
+    run = fn opts ->
+      {_outcome, messages} =
+        ActionHandler.handle(
+          BulkTasksUI,
+          envelope("bulk_invoke", %{
+            "action" => "approve",
+            "component" => "table",
+            "records" => rows([bad], [bad]),
+            "contexts" => contexts(project)
+          }),
+          [actor: actor()] ++ opts
+        )
 
-      run = fn opts ->
-        {_outcome, messages} =
-          ActionHandler.handle(
-            BulkTasksUI,
-            envelope("bulk_invoke", %{
-              "action" => "approve",
-              "component" => "table",
-              "records" => rows([bad], [bad]),
-              "contexts" => contexts(project)
-            }),
-            [actor: actor(), spec_version: @spec_version] ++ opts
-          )
-
-        %{"errors" => [%{"message" => message}]} = value_at(messages, "/bulk/table/result")
-        message
-      end
-
-      assert run.([]) == "score: must be greater than or equal to 0"
-
-      fr = [gettext_backend: {TestGettext, "ash_a2ui"}, locale: "fr"]
-      assert run.(fr) == "score: doit être supérieur ou égal à 0"
-
-      # The errors domain is the host's to name.
-      assert run.(fr ++ [errors_domain: "elsewhere"]) ==
-               "score: must be greater than or equal to 0"
+      %{"errors" => [%{"message" => message}]} = value_at(messages, "/bulk/table/result")
+      message
     end
+
+    assert run.([]) == "score: must be greater than or equal to 0"
+
+    fr = [gettext_backend: {TestGettext, "ash_a2ui"}, locale: "fr"]
+    assert run.(fr) == "score: doit être supérieur ou égal à 0"
+
+    # The errors domain is the host's to name.
+    assert run.(fr ++ [errors_domain: "elsewhere"]) ==
+             "score: must be greater than or equal to 0"
   end
 
   test "a context's select label keeps its own case in one message" do

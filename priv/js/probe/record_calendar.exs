@@ -33,13 +33,19 @@ october = %{"window" => %{"anchor" => "2026-10-01", "selected" => ""}, "page" =>
 
 envelope = fn name, context ->
   %{
-    "version" => "v0.9.1",
-    "action" => %{
-      "name" => name,
+    "version" => "1.0",
+    "callAgentFunction" => %{
       "surfaceId" => "calendar_month",
-      "sourceComponentId" => "calendar",
-      "timestamp" => "2026-10-16T00:00:00Z",
-      "context" => Map.merge(%{"component" => "schedule", "query" => october}, context)
+      "functionCallId" => "probe-call",
+      "callFunction" => %{
+        "@call" => "ashAction",
+        "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+        "args" => %{
+          "name" => name,
+          "sourceComponentId" => "calendar",
+          "context" => Map.merge(%{"component" => "schedule", "query" => october}, context)
+        }
+      }
     }
   }
 end
@@ -65,13 +71,19 @@ Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
 switch_envelope = fn context ->
   %{
-    "version" => "v0.9.1",
-    "action" => %{
-      "name" => "query",
+    "version" => "1.0",
+    "callAgentFunction" => %{
       "surfaceId" => "calendar_switch",
-      "sourceComponentId" => "calendar",
-      "timestamp" => "2026-10-16T00:00:00Z",
-      "context" => Map.merge(%{"component" => "schedule", "query" => october}, context)
+      "functionCallId" => "probe-call",
+      "callFunction" => %{
+        "@call" => "ashAction",
+        "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+        "args" => %{
+          "name" => "query",
+          "sourceComponentId" => "calendar",
+          "context" => Map.merge(%{"component" => "schedule", "query" => october}, context)
+        }
+      }
     }
   }
 end

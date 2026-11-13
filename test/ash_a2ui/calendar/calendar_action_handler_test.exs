@@ -13,21 +13,13 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Calendar.{Event, MonthUI}
+  alias AshA2ui.Test.Messages
 
   @red %{team: "red"}
   @blue %{team: "blue"}
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "calendar_month",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "calendar_month", context)
   end
 
   defp value_at(messages, path) do
@@ -75,7 +67,7 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
     assert {:ok, messages} =
              ActionHandler.handle(MonthUI, message, actor: actor, authorize?: false)
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     messages
   end
 
@@ -178,7 +170,7 @@ defmodule AshA2ui.Calendar.CalendarActionHandlerTest do
     assert {:ok, messages} =
              ActionHandler.handle(MonthUI, message, actor: @red, authorize?: false)
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     assert Ash.get!(Event, target.id, authorize?: false).status == :confirmed
 

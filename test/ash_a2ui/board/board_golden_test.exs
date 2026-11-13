@@ -1,11 +1,12 @@
 defmodule AshA2ui.Board.BoardGoldenTest do
   @moduledoc """
   Boards without `swimlanes_by` encode byte-for-byte as before swimlanes
-  (A2UI-105B): the surfaces of the lane-only board fixtures — v0.9.1, v1.0,
-  the admin catalog's basic fallback — and a transition's handler reply
-  match golden payloads captured on the pre-swimlane base (0add6c5).
+  (A2UI-105B): the surfaces of the lane-only board fixtures — queried,
+  unqueried, the admin catalog's basic fallback — and a transition's
+  handler reply match golden payloads first captured on the pre-swimlane
+  base (0add6c5) and re-recorded for the A2UI 1.0 wire.
 
-  Re-record (only on purpose, against the base the goldens describe) with
+  Re-record (only on purpose, when the wire itself changes) with
   `RECORD_BOARD_GOLDEN=1 mix test test/ash_a2ui/board/board_golden_test.exs`.
   """
 
@@ -13,6 +14,7 @@ defmodule AshA2ui.Board.BoardGoldenTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.BoardTask
+  alias AshA2ui.Test.Messages
 
   @golden_dir Path.expand("golden", __DIR__)
 
@@ -56,16 +58,9 @@ defmodule AshA2ui.Board.BoardGoldenTest do
   end
 
   defp claim_envelope(card) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "invoke",
-        "surfaceId" => "board_tasks",
-        "sourceComponentId" => "test_component",
-        "timestamp" => "2026-10-17T00:00:00Z",
-        "context" => %{"action" => "claim", "recordId" => card.id}
-      }
-    }
+    Messages.call("invoke", "board_tasks", %{"action" => "claim", "recordId" => card.id},
+      id: "call-claim"
+    )
   end
 
   @tag ac: "A2UI-105B/AC-6"
@@ -109,14 +104,17 @@ defmodule AshA2ui.Board.BoardGoldenTest do
   end
 
   @tag ac: "A2UI-105B/AC-6"
-  test "a v1.0 board without swimlanes encodes as before" do
+  test "an unqueried board without swimlanes encodes as before" do
     # One task per lane: without a query the lane's read has no sort, so a
     # lane holding several records would order them by ETS hash.
     subs = substitutions(seed([{"alpha", :open, :high}, {"delta", :claimed, :low}]))
 
     assert_golden(
-      "board_task_v1_ui",
-      normalize(AshA2ui.Info.build_surface(AshA2ui.Test.BoardTaskV1UI, authorize?: false), subs)
+      "board_task_unqueried_ui",
+      normalize(
+        AshA2ui.Info.build_surface(AshA2ui.Test.BoardTaskUnqueriedUI, authorize?: false),
+        subs
+      )
     )
   end
 end

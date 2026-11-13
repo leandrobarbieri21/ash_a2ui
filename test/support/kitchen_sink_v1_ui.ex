@@ -1,9 +1,8 @@
 defmodule AshA2ui.Test.KitchenSinkV1UI do
   @moduledoc """
-  The v1.0 twin of `AshA2ui.Test.KitchenSink`'s surface: the same table +
-  form over the same resource, but with `spec_version "1.0"` — the fixture
-  every v1.0 encoder/handler/conformance test drives so v1.0 coverage spans
-  the full field-type matrix (string, boolean, integer, decimal, date,
+  A second surface over `AshA2ui.Test.KitchenSink`: the same table + form
+  over the same resource under its own surface id, spanning the full
+  field-type matrix (string, boolean, integer, decimal, date,
   utc_datetime, enum, timestamps with a `formatDate` function cell).
   """
 
@@ -12,7 +11,6 @@ defmodule AshA2ui.Test.KitchenSinkV1UI do
   a2ui do
     for_resource AshA2ui.Test.KitchenSink
     surface_id "kitchen_sink_v1"
-    spec_version "1.0"
 
     component :table do
       fields [:name, :active, :count, :price, :birthday, :scheduled_at, :status, :inserted_at]

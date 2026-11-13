@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-      "surfaceId": "tickets_search"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
       "components": [
         {
           "children": [
@@ -22,10 +16,16 @@
           "title": "Ticket"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -34,6 +34,7 @@
           "variant": "primary"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "create_text",
           "text": "Create Ticket"
@@ -57,7 +58,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "View"
@@ -67,7 +68,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "Edit"
@@ -78,14 +79,14 @@
             "context": {
               "component": "table",
               "recordId": {
-                "path": "id"
+                "@path": "id"
               }
             },
             "label": "View"
           },
           "rowId": "id",
           "rows": {
-            "path": "/records"
+            "@path": "/records"
           }
         },
         {
@@ -93,10 +94,11 @@
           "component": "emptyState",
           "id": "empty_state",
           "message": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "form",
             "path": "/ui/panel/visible"
@@ -105,11 +107,13 @@
           "id": "form_slot"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "child": "form_body",
           "component": "Card",
           "id": "form"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "form_title",
             "panel_view_slot",
@@ -121,10 +125,12 @@
           "id": "form_body"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Divider",
           "id": "form_footer_divider"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "form_submit_slot",
             "form_cancel_button"
@@ -133,6 +139,7 @@
           "id": "form_footer"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "panel_view",
             "path": "/ui/panel/view_visible"
@@ -141,6 +148,7 @@
           "id": "panel_view_slot"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "panel_view_subject",
             "panel_view_author_id"
@@ -149,6 +157,7 @@
           "id": "panel_view"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "panel_view_subject_label",
             "panel_view_subject_value"
@@ -157,19 +166,22 @@
           "id": "panel_view_subject"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "panel_view_subject_label",
           "text": "Subject",
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "panel_view_subject_value",
           "text": {
-            "path": "/ui/panel/record/subject"
+            "@path": "/ui/panel/record/subject"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "panel_view_author_id_label",
             "panel_view_author_id_value"
@@ -178,19 +190,22 @@
           "id": "panel_view_author_id"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "panel_view_author_id_label",
           "text": "Author id",
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "panel_view_author_id_value",
           "text": {
-            "path": "/ui/panel/record/author_id"
+            "@path": "/ui/panel/record/author_id"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "form_fields",
             "path": "/ui/panel/form_visible"
@@ -199,6 +214,7 @@
           "id": "form_fields_slot"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "form_input_subject",
             "form_error_subject",
@@ -210,14 +226,16 @@
           "id": "form_fields"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_input_subject",
           "label": "Subject",
           "value": {
-            "path": "/form/subject"
+            "@path": "/form/subject"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "form_select_author_id_label",
             "form_select_author_id_selected",
@@ -228,19 +246,21 @@
           "id": "form_select_author_id"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_select_author_id_label",
-          "text": "Author id",
-          "variant": "h4"
+          "text": "#### Author id"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_select_author_id_selected",
           "text": {
-            "path": "/select/author_id/label"
+            "@path": "/select/author_id/label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "form_select_author_id_search_input",
             "form_select_author_id_search_button"
@@ -249,23 +269,30 @@
           "id": "form_select_author_id_controls"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_select_author_id_search_input",
           "label": "Search",
           "value": {
-            "path": "/select/author_id/search"
+            "@path": "/select/author_id/search"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "field": "author_id",
-                "search": {
-                  "path": "/select/author_id/search"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "author_id",
+                  "search": {
+                    "@path": "/select/author_id/search"
+                  }
+                },
+                "name": "option_search",
+                "sourceComponentId": "form_select_author_id_search_button"
               },
-              "name": "option_search"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_select_author_id_search_text",
@@ -273,11 +300,13 @@
           "id": "form_select_author_id_search_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_select_author_id_search_text",
           "text": "Search"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "form_select_author_id_option_button",
             "path": "/options/author_id"
@@ -286,15 +315,21 @@
           "id": "form_select_author_id_options"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "field": "author_id",
-                "value": {
-                  "path": "value"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "author_id",
+                  "value": {
+                    "@path": "value"
+                  }
+                },
+                "name": "option_select",
+                "sourceComponentId": "form_select_author_id_option_button"
               },
-              "name": "option_select"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_select_author_id_option_text",
@@ -303,13 +338,15 @@
           "variant": "borderless"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_select_author_id_option_text",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "nested_tags_heading",
             "nested_tags_rows",
@@ -320,12 +357,13 @@
           "id": "nested_tags"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "nested_tags_heading",
-          "text": "Tags",
-          "variant": "h3"
+          "text": "### Tags"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "nested_tags_row",
             "path": "/form/tags"
@@ -334,6 +372,7 @@
           "id": "nested_tags_rows"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "nested_tags_row_label",
             "nested_tags_remove_button"
@@ -342,25 +381,32 @@
           "id": "nested_tags_row"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "nested_tags_row_label",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "argument": "tags",
-                "row": {
-                  "path": "_row"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "argument": "tags",
+                  "row": {
+                    "@path": "_row"
+                  },
+                  "rows": {
+                    "@path": "/form/tags"
+                  }
                 },
-                "rows": {
-                  "path": "/form/tags"
-                }
+                "name": "nested_remove",
+                "sourceComponentId": "nested_tags_remove_button"
               },
-              "name": "nested_remove"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_remove_text",
@@ -368,11 +414,13 @@
           "id": "nested_tags_remove_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "nested_tags_remove_text",
           "text": "Remove"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "nested_tags_search_input",
             "nested_tags_search_button"
@@ -381,23 +429,30 @@
           "id": "nested_tags_controls"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "nested_tags_search_input",
           "label": "Search",
           "value": {
-            "path": "/select/tags/search"
+            "@path": "/select/tags/search"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "field": "tags",
-                "search": {
-                  "path": "/select/tags/search"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "tags",
+                  "search": {
+                    "@path": "/select/tags/search"
+                  }
+                },
+                "name": "option_search",
+                "sourceComponentId": "nested_tags_search_button"
               },
-              "name": "option_search"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_search_text",
@@ -405,11 +460,13 @@
           "id": "nested_tags_search_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "nested_tags_search_text",
           "text": "Search"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "nested_tags_option_button",
             "path": "/options/tags"
@@ -418,18 +475,24 @@
           "id": "nested_tags_options"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "argument": "tags",
-                "rows": {
-                  "path": "/form/tags"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "argument": "tags",
+                  "rows": {
+                    "@path": "/form/tags"
+                  },
+                  "value": {
+                    "@path": "value"
+                  }
                 },
-                "value": {
-                  "path": "value"
-                }
+                "name": "nested_add",
+                "sourceComponentId": "nested_tags_option_button"
               },
-              "name": "nested_add"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_option_text",
@@ -438,37 +501,45 @@
           "variant": "borderless"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "nested_tags_option_text",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_subject",
           "text": {
-            "path": "/errors/subject"
+            "@path": "/errors/subject"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_author_id",
           "text": {
-            "path": "/errors/author_id"
+            "@path": "/errors/author_id"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_title",
           "text": {
-            "path": "/ui/panel/title"
-          },
-          "variant": "h3"
+            "@call": "formatString",
+            "args": {
+              "value": "### ${/ui/panel/title}"
+            },
+            "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
+          }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": {
             "componentId": "form_submit_button",
             "path": "/ui/panel/submit_visible"
@@ -477,17 +548,23 @@
           "id": "form_submit_slot"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "recordId": {
-                  "path": "/form/id"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "form_submit_button"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_submit_text",
@@ -496,17 +573,24 @@
           "variant": "primary"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_submit_text",
           "text": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -514,6 +598,7 @@
           "id": "form_cancel_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_cancel_text",
           "text": "Cancel"
@@ -522,13 +607,14 @@
           "component": "statusBanner",
           "id": "status_banner",
           "kind": {
-            "path": "/ui/feedback/kind"
+            "@path": "/ui/feedback/kind"
           },
           "message": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "action_result_text"
           ],
@@ -536,22 +622,15 @@
           "id": "action_result_panel"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "tickets_search"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "tickets_search",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Ticket records yet.",
         "_empty_visible": [
           {
@@ -578,11 +657,17 @@
           }
         },
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -596,8 +681,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "tickets_search"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

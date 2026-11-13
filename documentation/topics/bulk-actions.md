@@ -58,8 +58,8 @@ Compile-time rules (`AshA2ui.Verifiers.VerifyBulkActions`):
 
 ## What renders
 
-Everything is composed from the basic catalog, so it works on v0.9.1 and
-v1.0 and with any basic-catalog renderer:
+Everything is composed from the basic catalog, so it works with any
+basic-catalog renderer:
 
 - Each row template gets a `CheckBox` bound to the row-relative path
   `_selected`. On flat rows it is the first child of the row's cell Row
@@ -103,9 +103,9 @@ The action Buttons send:
   "context": {
     "action": "approve",
     "component": "table",
-    "records": {"path": "/records"},
-    "query": {"path": "/query"},
-    "contexts": {"path": "/context"}
+    "records": {"@path": "/records"},
+    "query": {"@path": "/query"},
+    "contexts": {"@path": "/context"}
   }
 }
 ```
@@ -150,13 +150,13 @@ contexts, as on every write action. The handler then:
 
 The typed `/ui/feedback` kind is `"success"` when every
 selected record was written, `"warning"` on partial success and `"error"`
-when nothing was written. On v1.0 surfaces the `actionResponse` value
-carries the result map under `"result"`.
+when nothing was written. The feedback map carries the result map under
+`"result"`, and it is the `agentFunctionResponse` value.
 
 ## The `bulk_select` action
 
 **Select page** and **Clear** send `bulk_select` with
-`{"component", "selected": true | false, "records": {"path": ...}}` plus the
+`{"component", "selected": true | false, "records": {"@path": ...}}` plus the
 same `"query"`/`"contexts"` bindings. The server re-reads the table exactly
 as a refresh would (current query state, context scope, as the actor) and
 rewrites its rows with `_selected` set. It never echoes the carried rows
@@ -173,7 +173,5 @@ selection it leaves is one a bulk run accepts.
 - One page at a time. Selecting across pages, or "everything matching this
   filter", is not supported.
 - No prompt for bulk actions.
-- Bulk actions are not added to the AG-UI tool surface. Letting one agent
-  call fan out to many writes is a separate decision.
 - Declared surfaces only: the dynamic surface spec has no `bulk_actions`
   vocabulary, so `AshA2ui.Dynamic` imports report it as a rejection.

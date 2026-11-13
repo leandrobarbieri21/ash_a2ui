@@ -12,18 +12,11 @@ defmodule AshA2ui.Board.BoardActionHandlerTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.BoardTask
   alias AshA2ui.Test.BoardTaskUI
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "board_tasks",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "board_tasks", context)
   end
 
   defp value_at(messages, path) do
@@ -48,11 +41,7 @@ defmodule AshA2ui.Board.BoardActionHandlerTest do
     # (gated on :claimed) is not.
     surface = AshA2ui.Info.build_surface(BoardTaskUI, authorize?: false)
 
-    initial =
-      Enum.find_value(surface, fn
-        %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
-        _other -> nil
-      end)
+    initial = Surface.data_model(surface)
 
     assert [open_row] = initial["records"]["board_open"]
     assert open_row["name"] == "card"
@@ -62,7 +51,7 @@ defmodule AshA2ui.Board.BoardActionHandlerTest do
     message = envelope("invoke", %{"action" => "claim", "recordId" => card.id})
 
     assert {:ok, messages} = ActionHandler.handle(BoardTaskUI, message, authorize?: false)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     # The record changed state.
     assert Ash.get!(BoardTask, card.id, authorize?: false).status == :claimed
@@ -101,7 +90,7 @@ defmodule AshA2ui.Board.BoardActionHandlerTest do
         })
 
       assert {:ok, messages} = ActionHandler.handle(BoardTaskUI, message, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/records/board_open") == []
       assert value_at(messages, "/_lane_total_board_open") == "0"

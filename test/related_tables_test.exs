@@ -13,7 +13,9 @@ defmodule AshA2ui.RelatedTablesTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Links.{Note, Participant, PeopleTaskUI, PeopleUI, Person}
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Paginated
+  alias AshA2ui.Test.Surface
 
   setup do
     for resource <- [Participant, Note, Person] do
@@ -39,6 +41,7 @@ defmodule AshA2ui.RelatedTablesTest do
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)
@@ -47,16 +50,7 @@ defmodule AshA2ui.RelatedTablesTest do
   defp root(messages), do: value_at(messages, "/")
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "people",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "people", context)
   end
 
   test "related tables resolve against their own resource" do
@@ -77,7 +71,7 @@ defmodule AshA2ui.RelatedTablesTest do
     bob: bob
   } do
     messages = AshA2ui.Info.build_surface(PeopleUI)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     assert root(messages)["records"]["their_notes"] == []
 
     state = AshA2ui.Info.context_state_for(PeopleUI, %{"person" => ada.id})
@@ -130,19 +124,17 @@ defmodule AshA2ui.RelatedTablesTest do
     assert Enum.map(records, & &1["title"]) == ["Review"]
   end
 
-  defp components_by_id(messages) do
-    Enum.find_value(messages, fn
-      %{"updateComponents" => %{"components" => components}} ->
-        Map.new(components, &{&1["id"], &1})
-
-      _other ->
-        nil
-    end)
-  end
+  defp components_by_id(messages), do: Surface.components_by_id(messages)
 
   # Every component id whose action dispatches `event`, sorted.
   defp ids_dispatching(comps, event) do
-    for {id, %{"action" => %{"event" => %{"name" => ^event}}}} <- comps, do: id
+    for {id,
+         %{
+           "action" => %{
+             "functionCall" => %{"@call" => "ashAction", "args" => %{"name" => ^event}}
+           }
+         }} <- comps,
+        do: id
   end
 
   defp texts(comps), do: for({_id, %{"component" => "Text", "text" => t}} <- comps, do: t)
@@ -155,7 +147,7 @@ defmodule AshA2ui.RelatedTablesTest do
 
     test "basic: only the master table gets View/Edit and the one create button" do
       messages = AshA2ui.Info.build_surface(PeopleTaskUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       comps = components_by_id(messages)
 
       # The master table (over the surface's own resource) keeps all three.
@@ -177,13 +169,13 @@ defmodule AshA2ui.RelatedTablesTest do
       end
 
       assert comps["record_row_their_notes_content"]["children"] == [
-               "table_cell_their_notes_title",
-               "table_cell_their_notes_status",
-               "table_cell_their_notes_amount"
+               "table_cell_their_notes_title_row",
+               "table_cell_their_notes_status_row",
+               "table_cell_their_notes_amount_row"
              ]
 
       assert comps["record_row_participations_content"]["children"] == [
-               "table_cell_participations_note_title"
+               "table_cell_participations_note_title_row"
              ]
 
       # One create label in the whole tree, never repeated per table.
@@ -215,7 +207,9 @@ defmodule AshA2ui.RelatedTablesTest do
     test "the select_context button says it selects, in both compositions" do
       basic = components_by_id(AshA2ui.Info.build_surface(PeopleTaskUI))
 
-      assert basic["row_context_table_button"]["action"]["event"]["name"] == "context_select"
+      assert basic["row_context_table_button"]["action"]["functionCall"]["args"]["name"] ==
+               "context_select"
+
       assert basic["row_context_table_text"]["text"] == "Select person"
       # distinct from the task panel's own row control
       assert basic["view_table_button_text"]["text"] == "View"
@@ -314,14 +308,13 @@ defmodule AshA2ui.RelatedTablesTest do
         Ash.create!(Paginated, %{name: name, status: status}, authorize?: false)
       end
 
-      [_create, _components, data] = AshA2ui.Info.build_surface(Paginated)
-      initial = data["updateDataModel"]["value"]["records"]
+      [%{"createSurface" => %{"components" => _components, "dataModel" => data}}] =
+        AshA2ui.Info.build_surface(Paginated)
+
+      initial = data["records"]
 
       {:ok, messages} =
-        ActionHandler.handle(Paginated, %{
-          "version" => "v0.9.1",
-          "action" => %{"name" => "query", "context" => %{"query" => %{}}}
-        })
+        ActionHandler.handle(Paginated, Messages.call("query", "test_surface", %{"query" => %{}}))
 
       refreshed = value_at(messages, "/records")
 

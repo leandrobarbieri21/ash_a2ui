@@ -164,7 +164,7 @@ size only) gets no controls card, only the pagination.
 With `apply_on_change true` the `/query` state also carries
 `"autoApply": {"debounceMs": 300}`. A renderer that honours it (the merged
 catalog's Button, `createAshA2uiCatalog`) hides the Apply button and sends
-its envelope itself when the controls change: at once for a picker or a
+its action itself when the controls change: at once for a picker or a
 range, after a 300 ms pause in typing for search. The server sees exactly an
 Apply click. A renderer that doesn't know `autoApply` keeps showing Apply,
 which still works.
@@ -185,7 +185,7 @@ All of them dispatch the `"query"` client action. The wire contract:
 ```
 
 - `"query"` is the current `/query` data-model map (the controls bind it via
-  `{"path": "/query"}`).
+  `{"@path": "/query"}`).
 - `"page"` is an optional literal override — the Apply button sends
   `"page": 1` so a new search/filter starts from the first page.
 - `"pageDelta"` is an optional relative change — the Previous/Next buttons
@@ -246,7 +246,7 @@ stable under equal sort values.
 ## Writes respect the active query
 
 On query-enabled surfaces the emitted `submit_form` and row-action `invoke`
-contexts also carry `"query": {"path": "/query"}` (on multi-table surfaces
+contexts also carry `"query": {"@path": "/query"}` (on multi-table surfaces
 that binds the whole per-table state object). After a successful write,
 the refresh re-runs the *current* query (same search/filters/sort/page) and
 includes a fresh `/query` message — the user stays on their page with their

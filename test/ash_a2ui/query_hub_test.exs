@@ -14,6 +14,7 @@ defmodule AshA2ui.QueryHubTest do
   alias AshA2ui.QueryRunner
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{HubContract, HubLine, HubRole, HubUI, SchemaHelper}
+  alias AshA2ui.Test.Surface
 
   setup do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
@@ -48,9 +49,11 @@ defmodule AshA2ui.QueryHubTest do
   end
 
   defp surface(opts \\ [authorize?: false]) do
-    [_create, components, data] = AshA2ui.Info.build_surface(HubUI, opts)
-    by_id = Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
-    {by_id, data["updateDataModel"]["value"]}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(HubUI, opts)
+
+    by_id = Map.new(components, &{&1["id"], &1})
+    {by_id, data}
   end
 
   defp run!(state, opts \\ [authorize?: false]) do
@@ -85,9 +88,10 @@ defmodule AshA2ui.QueryHubTest do
       assert components["query_search_input"] == %{
                "id" => "query_search_input",
                "component" => "TextField",
+               "@catalogId" => AshA2ui.Encoder.basic_catalog_id(),
                "label" => "Search",
                "placeholder" => "Search contracts or vendors",
-               "value" => %{"path" => "/query/search"}
+               "value" => %{"@path" => "/query/search"}
              }
     end
 
@@ -96,12 +100,12 @@ defmodule AshA2ui.QueryHubTest do
 
       assert components["query_filter_status"] == %{
                "id" => "query_filter_status",
-               "component" => "ChoicePicker",
+               "component" => "filterPicker",
                "label" => "Contract status",
                "variant" => "multipleSelection",
-               "value" => %{"path" => "/query/filters/status"},
+               "value" => %{"@path" => "/query/filters/status"},
                "hint" => "Statuses update nightly.",
-               "counts" => %{"path" => "/query/facets/status"},
+               "counts" => %{"@path" => "/query/facets/status"},
                "options" => [
                  %{"label" => "Active", "value" => "active"},
                  %{"label" => "Expiring soon", "value" => "expiring", "group" => true},
@@ -136,13 +140,13 @@ defmodule AshA2ui.QueryHubTest do
 
       assert components["query_filter_property"] == %{
                "id" => "query_filter_property",
-               "component" => "ChoicePicker",
+               "component" => "filterPicker",
                "label" => "Property",
                "variant" => "multipleSelection",
-               "value" => %{"path" => "/query/filters/property"},
+               "value" => %{"@path" => "/query/filters/property"},
                "options" => [],
-               "dynamicOptions" => %{"path" => "/query/options/property"},
-               "counts" => %{"path" => "/query/facets/property"}
+               "dynamicOptions" => %{"@path" => "/query/options/property"},
+               "counts" => %{"@path" => "/query/facets/property"}
              }
 
       # No filter_labels entry: the declared field label of :vendor_name is
@@ -158,7 +162,7 @@ defmodule AshA2ui.QueryHubTest do
                "pageSizeAction" => %{
                  "name" => "query",
                  "context" => %{
-                   "query" => %{"path" => "/query"},
+                   "query" => %{"@path" => "/query"},
                    "page" => 1,
                    "component" => "table"
                  }
@@ -172,15 +176,15 @@ defmodule AshA2ui.QueryHubTest do
       {components, data} = surface()
 
       assert %{
-               "title" => %{"path" => "/query/emptyState/title"},
-               "message" => %{"path" => "/query/emptyState/message"},
-               "icon" => %{"path" => "/query/emptyState/icon"},
-               "clearVisible" => %{"path" => "/query/emptyState/clear"},
+               "title" => %{"@path" => "/query/emptyState/title"},
+               "message" => %{"@path" => "/query/emptyState/message"},
+               "icon" => %{"@path" => "/query/emptyState/icon"},
+               "clearVisible" => %{"@path" => "/query/emptyState/clear"},
                "clearAction" => %{
                  "label" => "Clear search and filters",
                  "action" => %{
                    "name" => "query",
-                   "context" => %{"query" => %{"path" => "/query"}, "page" => 1}
+                   "context" => %{"query" => %{"@path" => "/query"}, "page" => 1}
                  }
                }
              } = components["empty_state"]
@@ -220,13 +224,12 @@ defmodule AshA2ui.QueryHubTest do
       {components, _data} =
         AshA2ui.Test.ColumnTask
         |> AshA2ui.Info.build_surface(authorize?: false)
-        |> Enum.at(1)
-        |> then(&{Map.new(&1["updateComponents"]["components"], fn c -> {c["id"], c} end), nil})
+        |> then(&{Surface.components_by_id(&1), nil})
 
       assert components["empty_state"] == %{
                "id" => "empty_state",
                "component" => "emptyState",
-               "message" => %{"path" => "_empty_message"},
+               "message" => %{"@path" => "_empty_message"},
                "children" => []
              }
     end
@@ -256,7 +259,7 @@ defmodule AshA2ui.QueryHubTest do
     test "the basic surface stays valid against the A2UI schema" do
       HubUI
       |> AshA2ui.Info.build_surface(authorize?: false)
-      |> Enum.each(&SchemaHelper.assert_valid_server_message/1)
+      |> Enum.each(&SchemaHelper.assert_valid_agent_message/1)
     end
   end
 
@@ -268,7 +271,10 @@ defmodule AshA2ui.QueryHubTest do
     for catalog <- [:admin_v1, :basic] do
       test "the hub components match the #{catalog} golden" do
         Application.put_env(:ash_a2ui, :catalog, unquote(catalog))
-        [_create, components, _data] = AshA2ui.Info.build_surface(HubUI, authorize?: false)
+
+        [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+          AshA2ui.Info.build_surface(HubUI, authorize?: false)
+
         json = Jason.encode!(components, pretty: true)
         path = Path.join(@golden_dir, "hub_#{unquote(catalog)}_components.json")
 

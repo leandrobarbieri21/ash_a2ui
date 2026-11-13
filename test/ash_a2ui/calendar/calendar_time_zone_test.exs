@@ -13,6 +13,7 @@ defmodule AshA2ui.Calendar.CalendarTimeZoneTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Calendar
   alias AshA2ui.Test.Calendar.{Event, WeekUI}
+  alias AshA2ui.Test.Messages
 
   @red %{team: "red"}
 
@@ -32,28 +33,20 @@ defmodule AshA2ui.Calendar.CalendarTimeZoneTest do
   defp put_zone(zone), do: Application.put_env(:ash_a2ui, :calendar_time_zone, zone)
 
   defp envelope(context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "surfaceId" => "calendar_week",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => Map.put(context, "component", "week")
-      }
-    }
+    Messages.call("query", "calendar_week", Map.put(context, "component", "week"))
   end
 
   defp query(context) do
     assert {:ok, messages} =
              ActionHandler.handle(WeekUI, envelope(context), actor: @red, authorize?: false)
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     messages
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)

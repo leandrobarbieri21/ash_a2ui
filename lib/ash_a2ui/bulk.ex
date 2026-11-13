@@ -403,7 +403,7 @@ defmodule AshA2ui.Bulk do
           [map]
   def toolbar_components(table, sfx, bind, label \\ &Label.humanize/1, l10n \\ nil) do
     base = "bulk#{sfx}"
-    records = %{"path" => table.records_path}
+    records = %{"@path" => table.records_path}
     component = to_string(table.name)
 
     # Action buttons are namespaced under "_action_" so an action named
@@ -446,7 +446,7 @@ defmodule AshA2ui.Bulk do
         "id" => "#{id}_button",
         "component" => "Button",
         "child" => "#{id}_text",
-        "action" => %{"event" => %{"name" => event, "context" => context}}
+        "action" => AshA2ui.Encoder.ash_action(event, context, "#{id}_button")
       },
       %{"id" => "#{id}_text", "component" => "Text", "text" => label}
     ]
@@ -472,7 +472,7 @@ defmodule AshA2ui.Bulk do
         "id" => checkbox_id,
         "component" => "CheckBox",
         "label" => L10n.t(l10n, msg("Select")),
-        "value" => %{"path" => @selected_key}
+        "value" => %{"@path" => @selected_key}
       }
 
       Enum.map(components, fn

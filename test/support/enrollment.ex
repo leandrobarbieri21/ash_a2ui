@@ -76,39 +76,6 @@ defmodule AshA2ui.Test.Enrollment do
   end
 end
 
-defmodule AshA2ui.Test.EnrollmentV1UI do
-  @moduledoc """
-  The v1.0 twin of `AshA2ui.Test.Enrollment`'s stepped surface.
-  """
-
-  use AshA2ui.Standalone
-
-  a2ui do
-    for_resource AshA2ui.Test.Enrollment
-    surface_id "enrollments_v1"
-    spec_version "1.0"
-
-    component :form do
-      fields [:name, :email, :role, :team]
-      create_action :create
-      update_action :update
-
-      step :who do
-        label "Who"
-        fields [:name, :email]
-      end
-
-      step :what do
-        fields [:role, :team]
-      end
-
-      step :confirm do
-        review? true
-      end
-    end
-  end
-end
-
 defmodule AshA2ui.Test.EnrollmentRowActionsUI do
   @moduledoc """
   `AshA2ui.Test.Enrollment`'s stepped form next to a table with a

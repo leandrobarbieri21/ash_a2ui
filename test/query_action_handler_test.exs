@@ -12,19 +12,11 @@ defmodule AshA2ui.QueryActionHandlerTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.ActionHandler
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Paginated
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "paginated",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "paginated", context)
   end
 
   defp seed!(count, attrs_fn) do
@@ -34,9 +26,9 @@ defmodule AshA2ui.QueryActionHandlerTest do
   end
 
   defp by_path(messages) do
-    Map.new(messages, fn %{"updateDataModel" => %{"path" => path, "value" => value}} ->
-      {path, value}
-    end)
+    for %{"updateDataModel" => %{"path" => path, "value" => value}} <- messages,
+        into: %{},
+        do: {path, value}
   end
 
   describe "the query action" do
@@ -44,10 +36,10 @@ defmodule AshA2ui.QueryActionHandlerTest do
       seed!(7, &%{name: "Item #{&1}", status: :open})
 
       envelope = envelope("query", %{"query" => %{"search" => "item"}})
-      assert_valid_client_message(envelope)
+      assert_valid_renderer_message(envelope)
 
       assert {:ok, messages} = ActionHandler.handle(Paginated, envelope, actor: nil)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       values = by_path(messages)
 
@@ -92,8 +84,10 @@ defmodule AshA2ui.QueryActionHandlerTest do
       envelope =
         envelope("query", %{"query" => %{"sort" => %{"field" => "status", "dir" => "asc"}}})
 
-      assert {:error, [message]} = ActionHandler.handle(Paginated, envelope, actor: nil)
-      assert_valid_server_message(message)
+      assert {:error, [message, _response]} =
+               ActionHandler.handle(Paginated, envelope, actor: nil)
+
+      assert_valid_agent_message(message)
 
       assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
                message["updateDataModel"]
@@ -104,7 +98,8 @@ defmodule AshA2ui.QueryActionHandlerTest do
     test "rejects a non-allowlisted filter with a /ui/feedback error" do
       envelope = envelope("query", %{"query" => %{"filters" => %{"name" => "x"}}})
 
-      assert {:error, [message]} = ActionHandler.handle(Paginated, envelope, actor: nil)
+      assert {:error, [message, _response]} =
+               ActionHandler.handle(Paginated, envelope, actor: nil)
 
       assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
                message["updateDataModel"]
@@ -115,7 +110,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
     test "rejects the query action on a surface without a query" do
       envelope = envelope("query", %{"query" => %{}})
 
-      assert {:error, [message]} =
+      assert {:error, [message, _response]} =
                ActionHandler.handle(AshA2ui.Test.KitchenSink, envelope, actor: nil)
 
       assert %{"path" => "/ui/feedback", "value" => %{"message" => value}} =
@@ -137,7 +132,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
       assert {:ok, messages} =
                ActionHandler.handle(Paginated, envelope("submit_form", context), actor: nil)
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       values = by_path(messages)
 
       # 8 records after the create; page 2 of 5 sorted by name: Item 6, Item 7, Zed
@@ -190,7 +185,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
       assert {:ok, messages} =
                ActionHandler.handle(Paginated, envelope("invoke", context), actor: nil)
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       values = by_path(messages)
 
       # "Other" is filtered out by the carried search; the victim is gone.
@@ -206,7 +201,7 @@ defmodule AshA2ui.QueryActionHandlerTest do
                  actor: nil
                )
 
-      paths = Enum.map(messages, & &1["updateDataModel"]["path"])
+      paths = for(%{"updateDataModel" => %{"path" => path}} <- messages, do: path)
       refute "/query" in paths
     end
   end

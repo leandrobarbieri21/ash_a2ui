@@ -1,386 +1,391 @@
-{
-  "updateComponents": {
-    "components": [
+[
+  {
+    "children": [
+      "status_banner",
+      "query_controls",
+      "data_grid",
+      "action_result_panel"
+    ],
+    "component": "entityPage",
+    "id": "root",
+    "title": "Hub contract"
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "align": "end",
+    "children": [
+      "query_search_input",
+      "query_filter_status",
+      "query_filter_verified",
+      "query_filter_property",
+      "query_filter_vendor",
+      "query_apply_button"
+    ],
+    "component": "Row",
+    "id": "query_controls"
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "component": "TextField",
+    "id": "query_search_input",
+    "label": "Search",
+    "placeholder": "Search contracts or vendors",
+    "value": {
+      "@path": "/query/search"
+    }
+  },
+  {
+    "component": "filterPicker",
+    "counts": {
+      "@path": "/query/facets/status"
+    },
+    "hint": "Statuses update nightly.",
+    "id": "query_filter_status",
+    "label": "Contract status",
+    "options": [
       {
-        "children": [
-          "status_banner",
-          "query_controls",
-          "data_grid",
-          "action_result_panel"
-        ],
-        "component": "entityPage",
-        "id": "root",
-        "title": "Hub contract"
+        "label": "Active",
+        "value": "active"
       },
       {
-        "align": "end",
-        "children": [
-          "query_search_input",
-          "query_filter_status",
-          "query_filter_verified",
-          "query_filter_property",
-          "query_filter_vendor",
-          "query_apply_button"
-        ],
-        "component": "Row",
-        "id": "query_controls"
+        "group": true,
+        "label": "Expiring soon",
+        "value": "expiring"
       },
       {
-        "component": "TextField",
-        "id": "query_search_input",
-        "label": "Search",
-        "placeholder": "Search contracts or vendors",
-        "value": {
-          "path": "/query/search"
-        }
+        "label": "Expiring soon",
+        "parent": "expiring",
+        "value": "expiring_soon"
       },
       {
-        "component": "ChoicePicker",
-        "counts": {
-          "path": "/query/facets/status"
-        },
-        "hint": "Statuses update nightly.",
-        "id": "query_filter_status",
-        "label": "Contract status",
-        "options": [
-          {
-            "label": "Active",
-            "value": "active"
-          },
-          {
-            "group": true,
-            "label": "Expiring soon",
-            "value": "expiring"
-          },
-          {
-            "label": "Expiring soon",
-            "parent": "expiring",
-            "value": "expiring_soon"
-          },
-          {
-            "label": "Renewal scheduled",
-            "parent": "expiring",
-            "value": "renewal_scheduled"
-          },
-          {
-            "label": "Expired",
-            "value": "expired"
-          },
-          {
-            "label": "Draft",
-            "value": "draft"
-          }
-        ],
-        "value": {
-          "path": "/query/filters/status"
-        },
-        "variant": "multipleSelection"
+        "label": "Renewal scheduled",
+        "parent": "expiring",
+        "value": "renewal_scheduled"
       },
       {
-        "component": "ChoicePicker",
-        "counts": {
-          "path": "/query/facets/verified"
-        },
-        "id": "query_filter_verified",
-        "label": "Verified",
-        "options": [
-          {
-            "label": "All",
-            "value": ""
-          },
-          {
-            "label": "True",
-            "value": "true"
-          },
-          {
-            "label": "False",
-            "value": "false"
-          }
-        ],
-        "value": {
-          "path": "/query/filters/verified"
-        },
-        "variant": "mutuallyExclusive"
+        "label": "Expired",
+        "value": "expired"
       },
       {
-        "component": "ChoicePicker",
-        "counts": {
-          "path": "/query/facets/property"
-        },
-        "dynamicOptions": {
-          "path": "/query/options/property"
-        },
-        "id": "query_filter_property",
-        "label": "Property",
-        "options": [],
-        "value": {
-          "path": "/query/filters/property"
-        },
-        "variant": "multipleSelection"
+        "label": "Draft",
+        "value": "draft"
+      }
+    ],
+    "value": {
+      "@path": "/query/filters/status"
+    },
+    "variant": "multipleSelection"
+  },
+  {
+    "component": "filterPicker",
+    "counts": {
+      "@path": "/query/facets/verified"
+    },
+    "id": "query_filter_verified",
+    "label": "Verified",
+    "options": [
+      {
+        "label": "All",
+        "value": ""
       },
       {
-        "component": "ChoicePicker",
-        "counts": {
-          "path": "/query/facets/vendor"
-        },
-        "dynamicOptions": {
-          "path": "/query/options/vendor"
-        },
-        "id": "query_filter_vendor",
-        "label": "Vendor",
-        "options": [],
-        "value": {
-          "path": "/query/filters/vendor"
-        },
-        "variant": "multipleSelection"
+        "label": "True",
+        "value": "true"
       },
       {
-        "action": {
-          "event": {
-            "context": {
-              "component": "table",
-              "contexts": {
-                "path": "/context"
-              },
-              "page": 1,
-              "query": {
-                "path": "/query"
-              }
-            },
-            "name": "query"
-          }
-        },
-        "child": "query_apply_text",
-        "component": "Button",
-        "id": "query_apply_button"
-      },
-      {
-        "component": "Text",
-        "id": "query_apply_text",
-        "text": "Apply"
-      },
-      {
-        "children": [
-          "empty_state",
-          "pagination"
-        ],
-        "columns": [
-          {
-            "label": "Name",
-            "path": "name",
-            "sortable": true,
-            "subtitle": {
-              "path": "vendor_name"
-            },
-            "width": 320
-          },
-          {
-            "help": {
-              "body": "Where the work happens.\n\n**Portfolio** — every property of the account.",
-              "title": "Property"
-            },
-            "label": "Property name",
-            "more": {
-              "captionPath": "_more_caption_property_name",
-              "labelPath": "_more_label_property_name",
-              "path": "line_count",
-              "textPath": "_more_text_property_name",
-              "valuesPath": "_more_values_property_name"
-            },
-            "moreNoun": "properties",
-            "path": "property_name"
-          },
-          {
-            "badge": {
-              "path": "_badge_status_text",
-              "tonePath": "_badge_tone_status_text"
-            },
-            "detail": {
-              "helpPath": "_detail_help_status_text",
-              "path": "_detail_status_text"
-            },
-            "label": "Status",
-            "path": "status_text",
-            "sortField": "status",
-            "sortable": true
-          }
-        ],
-        "component": "dataGrid",
-        "id": "data_grid",
-        "label": "Hub contract",
-        "rowActions": [],
-        "rowClick": {
-          "action": "context_select",
-          "context": {
-            "component": "table",
-            "context": "contract",
-            "contexts": {
-              "path": "/context"
-            },
-            "query": {
-              "path": "/query"
-            },
-            "value": {
-              "path": "id"
-            }
-          },
-          "inline": true,
-          "label": "Select contract",
-          "labelPath": "_primary_label",
-          "variantPath": "_primary_variant",
-          "width": 96
-        },
-        "rowId": "id",
-        "rows": {
-          "path": "/records"
-        },
-        "sort": {
-          "action": {
-            "context": {
-              "component": "table",
-              "contexts": {
-                "path": "/context"
-              },
-              "page": 1,
-              "query": {
-                "path": "/query"
-              }
-            },
-            "name": "query"
-          },
-          "path": "/query/sort"
-        }
-      },
-      {
-        "children": [],
-        "clearAction": {
-          "action": {
-            "context": {
-              "component": "table",
-              "contexts": {
-                "path": "/context"
-              },
-              "page": 1,
-              "query": {
-                "path": "/query"
-              }
-            },
-            "name": "query"
-          },
-          "label": "Clear search and filters"
-        },
-        "clearVisible": {
-          "path": "/query/emptyState/clear"
-        },
-        "component": "emptyState",
-        "icon": {
-          "path": "/query/emptyState/icon"
-        },
-        "id": "empty_state",
-        "message": {
-          "path": "/query/emptyState/message"
-        },
-        "title": {
-          "path": "/query/emptyState/title"
-        }
-      },
-      {
-        "component": "pagination",
-        "hasNext": {
-          "path": "/query/hasMore"
-        },
-        "id": "pagination",
-        "nextAction": {
+        "label": "False",
+        "value": "false"
+      }
+    ],
+    "value": {
+      "@path": "/query/filters/verified"
+    },
+    "variant": "mutuallyExclusive"
+  },
+  {
+    "component": "filterPicker",
+    "counts": {
+      "@path": "/query/facets/property"
+    },
+    "dynamicOptions": {
+      "@path": "/query/options/property"
+    },
+    "id": "query_filter_property",
+    "label": "Property",
+    "options": [],
+    "value": {
+      "@path": "/query/filters/property"
+    },
+    "variant": "multipleSelection"
+  },
+  {
+    "component": "filterPicker",
+    "counts": {
+      "@path": "/query/facets/vendor"
+    },
+    "dynamicOptions": {
+      "@path": "/query/options/vendor"
+    },
+    "id": "query_filter_vendor",
+    "label": "Vendor",
+    "options": [],
+    "value": {
+      "@path": "/query/filters/vendor"
+    },
+    "variant": "multipleSelection"
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "action": {
+      "functionCall": {
+        "@call": "ashAction",
+        "args": {
           "context": {
             "component": "table",
             "contexts": {
-              "path": "/context"
-            },
-            "pageDelta": 1,
-            "query": {
-              "path": "/query"
-            }
-          },
-          "name": "query"
-        },
-        "nextVisible": {
-          "path": "/query/nextVisible"
-        },
-        "page": {
-          "path": "/query/page"
-        },
-        "pageSize": {
-          "path": "/query/pageSize"
-        },
-        "pageSizeAction": {
-          "context": {
-            "component": "table",
-            "contexts": {
-              "path": "/context"
+              "@path": "/context"
             },
             "page": 1,
             "query": {
-              "path": "/query"
+              "@path": "/query"
             }
           },
-          "name": "query"
+          "name": "query",
+          "sourceComponentId": "query_apply_button"
         },
-        "pageSizeOptions": [
-          2,
-          10
-        ],
-        "previousAction": {
-          "context": {
-            "component": "table",
-            "contexts": {
-              "path": "/context"
-            },
-            "pageDelta": -1,
-            "query": {
-              "path": "/query"
-            }
-          },
-          "name": "query"
+        "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+      }
+    },
+    "child": "query_apply_text",
+    "component": "Button",
+    "id": "query_apply_button"
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "component": "Text",
+    "id": "query_apply_text",
+    "text": "Apply"
+  },
+  {
+    "children": [
+      "empty_state",
+      "pagination"
+    ],
+    "columns": [
+      {
+        "label": "Name",
+        "path": "name",
+        "sortable": true,
+        "subtitle": {
+          "path": "vendor_name"
         },
-        "previousVisible": {
-          "path": "/query/previousVisible"
-        },
-        "rangeText": {
-          "path": "/query/_range_text"
-        },
-        "total": {
-          "path": "/query/totalCount"
-        },
-        "visible": {
-          "path": "/query/paginationVisible"
-        }
+        "width": 320
       },
       {
-        "component": "statusBanner",
-        "id": "status_banner",
-        "kind": {
-          "path": "/ui/feedback/kind"
+        "help": {
+          "body": "Where the work happens.\n\n**Portfolio** — every property of the account.",
+          "title": "Property"
         },
-        "message": {
-          "path": "/ui/feedback/message"
-        }
+        "label": "Property name",
+        "more": {
+          "captionPath": "_more_caption_property_name",
+          "labelPath": "_more_label_property_name",
+          "path": "line_count",
+          "textPath": "_more_text_property_name",
+          "valuesPath": "_more_values_property_name"
+        },
+        "moreNoun": "properties",
+        "path": "property_name"
       },
       {
-        "children": [
-          "action_result_text"
-        ],
-        "component": "Column",
-        "id": "action_result_panel"
-      },
-      {
-        "component": "Text",
-        "id": "action_result_text",
-        "text": {
-          "path": "/ui/action_result_text"
-        }
+        "badge": {
+          "path": "_badge_status_text",
+          "tonePath": "_badge_tone_status_text"
+        },
+        "detail": {
+          "helpPath": "_detail_help_status_text",
+          "path": "_detail_status_text"
+        },
+        "label": "Status",
+        "path": "status_text",
+        "sortField": "status",
+        "sortable": true
       }
     ],
-    "surfaceId": "hub"
+    "component": "dataGrid",
+    "id": "data_grid",
+    "label": "Hub contract",
+    "rowActions": [],
+    "rowClick": {
+      "action": "context_select",
+      "context": {
+        "component": "table",
+        "context": "contract",
+        "contexts": {
+          "@path": "/context"
+        },
+        "query": {
+          "@path": "/query"
+        },
+        "value": {
+          "@path": "id"
+        }
+      },
+      "inline": true,
+      "label": "Select contract",
+      "labelPath": "_primary_label",
+      "variantPath": "_primary_variant",
+      "width": 96
+    },
+    "rowId": "id",
+    "rows": {
+      "@path": "/records"
+    },
+    "sort": {
+      "action": {
+        "context": {
+          "component": "table",
+          "contexts": {
+            "@path": "/context"
+          },
+          "page": 1,
+          "query": {
+            "@path": "/query"
+          }
+        },
+        "name": "query"
+      },
+      "path": "/query/sort"
+    }
   },
-  "version": "v0.9.1"
-}
+  {
+    "children": [],
+    "clearAction": {
+      "action": {
+        "context": {
+          "component": "table",
+          "contexts": {
+            "@path": "/context"
+          },
+          "page": 1,
+          "query": {
+            "@path": "/query"
+          }
+        },
+        "name": "query"
+      },
+      "label": "Clear search and filters"
+    },
+    "clearVisible": {
+      "@path": "/query/emptyState/clear"
+    },
+    "component": "emptyState",
+    "icon": {
+      "@path": "/query/emptyState/icon"
+    },
+    "id": "empty_state",
+    "message": {
+      "@path": "/query/emptyState/message"
+    },
+    "title": {
+      "@path": "/query/emptyState/title"
+    }
+  },
+  {
+    "component": "pagination",
+    "hasNext": {
+      "@path": "/query/hasMore"
+    },
+    "id": "pagination",
+    "nextAction": {
+      "context": {
+        "component": "table",
+        "contexts": {
+          "@path": "/context"
+        },
+        "pageDelta": 1,
+        "query": {
+          "@path": "/query"
+        }
+      },
+      "name": "query"
+    },
+    "nextVisible": {
+      "@path": "/query/nextVisible"
+    },
+    "page": {
+      "@path": "/query/page"
+    },
+    "pageSize": {
+      "@path": "/query/pageSize"
+    },
+    "pageSizeAction": {
+      "context": {
+        "component": "table",
+        "contexts": {
+          "@path": "/context"
+        },
+        "page": 1,
+        "query": {
+          "@path": "/query"
+        }
+      },
+      "name": "query"
+    },
+    "pageSizeOptions": [
+      2,
+      10
+    ],
+    "previousAction": {
+      "context": {
+        "component": "table",
+        "contexts": {
+          "@path": "/context"
+        },
+        "pageDelta": -1,
+        "query": {
+          "@path": "/query"
+        }
+      },
+      "name": "query"
+    },
+    "previousVisible": {
+      "@path": "/query/previousVisible"
+    },
+    "rangeText": {
+      "@path": "/query/_range_text"
+    },
+    "total": {
+      "@path": "/query/totalCount"
+    },
+    "visible": {
+      "@path": "/query/paginationVisible"
+    }
+  },
+  {
+    "component": "statusBanner",
+    "id": "status_banner",
+    "kind": {
+      "@path": "/ui/feedback/kind"
+    },
+    "message": {
+      "@path": "/ui/feedback/message"
+    }
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "children": [
+      "action_result_text"
+    ],
+    "component": "Column",
+    "id": "action_result_panel"
+  },
+  {
+    "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+    "component": "Text",
+    "id": "action_result_text",
+    "text": {
+      "@path": "/ui/feedback/resultText"
+    }
+  }
+]

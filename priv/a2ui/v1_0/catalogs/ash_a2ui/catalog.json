@@ -1,17 +1,53 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://a2ui.org/specification/v1_0/catalogs/ash_a2ui/catalog.json",
-  "title": "AshA2ui Extension Catalog",
-  "description": "Client functions AshA2ui servers may invoke beyond the v1.0 basic catalog. Load it alongside the basic catalog (the shipped hook registers the implementations as built-ins). Currently: downloadFile, the frozen file-export delivery contract (see AshA2ui.Export).",
-  "catalogId": "https://a2ui.org/specification/v1_0/catalogs/ash_a2ui/catalog.json",
+  "$id": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+  "protocolVersion": "1.0",
+  "title": "AshA2ui Function Catalog",
+  "description": "The functions an AshA2ui agent and renderer share beside the basic catalog: ashAction, which a renderer calls on the agent for every server-handled interaction, and downloadFile, which the agent calls on the renderer to deliver an export. It declares no components. The shipped LiveView hook (priv/js/ash_a2ui_hook.js) registers the implementations.",
+  "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
   "components": {},
   "functions": {
+    "ashAction": {
+      "type": "object",
+      "description": "Runs a named ash_a2ui action on the agent. The renderer sends it as callAgentFunction; the agent answers with agentFunctionResponse after its data-model updates.",
+      "returnType": "object",
+      "requiresUserActivation": true,
+      "properties": {
+        "@call": {
+          "const": "ashAction"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The action's name (submit_form, query, invoke, ...)."
+            },
+            "sourceComponentId": {
+              "type": "string",
+              "description": "The id of the component the interaction came from."
+            },
+            "context": {
+              "type": "object",
+              "description": "The action's inputs. Bindings resolve against the data model before the call is sent.",
+              "additionalProperties": {
+                "$ref": "common_types.json#/$defs/DynamicValue"
+              }
+            }
+          },
+          "required": ["name"],
+          "unevaluatedProperties": false
+        }
+      },
+      "required": ["@call", "args"]
+    },
     "downloadFile": {
       "type": "object",
-      "description": "Downloads a server-generated file: exactly one of dataUrl (an inline data: URL — how AshA2ui delivers CSV exports) or url (a signed download URL, for hosts that upload instead of inlining), saved under filename. This function has no return value.",
+      "description": "Downloads a file the agent generated: exactly one of dataUrl (an inline data: URL, how AshA2ui delivers CSV exports) or url (a signed download URL, for hosts that upload instead of inlining), saved under filename. The agent sends it as callRendererFunction after an export. This function has no return value.",
       "returnType": "void",
+      "allowedCallers": "agentOnly",
       "properties": {
-        "call": {
+        "@call": {
           "const": "downloadFile"
         },
         "args": {
@@ -38,34 +74,18 @@
           },
           "required": ["filename"],
           "oneOf": [{"required": ["dataUrl"]}, {"required": ["url"]}],
-          "additionalProperties": false
+          "unevaluatedProperties": false
         }
       },
-      "required": ["call", "args"],
-      "unevaluatedProperties": false
+      "required": ["@call", "args"]
     }
   },
   "$defs": {
-    "surfaceProperties": {
-      "type": "object",
-      "properties": {
-        "iconUrl": {
-          "type": "string",
-          "format": "uri",
-          "description": "A URL for an image that identifies the agent or tool associated with the surface."
-        },
-        "agentDisplayName": {
-          "type": "string",
-          "description": "Text to be displayed next to the surface to identify the agent or tool that created it."
-        }
-      },
-      "additionalProperties": true
-    },
     "anyComponent": {
-      "oneOf": [{"type": "object"}]
+      "not": {}
     },
     "anyFunction": {
-      "oneOf": [{"$ref": "#/functions/downloadFile"}]
+      "oneOf": [{"$ref": "#/functions/ashAction"}, {"$ref": "#/functions/downloadFile"}]
     }
   }
 }

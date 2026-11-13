@@ -1,97 +1,84 @@
 /**
- * Ash admin catalog v1 — semantic Lit components for the `@a2ui/lit`
+ * Ash admin catalog v2 — semantic Lit components for the `@a2ui/lit`
  * renderer.
  *
  * `createAshAdminCatalog(deps)` builds a `@a2ui/web_core` Catalog
  * registered under the admin catalog id
- * (`https://ash-a2ui.dev/catalogs/admin/v1`) so a surface whose
- * `createSurface.catalogId` matches resolves these components. Registration
- * under a custom catalog id is first-class in the renderer:
- * `MessageProcessor.processCreateSurfaceMessage` resolves
- * `catalogs.find(c => c.id === catalogId)` by exact match (see
- * web_core `processing/message-processor.js`), and the renderer looks every
- * component type up via `catalog.components.get(type).tagName` (see @a2ui/lit
- * `surface/render-a2ui-node.js`). No merging into the basic catalog is
- * involved — the admin catalog is a sibling the host registers alongside it:
+ * (`https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2`) so a surface whose
+ * `createSurface.catalogId` matches resolves these components. The
+ * renderer resolves a surface's catalog by exact id and renders every
+ * component type with its catalog entry's element. The admin catalog is a
+ * sibling the host registers beside the basic catalog:
  *
- *     import {z} from "zod";
- *     import {Catalog} from "@a2ui/web_core/v0_9";
- *     import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
+ *     import {A2uiLitElement, A2uiController} from "@a2ui/lit";
  *     import {html, css, nothing} from "lit";
  *     import {createAshAdminCatalog} from "../../deps/ash_a2ui/priv/js/ash_admin_catalog.js";
  *
  *     const adminCatalog = createAshAdminCatalog({
- *       Catalog, basicCatalog, A2uiLitElement, A2uiController,
+ *       basicCatalog, // the basic catalog, or createAshA2uiCatalog's
+ *       A2uiLitElement,
+ *       A2uiController,
  *       lit: {html, css, nothing},
- *       // `z` is OPTIONAL since issue #5: binding-capable props are built
- *       // from @a2ui/web_core's own exported schema builders (web_core's
- *       // zod 3), so the host zod is no longer consumed. If you still pass
- *       // `z`, it must be the same zod MAJOR as @a2ui/web_core (zod 3) —
- *       // a foreign major throws immediately.
- *       z,
  *     });
- *     configureAshA2ui({MessageProcessor, catalogs: [basicCatalog, adminCatalog]});
+ *     configureAshA2ui({MessageProcessor, Catalog, catalogs: [basicCatalog, adminCatalog]});
  *
- * The catalog EXTENDS the basic catalog (contract: "admin adds semantic
- * components; it does not remove primitives"): every component of
- * `deps.basicCatalog` is carried over — pass the stock `basicCatalog` or the
- * merged `createAshA2uiCatalog` result to inherit its upgrades — plus the
- * ten semantic components:
+ * The JS catalog carries every component of `deps.basicCatalog` (pass the
+ * stock `basicCatalog` or the merged `createAshA2uiCatalog` result to
+ * inherit its upgrades), so a basic component without `@catalogId` still
+ * resolves on an admin surface, plus the semantic components:
  *
  *   entityPage, dataGrid, emptyState, pagination, recordPanel, fieldDisplay,
- *   formSection, actionBar, statusBanner, confirmDialog
+ *   formSection, actionBar, statusBanner, confirmDialog, calendarView,
+ *   liveDiagram
  *
- * (camelCase names are the wire contract, pinned by A2UI-101B/AC-1 and
+ * (camelCase names are the wire contract, pinned by
  * `priv/a2ui/admin_v1/catalog.json`.)
  *
  * ## Events
  *
- * Every dispatched action reuses the existing envelopes byte-for-byte:
+ * Every admin action is server-handled and goes out as the ash_a2ui
+ * catalog's `ashAction` function call (see `ash_a2ui_hook.js`), with its
+ * context's `{"@path": ...}` bindings resolved at click time:
  *
- *   - row actions / ConfirmDialog confirm → the flat envelope the encoder
- *     emits (`{label, action: <name>, context: {...}}`), with
- *     `{"path": "id"}`-style leaves resolved against the clicked row's base
- *     path — the same resolution the basic catalog's templated buttons
- *     perform;
- *   - ActionBar primary → the `action` envelope prop (emitted as the frozen
- *     `submit_form` event), dispatched through the GenericBinder's own
- *     action resolution exactly like a basic Button; a reconstructed
- *     `{values: /form, recordId: /form/id[, query][, contexts]}` fallback
- *     covers envelope-less emissions;
- *   - Pagination prev/next → the `previousAction`/`nextAction` bare event
- *     objects the encoder emits (`{"name": "query", "context": {...}}`),
- *     resolved and dispatched with pageDelta ∓1/±1; a derivation fallback
- *     covers envelope-less emissions.
+ *   - row actions / ConfirmDialog confirm → the flat entry the encoder
+ *     emits (`{label, action: <name>, context: {...}}`), with row-relative
+ *     `{"@path": "id"}` bindings resolved against the clicked row's base
+ *     path;
+ *   - ActionBar primary → the `action` prop (the `submit_form` ashAction),
+ *     run through the GenericBinder's own action resolution exactly like a
+ *     basic Button; a reconstructed `{values: /form, recordId: /form/id[,
+ *     query][, contexts]}` fallback covers an emission without one;
+ *   - Pagination prev/next, sortable headers, the empty state's clear and
+ *     the calendar window → the bare `{name, context}` events the encoder
+ *     emits (the catalog's actionEvent), sent with what the component adds
+ *     (pageDelta, a sort, a page size, a window).
  *
  * ## Zero jank: instant action acknowledgement
  *
  * Dispatching components acknowledge clicks at 0 RTT: the ActionBar primary
  * button and every DataGrid row-action button render disabled + spinner the
  * moment they dispatch, and settle when the surface's data model next
- * reports an outcome write (`/ui/feedback` or `/ui/response` — at least
- * one is written by every AshA2ui action these components dispatch:
- * submits, invokes, task open/cancel, context select/clear and every
- * rejection, on both wire versions). Any path write settles, including one
- * that leaves the value as it was: View and Cancel write the already-clear
- * feedback, and waiting for a changed message left the View button
- * spinning (clinic-demo). A write replacing the whole data model (a PubSub
- * refresh) is not an outcome and does not settle. No styling round
- * trip and no `phx-*-loading`: these components own their shadow DOM, and
- * host CSS cannot reach inside it.
+ * reports an outcome write at `/ui/feedback`, which every AshA2ui action
+ * these components dispatch writes: submits, invokes, task open/cancel,
+ * context select/clear and every rejection. Any settled write counts,
+ * including one that leaves the value as it was: View and Cancel write the
+ * already-clear feedback, and waiting for a changed message left the View
+ * button spinning. The hook's pending write and a write replacing the
+ * whole data model (a PubSub refresh) are not outcomes and do not settle.
+ * No styling round trip and no `phx-*-loading`: these components own their
+ * shadow DOM, and host CSS cannot reach inside it.
  *
  * ## A11y-hardened basic inputs
  *
- * The core basic-catalog inputs render adjacent validation errors but do not
- * wire `aria-invalid`/`aria-describedby` (verified against @a2ui/lit 0.10.x
- * `TextField.js`/`CheckBox.js`). To satisfy the renderer quality contract,
- * this catalog REPLACES TextField, CheckBox, ChoicePicker and DateTimeInput
- * (inside admin surfaces only — the basic catalog registered under its own id
- * is untouched) with equivalent components that associate a real `<label>`,
- * read the AshA2ui form-error state (`/errors/<field>`, derived from each
- * input's `/form/<field>` value binding), and render the error adjacent to
- * the control with the aria wiring. FormSection pairs the encoder's sibling
- * `form_error_<field>` Texts with their inputs so messages are never
- * double-rendered (see that component below).
+ * This catalog REPLACES TextField, CheckBox, ChoicePicker and DateTimeInput
+ * (for components resolved in the admin catalog only; the basic catalog
+ * registered under its own id is untouched) with equivalent components that
+ * associate a real `<label>`, read the AshA2ui form-error state
+ * (`/errors/<field>`, derived from each input's `/form/<field>` value
+ * binding), and render the error adjacent to the control with the aria
+ * wiring. FormSection pairs the encoder's sibling `form_error_<field>`
+ * Texts with their inputs so messages are never double-rendered (see that
+ * component below).
  *
  * ## Design tokens
  *
@@ -102,31 +89,27 @@
  *
  * ## Contract with the host bundle
  *
- * Same discipline as `ash_a2ui_catalog.js`: no bundled dependencies, the
- * host passes the single `lit` / `@a2ui` instance in. Verified against
- * @a2ui/lit 0.10.1 / @a2ui/web_core 0.11.0 / lit 3.x.
+ * Same discipline as `ash_a2ui_catalog.js`: the host passes the single
+ * `lit` / `@a2ui/lit` instance in. Written against @a2ui/lit +
+ * @a2ui/web_core 0.15.0 / lit 3.x; an admin surface mixes catalogs through
+ * `@catalogId`, which that release refuses (see the hook's note), so it
+ * renders on the first web_core release after 0.15.0.
  *
- * ## Schema provenance (issue #5)
+ * ## Schema provenance
  *
  * `@a2ui/web_core`'s GenericBinder classifies binding-capable props by
- * introspecting **zod 3 internals** (`_def.typeName`, `_def.shape()` — see
- * its `scrapeSchemaBehavior`). This file used to build its ten component
- * schemas with the host's `z`; under a host zod 4 every node scraped as
- * STATIC, so reserved-path bindings rendered `[object Object]` and grids
- * stayed empty. The schemas are therefore now composed from web_core's own
- * exported builders (`DynamicStringSchema`, `DynamicValueSchema`,
- * `ActionSchema`, `ChildListSchema`, ... — imported from
- * `@a2ui/web_core/v0_9`, the SAME module instance the binder uses):
- * binder-visible under any host zod. Static (non-binding) props derive
- * their primitives from web_core's exported schemas via public zod-3
- * accessors, so the host's `z` is no longer consumed at all — passing it
- * is optional, and when it IS passed its major is checked loudly (see the
- * guard in `createAshAdminCatalog`).
+ * introspecting zod 3 internals. The component schemas are therefore
+ * composed from web_core's own exported builders (`DynamicStringSchema`,
+ * `DynamicValueSchema`, `ActionSchema`, `ChildListSchema`, ... imported
+ * from `@a2ui/web_core/v1_0`, the SAME module instance the binder uses),
+ * and static props take their primitives from web_core's exported schemas
+ * too, so the whole tree is binder-visible whatever zod the host bundles.
+ * The envelope keys (`@accessibility`, `@checks`) are the renderer's, not
+ * the components'.
  */
 
 import {
   createAdminStyles,
-  resolveEventContext,
   getByPath,
   formatDisplayValue,
   applyWeight,
@@ -145,12 +128,17 @@ import {
 // here too), and the action-outcome subscription both catalogs settle on.
 // The file defines its element only when asked.
 import {
-  catalogLike,
+  actionSpec,
+  bindingPath,
+  dispatchActionSpec,
   promptModalComponent,
   retagged,
   subscribeActionOutcomes,
   unsubscribeActionOutcomes,
 } from "./ash_a2ui_catalog.js";
+
+// The ash_a2ui catalog's id: the admin envelopes are sent as its ashAction.
+import {ASH_A2UI_CATALOG_ID} from "./ash_a2ui_protocol.js";
 
 // The NB layer's calendar grid (`nb-calendar`), used by calendarView. The
 // file has no imports of its own and defines its elements only when asked.
@@ -160,31 +148,29 @@ import {defineNbComponents} from "./nb_components.js";
 // and of the nodes (pure geometry, unit-tested without a browser).
 import {placeMarkerGroups, separate} from "./ash_a2ui_diagram_layout.js";
 
-// Schema builders from web_core's OWN zod (3.x) — the instance the
+// Schema builders from web_core's OWN zod (3.x), the instance the
 // GenericBinder introspects. Importing the module directly (rather than
 // receiving builders through `deps`) guarantees instance identity: the
 // host bundle resolves the same specifier the renderer uses, so there is
 // no dual-zod hazard regardless of which zod the host itself bundles.
 import {
   ActionSchema,
-  AnyComponentSchema,
-  CheckableSchema,
   ChildListSchema,
   ComponentIdSchema,
   CreateSurfaceMessageSchema,
-  DataBindingSchema,
   DynamicBooleanSchema,
   DynamicNumberSchema,
   DynamicStringSchema,
   DynamicValueSchema,
-  FunctionCallSchema,
-} from "@a2ui/web_core/v0_9";
+  TextApi,
+  WeightSchema,
+} from "@a2ui/web_core/v1_0";
 
 /** The admin catalog id a surface must declare to resolve here. */
-const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
+const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2";
 
-/** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.18.0";
+/** The admin catalog contract version (minor versions are additive). */
+export const ADMIN_CATALOG_VERSION = "2.0.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -244,6 +230,7 @@ const TAGS = {
   confirmDialog: "ash-admin-confirm-dialog",
   calendarView: "ash-admin-calendar-view",
   liveDiagram: "ash-admin-live-diagram",
+  filterPicker: "ash-admin-filter-picker",
 };
 
 /** Basic input kinds this catalog replaces with a11y-hardened elements. */
@@ -262,8 +249,8 @@ void GRID_TABLE_MIN;
 
 /**
  * Builds the admin catalog. See the module docs for the `deps` contract:
- * `{Catalog, basicCatalog, A2uiLitElement, A2uiController, z,
- * lit: {html, css, nothing}}`, plus the optional `loadMermaid` (a function
+ * `{basicCatalog, A2uiLitElement, A2uiController, lit: {html, css,
+ * nothing}}`, plus the optional `loadMermaid` (a function
  * returning a promise of the mermaid engine, called the first time a
  * `liveDiagram` draws; see priv/js/ash_a2ui_mermaid.js) and
  * `openSurface`, and `renderActionButton(opts)`: every button the catalog
@@ -277,26 +264,9 @@ void GRID_TABLE_MIN;
  *   catalog id, extending `deps.basicCatalog`.
  */
 export function createAshAdminCatalog(deps) {
-  const {Catalog, basicCatalog, A2uiLitElement, A2uiController, lit, z} = deps || {};
-
-  // Loud guard (issue #5 defense): a foreign-zod `z` was the root cause of
-  // reserved-path bindings rendering "[object Object]" — the GenericBinder
-  // scrapes zod-3 internals, and under a different major every binding prop
-  // scrapes STATIC. Binding schemas are now built from web_core's own
-  // builders and `z` is optional, but any residual host-z usage must be
-  // same-major or the catalog refuses to build with a message naming the
-  // fix. (`z.string()._def?.typeName` is "ZodString" on zod 3; on zod 4
-  // there is no typeName, so the optional chain short-circuits to undefined.)
-  if (z && z.string()._def?.typeName !== "ZodString") {
-    throw new Error(
-      "createAshAdminCatalog: `z` must be the same zod major as @a2ui/web_core " +
-        "(zod 3); binding schemas are now built from web_core's own builders — " +
-        "upgrade or stop passing z for binding props",
-    );
-  }
+  const {basicCatalog, A2uiLitElement, A2uiController, lit} = deps || {};
 
   if (
-    !Catalog ||
     !basicCatalog ||
     !A2uiLitElement ||
     !A2uiController ||
@@ -306,16 +276,18 @@ export function createAshAdminCatalog(deps) {
     !lit.nothing
   ) {
     throw new Error(
-      "createAshAdminCatalog: missing deps. Pass {Catalog, basicCatalog, " +
-        "A2uiLitElement, A2uiController, lit: {html, css, nothing}} — Catalog is " +
-        "the @a2ui/web_core Catalog class. `z` is optional (binding schemas are " +
-        "built from @a2ui/web_core's own builders); if passed it must be zod 3.",
+      "createAshAdminCatalog: missing deps. Pass {basicCatalog, A2uiLitElement, " +
+        "A2uiController, lit: {html, css, nothing}}.",
     );
   }
 
   const schemas = buildSchemas(basicCatalog);
+  // filterPicker extends the basic ChoicePicker's schema, so it exists only
+  // when the basic catalog has one to extend.
   const adminApis = Object.fromEntries(
-    Object.keys(TAGS).map((kind) => [kind, {name: kind, schema: schemas[kind], tagName: TAGS[kind]}]),
+    Object.keys(TAGS)
+      .filter((kind) => schemas[kind])
+      .map((kind) => [kind, {name: kind, schema: schemas[kind], tagName: TAGS[kind]}]),
   );
 
   defineAdminElements(deps, {adminApis, inputSchemas: schemas.inputs});
@@ -339,10 +311,12 @@ export function createAshAdminCatalog(deps) {
 
   // The catalog's own client function: openSurface (reference-link
   // navigation — see OPEN_SURFACE_EVENT). Usable from any functionCall
-  // action as {"call": "openSurface", "args": {surface, recordId, query}}.
+  // action as {"@call": "openSurface", "args": {surface, recordId, query}};
+  // like every navigation it runs only from a user gesture.
   const openSurfaceFunction = {
     name: "openSurface",
     returnType: "void",
+    requiresUserActivation: true,
     schema: schemas.openSurfaceArgs,
     execute: (args, context) => {
       requestOpenSurface(deps, openSurfaceArgs(args || {}), {surfaceId: context?.surface?.id});
@@ -350,16 +324,14 @@ export function createAshAdminCatalog(deps) {
     },
   };
 
-  return catalogLike(
-    Catalog,
-    basicCatalog,
-    ADMIN_CATALOG_ID,
-    [...components, ...Object.values(adminApis)],
-    [
+  return basicCatalog.derive({
+    catalogId: ADMIN_CATALOG_ID,
+    components: [...components, ...Object.values(adminApis)],
+    functions: [
       ...[...basicCatalog.functions.values()].filter((fn) => fn.name !== "openSurface"),
       openSurfaceFunction,
     ],
-  );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -390,28 +362,33 @@ export function createAshAdminCatalog(deps) {
  */
 export function buildSchemas(basicCatalog = null) {
   // --- static primitives on web_core's own zod ------------------------------
-  // Derived once from web_core's exported schemas via public zod-3
-  // accessors (`.shape`, `.unwrap()`, static `.create()`), so static props
-  // need no host `z`. Each primitive classifies STATIC in the binder (plain
-  // ZodString/Number/Boolean/Any/Record — `ComponentIdSchema` is a plain
-  // ZodString whose `component-id` child-ref stamp only matters inside
-  // ChildList classification, which these positions never reach).
-  const EmptyObject = DataBindingSchema.pick({});
+  // Taken from web_core's exported schemas through public zod-3 API
+  // (`.unwrap()`, `.removeDefault()`, `.array()`, static `.create()`), so
+  // static props need no host `z`. Each primitive classifies STATIC in the
+  // binder (plain ZodString/Number/Boolean/Any/Record; `ComponentIdSchema`
+  // is a plain ZodString whose `component-id` child-ref stamp only matters
+  // inside ChildList classification, which these positions never reach).
+  const createSurface = CreateSurfaceMessageSchema.shape.createSurface.shape;
+  // An empty object with no description (a REF description, like
+  // Checkable's, would classify every admin component as that def).
+  const EmptyObject = CreateSurfaceMessageSchema.pick({}).strip();
   const Str = ComponentIdSchema;
-  const Num = AnyComponentSchema.shape.weight.unwrap();
-  const Bool = CreateSurfaceMessageSchema.shape.createSurface.shape.sendDataModel.unwrap();
-  const Any = CreateSurfaceMessageSchema.shape.createSurface.shape.theme.unwrap();
-  const RecordAny = FunctionCallSchema.shape.args;
-  const ArrayOf = (element) => CheckableSchema.shape.checks.unwrap().constructor.create(element);
-  const EnumOf = (values) => CreateSurfaceMessageSchema.shape.version.constructor.create(values);
+  const Num = WeightSchema;
+  const Bool = createSurface.sendDataModel.unwrap();
+  const RecordAny = createSurface.dataModel.unwrap();
+  const Any = RecordAny.valueSchema;
+  const ArrayOf = (element) => element.array();
+  const ZodEnum = TextApi.schema.shape.variant.unwrap().removeDefault().constructor;
+  const EnumOf = (values) => ZodEnum.create(values);
 
   const formatEnum = () => EnumOf(["text", "datetime", "boolean", "number"]).optional();
 
-  // Bare event objects exactly as `admin_page_action/3` emits them:
-  // {"name": "query", "context": {...}} with absolute path refs.
-  // Deliberately NOT a union with an event-shaped option — that would trip
-  // the GenericBinder's ACTION detection and silently mis-dispatch these
-  // values (dispatchAction drops payloads without an `event`).
+  // The admin envelopes ({"name": "query", "context": {...}}, the
+  // catalog's actionEvent), sent as an ashAction with the context's
+  // {"@path"} bindings resolved at click time. Deliberately NOT an
+  // ActionSchema: that would make the binder resolve it into a callable
+  // with the component's own scope, and the components add to the context
+  // (pageDelta, a sort, a calendar window) before sending.
   const bareEvent = () => EmptyObject.extend({name: Str, context: RecordAny.optional()});
 
   // 1.10: the basic ChoicePicker and TextField, extended with the keys the
@@ -444,13 +421,16 @@ export function buildSchemas(basicCatalog = null) {
 
   return {
     inputs,
+    // A query filter's picker: the extended ChoicePicker under its own name
+    // (two catalogs declaring one name would make a mixed surface
+    // ambiguous).
+    filterPicker: inputs.ChoicePicker,
     entityPage: EmptyObject.extend({
       title: DynamicStringSchema,
       description: DynamicStringSchema.nullable().optional(),
       children: ChildListSchema.optional(),
       // 1.6: false when the host page already owns the heading.
       headerVisible: Bool.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -564,7 +544,6 @@ export function buildSchemas(basicCatalog = null) {
       // itself at click time.
       sort: RecordAny.optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -580,7 +559,6 @@ export function buildSchemas(basicCatalog = null) {
       clearVisible: DynamicBooleanSchema.nullable().optional(),
       child: Str.optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -594,16 +572,12 @@ export function buildSchemas(basicCatalog = null) {
       nextVisible: DynamicBooleanSchema.nullable().optional(),
       rangeText: DynamicStringSchema.nullable().optional(),
       label: DynamicStringSchema.nullable().optional(),
-      prevAction: bareEvent().optional(),
-      // The encoder emits `previousAction` (the contract name); `prevAction`
-      // stays accepted for older emissions.
       previousAction: bareEvent().optional(),
       nextAction: bareEvent().optional(),
       // 1.10: the page sizes offered and the envelope sent (with the picked
       // pageSize, page 1) when one is picked.
       pageSizeOptions: ArrayOf(Num).optional(),
       pageSizeAction: bareEvent().optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -612,7 +586,6 @@ export function buildSchemas(basicCatalog = null) {
       title: DynamicStringSchema.nullable().optional(),
       recordId: DynamicValueSchema.nullable().optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -632,7 +605,6 @@ export function buildSchemas(basicCatalog = null) {
       hideWhenEmpty: Bool.optional(),
       // 1.17: a steps field's normalized steps, drawn as a numbered stepper.
       steps: DynamicValueSchema.nullable().optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -640,7 +612,6 @@ export function buildSchemas(basicCatalog = null) {
       title: DynamicStringSchema.nullable().optional(),
       columns: Num.int().min(1).max(6).optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -648,19 +619,17 @@ export function buildSchemas(basicCatalog = null) {
       primaryLabel: DynamicStringSchema.nullable().optional(),
       busy: DynamicBooleanSchema.nullable().optional(),
       destructive: Bool.optional(),
-      // Emitted as {"event": submit_event} — the frozen submit_form
-      // envelope, binder-resolved into a callable (ActionSchema classifies
-      // ACTION via its REF description and its {event} union option).
+      // Emitted as the submit_form ashAction call ({"functionCall": ...}),
+      // binder-resolved into a callable (ActionSchema classifies ACTION via
+      // its REF description).
       action: ActionSchema.optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
     statusBanner: EmptyObject.extend({
       kind: DynamicStringSchema.nullable().optional(),
       message: DynamicStringSchema.nullable().optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -675,7 +644,6 @@ export function buildSchemas(basicCatalog = null) {
       window: DynamicValueSchema.optional(),
       windowAction: bareEvent().optional(),
       children: ChildListSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -689,7 +657,6 @@ export function buildSchemas(basicCatalog = null) {
       markers: DynamicValueSchema.optional(),
       nodes: DynamicValueSchema.optional(),
       error: DynamicStringSchema.nullable().optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
 
@@ -706,7 +673,6 @@ export function buildSchemas(basicCatalog = null) {
       confirmLabel: DynamicStringSchema.nullable().optional(),
       destructive: Bool.optional(),
       action: ActionSchema.optional(),
-      accessibility: Any.optional(),
       weight: Num.optional(),
     }),
   };
@@ -777,12 +743,6 @@ function fieldErrors(props, selfError) {
 }
 
 /**
- * Normalizes a row-action entry into a raw `{event: {name, context}}`
- * envelope ready for resolveEventContext + dispatchAction. Prefers the flat
- * shape the admin encoder emits (`{label, action: <name>, context}`); a
- * legacy nested `{label, action: {event: ...}}` is tolerated defensively.
- */
-/**
  * The button tone of a primary action variant (the A2UI Button variants):
  * primary is the filled call to action, borderless reads as a link,
  * default (and anything unknown) is the outlined button.
@@ -793,16 +753,21 @@ function primaryVariantTone(variant) {
   return "default";
 }
 
-function rowActionEnvelope(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  if (typeof entry.action === "string") {
-    return {event: {name: entry.action, context: entry.context || {}}};
+/**
+ * The action an admin envelope sends, as an `actionSpec`: a row action
+ * entry (`{label, action: <name>, context}`) or a bare admin envelope
+ * (`{name, context}`: pagination, sort, the empty-state clear, the
+ * calendar window) is server-handled and goes out as the ash_a2ui
+ * catalog's `ashAction`; a full `ashAction` Action (`{functionCall}`)
+ * keeps its catalog id. Null for anything else, an event action included.
+ */
+function adminActionSpec(envelope) {
+  if (!envelope || typeof envelope !== "object") return null;
+  const name = typeof envelope.action === "string" ? envelope.action : envelope.name;
+  if (typeof name === "string") {
+    return {name, context: envelope.context || {}, catalogId: ASH_A2UI_CATALOG_ID};
   }
-  const nested = entry.action;
-  if (nested && typeof nested === "object" && nested.event && typeof nested.event.name === "string") {
-    return nested;
-  }
-  return null;
+  return actionSpec(typeof envelope.action === "object" ? envelope.action : envelope);
 }
 
 /**
@@ -840,7 +805,7 @@ function rowActionVisible(action, row) {
 function syncFieldError(el) {
   const context = el.context;
   const raw = context?.componentModel?.properties;
-  const valuePath = raw?.value?.path;
+  const valuePath = bindingPath(raw?.value);
   const match = typeof valuePath === "string" ? /^\/form\/(.+)$/.exec(valuePath) : null;
   const errorPath = match ? `/errors/${match[1]}` : null;
 
@@ -889,15 +854,15 @@ function errorText(value) {
  */
 function buildSubmitFormContext(surface) {
   const context = {
-    values: {path: "/form"},
-    recordId: {path: "/form/id"},
+    values: {"@path": "/form"},
+    recordId: {"@path": "/form/id"},
   };
   const dataModel = surface.dataModel;
   if (dataModel.get("/query") !== null && dataModel.get("/query") !== undefined) {
-    context.query = {path: "/query"};
+    context.query = {"@path": "/query"};
   }
   if (dataModel.get("/context") !== null && dataModel.get("/context") !== undefined) {
-    context.contexts = {path: "/context"};
+    context.contexts = {"@path": "/context"};
   }
   return context;
 }
@@ -1047,26 +1012,21 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   // (disabled + spinner), then settle when the surface's data model next
   // reports an outcome. Every AshA2ui action these components dispatch
   // (submits, invokes, task open/cancel, context select/clear, and every
-  // rejection) writes at least one of /ui/feedback (both wire versions) or
-  // /ui/response (v1.0 wire), so subscribing to both settles on the first
-  // outcome. Both are subscribed as OBJECT paths through
+  // rejection) writes /ui/feedback, subscribed as an OBJECT path through
   // subscribeActionOutcomes (see "Action outcomes" in ash_a2ui_catalog.js),
-  // so the settle fires on every outcome path write, also one that leaves
-  // the value unchanged. view_record and cancel_record_task write the
-  // already-clear feedback; a primitive leaf like /ui/feedback/message
-  // only fires when its value changes, which left View spinning after
-  // View + Cancel. A whole-model refresh (a PubSub push or URL-state change
-  // writing "/") is not an outcome and does not settle. No styling round
-  // trip, no phx-*-loading — these components own their shadow DOM.
-  const SETTLE_PATHS = ["/ui/feedback", "/ui/response"];
-
+  // so the settle fires on every outcome write, also one that leaves the
+  // value unchanged: view_record and cancel_record_task write the
+  // already-clear feedback. The hook's pending write and a whole-model
+  // refresh (a PubSub push or URL-state change writing "/") are not
+  // outcomes and do not settle. No styling round trip, no phx-*-loading:
+  // these components own their shadow DOM.
   function markActionBusy(component) {
     if (component._amSettleUnsubscribes) return;
     const surface = component.surface;
     if (!surface || !surface.dataModel || typeof surface.dataModel.subscribe !== "function") {
       return;
     }
-    component._amSettleUnsubscribes = subscribeActionOutcomes(surface.dataModel, SETTLE_PATHS, () =>
+    component._amSettleUnsubscribes = subscribeActionOutcomes(surface.dataModel, () =>
       settleActionBusy(component),
     );
   }
@@ -1614,8 +1574,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const prompt = this._amPrompt;
         if (!prompt || !prompt.busy) return;
         // The outcome batch is processed synchronously; read it once the
-        // whole batch has landed (the /ui/response write of a v1.0 reply
-        // precedes its /ui/feedback mirror).
+        // whole batch has landed.
         Promise.resolve().then(() => {
           if (this._amPrompt !== prompt) return;
           prompt.busy = false;
@@ -1636,8 +1595,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       /** Raw rows binding path — anchors each row action's relative refs. */
       get rowsBasePath() {
-        const raw = this.context?.componentModel?.properties?.rows;
-        return raw && typeof raw.path === "string" ? raw.path : null;
+        return bindingPath(this.context?.componentModel?.properties?.rows);
       }
 
       childType(ref) {
@@ -1841,14 +1799,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const current = this.sortDirection(column);
         const other = first === "asc" ? "desc" : "asc";
         const dir = !current ? first : current === first ? other : sort.reset === true ? null : first;
-        const resolved = resolveEventContext(
-          {event: {name: sort.action.name, context: sort.action.context || {}}},
-          surface.dataModel,
-          "/",
-        );
-        const context = resolved.event.context;
-        context.query = {...(context.query || {}), sort: dir ? {field: sortField(column), dir} : null};
-        surface.dispatchAction(resolved, this.context.componentModel.id);
+        const spec = adminActionSpec(sort.action);
+        if (!spec) return;
+        dispatchActionSpec(this.context, spec, {
+          update: (context) => ({
+            ...context,
+            query: {...(context.query || {}), sort: dir ? {field: sortField(column), dir} : null},
+          }),
+        });
       }
 
       renderTableRow(row, index, columns, rowActions, hasActions) {
@@ -1943,6 +1901,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           rowText(column.more?.captionPath) ||
           (Array.isArray(moreValues) ? `${moreValues.length} ${str(column.moreNoun) || "values"}` : "");
         const moreTitle = Array.isArray(moreValues) ? `${moreCaption}: ${moreValues.join(", ")}` : "";
+        const moreLabel = rowText(column.more?.labelPath);
         const subtitle = at(column.subtitle);
         const detail = column.detail
           ? detailText(at(column.detail), column.detail.datePath ? getByPath(row, column.detail.datePath) : null)
@@ -1992,7 +1951,11 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
               : nothing}
             <span>${value}</span>
             ${more > 0
-              ? html`<span class="am-badge" data-tone="neutral" title=${moreTitle || nothing}
+              ? html`<span
+                  class="am-badge"
+                  data-tone="neutral"
+                  title=${moreTitle || nothing}
+                  aria-label=${moreLabel || nothing}
                   >${moreText}</span
                 >`
               : nothing}
@@ -2178,7 +2141,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           restoreFocus: this.shadowRoot?.activeElement || document.activeElement,
           focused: false,
         };
-        const open = rowActionEnvelope(action.prompt.open);
+        const open = adminActionSpec(action.prompt.open);
         if (open) this.dispatchRowAction(open, this.rowBasePath(index));
         this.requestUpdate();
       }
@@ -2205,7 +2168,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           this.requestUpdate();
           return;
         }
-        const envelope = rowActionEnvelope(prompt.entry);
+        const envelope = adminActionSpec(prompt.entry);
         if (!envelope) return;
         prompt.busy = true;
         prompt.error = "";
@@ -2314,7 +2277,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       onRowAction(action, index) {
         if (!action) return;
-        const envelope = rowActionEnvelope(action);
+        const envelope = adminActionSpec(action);
         if (!envelope) return;
 
         if (action.prompt && typeof action.prompt.content === "string") {
@@ -2340,7 +2303,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       /** Zero jank: the clicked button acknowledges at 0 RTT; the data
-       * model's next outcome write (SETTLE_PATHS) re-enables it. */
+       * model's next outcome write (subscribeActionOutcomes) re-enables it. */
       markRowActionBusy(action, index) {
         const rows = this.controller?.props?.rows || [];
         this.markRowActionBusyByIdentity(action, this.rowIdentity(rows[index], index));
@@ -2352,11 +2315,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this.requestUpdate();
       }
 
-      dispatchRowAction(envelope, basePath) {
-        const surface = this.surface;
-        if (!surface || !this.context?.componentModel) return;
-        const resolved = resolveEventContext(envelope, surface.dataModel, basePath);
-        surface.dispatchAction(resolved, this.context.componentModel.id);
+      dispatchRowAction(spec, basePath) {
+        if (!this.surface || !this.context?.componentModel) return;
+        dispatchActionSpec(this.context, spec, {basePath});
       }
 
       /**
@@ -2518,8 +2479,10 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const context = this.context;
         const surface = context?.dataContext?.surface;
         if (!clear?.action || !surface || !context.componentModel) return;
-        const queryPath = clear.action.context?.query?.path;
-        if (typeof queryPath === "string") {
+        const spec = adminActionSpec(clear.action);
+        if (!spec) return;
+        const queryPath = bindingPath(spec.context.query);
+        if (queryPath !== null) {
           const state = surface.dataModel.get(queryPath) || {};
           surface.dataModel.set(`${queryPath}/search`, "");
           for (const [name, value] of Object.entries(state.filters || {})) {
@@ -2529,12 +2492,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             surface.dataModel.set(`${queryPath}/ranges/${name}`, {from: "", to: ""});
           }
         }
-        const resolved = resolveEventContext(
-          {event: {name: clear.action.name, context: clear.action.context || {}}},
-          surface.dataModel,
-          "/",
-        );
-        surface.dispatchAction(resolved, context.componentModel.id);
+        dispatchActionSpec(context, spec);
       }
     }
 
@@ -2793,96 +2751,62 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const context = this.context;
         const surface = context?.dataContext?.surface;
         if (!envelope || !surface || !context.componentModel || !Number.isInteger(size)) return;
-        const resolved = resolveEventContext(
-          {event: {name: envelope.name, context: envelope.context || {}}},
-          surface.dataModel,
-          "/",
-        );
-        const eventContext = resolved.event.context;
-        eventContext.query = {...(eventContext.query || {}), pageSize: size, page: 1};
-        surface.dispatchAction(resolved, context.componentModel.id);
+        const spec = adminActionSpec(envelope);
+        if (!spec) return;
+        dispatchActionSpec(context, spec, {
+          update: (resolved) => ({
+            ...resolved,
+            query: {...(resolved.query || {}), pageSize: size, page: 1},
+          }),
+        });
       }
 
       /**
-       * Dispatches the existing `query` envelope with the given pageDelta
-       * (any integer: prev/next are ∓1, a page chip jumps by the distance).
+       * Sends the `query` envelope with the given pageDelta (any integer:
+       * prev/next are ∓1, a page chip jumps by the distance).
        *
-       * Priority: the `previousAction`/`nextAction` event object the admin
-       * encoder emits (`{"name": "query", "context": {...}}`, byte-exact) —
-       * its path refs are resolved at click time and dispatched; a legacy
-       * callable or `{event: {...}}` envelope is tolerated; when neither is
-       * present the envelope is reconstructed like the basic
-       * `query_button/2` emission: the query path is derived from the `page`
-       * binding, `component` is added for multi-table surfaces, and the
-       * `contexts` binding rides along when the surface carries context
-       * state.
+       * The `previousAction`/`nextAction` the admin encoder emits
+       * (`{"name": "query", "context": {...}}`) is sent as an ashAction,
+       * its bindings resolved at click time. When neither is present the
+       * envelope is reconstructed like the basic `query_button/2` emission:
+       * the query path is derived from the `page` binding, `component` is
+       * added for multi-table surfaces, and the `contexts` binding rides
+       * along when the surface carries context state.
        */
       turnPage(delta) {
         const props = this.controller?.props;
-        if (!props) return;
-
-        const envelope =
-          delta < 0 ? props.previousAction || props.prevAction : props.nextAction;
-
-        if (typeof envelope === "function") {
-          // Legacy callables only know their own ±1 step.
-          if (Math.abs(delta) === 1) envelope();
-          return;
-        }
-
         const context = this.context;
         const surface = context?.dataContext?.surface;
-        if (!surface || !context.componentModel) return;
+        if (!props || !surface || !context.componentModel) return;
 
-        if (envelope && typeof envelope.name === "string") {
-          const resolved = resolveEventContext(
-            {event: {name: envelope.name, context: {...(envelope.context || {}), pageDelta: delta}}},
-            surface.dataModel,
-            "/",
-          );
-          surface.dispatchAction(resolved, context.componentModel.id);
-          return;
-        }
-
-        if (envelope && envelope.event && typeof envelope.event.name === "string") {
-          const event = {
-            ...envelope.event,
-            context: {...(envelope.event.context || {}), pageDelta: delta},
-          };
-          const resolved = resolveEventContext({...envelope, event}, surface.dataModel, "/");
-          surface.dispatchAction(resolved, context.componentModel.id);
+        const withDelta = (resolved) => ({...resolved, pageDelta: delta});
+        const spec = adminActionSpec(delta < 0 ? props.previousAction : props.nextAction);
+        if (spec) {
+          dispatchActionSpec(context, spec, {update: withDelta});
           return;
         }
 
         const raw = context.componentModel.properties || {};
-        const pagePath =
-          typeof raw.page?.path === "string"
-            ? raw.page.path
-            : typeof raw.pageSize?.path === "string"
-              ? raw.pageSize.path
-              : null;
+        const pagePath = bindingPath(raw.page) ?? bindingPath(raw.pageSize);
 
         let queryPath = "/query";
         if (pagePath && pagePath.endsWith("/page")) {
           queryPath = pagePath.slice(0, -"/page".length) || "/query";
         }
 
-        const actionContext = {pageDelta: delta, query: {path: queryPath}};
+        const actionContext = {query: {"@path": queryPath}};
         if (queryPath !== "/query") {
           const segments = queryPath.split("/");
           actionContext.component = segments[segments.length - 1];
         }
         const contexts = surface.dataModel.get("/context");
         if (contexts !== null && contexts !== undefined && typeof contexts === "object") {
-          actionContext.contexts = {path: "/context"};
+          actionContext.contexts = {"@path": "/context"};
         }
 
-        const resolved = resolveEventContext(
-          {event: {name: "query", context: actionContext}},
-          surface.dataModel,
-          "/",
-        );
-        surface.dispatchAction(resolved, context.componentModel.id);
+        dispatchActionSpec(context, adminActionSpec({name: "query", context: actionContext}), {
+          update: withDelta,
+        });
       }
     }
 
@@ -3337,7 +3261,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
     const tag = TAGS.formSection;
     if (customElements.get(tag)) return;
 
-    // Frozen AshA2ui encoder id conventions (see the v0_9_1 emission):
+    // Frozen AshA2ui encoder id conventions (see AshA2ui.Encoder):
     // inputs are `form_input_<field>` with value bound to `/form/<field>`,
     // errors are `form_error_<field>` Texts bound to `/errors/<field>`, and
     // searchable relationship selects are `form_select_<field>` composites.
@@ -3408,9 +3332,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       childValuePath(ref) {
         try {
-          const path = this.context?.dataContext?.surface?.componentsModel?.get(ref.id)?.properties
-            ?.value?.path;
-          return typeof path === "string" ? path : null;
+          return bindingPath(
+            this.context?.dataContext?.surface?.componentsModel?.get(ref.id)?.properties?.value,
+          );
         } catch {
           return null;
         }
@@ -3507,7 +3431,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       constructor() {
         super();
         // Zero jank: set at submit time (0 RTT), cleared when the data
-        // model reports the action's outcome (see SETTLE_PATHS above).
+        // model reports the action's outcome (see markActionBusy above).
         this._amOptimisticBusy = false;
         this._amSettleUnsubscribes = null;
       }
@@ -3615,11 +3539,10 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const surface = context?.dataContext?.surface;
         if (!surface || !context.componentModel) return;
 
-        const resolved = resolveEventContext(
-          {event: {name: "submit_form", context: buildSubmitFormContext(surface)}},
-          surface.dataModel,
-          "/",
-        );
+        const spec = adminActionSpec({
+          name: "submit_form",
+          context: buildSubmitFormContext(surface),
+        });
 
         // Zero jank: the click is acknowledged before the envelope leaves
         // the browser — disabled + spinner now, settled by the outcome
@@ -3628,7 +3551,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         markActionBusy(this);
         this.requestUpdate();
 
-        surface.dispatchAction(resolved, context.componentModel.id);
+        dispatchActionSpec(context, spec);
       }
     }
 
@@ -4110,17 +4033,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const context = this.context;
         const surface = context?.dataContext?.surface;
         const envelope = props?.windowAction;
-        if (!surface || !context.componentModel || !envelope || typeof envelope.name !== "string") return;
+        const spec = adminActionSpec(envelope);
+        if (!surface || !context.componentModel || !spec) return;
 
         // A null key (a size switch) waits for no particular window.
         if (key === null) this.clearPending();
         else this.setPending(key, surface);
-        const resolved = resolveEventContext(
-          {event: {name: envelope.name, context: {...(envelope.context || {}), ...extra}}},
-          surface.dataModel,
-          "/",
-        );
-        surface.dispatchAction(resolved, context.componentModel.id);
+        dispatchActionSpec(context, {...spec, context: {...spec.context, ...extra}});
       }
 
       setPending(key, surface) {
@@ -5255,6 +5174,17 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
     }
 
     customElements.define(tag, AshAdminChoicePicker);
+
+    // The admin filterPicker draws exactly like the choicepicker, bound to
+    // its own Api (the same extended schema under the filterPicker name).
+    if (adminApis.filterPicker && !customElements.get(TAGS.filterPicker)) {
+      class AshAdminFilterPicker extends AshAdminChoicePicker {
+        createController() {
+          return new A2uiController(this, adminApis.filterPicker);
+        }
+      }
+      customElements.define(TAGS.filterPicker, AshAdminFilterPicker);
+    }
   }
 
   function defineDateTimeInput() {

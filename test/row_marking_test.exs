@@ -27,7 +27,10 @@ defmodule AshA2ui.RowMarkingTest do
 
   defp components(messages) do
     messages
-    |> Enum.flat_map(&(get_in(&1, ["updateComponents", "components"]) || []))
+    |> Enum.flat_map(
+      &(get_in(&1, ["createSurface", "components"]) ||
+          get_in(&1, ["updateComponents", "components"]) || [])
+    )
     |> Map.new(&{&1["id"], &1})
   end
 
@@ -37,7 +40,7 @@ defmodule AshA2ui.RowMarkingTest do
     for {id, %{"component" => "Button"} = button} <- components,
         Regex.match?(@action_pattern, id),
         not String.ends_with?(id, "_confirm_button"),
-        do: get_in(button, ["action", "event", "context", "action"])
+        do: get_in(button, ["action", "functionCall", "args", "context", "action"])
   end
 
   describe "card rows with bulk actions" do

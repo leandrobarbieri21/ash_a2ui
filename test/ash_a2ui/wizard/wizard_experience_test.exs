@@ -14,18 +14,21 @@ defmodule AshA2ui.Wizard.WizardExperienceTest do
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Enrollment
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.Messages
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)
   end
 
   defp handle(name, context) do
-    message = %{"version" => "v0.9.1", "action" => %{"name" => name, "context" => context}}
+    message = Messages.call(name, "test_surface", context)
+
     {tag, messages} = ActionHandler.handle(Enrollment, message)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     {tag, messages}
   end
 

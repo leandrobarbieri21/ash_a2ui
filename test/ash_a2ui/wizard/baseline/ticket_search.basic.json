@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
-      "surfaceId": "tickets_search"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
       "components": [
         {
           "children": [
@@ -25,8 +19,7 @@
         {
           "component": "Text",
           "id": "table_heading",
-          "text": "Ticket",
-          "variant": "h2"
+          "text": "## Ticket"
         },
         {
           "children": {
@@ -38,9 +31,14 @@
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -60,7 +58,7 @@
         },
         {
           "children": [
-            "table_cell_subject",
+            "table_cell_subject_row",
             "view_button",
             "edit_button"
           ],
@@ -73,7 +71,7 @@
             "table_cell_subject_value"
           ],
           "component": "Row",
-          "id": "table_cell_subject"
+          "id": "table_cell_subject_row"
         },
         {
           "component": "Text",
@@ -85,19 +83,24 @@
           "component": "Text",
           "id": "table_cell_subject_value",
           "text": {
-            "path": "subject"
+            "@path": "subject"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "view_record",
+                "sourceComponentId": "view_button"
               },
-              "name": "view_record"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "view_button_text",
@@ -111,14 +114,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "start_edit",
+                "sourceComponentId": "edit_button"
               },
-              "name": "start_edit"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "edit_button_text",
@@ -142,7 +150,7 @@
           "component": "Text",
           "id": "empty_state_text",
           "text": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
@@ -215,7 +223,7 @@
           "component": "Text",
           "id": "panel_view_subject_value",
           "text": {
-            "path": "/ui/panel/record/subject"
+            "@path": "/ui/panel/record/subject"
           }
         },
         {
@@ -236,7 +244,7 @@
           "component": "Text",
           "id": "panel_view_author_id_value",
           "text": {
-            "path": "/ui/panel/record/author_id"
+            "@path": "/ui/panel/record/author_id"
           }
         },
         {
@@ -263,7 +271,7 @@
           "id": "form_input_subject",
           "label": "Subject",
           "value": {
-            "path": "/form/subject"
+            "@path": "/form/subject"
           }
         },
         {
@@ -279,14 +287,13 @@
         {
           "component": "Text",
           "id": "form_select_author_id_label",
-          "text": "Author id",
-          "variant": "h4"
+          "text": "#### Author id"
         },
         {
           "component": "Text",
           "id": "form_select_author_id_selected",
           "text": {
-            "path": "/select/author_id/label"
+            "@path": "/select/author_id/label"
           }
         },
         {
@@ -302,19 +309,24 @@
           "id": "form_select_author_id_search_input",
           "label": "Search",
           "value": {
-            "path": "/select/author_id/search"
+            "@path": "/select/author_id/search"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "field": "author_id",
-                "search": {
-                  "path": "/select/author_id/search"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "author_id",
+                  "search": {
+                    "@path": "/select/author_id/search"
+                  }
+                },
+                "name": "option_search",
+                "sourceComponentId": "form_select_author_id_search_button"
               },
-              "name": "option_search"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_select_author_id_search_text",
@@ -336,14 +348,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "field": "author_id",
-                "value": {
-                  "path": "value"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "author_id",
+                  "value": {
+                    "@path": "value"
+                  }
+                },
+                "name": "option_select",
+                "sourceComponentId": "form_select_author_id_option_button"
               },
-              "name": "option_select"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_select_author_id_option_text",
@@ -355,7 +372,7 @@
           "component": "Text",
           "id": "form_select_author_id_option_text",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
@@ -371,8 +388,7 @@
         {
           "component": "Text",
           "id": "nested_tags_heading",
-          "text": "Tags",
-          "variant": "h3"
+          "text": "### Tags"
         },
         {
           "children": {
@@ -394,22 +410,27 @@
           "component": "Text",
           "id": "nested_tags_row_label",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "argument": "tags",
-                "row": {
-                  "path": "_row"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "argument": "tags",
+                  "row": {
+                    "@path": "_row"
+                  },
+                  "rows": {
+                    "@path": "/form/tags"
+                  }
                 },
-                "rows": {
-                  "path": "/form/tags"
-                }
+                "name": "nested_remove",
+                "sourceComponentId": "nested_tags_remove_button"
               },
-              "name": "nested_remove"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_remove_text",
@@ -434,19 +455,24 @@
           "id": "nested_tags_search_input",
           "label": "Search",
           "value": {
-            "path": "/select/tags/search"
+            "@path": "/select/tags/search"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "field": "tags",
-                "search": {
-                  "path": "/select/tags/search"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "field": "tags",
+                  "search": {
+                    "@path": "/select/tags/search"
+                  }
+                },
+                "name": "option_search",
+                "sourceComponentId": "nested_tags_search_button"
               },
-              "name": "option_search"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_search_text",
@@ -468,17 +494,22 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "argument": "tags",
-                "rows": {
-                  "path": "/form/tags"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "argument": "tags",
+                  "rows": {
+                    "@path": "/form/tags"
+                  },
+                  "value": {
+                    "@path": "value"
+                  }
                 },
-                "value": {
-                  "path": "value"
-                }
+                "name": "nested_add",
+                "sourceComponentId": "nested_tags_option_button"
               },
-              "name": "nested_add"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "nested_tags_option_text",
@@ -490,14 +521,14 @@
           "component": "Text",
           "id": "nested_tags_option_text",
           "text": {
-            "path": "label"
+            "@path": "label"
           }
         },
         {
           "component": "Text",
           "id": "form_error_subject",
           "text": {
-            "path": "/errors/subject"
+            "@path": "/errors/subject"
           },
           "variant": "caption"
         },
@@ -505,7 +536,7 @@
           "component": "Text",
           "id": "form_error_author_id",
           "text": {
-            "path": "/errors/author_id"
+            "@path": "/errors/author_id"
           },
           "variant": "caption"
         },
@@ -513,9 +544,11 @@
           "component": "Text",
           "id": "form_title",
           "text": {
-            "path": "/ui/panel/title"
-          },
-          "variant": "h3"
+            "@call": "formatString",
+            "args": {
+              "value": "### ${/ui/panel/title}"
+            }
+          }
         },
         {
           "children": {
@@ -527,16 +560,21 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "recordId": {
-                  "path": "/form/id"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "form_submit_button"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_submit_text",
@@ -548,14 +586,19 @@
           "component": "Text",
           "id": "form_submit_text",
           "text": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -571,7 +614,7 @@
           "component": "Text",
           "id": "status_text",
           "text": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
@@ -585,19 +628,11 @@
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "tickets_search"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "tickets_search",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Ticket records yet.",
         "_empty_visible": [
           {
@@ -624,11 +659,17 @@
           }
         },
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -642,8 +683,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "tickets_search"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

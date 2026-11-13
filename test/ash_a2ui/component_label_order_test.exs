@@ -9,13 +9,12 @@ defmodule AshA2ui.ComponentLabelOrderTest do
   use ExUnit.Case, async: false
 
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{AppointmentsUI, RecordPageUI}
+  alias AshA2ui.Test.{AppointmentsUI, RecordPageUI, Surface}
 
   defp surface(ui, catalog) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
     on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
-    [_create, components, _data] = AshA2ui.Info.build_surface(ui, authorize?: false)
-    Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+    ui |> AshA2ui.Info.build_surface(authorize?: false) |> Surface.components_by_id()
   end
 
   defp sections(components) do
@@ -29,10 +28,10 @@ defmodule AshA2ui.ComponentLabelOrderTest do
     test "labels head the cards and the related table" do
       components = surface(RecordPageUI, :admin_v1)
 
-      assert components["detail_summary_heading"]["text"] == "At a glance"
+      assert components["detail_summary_heading"]["text"] == "### At a glance"
       assert components["data_grid"]["label"] == "Visits & follow-ups"
       # No label: the humanized component name, as before.
-      assert components["detail_contact_heading"]["text"] == "Contact"
+      assert components["detail_contact_heading"]["text"] == "### Contact"
     end
 
     test ":declared keeps the cards where they were declared" do
@@ -50,8 +49,8 @@ defmodule AshA2ui.ComponentLabelOrderTest do
     test "labels head the cards and the related table; declaration order as always" do
       components = surface(RecordPageUI, :basic)
 
-      assert components["detail_summary_heading"]["text"] == "At a glance"
-      assert components["table_heading"]["text"] == "Visits & follow-ups"
+      assert components["detail_summary_heading"]["text"] == "### At a glance"
+      assert components["table_heading"]["text"] == "## Visits & follow-ups"
 
       assert components |> sections() |> Enum.take(2) ==
                ["detail_summary", "table_heading"]

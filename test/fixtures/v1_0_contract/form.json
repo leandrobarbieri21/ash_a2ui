@@ -1,0 +1,256 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "contract_form",
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+      "components": [
+        {
+          "id": "root",
+          "component": "Column",
+          "children": [
+            "title",
+            "name",
+            "email",
+            "notes",
+            "role",
+            "subscribed",
+            "starts_on",
+            "errors",
+            "submit"
+          ]
+        },
+        {
+          "id": "title",
+          "component": "Text",
+          "text": "## New contact"
+        },
+        {
+          "id": "name",
+          "component": "TextField",
+          "label": "Name",
+          "value": {
+            "@path": "/form/name"
+          },
+          "placeholder": "Ada Lovelace",
+          "@checks": [
+            {
+              "condition": {
+                "@call": "required",
+                "args": {
+                  "value": {
+                    "@path": "/form/name"
+                  }
+                }
+              },
+              "message": "Name is required"
+            },
+            {
+              "condition": {
+                "@call": "length",
+                "args": {
+                  "value": {
+                    "@path": "/form/name"
+                  },
+                  "max": 80
+                }
+              },
+              "message": "At most 80 characters"
+            }
+          ],
+          "@accessibility": {
+            "label": "Full name",
+            "description": "Shown on the contact card"
+          }
+        },
+        {
+          "id": "email",
+          "component": "TextField",
+          "label": "Email",
+          "value": {
+            "@path": "/form/email"
+          },
+          "@checks": [
+            {
+              "condition": {
+                "@call": "required",
+                "args": {
+                  "value": {
+                    "@path": "/form/email"
+                  }
+                }
+              }
+            },
+            {
+              "condition": {
+                "@call": "email",
+                "args": {
+                  "value": {
+                    "@path": "/form/email"
+                  }
+                }
+              },
+              "message": "Not an email address"
+            }
+          ]
+        },
+        {
+          "id": "notes",
+          "component": "TextField",
+          "label": "Notes",
+          "value": {
+            "@path": "/form/notes"
+          },
+          "variant": "longText"
+        },
+        {
+          "id": "role",
+          "component": "ChoicePicker",
+          "label": "Role",
+          "variant": "mutuallyExclusive",
+          "value": {
+            "@path": "/form/role"
+          },
+          "options": [
+            {
+              "label": "Admin",
+              "value": "admin"
+            },
+            {
+              "label": "Member",
+              "value": "member"
+            }
+          ]
+        },
+        {
+          "id": "subscribed",
+          "component": "CheckBox",
+          "label": "Subscribe",
+          "value": {
+            "@path": "/form/subscribed"
+          }
+        },
+        {
+          "id": "starts_on",
+          "component": "DateTimeInput",
+          "label": "Starts on",
+          "value": {
+            "@path": "/form/starts_on"
+          },
+          "enableDate": true
+        },
+        {
+          "id": "errors",
+          "component": "Text",
+          "text": {
+            "@path": "/ui/feedback/message"
+          },
+          "@accessibility": {
+            "live": "polite"
+          }
+        },
+        {
+          "id": "submit",
+          "component": "Button",
+          "variant": "primary",
+          "child": "submit_label",
+          "@checks": [
+            {
+              "condition": {
+                "@call": "and",
+                "args": {
+                  "values": [
+                    {
+                      "@call": "required",
+                      "args": {
+                        "value": {
+                          "@path": "/form/name"
+                        }
+                      }
+                    },
+                    {
+                      "@call": "email",
+                      "args": {
+                        "value": {
+                          "@path": "/form/email"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "message": "Fix the form first"
+            }
+          ],
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "submit_form",
+                "sourceComponentId": "submit",
+                "context": {
+                  "name": {
+                    "@path": "/form/name"
+                  },
+                  "email": {
+                    "@path": "/form/email"
+                  },
+                  "notes": {
+                    "@path": "/form/notes"
+                  },
+                  "role": {
+                    "@path": "/form/role"
+                  },
+                  "subscribed": {
+                    "@path": "/form/subscribed"
+                  },
+                  "starts_on": {
+                    "@path": "/form/starts_on"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "submit_label",
+          "component": "Text",
+          "text": "Create"
+        }
+      ],
+      "dataModel": {
+        "form": {
+          "name": "",
+          "email": "",
+          "notes": "",
+          "role": [
+            "member"
+          ],
+          "subscribed": false,
+          "starts_on": ""
+        },
+        "ui": {
+          "feedback": {
+            "status": "idle",
+            "message": ""
+          }
+        }
+      }
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_form",
+      "path": "/ui/feedback",
+      "value": {
+        "status": "error",
+        "message": "Email is already taken",
+        "errors": {
+          "email": "is already taken"
+        }
+      }
+    }
+  }
+]

@@ -47,6 +47,7 @@ defmodule AshA2ui.Wizard do
 
   import AshA2ui.Gettext, only: [msg: 1]
 
+  alias AshA2ui.Encoder
   alias AshA2ui.Experience
   alias AshA2ui.L10n
 
@@ -219,12 +220,12 @@ defmodule AshA2ui.Wizard do
       %{
         "id" => "form_wizard_progress_label",
         "component" => "Text",
-        "text" => %{"path" => "label"}
+        "text" => %{"@path" => "label"}
       },
       %{
         "id" => "form_wizard_progress_state",
         "component" => "Text",
-        "text" => %{"path" => "state"},
+        "text" => %{"@path" => "state"},
         "variant" => "caption"
       }
     ]
@@ -270,8 +271,7 @@ defmodule AshA2ui.Wizard do
       %{
         "id" => "#{base}_heading",
         "component" => "Text",
-        "text" => step.label,
-        "variant" => "h3"
+        "text" => Encoder.heading(3, step.label)
       }
     ] ++ description ++ body
   end
@@ -300,7 +300,7 @@ defmodule AshA2ui.Wizard do
           %{
             "id" => "#{base}_value",
             "component" => "Text",
-            "text" => %{"path" => review_path(view, field)}
+            "text" => %{"@path" => review_path(view, field)}
           }
         ]
       end)
@@ -334,15 +334,15 @@ defmodule AshA2ui.Wizard do
         "id" => "form_wizard_back_button",
         "component" => "Button",
         "child" => "form_wizard_back_text",
-        "action" => %{
-          "event" => %{
-            "name" => "wizard_back",
-            "context" => %{
-              "index" => %{"path" => "/ui/wizard/index"},
-              "recordId" => %{"path" => "/form/id"}
-            }
-          }
-        }
+        "action" =>
+          Encoder.ash_action(
+            "wizard_back",
+            %{
+              "index" => %{"@path" => "/ui/wizard/index"},
+              "recordId" => %{"@path" => "/form/id"}
+            },
+            "form_wizard_back_button"
+          )
       },
       %{
         "id" => "form_wizard_back_text",
@@ -362,21 +362,21 @@ defmodule AshA2ui.Wizard do
         "component" => "Button",
         "variant" => "primary",
         "child" => "form_wizard_next_text",
-        "action" => %{
-          "event" => %{
-            "name" => "wizard_next",
-            "context" => %{
-              "values" => %{"path" => "/form"},
-              "recordId" => %{"path" => "/form/id"},
-              "index" => %{"path" => "/ui/wizard/index"}
-            }
-          }
-        }
+        "action" =>
+          Encoder.ash_action(
+            "wizard_next",
+            %{
+              "values" => %{"@path" => "/form"},
+              "recordId" => %{"@path" => "/form/id"},
+              "index" => %{"@path" => "/ui/wizard/index"}
+            },
+            "form_wizard_next_button"
+          )
       },
       %{
         "id" => "form_wizard_next_text",
         "component" => "Text",
-        "text" => %{"path" => "/ui/panel/primary_label"}
+        "text" => %{"@path" => "/ui/panel/primary_label"}
       }
     ]
   end

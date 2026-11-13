@@ -15,6 +15,7 @@ defmodule AshA2ui.Adoption.BoardLanesTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.Test.Adoption.{Job, JobBoardUI}
+  alias AshA2ui.Test.Surface
 
   @red %{id: "u-red", team: "red"}
 
@@ -31,14 +32,13 @@ defmodule AshA2ui.Adoption.BoardLanesTest do
   defp components(ui, opts \\ []) do
     ui
     |> AshA2ui.Info.build_surface(Keyword.put(opts, :actor, @red))
-    |> Enum.find_value(& &1["updateComponents"])
-    |> Map.fetch!("components")
+    |> Surface.components()
     |> Map.new(&{&1["id"], &1})
   end
 
   test "the lanes sit in a Row, each lane at weight 1" do
     messages = AshA2ui.Info.build_surface(JobBoardUI, actor: @red)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     by_id = components(JobBoardUI)
     lanes = by_id["board_board_lanes"]
@@ -60,7 +60,9 @@ defmodule AshA2ui.Adoption.BoardLanesTest do
     on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
     admin = components(JobBoardUI)
 
-    assert admin["board_board_lanes"] == basic["board_board_lanes"]
-    assert admin["lane_board_open"] == basic["lane_board_open"]
+    assert Surface.unqualified(admin["board_board_lanes"]) ==
+             basic["board_board_lanes"]
+
+    assert Surface.unqualified(admin["lane_board_open"]) == basic["lane_board_open"]
   end
 end

@@ -12,7 +12,7 @@ defmodule AshA2ui.CardRowsTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{Appointment, CardVisitsUI, Clinic, Owner}
+  alias AshA2ui.Test.{Appointment, CardVisitsUI, Clinic, Owner, SchemaHelper}
 
   setup do
     on_exit(fn ->
@@ -36,14 +36,16 @@ defmodule AshA2ui.CardRowsTest do
   defp build(catalog, owner) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(CardVisitsUI,
         authorize?: false,
         context_state: %{"owner" => %{"search" => "", "value" => owner.id, "label" => "x"}}
       )
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
+    catalogs = if catalog == :admin_v1, do: SchemaHelper.admin_catalogs()
+    SchemaHelper.assert_valid_agent_message(message, catalogs: catalogs)
+
+    {Map.new(surface["components"], &{&1["id"], &1}), surface["dataModel"]}
   end
 
   test "the admin grid asks for cards, names the disclosure and marks the pairs", %{owner: owner} do

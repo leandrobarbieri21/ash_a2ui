@@ -1,7 +1,7 @@
 <!--
-Badges: the hex.pm / hexdocs badges are placeholders until the first
-`mix hex.publish` (see SUBMISSION.md). The CI badge is live once the repo is
-pushed to GitHub.
+Badges: the hex.pm / hexdocs badges start working with the first
+`mix hex.publish` (see SUBMISSION.md). The CI badge tracks the GitHub
+Actions workflow.
 -->
 
 ![Elixir CI](https://github.com/lukegalea/ash_a2ui/actions/workflows/elixir.yml/badge.svg)
@@ -15,26 +15,24 @@ standards-based, agent-ready UI over the wire — no templates, no components,
 no hand-written JSON.
 
 AshA2ui is an Ash extension that generates
-[A2UI (Agent to UI)](https://github.com/a2ui-project/a2ui) protocol
-payloads — **v0.9.1** (the default) or **v1.0 (RC)** per surface — directly
-from your Ash resources. You describe *what* the surface
+[A2UI (Agent to UI)](https://github.com/a2ui-project/a2ui) **1.0** protocol
+payloads directly from your Ash resources. You describe *what* the surface
 shows (a table, a form, per-row actions) in a small `a2ui` DSL block; AshA2ui
 derives the rest from what your resource already knows — attributes, types,
 actions, policies — and emits the A2UI message stream that any A2UI renderer
 (such as [`@a2ui/lit`](https://www.npmjs.com/package/@a2ui/lit) or
 [`@a2ui/react`](https://www.npmjs.com/package/@a2ui/react)) turns into a live
-UI. Client interactions come back as A2UI `action` envelopes and are routed
-into your Ash actions with full actor/authorization support.
+UI. A surface is one inline `createSurface` message. Client interactions come
+back as A2UI messages (`callAgentFunction` and `action`) and are routed into
+your Ash actions with full actor/authorization support; the outcome returns
+as an `agentFunctionResponse` plus one `/ui/feedback` data-model write.
 
-To our knowledge AshA2ui is the **first framework with an executable A2UI
-1.0 conformance suite**: the v1.0(-RC) schemas, basic catalog, and the
-spec's own test cases are vendored at a pinned commit and run in CI, and
-every v1.0 message the encoders and action handler emit is validated
-against them — plus targeted tests for the semantic rules schemas can't
-express. Opt in per surface with `spec_version "1.0"` and get v1.0's UX
-upgrades — single-message surfaces, per-action `actionResponse` feedback,
-`callFunction` — with v0.9.1 output staying byte-identical. See
-[A2UI 1.0](documentation/topics/a2ui-1-0.md).
+AshA2ui speaks protocol 1.0 only. Every message it emits is validated, in its
+test suite, against the 1.0 JSON Schemas and basic catalog vendored from the
+upstream specification at a pinned commit, and the upstream test cases at
+that commit pass. See
+[The A2UI 1.0 wire contract](documentation/topics/a2ui-1-0.md) for the
+shapes, the feedback design and what the renderer must support.
 
 Why this exists: in the agent era, "the UI" is increasingly something a server
 (or an agent) *describes* and a remote canvas renders — chat surfaces, agent
@@ -55,8 +53,11 @@ gap between the two.
   exist fails at compile time, not in production — strictness matters more
   when you're emitting a wire protocol.
 
-> **Status:** under active development, not yet published to hex.pm. APIs may
-> change until v0.1.0 is tagged.
+> **Status:** under active development, not yet published to hex.pm. The
+> first release waits for the `@a2ui/lit` / `@a2ui/web_core` npm release that
+> implements the 1.0 specification text AshA2ui targets (see
+> [What the renderer must support](documentation/topics/a2ui-1-0.md#what-the-renderer-must-support)).
+> APIs may change until v0.1.0 is tagged.
 
 ## Installation
 
@@ -91,7 +92,7 @@ DSL:
 ### Agent usage rules
 
 AshA2ui ships LLM usage rules (`usage-rules.md` plus the
-`usage-rules/actions.md`, `usage-rules/ag-ui.md`, `usage-rules/contexts.md`,
+`usage-rules/actions.md`, `usage-rules/contexts.md`,
 `usage-rules/dynamic.md`, `usage-rules/layout.md`,
 `usage-rules/liveview.md`, `usage-rules/queries.md`,
 `usage-rules/relationships.md`, `usage-rules/reports.md`,
@@ -423,9 +424,13 @@ component tree, the ordering contract, and the `_badge_<field>` convention.
 ```elixir
 messages = AshA2ui.Info.build_surface(MyApp.Support.Ticket, actor: current_user)
 # => [
-#   %{"version" => "v0.9.1", "createSurface" => %{"surfaceId" => "tickets", ...}},
-#   %{"version" => "v0.9.1", "updateComponents" => %{...}},
-#   %{"version" => "v0.9.1", "updateDataModel" => %{...}}
+#   %{"version" => "1.0",
+#     "createSurface" => %{
+#       "surfaceId" => "tickets",
+#       "catalogId" => "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+#       "components" => [...],
+#       "dataModel" => %{...}
+#     }}
 # ]
 ```
 
@@ -493,8 +498,8 @@ That's the whole LiveView. On mount it subscribes (when `:pubsub` is
 configured), builds the surface as an async task — the page renders
 immediately and the shipped JS hook's skeleton shows until the first tree
 hydrates — and pushes the messages to the shipped JS hook
-(`priv/js/ash_a2ui_hook.js`) hosting `<a2ui-surface>`; client `action`
-envelopes arrive as the `"a2ui:action"` event and are routed through
+(`priv/js/ash_a2ui_hook.js`) hosting `<a2ui-surface>`; client messages
+arrive as the `"a2ui:message"` event and are routed through
 `AshA2ui.ActionHandler`; and if the resource has
 `Ash.Notifier.PubSub` configured, the LiveView subscribes on mount and pushes
 `updateDataModel` refreshes when records change — live refresh across browser
@@ -596,7 +601,7 @@ the metadata domain, or Ash's errors domain) and `meta[:context]` (a
 values, action and field names and record data are never translated, and a
 missing translation falls back to the English text. ash_a2ui does not depend
 on `:gettext`; your app does. The
-[localization usage rules](usage-rules/localization.md) have the details.
+localization usage rules (`usage-rules/localization.md`) have the details.
 Ash's own field error messages are looked up by their own msgid in the
 `errors` domain (`errors_domain:` to change it), where
 `mix ash.gen.gettext --domain errors` merges Ash's catalog.
@@ -634,7 +639,7 @@ in this repo. POC route cells are filled in when the POC lands.
 | Actor-aware authorization | `/admin-tools/promotions-providers` (admin live_session actor) | `test/action_handler_test.exs` |
 | Field inference from public attributes | n/a (compile time) | `test/transformer_test.exs` |
 | Compile-time verifiers (bad fields/actions) | n/a (compile time) | `test/verifier_test.exs` |
-| Schema validation of every payload (vendored v0.9.1 schemas) | validated in POC transport specs | `test/schema_helper_test.exs` + every encoder/e2e test |
+| Schema validation of every payload (vendored 1.0 schemas) | validated in POC transport specs | `test/schema_helper_test.exs`, `test/v1_0_conformance_test.exs` + every encoder/e2e test |
 | LiveView transport (mount, action round trip) | `/admin-tools/promotions-providers` | `test/live_renderer_test.exs` |
 | PubSub live data refresh | `/admin-tools/promotions-providers` (second-session create) | `test/live_renderer_test.exs` |
 | End-to-end: resource → surface → action → updated data model | `/admin-tools/promotions-providers` + `GET /admin-tools/a2ui/promotions-providers` (JSON) | `test/ash_a2ui_test.exs` |
@@ -655,15 +660,10 @@ Shipped beyond the v0 core:
   search/sort/filter/pagination per table, referenced by name and validated
   server-side (see
   [Queries and Pagination](documentation/topics/queries-and-pagination.md)).
-- ✅ **AG-UI transport** (`AshA2ui.AgUi`) — serve surfaces to AG-UI clients
-  (CopilotKit et al.) from any HTTP host: framework-free event builders,
-  SSE encoding, `RunAgentInput`/action decoding, and the `a2ui-surface`
-  activity binding, with a per-call `spec_version:` override to pin the
-  wire version to the consuming renderer (see
-  [External Transports](documentation/topics/external-transports.md)).
-- ✅ **`usage_rules` support** — the package ships `usage-rules.md` plus ten
-  sub-rules (`actions`, `ag-ui`, `contexts`, `dynamic`, `layout`,
-  `liveview`, `queries`, `relationships`, `reports`, `zero-jank`),
+- ✅ **`usage_rules` support** — the package ships `usage-rules.md` plus thirteen
+  sub-rules (`actions`, `contexts`, `diagrams`, `dynamic`, `layout`,
+  `liveview`, `localization`, `queries`, `relationships`, `reports`, `shell`,
+  `time-travel`, `zero-jank`),
   syncable into a consumer's
   AGENTS.md via [`mix usage_rules.sync`](https://hexdocs.pm/usage_rules) (see
   [Agent usage rules](#agent-usage-rules)).
@@ -732,7 +732,7 @@ Shipped beyond the v0 core:
   one form and the one Ash action: Back/Next with server-side validation of
   the reached steps (nothing persisted until the final submit), an optional
   read-only review step, and `/ui/wizard` state composed from basic
-  components on v0.9.1 and v1.0. The step vocabulary is borrowed from
+  components. The step vocabulary is borrowed from
   PyroManiac (see [Wizard Steps](documentation/topics/wizard-steps.md)).
 - ✅ **Nested relationship forms (`nested_form`)** — forms edit related
   records through `manage_relationship` action arguments, with the
@@ -768,22 +768,23 @@ Shipped beyond the v0 core:
   structured self-correction errors (see
   [Agent-Composed Surfaces](documentation/topics/agent-composed-surfaces.md)).
 
-- ✅ **A2UI v1.0 (RC) support** — per-surface `spec_version "1.0"` with a
-  versioned encoder (`AshA2ui.Encoder.V1_0`): single inline `createSurface`,
-  the `actionResponse` contract with the structured `/ui/response` path and
-  stable error codes, `surfaceProperties`, `call_function/3`, Markdown
-  headings, and a vendored executable conformance suite pinned to the RC
-  commit (see [A2UI 1.0](documentation/topics/a2ui-1-0.md)).
+- ✅ **A2UI 1.0 wire contract** — a single inline `createSurface`, every
+  server-handled control sent as an `ashAction` function call answered by an
+  `agentFunctionResponse`, one `/ui/feedback` outcome map,
+  `callRendererFunction` for the CSV export, the ash_a2ui and admin catalogs
+  as 1.0 catalog definitions, and a vendored executable conformance suite
+  pinned to an upstream commit (see
+  [The A2UI 1.0 wire contract](documentation/topics/a2ui-1-0.md)).
 
 Documented as roadmap (not built):
 
-- **A2UI v1.0 final re-pin** — v1.0 is vendored at a pinned RC commit
-  (`priv/a2ui/v1_0/NOTES.md`); when the spec leaves RC, re-vendor and rerun
-  the conformance suite to surface any drift.
-- **Upstream v1.0 renderer adoption** — no published `@a2ui/lit` /
-  `@a2ui/web_core` release ships a v1.0 runtime yet; the shipped hook
-  adapts v1.0 messages for the v0_9 renderer, and the adapter seam is
-  removed once upstream ships a v1_0 entry point.
+- **Renderer release for the pinned spec** — the Hex release waits for the
+  `@a2ui/lit` / `@a2ui/web_core` npm release that implements the specification
+  text AshA2ui targets (the `@`-prefixed envelope keys, required
+  `TextField.value`, agent-function routing). Published 0.15.0 predates them.
+- **Upstream `@child` / `@action` / `@functionCall` keys** — upstream pull
+  request a2ui-project/a2ui#4171 was open at the pinned commit and is not
+  adopted. If it merges, the schemas are re-vendored and the encoder follows.
 - **Richer client-driven `query` filters** — custom filter shapes beyond
   the shipped equality filters, range filters, and named presets, and
   multiple queries per table.
@@ -816,12 +817,12 @@ Documented as roadmap (not built):
 - [Getting Started tutorial](documentation/tutorials/getting-started-with-ash-a2ui.md)
 - [What is AshA2ui?](documentation/topics/what-is-ash-a2ui.md) — concept and
   the honest "when it pays off" boundary
-- [A2UI 1.0](documentation/topics/a2ui-1-0.md) — the v1.0 wire contract,
-  per-feature UX rationale, and the executable conformance suite
+- [The A2UI 1.0 wire contract](documentation/topics/a2ui-1-0.md) — message
+  shapes, the action feedback design, catalogs, renderer requirements and the
+  executable conformance suite
 - [Rendering Clients](documentation/topics/rendering-clients.md) — transports,
   hook contract, `@a2ui/lit` / `@a2ui/react`
 - [External Transports](documentation/topics/external-transports.md) — the
-  AG-UI transport (`AshA2ui.AgUi`), the CopilotKit client wiring, and the
   designed A2A binding
 - [Actions and Authorization](documentation/topics/actions-and-authorization.md)
 - [Queries and Pagination](documentation/topics/queries-and-pagination.md)
@@ -841,11 +842,11 @@ Documented as roadmap (not built):
 Issues and PRs welcome at
 [github.com/lukegalea/ash_a2ui](https://github.com/lukegalea/ash_a2ui).
 Every payload-producing change must keep the schema-validation test suite
-green (`mix test`) — the vendored A2UI JSON Schemas in `priv/a2ui/v0_9_1/`
-and `priv/a2ui/v1_0/` are the executable spec.
+green (`mix test`) — the vendored A2UI 1.0 JSON Schemas in
+`priv/a2ui/v1_0/` are the executable spec.
 
 The JavaScript under `priv/js/` has its own tests (`test/js/`, plain
 `node --test`, no npm dependencies): run them with `mix js.test` (or
 `node --test test/js/*.test.mjs` directly; Node 18+).
 
-Agents: read [AGENTS.md](AGENTS.md) before you change this repository. It links the agent constitution (`AGENT_PRINCIPLES.md`).
+Agents: read [AGENTS.md](https://github.com/lukegalea/ash_a2ui/blob/main/AGENTS.md) before you change this repository. It links the agent constitution (`AGENT_PRINCIPLES.md`).

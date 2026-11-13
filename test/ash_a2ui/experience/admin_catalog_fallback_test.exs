@@ -12,6 +12,7 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
 
   alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.Surface
   alias AshA2ui.Test.Ticket
 
   setup do
@@ -22,7 +23,7 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
   end
 
   defp components_by_id(components_message) do
-    Map.new(components_message["updateComponents"]["components"], &{&1["id"], &1})
+    Surface.components_by_id(components_message)
   end
 
   describe "advanced features" do
@@ -37,8 +38,11 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
       basic_surface = AshA2ui.Info.build_surface(Ticket, actor: nil)
       Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
-      [_create_admin, components_admin, data_admin] = admin_surface
-      [_create_basic, components_basic, data_basic] = basic_surface
+      [%{"createSurface" => %{"components" => components_admin, "dataModel" => data_admin}}] =
+        admin_surface
+
+      [%{"createSurface" => %{"components" => components_basic, "dataModel" => data_basic}}] =
+        basic_surface
 
       admin = components_by_id(components_admin)
       basic = components_by_id(components_basic)
@@ -67,8 +71,11 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
       assert "nested_notes" in shared
       assert "form_submit_button" in shared
 
+      # (on the admin surface a basic component names its catalog, as do
+      # the basic function calls in it; nothing else differs)
       Enum.each(shared, fn id ->
-        assert admin[id] == basic[id], "shared component #{id} diverged from basic"
+        assert Surface.unqualified(admin[id]) == basic[id],
+               "shared component #{id} diverged from basic"
       end)
 
       # and the whole data model is byte-equal (the ticket table has no
@@ -93,18 +100,20 @@ defmodule AshA2ui.Experience.AdminCatalogFallbackTest do
 
       # byte-identical to the A2UI-101 basic emission
       assert unset_surface == basic_surface
-      Enum.each(basic_surface, &assert_valid_server_message/1)
+      Enum.each(basic_surface, &assert_valid_agent_message/1)
 
-      [create, components, data] = basic_surface
+      [%{"createSurface" => %{"components" => components, "dataModel" => data}} = create] =
+        basic_surface
+
       comps = components_by_id(components)
 
       assert comps["root"]["component"] == "Column"
       assert Map.has_key?(comps, "form_slot")
 
       assert create["createSurface"]["catalogId"] ==
-               "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+               "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
 
-      %{"updateDataModel" => %{"value" => model}} = data
+      model = data
       assert Map.has_key?(model["query"], "_pagination_visible")
       refute Map.has_key?(model["query"], "paginationVisible")
     end

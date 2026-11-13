@@ -18,7 +18,7 @@ defmodule AshA2ui.ReportParamPlaceholdersTest do
 
     WordReportPlaceholderUI
     |> AshA2ui.Info.build_surface(authorize?: false)
-    |> Enum.find_value(& &1["updateComponents"])
+    |> Enum.find_value(& &1["createSurface"])
     |> Map.fetch!("components")
     |> Map.new(&{&1["id"], &1})
   end

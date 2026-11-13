@@ -13,7 +13,7 @@ defmodule AshA2ui.RangeFilterTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.{ActionHandler, Info}
-  alias AshA2ui.Test.{Appointment, Clinic, ClinicMembership, Owner}
+  alias AshA2ui.Test.{Appointment, Clinic, ClinicMembership, Messages, Owner}
 
   setup do
     on_exit(fn ->
@@ -26,10 +26,7 @@ defmodule AshA2ui.RangeFilterTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{"name" => name, "surfaceId" => "appointments", "context" => context}
-    }
+    Messages.call(name, "appointments", context)
   end
 
   defp value_at(messages, path) do
@@ -90,7 +87,7 @@ defmodule AshA2ui.RangeFilterTest do
                  "scheduled_for" => %{"from" => "2026-03-01T00:00:00Z", "to" => ""}
                })
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/records") |> Enum.map(& &1["title"]) ==
                ["May visit", "March visit"]
@@ -162,9 +159,9 @@ defmodule AshA2ui.RangeFilterTest do
       seed()
 
       messages = Info.build_surface(AshA2ui.Test.AppointmentsUI, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      [_create, %{"updateComponents" => %{"components" => components}}, data_model] = messages
+      [%{"createSurface" => %{"components" => components, "dataModel" => data_model}}] = messages
 
       controls = Enum.find(components, &(&1["id"] == "query_controls_body"))
       assert "query_range_scheduled_for_from" in controls["children"]
@@ -172,9 +169,9 @@ defmodule AshA2ui.RangeFilterTest do
 
       from_input = Enum.find(components, &(&1["id"] == "query_range_scheduled_for_from"))
       assert from_input["component"] == "TextField"
-      assert from_input["value"] == %{"path" => "/query/ranges/scheduled_for/from"}
+      assert from_input["value"] == %{"@path" => "/query/ranges/scheduled_for/from"}
 
-      assert data_model["updateDataModel"]["value"]["query"]["ranges"] == %{
+      assert data_model["query"]["ranges"] == %{
                "scheduled_for" => %{"from" => "", "to" => ""}
              }
     end

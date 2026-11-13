@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-      "surfaceId": "experience_task"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
       "components": [
         {
           "children": [
@@ -23,11 +17,13 @@
           "title": "Task"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "child": "query_controls_body",
           "component": "Card",
           "id": "query_controls"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "align": "end",
           "children": [
             "query_search_input",
@@ -37,24 +33,31 @@
           "id": "query_controls_body"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "query_search_input",
           "label": "Search",
           "value": {
-            "path": "/query/search"
+            "@path": "/query/search"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "page": 1,
-                "query": {
-                  "path": "/query"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "page": 1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_apply_button"
               },
-              "name": "query"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "query_apply_text",
@@ -62,15 +65,22 @@
           "id": "query_apply_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "query_apply_text",
           "text": "Apply"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -79,6 +89,7 @@
           "variant": "primary"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "create_text",
           "text": "Create Task"
@@ -103,7 +114,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "View"
@@ -113,7 +124,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "Edit"
@@ -124,10 +135,10 @@
                 "action": "destroy",
                 "component": "table",
                 "query": {
-                  "path": "/query"
+                  "@path": "/query"
                 },
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "destructive": true,
@@ -139,14 +150,14 @@
             "context": {
               "component": "table",
               "recordId": {
-                "path": "id"
+                "@path": "id"
               }
             },
             "label": "View"
           },
           "rowId": "id",
           "rows": {
-            "path": "/records"
+            "@path": "/records"
           }
         },
         {
@@ -154,13 +165,13 @@
           "component": "emptyState",
           "id": "empty_state",
           "message": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
           "component": "pagination",
           "hasNext": {
-            "path": "/query/hasMore"
+            "@path": "/query/hasMore"
           },
           "id": "pagination",
           "nextAction": {
@@ -168,41 +179,41 @@
               "component": "table",
               "pageDelta": 1,
               "query": {
-                "path": "/query"
+                "@path": "/query"
               }
             },
             "name": "query"
           },
           "nextVisible": {
-            "path": "/query/nextVisible"
+            "@path": "/query/nextVisible"
           },
           "page": {
-            "path": "/query/page"
+            "@path": "/query/page"
           },
           "pageSize": {
-            "path": "/query/pageSize"
+            "@path": "/query/pageSize"
           },
           "previousAction": {
             "context": {
               "component": "table",
               "pageDelta": -1,
               "query": {
-                "path": "/query"
+                "@path": "/query"
               }
             },
             "name": "query"
           },
           "previousVisible": {
-            "path": "/query/previousVisible"
+            "@path": "/query/previousVisible"
           },
           "rangeText": {
-            "path": "/query/_range_text"
+            "@path": "/query/_range_text"
           },
           "total": {
-            "path": "/query/totalCount"
+            "@path": "/query/totalCount"
           },
           "visible": {
-            "path": "/query/paginationVisible"
+            "@path": "/query/paginationVisible"
           }
         },
         {
@@ -214,13 +225,13 @@
           "component": "recordPanel",
           "id": "record_panel",
           "mode": {
-            "path": "/ui/panel/mode"
+            "@path": "/ui/panel/mode"
           },
           "recordId": {
-            "path": "/ui/panel/record_id"
+            "@path": "/ui/panel/record_id"
           },
           "title": {
-            "path": "/ui/panel/title"
+            "@path": "/ui/panel/title"
           }
         },
         {
@@ -228,7 +239,7 @@
           "id": "field_display_name",
           "label": "Name",
           "value": {
-            "path": "/ui/panel/record/name"
+            "@path": "/ui/panel/record/name"
           }
         },
         {
@@ -240,36 +251,43 @@
           "id": "form_section"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_input_name",
           "label": "Name",
           "value": {
-            "path": "/form/name"
+            "@path": "/form/name"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_name",
           "text": {
-            "path": "/errors/name"
+            "@path": "/errors/name"
           },
           "variant": "caption"
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "query": {
-                  "path": "/query"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "recordId": {
-                  "path": "/form/id"
-                },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "action_bar"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "busy": false,
@@ -279,14 +297,20 @@
           "component": "actionBar",
           "id": "action_bar",
           "primaryLabel": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -294,6 +318,7 @@
           "id": "form_cancel_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_cancel_text",
           "text": "Cancel"
@@ -302,13 +327,14 @@
           "component": "statusBanner",
           "id": "status_banner",
           "kind": {
-            "path": "/ui/feedback/kind"
+            "@path": "/ui/feedback/kind"
           },
           "message": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "action_result_text"
           ],
@@ -316,22 +342,15 @@
           "id": "action_result_panel"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "experience_task"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "experience_task",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Task records yet.",
         "_empty_visible": [
           {
@@ -362,11 +381,17 @@
         },
         "records": [],
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -380,8 +405,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "experience_task"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

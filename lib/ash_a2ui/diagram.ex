@@ -234,14 +234,7 @@ defmodule AshA2ui.Diagram do
     Enum.map(view.diagrams, fn %{name: name} ->
       loaded = Map.fetch!(loaded_by_name, name)
 
-      %{
-        "version" => if(view.spec_version == :v1_0, do: "v1.0", else: "v0.9.1"),
-        "updateDataModel" => %{
-          "surfaceId" => view.surface_id,
-          "path" => data_path(name),
-          "value" => loaded.state
-        }
-      }
+      AshA2ui.Encoder.update_data_model(view.surface_id, data_path(name), loaded.state)
     end)
   end
 

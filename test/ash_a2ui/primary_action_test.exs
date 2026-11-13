@@ -16,9 +16,10 @@ defmodule AshA2ui.PrimaryActionTest do
 
   alias AshA2ui.Dynamic
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.{Paginated, Submission}
+  alias AshA2ui.Test.SchemaHelper
 
   setup do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
@@ -38,9 +39,11 @@ defmodule AshA2ui.PrimaryActionTest do
   end
 
   defp surface(ui) do
-    [_create, components, data] = AshA2ui.Info.build_surface(ui, authorize?: false)
-    by_id = Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
-    {by_id, data["updateDataModel"]["value"]}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(ui, authorize?: false)
+
+    by_id = Map.new(components, &{&1["id"], &1})
+    {by_id, data}
   end
 
   defp rows_by_title(records), do: Map.new(records, &{&1["title"], &1})
@@ -52,7 +55,7 @@ defmodule AshA2ui.PrimaryActionTest do
     assert grid["rowClick"] == %{
              "label" => "View",
              "action" => "view_record",
-             "context" => %{"recordId" => %{"path" => "id"}, "component" => "table"},
+             "context" => %{"recordId" => %{"@path" => "id"}, "component" => "table"},
              "labelPath" => "_primary_label",
              "variantPath" => "_primary_variant",
              "inline" => true
@@ -66,12 +69,8 @@ defmodule AshA2ui.PrimaryActionTest do
 
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    schema =
-      catalog["components"]["dataGrid"]
-      |> Map.put("$defs", catalog["$defs"] || %{})
-      |> ExJsonSchema.Schema.resolve()
-
-    assert ExJsonSchema.Validator.validate(schema, grid) == :ok
+    assert SchemaHelper.validate_catalog_component(catalog, "dataGrid", grid) ==
+             :ok
   end
 
   test "each row carries its label and variant; unmapped values get the defaults" do
@@ -98,7 +97,7 @@ defmodule AshA2ui.PrimaryActionTest do
       |> Ash.Query.load(table.loads)
       |> Ash.read_one!(authorize?: false)
 
-    row = V0_9_1.serialize_row(view, table, record, nil)
+    row = Encoder.serialize_row(view, table, record, nil)
 
     assert row["_primary_label"] == "Review"
     assert row["_primary_variant"] == "primary"
@@ -127,12 +126,14 @@ defmodule AshA2ui.PrimaryActionTest do
       allowlist = Dynamic.allowlist([Submission])
       {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
 
-      [_create, components, data] = Dynamic.build_surface(surface, authorize?: false)
-      grid = Enum.find(components["updateComponents"]["components"], &(&1["id"] == "data_grid"))
+      [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+        Dynamic.build_surface(surface, authorize?: false)
+
+      grid = Enum.find(components, &(&1["id"] == "data_grid"))
       assert grid["rowClick"]["inline"] == true
 
       assert %{"_primary_label" => "Review"} =
-               rows_by_title(data["updateDataModel"]["value"]["records"])["Sent one"]
+               rows_by_title(data["records"])["Sent one"]
 
       {:ok, source} =
         Dynamic.to_dsl_source(spec,

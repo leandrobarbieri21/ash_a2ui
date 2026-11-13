@@ -1,7 +1,6 @@
 defmodule AshA2ui.Calendar.CalendarEncoderTest do
   @moduledoc """
-  Calendar payloads (A2UI-107): the basic agenda composition on v0.9.1 and
-  v1.0 (schema-validated, built from basic-catalog components only, so a
+  Calendar payloads (A2UI-107): the basic agenda composition (schema-validated, built from basic-catalog components only, so a
   stock renderer shows it), the window state and row keys, and the admin
   catalog's `calendarView` wrapping the table's `dataGrid`.
   """
@@ -11,6 +10,8 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.Test.Calendar.{DayUI, Event, MonthUI, WeekUI}
+  alias AshA2ui.Test.SchemaHelper
+  alias AshA2ui.Test.Surface
 
   setup do
     on_exit(fn -> Application.delete_env(:ash_a2ui, :catalog) end)
@@ -38,15 +39,16 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
 
   defp components_by_id(components), do: Map.new(components, &{&1["id"], &1})
 
-  defp v0_9_1_parts(ui, opts) do
+  defp surface_parts(ui, opts) do
     messages = AshA2ui.Info.build_surface(ui, [authorize?: false] ++ opts)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -57,11 +59,11 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
   defp october, do: [query_state: %{"window" => %{"anchor" => "2026-10-20"}}]
 
   @tag ac: "A2UI-107/AC-3"
-  test "encodes the basic agenda for both versions" do
+  test "encodes the basic agenda" do
     seed_october()
 
-    # --- v0.9.1 ---
-    {components, value} = v0_9_1_parts(MonthUI, october())
+    # --- a month calendar ---
+    {components, value} = surface_parts(MonthUI, october())
 
     # The window state: the month holding the carried anchor.
     window = value["query"]["window"]
@@ -124,20 +126,36 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
              "calendar_today_button"
            ]
 
-    assert components["calendar_label"]["text"] == %{"path" => "/query/window/label"}
+    # a bound heading: Markdown around the bound label
+    assert components["calendar_label"]["text"] == %{
+             "@call" => "formatString",
+             "args" => %{"value" => "### ${/query/window/label}"}
+           }
 
     assert components["calendar_prev_button"]["action"] == %{
-             "event" => %{
-               "name" => "query",
-               "context" => %{
-                 "query" => %{"path" => "/query"},
-                 "component" => "schedule",
-                 "windowDelta" => -1
+             "functionCall" => %{
+               "@call" => "ashAction",
+               "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+               "args" => %{
+                 "sourceComponentId" => "calendar_prev_button",
+                 "name" => "query",
+                 "context" => %{
+                   "query" => %{"@path" => "/query"},
+                   "component" => "schedule",
+                   "windowDelta" => -1
+                 }
                }
              }
            }
 
-    assert get_in(components, ["calendar_today_button", "action", "event", "context", "anchor"]) ==
+    assert get_in(components, [
+             "calendar_today_button",
+             "action",
+             "functionCall",
+             "args",
+             "context",
+             "anchor"
+           ]) ==
              "today"
 
     # One Button per marked day, picking it.
@@ -146,19 +164,37 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
              "path" => "/query/window/marks"
            }
 
-    assert get_in(components, ["calendar_day_button", "action", "event", "context", "date"]) ==
-             %{"path" => "date"}
+    assert get_in(components, [
+             "calendar_day_button",
+             "action",
+             "functionCall",
+             "args",
+             "context",
+             "date"
+           ]) ==
+             %{"@path" => "date"}
 
-    assert components["calendar_day_text"]["text"] == %{"path" => "label"}
+    assert components["calendar_day_text"]["text"] == %{"@path" => "label"}
 
-    assert get_in(components, ["calendar_all_button", "action", "event", "context", "date"]) == ""
-    assert components["calendar_scope_label"]["text"] == %{"path" => "/query/window/scopeLabel"}
+    assert get_in(components, [
+             "calendar_all_button",
+             "action",
+             "functionCall",
+             "args",
+             "context",
+             "date"
+           ]) == ""
+
+    assert components["calendar_scope_label"]["text"] == %{
+             "@call" => "formatString",
+             "args" => %{"value" => "#### ${/query/window/scopeLabel}"}
+           }
 
     # Each row starts with its date text (card header under a row_layout).
     assert hd(components["record_row_header"]["children"]) == "record_row_when"
-    assert components["record_row_when"]["text"] == %{"path" => "_calendar_when"}
+    assert components["record_row_when"]["text"] == %{"@path" => "_calendar_when"}
 
-    # --- v1.0 (a day calendar) ---
+    # --- a day calendar ---
     event!(%{
       title: "Standup",
       starts_at: ~U[2026-10-20 09:30:00Z],
@@ -173,7 +209,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
                query_state: %{"window" => %{"anchor" => "2026-10-20"}}
              )
 
-    assert_valid_server_message(message, :v1_0)
+    assert_valid_agent_message(message)
 
     create = message["createSurface"]
     v1 = components_by_id(create["components"])
@@ -198,7 +234,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     event!(%{title: "Wed", starts_at: ~U[2026-10-14 12:00:00Z]})
 
     {components, value} =
-      v0_9_1_parts(WeekUI, query_state: %{"week" => %{"window" => %{"anchor" => "2026-10-15"}}})
+      surface_parts(WeekUI, query_state: %{"week" => %{"window" => %{"anchor" => "2026-10-15"}}})
 
     window = value["query"]["week"]["window"]
     assert window["from"] == "2026-10-12"
@@ -223,10 +259,10 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
   test "the fallback is basic catalog only" do
     seed_october()
 
-    {components, _value} = v0_9_1_parts(MonthUI, october())
+    {components, _value} = surface_parts(MonthUI, october())
 
     basic =
-      "priv/a2ui/v0_9_1/catalogs/basic/catalog.json"
+      "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json"
       |> File.read!()
       |> Jason.decode!()
       |> Map.fetch!("components")
@@ -253,7 +289,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     messages = AshA2ui.Info.build_surface(MonthUI, [authorize?: false] ++ october())
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     by_id = components_by_id(components)
 
@@ -266,10 +302,10 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
              "component" => "calendarView",
              "label" => "Event",
              "granularity" => "month",
-             "window" => %{"path" => "/query/window"},
+             "window" => %{"@path" => "/query/window"},
              "windowAction" => %{
                "name" => "query",
-               "context" => %{"query" => %{"path" => "/query"}, "component" => "schedule"}
+               "context" => %{"query" => %{"@path" => "/query"}, "component" => "schedule"}
              },
              "children" => ["data_grid"]
            }
@@ -277,7 +313,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     # The wrapped grid is the table's ordinary dataGrid, row actions and all.
     grid = by_id["data_grid"]
     assert grid["component"] == "dataGrid"
-    assert grid["rows"] == %{"path" => "/records"}
+    assert grid["rows"] == %{"@path" => "/records"}
     assert Enum.any?(grid["rowActions"], &(&1["context"]["action"] == "confirm"))
     assert "pagination" in grid["children"]
 
@@ -285,12 +321,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
     for {kind, id} <- [{"calendarView", "calendar"}, {"dataGrid", "data_grid"}] do
-      schema =
-        catalog["components"][kind]
-        |> Map.put("$defs", catalog["$defs"] || %{})
-        |> ExJsonSchema.Schema.resolve()
-
-      assert ExJsonSchema.Validator.validate(schema, by_id[id]) == :ok
+      assert SchemaHelper.validate_catalog_component(catalog, kind, by_id[id]) == :ok
     end
 
     # No basic calendar controls under the admin catalog.
@@ -300,6 +331,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     # The data model is the same window state.
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -332,7 +364,7 @@ defmodule AshA2ui.Calendar.CalendarEncoderTest do
     today = Date.utc_today()
     event!(%{title: "Today", starts_on: today})
 
-    {_components, value} = v0_9_1_parts(MonthUI, [])
+    {_components, value} = surface_parts(MonthUI, [])
 
     assert value["query"]["window"]["anchor"] ==
              today |> Date.beginning_of_month() |> Date.to_iso8601()

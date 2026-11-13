@@ -3,7 +3,7 @@ defmodule AshA2ui.Test.BulkHelpers do
   Shared setup and envelope helpers for the bulk-action tests (A2UI-104).
   """
 
-  alias AshA2ui.Test.{BulkProject, BulkTask}
+  alias AshA2ui.Test.{BulkProject, BulkTask, Messages}
 
   @actor %{id: "bulk-tester"}
 
@@ -48,23 +48,15 @@ defmodule AshA2ui.Test.BulkHelpers do
     %{"project" => %{"search" => "", "value" => project.id, "label" => project.name}}
   end
 
-  @doc "A v0.9.1 client action envelope."
+  @doc "An `ashAction` call from the bulk toolbar."
   def envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "bulk_tasks",
-        "sourceComponentId" => "bulk_toolbar",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "bulk_tasks", context, source: "bulk_toolbar", id: "call-#{name}")
   end
 
   @doc "The value of the first updateDataModel write at `path`."
   def value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)

@@ -13,7 +13,7 @@ defmodule AshA2ui.LinkUrlTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{Appointment, Clinic, LinkedVisitsUI, Owner}
+  alias AshA2ui.Test.{Appointment, Clinic, LinkedVisitsUI, Owner, SchemaHelper}
 
   setup do
     on_exit(fn ->
@@ -38,11 +38,12 @@ defmodule AshA2ui.LinkUrlTest do
   defp build(opts \\ []) do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
-    [_create, components, data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(LinkedVisitsUI, [authorize?: false] ++ opts)
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
+    SchemaHelper.assert_valid_agent_message(message, catalogs: SchemaHelper.admin_catalogs())
+
+    {Map.new(surface["components"], &{&1["id"], &1}), surface["dataModel"]}
   end
 
   test "a row links its title to the page, and a row without a URL carries no link", %{
@@ -70,7 +71,7 @@ defmodule AshA2ui.LinkUrlTest do
            }
 
     assert components["detail_visit_card_field_title"]["link"] == %{
-             "path" => "/detail/visit/_links/title"
+             "@path" => "/detail/visit/_links/title"
            }
   end
 

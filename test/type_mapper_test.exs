@@ -3,7 +3,7 @@ defmodule AshA2ui.TypeMapperTest do
   The Ash type -> default widget table implemented by `AshA2ui.TypeMapper`.
 
   Widget atoms map to basic-catalog component names in the encoder
-  (`AshA2ui.Encoder.V0_9_1`), not here.
+  (`AshA2ui.Encoder`), not here.
   """
 
   use ExUnit.Case, async: true

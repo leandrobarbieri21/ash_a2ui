@@ -40,44 +40,41 @@ defmodule AshA2ui.L10n.MetadataRoutingTest do
     assert_received {:looked_up, "Expired", [domain: "a2ui_metadata", context: "one_of:status"]}
   end
 
-  describe "pseudo-locale builds on both protocols" do
+  describe "pseudo-locale builds" do
     alias AshA2ui.Test.L10nScenarios
 
-    for spec <- ["v0_9_1", "v1_0"] do
-      @spec_tag spec
-      test "the admin hub shows every kind of host text translated once (#{spec})" do
-        json = run("hub_build_#{@spec_tag}_admin")
+    test "the admin hub shows every kind of host text translated once" do
+      json = run("hub_build_admin")
 
-        for text <-
-              ~w(Property properties) ++
-                ["Search contracts or vendors", "Expiring soon", "Ends soon", "Draft"] do
-          assert json =~ ~s("⟪#{text}⟫"), "#{text} is not translated"
-        end
-
-        # Values and identifiers stay.
-        assert json =~ ~s("value": "expiring_soon")
-        refute json =~ "⟪expiring_soon⟫"
-        refute json =~ "⟪⟪"
+      for text <-
+            ~w(Property properties) ++
+              ["Search contracts or vendors", "Expiring soon", "Ends soon", "Draft"] do
+        assert json =~ ~s("⟪#{text}⟫"), "#{text} is not translated"
       end
 
-      test "the no-results state and its clear action are translated (#{spec})" do
-        json = run("hub_no_results_#{@spec_tag}_admin")
+      # Values and identifiers stay.
+      assert json =~ ~s("value": "expiring_soon")
+      refute json =~ "⟪expiring_soon⟫"
+      refute json =~ "⟪⟪"
+    end
 
-        assert json =~ ~s("⟪No results⟫")
-        assert json =~ ~s("⟪Try other words or filters.⟫")
-      end
+    test "the no-results state and its clear action are translated" do
+      json = run("hub_no_results_admin")
 
-      test "board lanes and enum labels are translated, enum values are not (#{spec})" do
-        board = run("board_build_#{@spec_tag}_basic")
-        assert board =~ "⟪To do⟫"
-        assert board =~ "⟪Claimed⟫"
-        refute board =~ "⟪claimed⟫"
+      assert json =~ ~s("⟪No results⟫")
+      assert json =~ ~s("⟪Try other words or filters.⟫")
+    end
 
-        enum = run("enum_build_#{@spec_tag}_basic")
-        assert enum =~ "⟪To Do⟫"
-        assert enum =~ "⟪Very high⟫"
-        assert enum =~ ~s("very_high")
-      end
+    test "board lanes and enum labels are translated, enum values are not" do
+      board = run("board_build_basic")
+      assert board =~ "⟪To do⟫"
+      assert board =~ "⟪Claimed⟫"
+      refute board =~ "⟪claimed⟫"
+
+      enum = run("enum_build_basic")
+      assert enum =~ "⟪To Do⟫"
+      assert enum =~ "⟪Very high⟫"
+      assert enum =~ ~s("very_high")
     end
 
     defp run(name) do

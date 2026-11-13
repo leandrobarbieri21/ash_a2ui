@@ -81,7 +81,7 @@ defmodule AshA2ui.Test.Calendar.MonthUI do
   @moduledoc """
   A month calendar over date fields (`starts_on` to `ends_on`) with a card
   row layout, a toned status badge, a status filter and the `:confirm` row
-  action. Single table, v0.9.1.
+  action. Single table.
   """
 
   use AshA2ui.Standalone
@@ -150,8 +150,7 @@ end
 
 defmodule AshA2ui.Test.Calendar.DayUI do
   @moduledoc """
-  A day calendar over `starts_at` to `ends_at`, `spec_version "1.0"`, with
-  a CSV export (so the admin catalog keeps its basic composition).
+  A day calendar over `starts_at` to `ends_at`, with a CSV export (so the admin catalog keeps its basic composition).
   """
 
   use AshA2ui.Standalone
@@ -159,7 +158,6 @@ defmodule AshA2ui.Test.Calendar.DayUI do
   a2ui do
     for_resource AshA2ui.Test.Calendar.Event
     surface_id "calendar_day"
-    spec_version "1.0"
 
     query :day do
       page_size 25

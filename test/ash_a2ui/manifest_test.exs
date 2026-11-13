@@ -22,12 +22,16 @@ defmodule AshA2ui.ManifestTest do
 
   defp components(messages) do
     messages
-    |> Enum.flat_map(&(get_in(&1, ["updateComponents", "components"]) || []))
+    |> Enum.flat_map(
+      &(get_in(&1, ["createSurface", "components"]) ||
+          get_in(&1, ["updateComponents", "components"]) || [])
+    )
     |> Map.new(&{&1["id"], &1})
   end
 
   defp data_model(messages) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} -> value
       %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
       _other -> nil
     end)
@@ -39,7 +43,7 @@ defmodule AshA2ui.ManifestTest do
     test "describes each table: resource, read, columns, query and presets" do
       manifest = Manifest.for_surface(ManifestTask, catalog: :admin_v1)
 
-      assert %{version: 1, surface_id: "manifest_tasks", resource: ManifestTask} = manifest
+      assert %{version: 2, surface_id: "manifest_tasks", resource: ManifestTask} = manifest
       assert manifest.version == Manifest.version()
       assert manifest.catalog == :admin_v1
 
@@ -259,7 +263,7 @@ defmodule AshA2ui.ManifestTest do
     case action.confirm do
       :prompt ->
         assert rendered["#{base}_confirm_text"]["text"] == action.confirm_label
-        assert rendered["#{base}_prompt_title"]["text"] == action.prompt_title
+        assert rendered["#{base}_prompt_title"]["text"] == "### " <> action.prompt_title
 
         for field <- action.prompt_fields do
           input = rendered["#{base}_prompt_input_#{field.name}"]
@@ -439,7 +443,7 @@ defmodule AshA2ui.ManifestTest do
       refute AshA2ui.Test.Domain in surfaces
 
       for catalog <- @catalogs, module <- surfaces do
-        assert %{version: 1} = Manifest.for_surface(module, catalog: catalog)
+        assert %{version: 2} = Manifest.for_surface(module, catalog: catalog)
       end
     end
   end

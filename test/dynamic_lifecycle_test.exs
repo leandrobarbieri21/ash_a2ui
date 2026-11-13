@@ -251,15 +251,6 @@ defmodule AshA2ui.DynamicLifecycleTest do
       assert message =~ "99"
       assert message =~ "1"
     end
-
-    test "passes spec_version through to the resolved surface" do
-      serialized = Dynamic.serialize(minimal_spec())
-
-      {:ok, surface} =
-        Dynamic.deserialize(serialized, allowlist: @allowlist, spec_version: "1.0")
-
-      assert [%{"createSurface" => _}] = Dynamic.build_surface(surface, authorize?: false)
-    end
   end
 
   describe "diff/2" do
@@ -636,16 +627,15 @@ defmodule AshA2ui.DynamicLifecycleTest do
       assert scrub(ResolvedView.resolve(module)) == scrub(ResolvedView.resolve(surface.dsl_state))
     end
 
-    test "defaults the surface_id to the underscored module name and honors spec_version" do
+    test "defaults the surface_id to the underscored module name" do
       {:ok, source} =
         Dynamic.to_dsl_source(minimal_spec(),
           module: AshA2ui.Promoted.DefaultIdUI,
-          allowlist: @allowlist,
-          spec_version: "1.0"
+          allowlist: @allowlist
         )
 
       assert source =~ ~s(surface_id "default_id_ui")
-      assert source =~ ~s(spec_version "1.0")
+      refute source =~ "spec_version"
 
       [{module, _binary} | _rest] = Code.compile_string(source)
 

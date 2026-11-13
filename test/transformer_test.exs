@@ -299,17 +299,16 @@ defmodule AshA2ui.TransformerTest do
       assert action.run == {AshA2ui.RenderA2uiAction, []}
     end
 
-    test "render_a2ui is invocable and returns the surface message list" do
+    test "render_a2ui is invocable and returns the surface as one createSurface" do
       messages =
         AshA2ui.Test.KitchenSink
         |> Ash.ActionInput.for_action(:render_a2ui, %{})
         |> Ash.run_action!()
 
-      assert is_list(messages)
-      assert length(messages) == 3
+      assert [%{"createSurface" => _create}] = messages
 
       for message <- messages do
-        SchemaHelper.assert_valid_server_message(message)
+        SchemaHelper.assert_valid_agent_message(message)
       end
     end
 

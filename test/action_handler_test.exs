@@ -5,9 +5,9 @@
 
 defmodule AshA2ui.ActionHandlerTest do
   @moduledoc """
-  Round-trip tests for `AshA2ui.ActionHandler.handle/3` against the frozen
-  cross-track wire contract: client `action` envelopes in, schema-valid
-  `updateDataModel` follow-ups out.
+  Round-trip tests for `AshA2ui.ActionHandler.handle/3`: A2UI 1.0 `action`
+  messages in, schema-valid `updateDataModel` follow-ups out. The function
+  call path and the message validation are in renderer_messages_test.exs.
   """
 
   use ExUnit.Case, async: true
@@ -16,22 +16,12 @@ defmodule AshA2ui.ActionHandlerTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.ActionHandlerTest.{CheckInFacade, Gadget, Protected, Ticket, Widget}
-  alias AshA2ui.Test.{KitchenSink, Minimal, MinimalUI}
+  alias AshA2ui.Test.{KitchenSink, Messages, Minimal, MinimalUI}
 
   @actor %{id: "test-actor"}
 
-  defp envelope(name, surface_id, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface_id,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
-  end
+  defp envelope(name, surface_id, context),
+    do: Messages.call(name, surface_id, context, id: "call-1")
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
@@ -40,16 +30,12 @@ defmodule AshA2ui.ActionHandlerTest do
     end)
   end
 
-  defp last_value_at(messages, path) do
-    messages |> Enum.reverse() |> value_at(path)
-  end
-
   defp paths(messages) do
-    Enum.map(messages, & &1["updateDataModel"]["path"])
+    for(%{"updateDataModel" => %{"path" => path}} <- messages, do: path)
   end
 
   defp assert_all_valid(messages) do
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     messages
   end
 
@@ -60,7 +46,7 @@ defmodule AshA2ui.ActionHandlerTest do
           "values" => %{"name" => "Widget", "count" => 2}
         })
 
-      assert_valid_client_message(env)
+      assert_valid_renderer_message(env)
 
       assert {:ok, messages} = ActionHandler.handle(KitchenSink, env)
       assert_all_valid(messages)
@@ -155,7 +141,7 @@ defmodule AshA2ui.ActionHandlerTest do
       assert length(Ash.read!(KitchenSink, authorize?: false)) == 1
     end
 
-    test "merges a generic action's map result under /ui/action_result" do
+    test "puts a generic action's map result in the success feedback" do
       record = Ash.create!(Gadget, %{name: "G"}, authorize?: false)
 
       env =
@@ -167,17 +153,16 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:ok, messages} = ActionHandler.handle(Gadget, env)
       assert_all_valid(messages)
 
-      # the batch clears /ui/action_result before setting it; last write wins
-      result = last_value_at(messages, "/ui/action_result")
-      assert result["secret"] == "s3cr3t"
-      assert result["record_id"] == record.id
+      feedback = value_at(messages, "/ui/feedback")
+      assert feedback["kind"] == "success"
+      assert feedback["result"] == %{"secret" => "s3cr3t", "record_id" => record.id}
 
       # the regular refresh messages still accompany the action result
       assert "/records" in paths(messages)
-      assert value_at(messages, "/ui/feedback")["message"] == "Generate secret completed."
+      assert feedback["message"] == "Generate secret completed."
     end
 
-    test "serializes a map result to display text at /ui/action_result_text" do
+    test "renders a map result as display text in the feedback's resultText" do
       record = Ash.create!(Gadget, %{name: "G"}, authorize?: false)
 
       env =
@@ -189,8 +174,7 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:ok, messages} = ActionHandler.handle(Gadget, env)
       assert_all_valid(messages)
 
-      # the clear precedes the set, so the last write at the path wins
-      text = last_value_at(messages, "/ui/action_result_text")
+      text = value_at(messages, "/ui/feedback")["resultText"]
       assert text =~ "Secret: s3cr3t"
       assert text =~ "Record id: #{record.id}"
     end
@@ -199,7 +183,7 @@ defmodule AshA2ui.ActionHandlerTest do
       record = Ash.create!(Widget, %{name: "W"}, authorize?: false)
 
       env = envelope("invoke", "widget", %{"action" => "touch", "recordId" => record.id})
-      assert_valid_client_message(env)
+      assert_valid_renderer_message(env)
 
       assert {:ok, messages} = ActionHandler.handle(Widget, env)
       assert_all_valid(messages)
@@ -215,7 +199,7 @@ defmodule AshA2ui.ActionHandlerTest do
       assert value_at(messages, "/ui/feedback")["message"] == "Touch completed."
     end
 
-    test "subsequent actions clear /ui/action_result and /ui/action_result_text" do
+    test "the next action's feedback carries no stale result" do
       record = Ash.create!(Gadget, %{name: "G"}, authorize?: false)
 
       secret_env =
@@ -232,8 +216,8 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:ok, messages} = ActionHandler.handle(Gadget, destroy_env)
       assert_all_valid(messages)
 
-      assert value_at(messages, "/ui/action_result") == %{}
-      assert value_at(messages, "/ui/action_result_text") == ""
+      assert %{"kind" => "success", "result" => %{}, "resultText" => ""} =
+               value_at(messages, "/ui/feedback")
     end
   end
 
@@ -296,7 +280,8 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:error, messages} = ActionHandler.handle(Ticket, env)
       assert_all_valid(messages)
 
-      assert value_at(messages, "/ui/feedback")["message"] =~ "not authorized"
+      assert %{"code" => "FORBIDDEN", "message" => text} = value_at(messages, "/ui/feedback")
+      assert text =~ "not authorized"
     end
 
     test "a via action without a recordId is rejected" do
@@ -333,44 +318,47 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:error, messages} = ActionHandler.handle(KitchenSink, env)
       assert_all_valid(messages)
 
-      assert value_at(messages, "/ui/feedback") == %{
+      assert %{
                "kind" => "error",
+               "code" => "INVALID_ACTION",
+               "functionCallId" => "call-1",
                "message" => ~s(Malformed start_edit action: context is missing "recordId".)
-             }
+             } = value_at(messages, "/ui/feedback")
     end
 
     test "select_row is no longer an action" do
       record = Ash.create!(KitchenSink, %{name: "Pick", count: 5}, authorize?: false)
       env = envelope("select_row", "kitchen_sink", %{"recordId" => record.id})
 
-      assert {:error, [message]} = ActionHandler.handle(KitchenSink, env)
-      assert_valid_server_message(message)
+      assert {:error, [message, _response]} = ActionHandler.handle(KitchenSink, env)
+      assert_valid_agent_message(message)
       assert value_at([message], "/ui/feedback")["message"] == ~s(Unknown action "select_row".)
       refute value_at([message], "/form")
     end
   end
 
-  describe "envelope parsing" do
-    test "accepts a bare inner action map" do
+  describe "message parsing" do
+    test "refuses a bare inner action map: only a 1.0 message is accepted" do
       bare = %{"name" => "submit_form", "context" => %{"values" => %{"name" => "Bare"}}}
 
-      assert {:ok, messages} = ActionHandler.handle(KitchenSink, bare)
-      assert_all_valid(messages)
-      assert [%{name: "Bare"}] = Ash.read!(KitchenSink, authorize?: false)
+      assert {:error, []} = ActionHandler.handle(KitchenSink, bare)
+      assert Ash.read!(KitchenSink, authorize?: false) == []
     end
 
-    test "unknown action name returns an /ui/feedback error message" do
+    test "unknown action name returns an UNKNOWN_ACTION feedback error" do
       env = envelope("explode", "kitchen_sink", %{})
 
-      assert {:error, [message]} = ActionHandler.handle(KitchenSink, env)
-      assert_valid_server_message(message)
-      assert value_at([message], "/ui/feedback")["message"] =~ ~s(Unknown action "explode")
+      assert {:error, [message, _response]} = ActionHandler.handle(KitchenSink, env)
+      assert_valid_agent_message(message)
+
+      assert %{"kind" => "error", "code" => "UNKNOWN_ACTION", "message" => text} =
+               value_at([message], "/ui/feedback")
+
+      assert text =~ ~s(Unknown action "explode")
     end
 
-    test "malformed message returns an /ui/feedback error message" do
-      assert {:error, [message]} = ActionHandler.handle(KitchenSink, %{"wat" => true})
-      assert_valid_server_message(message)
-      assert value_at([message], "/ui/feedback")["message"] =~ "Malformed"
+    test "a message that is no renderer-to-agent message is refused with no follow-ups" do
+      assert {:error, []} = ActionHandler.handle(KitchenSink, %{"wat" => true})
     end
   end
 
@@ -381,7 +369,8 @@ defmodule AshA2ui.ActionHandlerTest do
       assert {:error, messages} = ActionHandler.handle(Protected, env)
       assert_all_valid(messages)
 
-      assert value_at(messages, "/ui/feedback")["message"] =~ "not authorized"
+      assert %{"code" => "FORBIDDEN", "message" => text} = value_at(messages, "/ui/feedback")
+      assert text =~ "not authorized"
       refute Enum.any?(paths(messages), &String.starts_with?(&1, "/errors/"))
       assert Ash.read!(Protected, authorize?: false) == []
     end
@@ -416,7 +405,10 @@ defmodule AshA2ui.ActionHandlerTest do
 
       assert [%{name: "Standalone"}] = Ash.read!(Minimal, authorize?: false)
 
-      assert Enum.all?(messages, fn message ->
+      assert [%{"agentFunctionResponse" => %{"functionCallId" => "call-1"}} | updates] =
+               Enum.reverse(messages)
+
+      assert Enum.all?(updates, fn message ->
                message["updateDataModel"]["surfaceId"] == "minimal_standalone"
              end)
     end

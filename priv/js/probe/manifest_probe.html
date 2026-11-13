@@ -30,10 +30,7 @@
           "lit-element": "./nm/lit-element/index.js",
           "lit-element/": "./nm/lit-element/",
           "@a2ui/web_core/": "./nm/@a2ui/web_core/src/",
-          "@a2ui/web_core/v0_9": "./nm/@a2ui/web_core/src/v0_9/index.js",
-          "@a2ui/web_core/v0_9/basic_catalog": "./nm/@a2ui/web_core/src/v0_9/basic_catalog/index.js",
           "@a2ui/lit/": "./nm/@a2ui/lit/src/",
-          "@a2ui/lit/v0_9": "./nm/@a2ui/lit/src/v0_9/index.js",
           "zod": "./nm/zod/index.js",
           "zod/v3": "./nm/zod/v3/index.js",
           "zod/v4": "./nm/zod/v4/index.js",
@@ -63,7 +60,6 @@
           "@a2ui/web_core/semver": "./nm/@a2ui/web_core/src/common/semver.js",
           "@a2ui/web_core/v0_8": "./nm/@a2ui/web_core/src/v0_8/index.js",
           "@a2ui/web_core/v0_8/basic_catalog": "./nm/@a2ui/web_core/src/v0_8/basic_catalog/index.js",
-          "@a2ui/web_core/v0_9/universal": "./nm/@a2ui/web_core/src/v0_9/universal/index.js",
           "@a2ui/web_core/v1_0": "./nm/@a2ui/web_core/src/v1_0/index.js",
           "@a2ui/web_core/v1_0/basic_catalog": "./nm/@a2ui/web_core/src/v1_0/basic_catalog/index.js",
           "@a2ui/lit": "./nm/@a2ui/lit/src/index.js",
@@ -78,10 +74,11 @@
     </script>
     <script type="module">
       import {html, css, nothing} from "lit";
-      import "@a2ui/lit/v0_9";
-      import {basicCatalog, A2uiLitElement, A2uiController} from "@a2ui/lit/v0_9";
-      import {MessageProcessor, Catalog} from "@a2ui/web_core/v0_9";
-      import {ChoicePickerApi, ColumnApi} from "@a2ui/web_core/v0_9/basic_catalog";
+      import "@a2ui/lit";
+      import {A2uiLitElement, A2uiController} from "@a2ui/lit";
+      import {MessageProcessor, Catalog} from "@a2ui/web_core";
+      import {createAshFunctionCatalog} from "./catalog/ash_a2ui_protocol.js";
+      import {basicCatalog, ChoicePickerApi, ColumnApi} from "@a2ui/web_core/catalogs/basic/v1";
       import {createAshA2uiCatalog} from "./catalog/ash_a2ui_catalog.js";
       import {createAshAdminCatalog} from "./catalog/ash_admin_catalog.js";
 
@@ -92,7 +89,6 @@
       const ashCatalog = stock
         ? basicCatalog
         : createAshA2uiCatalog({
-            Catalog,
             basicCatalog,
             ChoicePickerApi,
             ColumnApi,
@@ -101,7 +97,6 @@
             lit,
           });
       const adminCatalog = createAshAdminCatalog({
-        Catalog,
         basicCatalog: ashCatalog,
         A2uiLitElement,
         A2uiController,
@@ -115,9 +110,16 @@
       const surfaceEl = document.createElement("a2ui-surface");
       document.getElementById("host").appendChild(surfaceEl);
 
-      const processor = new MessageProcessor([ashCatalog, adminCatalog], (action) => {
+      // The encoder sends every server-handled action as an ashAction
+      // call; the probe records each call's name and context.
+      const recordAction = (action) => {
         window.__dispatched.push({name: action.name, context: action.context});
+      };
+      const ashFunctions = createAshFunctionCatalog(Catalog, {
+        ashAction: (args, context) => recordAction({...args, surfaceId: context.surface.id}),
+        downloadFile: () => undefined,
       });
+      const processor = new MessageProcessor([ashCatalog, adminCatalog, ashFunctions]);
       processor.onSurfaceCreated((surface) => {
         window.__boot.surfaceCreated = true;
         window.__surface = surface;

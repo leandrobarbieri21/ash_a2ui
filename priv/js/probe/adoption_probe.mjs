@@ -35,7 +35,7 @@
  *
  *     node priv/js/probe/adoption_probe.mjs [--node-modules DIR] [--port N]
  *
- * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.10.x and
+ * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.15.0 or later and
  * lit 3. Chrome comes from $CHROME, Playwright from
  * $PLAYWRIGHT_NODE_MODULES. Exit code is the verdict.
  */
@@ -351,7 +351,7 @@ async function main() {
         page.evaluate((text) => {
           window.__feed([
             {
-              version: "v0.9",
+              version: "1.0",
               updateDataModel: {surfaceId: "adoption_jobs", path: "/ui/feedback/message", value: text},
             },
           ]);

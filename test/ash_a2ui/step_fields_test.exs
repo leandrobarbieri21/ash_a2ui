@@ -15,7 +15,7 @@ defmodule AshA2ui.StepFieldsTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.Steps
-  alias AshA2ui.Test.{Appointment, Clinic, Owner, VisitProgressUI}
+  alias AshA2ui.Test.{Appointment, Clinic, Messages, Owner, SchemaHelper, VisitProgressUI}
 
   setup do
     on_exit(fn ->
@@ -39,7 +39,7 @@ defmodule AshA2ui.StepFieldsTest do
   defp surface(catalog, visit) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(VisitProgressUI,
         authorize?: false,
         context_state: %{
@@ -47,8 +47,11 @@ defmodule AshA2ui.StepFieldsTest do
         }
       )
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]["detail"]["appointment"]}
+    catalogs = if catalog == :admin_v1, do: SchemaHelper.admin_catalogs()
+    SchemaHelper.assert_valid_agent_message(message, catalogs: catalogs)
+
+    {Map.new(surface["components"], &{&1["id"], &1}),
+     surface["dataModel"]["detail"]["appointment"]}
   end
 
   describe "the wire" do
@@ -57,8 +60,8 @@ defmodule AshA2ui.StepFieldsTest do
       display = components["detail_progress_field_progress"]
 
       assert display["component"] == "fieldDisplay"
-      assert display["steps"] == %{"path" => "/detail/appointment/_steps_progress"}
-      assert display["value"] == %{"path" => "/detail/appointment/progress"}
+      assert display["steps"] == %{"@path" => "/detail/appointment/_steps_progress"}
+      assert display["value"] == %{"@path" => "/detail/appointment/progress"}
       assert display["emptyText"] == "No steps yet"
       refute Map.has_key?(components["detail_progress_field_title"], "steps")
     end
@@ -109,7 +112,7 @@ defmodule AshA2ui.StepFieldsTest do
       assert components["detail_progress_step_progress"] == %{
                "id" => "detail_progress_step_progress",
                "component" => "Text",
-               "text" => %{"path" => "line"}
+               "text" => %{"@path" => "line"}
              }
 
       assert Enum.map(detail["_steps_progress"], & &1["line"]) == [
@@ -122,16 +125,13 @@ defmodule AshA2ui.StepFieldsTest do
 
     test "selecting a record refreshes its steps", %{visit: visit} do
       {:ok, messages} =
-        ActionHandler.handle(VisitProgressUI, %{
-          "version" => "v0.9.1",
-          "action" => %{
-            "name" => "context_select",
-            "surfaceId" => "visit_progress",
-            "sourceComponentId" => "test_component",
-            "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-            "context" => %{"context" => "appointment", "value" => visit.id}
-          }
-        })
+        ActionHandler.handle(
+          VisitProgressUI,
+          Messages.call("context_select", "visit_progress", %{
+            "context" => "appointment",
+            "value" => visit.id
+          })
+        )
 
       detail =
         Enum.find_value(messages, fn

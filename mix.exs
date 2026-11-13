@@ -4,7 +4,7 @@ defmodule AshA2ui.MixProject do
   @version "0.1.0"
 
   @description """
-  An Ash extension that generates A2UI (Agent to UI) v0.9.1 or v1.0 payloads from Ash resources.
+  An Ash extension that generates A2UI (Agent to UI) 1.0 payloads from Ash resources.
   """
 
   def project do
@@ -40,6 +40,13 @@ defmodule AshA2ui.MixProject do
       licenses: ["MIT"],
       files: ~w(lib priv .formatter.exs mix.exs README* LICENSE*
       CHANGELOG* documentation usage-rules.md usage-rules),
+      # Browser probes, the upstream conformance cases (test data for this
+      # repo's suite) and the neobrutalist demo page are not library code.
+      exclude_patterns: [
+        ~r{^priv/js/probe/},
+        ~r{^priv/a2ui/v1_0/test/},
+        ~r{^priv/js/nb_demo\.html$}
+      ],
       links: %{
         "GitHub" => "https://github.com/lukegalea/ash_a2ui",
         "Changelog" => "https://github.com/lukegalea/ash_a2ui/blob/main/CHANGELOG.md"
@@ -142,8 +149,6 @@ defmodule AshA2ui.MixProject do
         ],
         Encoding: [
           AshA2ui.Encoder,
-          AshA2ui.Encoder.V0_9_1,
-          AshA2ui.Encoder.V1_0,
           AshA2ui.TypeMapper
         ],
         Actions: [
@@ -157,9 +162,6 @@ defmodule AshA2ui.MixProject do
           AshA2ui.PresenceBar,
           AshA2ui.Combobox,
           AshA2ui.Web.ComposerLive
-        ],
-        "External Transports": [
-          AshA2ui.AgUi
         ],
         Internals: ~r/.*/
       ]
@@ -185,7 +187,7 @@ defmodule AshA2ui.MixProject do
       {:ash_state_machine, "~> 0.2", optional: true},
       {:igniter, "~> 0.5", only: [:dev, :test]},
       {:simple_sat, "~> 0.1", only: [:dev, :test], runtime: false},
-      {:ex_json_schema, "~> 0.10", only: [:dev, :test]},
+      {:jsv, "~> 0.27", only: :test},
       # no :only — reactor (via ash) requires jason in all envs anyway
       {:jason, "~> 1.4"},
       {:ex_doc, "~> 0.36", only: [:dev, :test]},

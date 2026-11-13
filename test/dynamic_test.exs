@@ -55,6 +55,7 @@ defmodule AshA2ui.DynamicTest do
   alias AshA2ui.DynamicTest.Guarded
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.KitchenSink
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Minimal
 
   @allowlist Dynamic.allowlist([KitchenSink, Minimal, Guarded])
@@ -117,24 +118,23 @@ defmodule AshA2ui.DynamicTest do
       refute resolve!(minimal_spec()).surface_id == resolve!(minimal_spec()).surface_id
     end
 
-    test "build_surface emits the schema-valid message triple" do
+    test "build_surface emits one schema-valid createSurface" do
       Ash.create!(Minimal, %{name: "one"}, authorize?: false)
 
       messages = minimal_spec() |> resolve!() |> Dynamic.build_surface(authorize?: false)
 
-      assert [%{"createSurface" => _}, %{"updateComponents" => _}, %{"updateDataModel" => _}] =
-               messages
+      assert [%{"createSurface" => _}] = messages
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      [_create, _components, %{"updateDataModel" => %{"value" => data_model}}] = messages
+      [%{"createSurface" => %{"dataModel" => data_model}}] = messages
       assert [%{"name" => "one"}] = data_model["records"]
     end
 
     test "build_data_model emits a schema-valid refresh" do
       message = minimal_spec() |> resolve!() |> Dynamic.build_data_model(authorize?: false)
 
-      assert %{"updateDataModel" => _} = assert_valid_server_message(message)
+      assert %{"updateDataModel" => _} = assert_valid_agent_message(message)
     end
 
     test "omitted table fields are inferred from public attributes" do
@@ -200,7 +200,7 @@ defmodule AshA2ui.DynamicTest do
       }
 
       messages = spec |> resolve!() |> Dynamic.build_surface(authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
     end
 
     test "contexts, context_filter, and detail components resolve and scope" do
@@ -234,8 +234,8 @@ defmodule AshA2ui.DynamicTest do
 
       # Unscoped: require_context unmet, the table renders no records.
       messages = Dynamic.build_surface(surface, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
-      [_create, _components, %{"updateDataModel" => %{"value" => data_model}}] = messages
+      Enum.each(messages, &assert_valid_agent_message/1)
+      [%{"createSurface" => %{"dataModel" => data_model}}] = messages
       assert data_model["records"] == []
 
       # Scoped to the selected owner, the appointment appears.
@@ -245,7 +245,7 @@ defmodule AshA2ui.DynamicTest do
           context_state: %{"owner" => %{"value" => owner.id}}
         )
 
-      [_create, _components, %{"updateDataModel" => %{"value" => scoped_model}}] = scoped
+      [%{"createSurface" => %{"dataModel" => scoped_model}}] = scoped
       assert [%{"title" => "checkup"}] = scoped_model["records"]
       assert scoped_model["detail"]["owner"]["name"] == "Ada"
     end
@@ -281,27 +281,25 @@ defmodule AshA2ui.DynamicTest do
 
       # the initial /form carries stable empty arrays for both arguments
       messages = Dynamic.build_surface(surface, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      [_create, _components, %{"updateDataModel" => %{"value" => data_model}}] = messages
+      [%{"createSurface" => %{"dataModel" => data_model}}] = messages
       assert data_model["form"]["notes"] == []
       assert data_model["form"]["tags"] == []
 
       # submitting rows round-trips: create_inline maps survive, pick_existing
       # rows reduce to their picked ids (the manage_relationship inputs)
-      envelope = %{
-        "name" => "submit_form",
-        "context" => %{
+      envelope =
+        Messages.call("submit_form", surface.surface_id, %{
           "values" => %{
             "subject" => "nested round trip",
             "notes" => [%{"_row" => "r1", "body" => "first", "rating" => "2"}],
             "tags" => []
           }
-        }
-      }
+        })
 
       assert {:ok, messages} = Dynamic.handle_action(surface, envelope, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       [ticket] = Ash.read!(AshA2ui.Test.Ticket, authorize?: false)
       assert ticket.subject == "nested round trip"
@@ -348,11 +346,11 @@ defmodule AshA2ui.DynamicTest do
       # runtime name <template>_<sanitized value> (the value defaults to the
       # source's primary key), with scoped reads ANDed on
       messages = Dynamic.build_surface(surface, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       runtime_name = "per_bucket_#{String.replace(bucket.id, "-", "_")}"
 
-      [_create, _components, %{"updateDataModel" => %{"value" => data_model}}] = messages
+      [%{"createSurface" => %{"dataModel" => data_model}}] = messages
       assert [%{"word" => "misspeld"}] = data_model["records"][runtime_name]
     end
 
@@ -656,17 +654,11 @@ defmodule AshA2ui.DynamicTest do
     test "submit_form creates through the spec's create action and refreshes" do
       surface = resolve!(minimal_spec())
 
-      envelope = %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => "submit_form",
-          "surfaceId" => surface.surface_id,
-          "context" => %{"values" => %{"name" => "round-trip"}}
-        }
-      }
+      envelope =
+        Messages.call("submit_form", surface.surface_id, %{"values" => %{"name" => "round-trip"}})
 
       assert {:ok, messages} = Dynamic.handle_action(surface, envelope, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert Enum.any?(messages, fn
                %{"updateDataModel" => %{"path" => "/records", "value" => records}} ->
@@ -682,15 +674,9 @@ defmodule AshA2ui.DynamicTest do
     test "follow-up messages always carry the server-held surface id" do
       surface = resolve!(minimal_spec())
 
-      envelope = %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => "submit_form",
-          # A tampering client claims another surface — it is ignored.
-          "surfaceId" => "spoofed_surface",
-          "context" => %{"values" => %{"name" => "own-id"}}
-        }
-      }
+      # A tampering client claims another surface — it is ignored.
+      envelope =
+        Messages.call("submit_form", "spoofed_surface", %{"values" => %{"name" => "own-id"}})
 
       {:ok, messages} = Dynamic.handle_action(surface, envelope, authorize?: false)
 
@@ -703,12 +689,14 @@ defmodule AshA2ui.DynamicTest do
       record = Ash.create!(Minimal, %{name: "keep me"}, authorize?: false)
       surface = resolve!(minimal_spec())
 
-      envelope = %{
-        "name" => "invoke",
-        "context" => %{"action" => "destroy", "recordId" => record.id}
-      }
+      envelope =
+        Messages.call("invoke", surface.surface_id, %{
+          "action" => "destroy",
+          "recordId" => record.id
+        })
 
-      assert {:error, [message]} = Dynamic.handle_action(surface, envelope, authorize?: false)
+      assert {:error, [message, _response]} =
+               Dynamic.handle_action(surface, envelope, authorize?: false)
 
       assert %{
                "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
@@ -727,12 +715,13 @@ defmodule AshA2ui.DynamicTest do
 
       surface = resolve!(spec)
 
-      envelope = %{
-        "name" => "query",
-        "context" => %{"query" => %{"sort" => "count", "dir" => "asc"}}
-      }
+      envelope =
+        Messages.call("query", surface.surface_id, %{
+          "query" => %{"sort" => "count", "dir" => "asc"}
+        })
 
-      assert {:error, [message]} = Dynamic.handle_action(surface, envelope, authorize?: false)
+      assert {:error, [message, _response]} =
+               Dynamic.handle_action(surface, envelope, authorize?: false)
 
       assert %{
                "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
@@ -752,12 +741,10 @@ defmodule AshA2ui.DynamicTest do
 
       surface = resolve!(spec)
 
-      envelope = %{
-        "name" => "submit_form",
-        "context" => %{"values" => %{"name" => "sneaky"}}
-      }
+      envelope =
+        Messages.call("submit_form", surface.surface_id, %{"values" => %{"name" => "sneaky"}})
 
-      assert {:error, [message]} = Dynamic.handle_action(surface, envelope, [])
+      assert {:error, [message, _response]} = Dynamic.handle_action(surface, envelope, [])
 
       assert %{
                "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
@@ -783,10 +770,10 @@ defmodule AshA2ui.DynamicTest do
 
       surface = resolve!(spec)
 
-      envelope = %{"name" => "submit_form", "context" => %{"values" => %{}}}
+      envelope = Messages.call("submit_form", surface.surface_id, %{"values" => %{}})
 
       assert {:error, messages} = Dynamic.handle_action(surface, envelope, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert Enum.any?(messages, fn
                %{"updateDataModel" => %{"path" => "/errors/name"}} -> true
@@ -870,13 +857,14 @@ defmodule AshA2ui.DynamicTest do
           via_allowlist: @via_allowlist
         )
 
-      envelope = %{
-        "name" => "invoke",
-        "context" => %{"action" => "check_in", "recordId" => record.id}
-      }
+      envelope =
+        Messages.call("invoke", surface.surface_id, %{
+          "action" => "check_in",
+          "recordId" => record.id
+        })
 
       assert {:ok, messages} = Dynamic.handle_action(surface, envelope, authorize?: false)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       # the delegate ran with the dispatch context and its declared extra arg
       assert %{context: context, source: source} =
@@ -894,16 +882,17 @@ defmodule AshA2ui.DynamicTest do
 
   describe "spec_schema/1" do
     test "is a resolvable JSON Schema that accepts valid and rejects invalid specs" do
-      schema = @allowlist |> Dynamic.spec_schema() |> ExJsonSchema.Schema.resolve()
+      schema = @allowlist |> Dynamic.spec_schema() |> build_schema()
 
-      assert ExJsonSchema.Validator.valid?(schema, minimal_spec())
+      assert validate(schema, minimal_spec()) == :ok
 
-      refute ExJsonSchema.Validator.valid?(schema, %{"resource" => "Minimal"})
+      assert {:error, _} = validate(schema, %{"resource" => "Minimal"})
 
-      refute ExJsonSchema.Validator.valid?(schema, %{
-               "resource" => "Minimal",
-               "components" => [%{"kind" => "chart"}]
-             })
+      assert {:error, _} =
+               validate(schema, %{
+                 "resource" => "Minimal",
+                 "components" => [%{"kind" => "chart"}]
+               })
     end
 
     test "constrains resource enums to the allowlist" do

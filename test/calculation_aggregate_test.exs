@@ -34,23 +34,15 @@ defmodule AshA2ui.CalculationAggregateTest do
   alias AshA2ui.ActionHandler
   alias AshA2ui.CalculationAggregateTest.ArticleUI
   alias AshA2ui.ResolvedView
-  alias AshA2ui.Test.{Article, Comment}
+  alias AshA2ui.Test.{Article, Comment, Messages}
 
   defp envelope(name, surface_id, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface_id,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, surface_id, context)
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _ -> nil
     end)
@@ -94,7 +86,7 @@ defmodule AshA2ui.CalculationAggregateTest do
       create_article!("Alpha", comments: 2)
 
       messages = AshA2ui.Info.build_surface(ArticleUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [row] = value_at(messages, "/")["records"]
 
@@ -108,7 +100,7 @@ defmodule AshA2ui.CalculationAggregateTest do
       create_article!("Beta", comments: 1, status: :published)
 
       messages = AshA2ui.Info.build_surface(Article)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [row] = value_at(messages, "/")["records"]
 
@@ -120,7 +112,7 @@ defmodule AshA2ui.CalculationAggregateTest do
       create_article!("Gamma", comments: 3)
 
       message = AshA2ui.Info.build_data_model(ArticleUI)
-      assert_valid_server_message(message)
+      assert_valid_agent_message(message)
 
       assert [row] = message["updateDataModel"]["value"]["records"]
       assert row["comment_count"] == 3
@@ -134,7 +126,7 @@ defmodule AshA2ui.CalculationAggregateTest do
         envelope("submit_form", "articles_plain", %{"values" => %{"title" => "Delta"}})
 
       assert {:ok, messages} = ActionHandler.handle(ArticleUI, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [row] = value_at(messages, "/records")
       assert row["display_title"] == "Delta (draft)"
@@ -150,7 +142,7 @@ defmodule AshA2ui.CalculationAggregateTest do
         envelope("invoke", "articles", %{"action" => "destroy", "recordId" => doomed.id})
 
       assert {:ok, messages} = ActionHandler.handle(Article, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [row] = value_at(messages, "/records")
       assert row["title"] == "Stays"
@@ -170,7 +162,7 @@ defmodule AshA2ui.CalculationAggregateTest do
         })
 
       assert {:ok, messages} = ActionHandler.handle(Article, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       counts = messages |> value_at("/records") |> Enum.map(& &1["comment_count"])
       assert counts == [3, 1, 0]

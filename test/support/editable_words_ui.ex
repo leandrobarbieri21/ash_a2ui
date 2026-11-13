@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.EditableWordsUI do
   @moduledoc """
-  Fixture surface for inline cell editing (v0.9.1): a single table over
+  Fixture surface for inline cell editing: a single table over
   `AshA2ui.Test.BucketWord` whose `:replacement` column commits per cell
   through `update_replacement` (which validates lowercase — the error-mirror
   proving case).
@@ -25,10 +25,8 @@ end
 
 defmodule AshA2ui.Test.EditableWordsV1UI do
   @moduledoc """
-  The same inline-cell-editing fixture surface as
-  `AshA2ui.Test.EditableWordsUI`, but with `spec_version "1.0"` — validates
-  editable cells against the v1.0 schemas and the per-cell actionResponse
-  handshake.
+  A second surface over the inline-cell-editing fixture of
+  `AshA2ui.Test.EditableWordsUI`, under its own surface id.
   """
 
   use AshA2ui.Standalone
@@ -36,7 +34,6 @@ defmodule AshA2ui.Test.EditableWordsV1UI do
   a2ui do
     for_resource AshA2ui.Test.BucketWord
     surface_id "editable_words_v1"
-    spec_version "1.0"
 
     component :table do
       fields [:word, :replacement]

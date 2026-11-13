@@ -1,7 +1,7 @@
 defmodule AshA2ui.Wave5EncoderTest do
   @moduledoc """
   Encoder tests for Wave 5: searchable-select composites and nested-form
-  sections, all messages validated against the vendored v0.9.1 JSON Schemas.
+  sections, all messages validated against the vendored A2UI 1.0 JSON Schemas.
   """
 
   use ExUnit.Case, async: false
@@ -10,6 +10,7 @@ defmodule AshA2ui.Wave5EncoderTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Test.{Author, Tag, Ticket, TicketNote, TicketSearchUI}
+  alias AshA2ui.Test.Surface
 
   setup do
     on_exit(fn ->
@@ -22,18 +23,12 @@ defmodule AshA2ui.Wave5EncoderTest do
   end
 
   defp components(messages) do
-    %{"updateComponents" => %{"components" => components}} =
-      Enum.find(messages, &Map.has_key?(&1, "updateComponents"))
+    components = Surface.components(messages)
 
     Map.new(components, &{&1["id"], &1})
   end
 
-  defp data_model(messages) do
-    %{"updateDataModel" => %{"path" => "/", "value" => value}} =
-      Enum.find(messages, &Map.has_key?(&1, "updateDataModel"))
-
-    value
-  end
+  defp data_model(messages), do: Surface.data_model(messages)
 
   describe "searchable select composite (TicketSearchUI)" do
     setup do
@@ -42,7 +37,7 @@ defmodule AshA2ui.Wave5EncoderTest do
     end
 
     test "all messages are schema-valid", %{messages: messages} do
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
     end
 
     test "emits the composite instead of a ChoicePicker", %{messages: messages} do
@@ -67,30 +62,34 @@ defmodule AshA2ui.Wave5EncoderTest do
              ]
 
       assert components["form_select_author_id_selected"]["text"] ==
-               %{"path" => "/select/author_id/label"}
+               %{"@path" => "/select/author_id/label"}
 
       assert components["form_select_author_id_search_input"]["value"] ==
-               %{"path" => "/select/author_id/search"}
+               %{"@path" => "/select/author_id/search"}
 
-      assert components["form_select_author_id_search_button"]["action"]["event"] == %{
-               "name" => "option_search",
-               "context" => %{
-                 "field" => "author_id",
-                 "search" => %{"path" => "/select/author_id/search"}
+      assert components["form_select_author_id_search_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") ==
+               %{
+                 "name" => "option_search",
+                 "context" => %{
+                   "field" => "author_id",
+                   "search" => %{"@path" => "/select/author_id/search"}
+                 }
                }
-             }
 
       assert components["form_select_author_id_options"]["children"] == %{
                "componentId" => "form_select_author_id_option_button",
                "path" => "/options/author_id"
              }
 
-      assert components["form_select_author_id_option_button"]["action"]["event"] == %{
-               "name" => "option_select",
-               "context" => %{"field" => "author_id", "value" => %{"path" => "value"}}
-             }
+      assert components["form_select_author_id_option_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") ==
+               %{
+                 "name" => "option_select",
+                 "context" => %{"field" => "author_id", "value" => %{"@path" => "value"}}
+               }
 
-      assert components["form_select_author_id_option_text"]["text"] == %{"path" => "label"}
+      assert components["form_select_author_id_option_text"]["text"] == %{"@path" => "label"}
     end
 
     test "searchable pick_existing renders search controls and nested_add options",
@@ -112,23 +111,25 @@ defmodule AshA2ui.Wave5EncoderTest do
       assert components["nested_tags_row"]["children"] ==
                ["nested_tags_row_label", "nested_tags_remove_button"]
 
-      assert components["nested_tags_row_label"]["text"] == %{"path" => "label"}
+      assert components["nested_tags_row_label"]["text"] == %{"@path" => "label"}
 
-      assert components["nested_tags_remove_button"]["action"]["event"] == %{
+      assert components["nested_tags_remove_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") == %{
                "name" => "nested_remove",
                "context" => %{
                  "argument" => "tags",
-                 "row" => %{"path" => "_row"},
-                 "rows" => %{"path" => "/form/tags"}
+                 "row" => %{"@path" => "_row"},
+                 "rows" => %{"@path" => "/form/tags"}
                }
              }
 
-      assert components["nested_tags_option_button"]["action"]["event"] == %{
+      assert components["nested_tags_option_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") == %{
                "name" => "nested_add",
                "context" => %{
                  "argument" => "tags",
-                 "value" => %{"path" => "value"},
-                 "rows" => %{"path" => "/form/tags"}
+                 "value" => %{"@path" => "value"},
+                 "rows" => %{"@path" => "/form/tags"}
                }
              }
     end
@@ -159,7 +160,7 @@ defmodule AshA2ui.Wave5EncoderTest do
     end
 
     test "all messages are schema-valid", %{messages: messages} do
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
     end
 
     test "create_inline renders widget-mapped row inputs and an add button",
@@ -169,7 +170,7 @@ defmodule AshA2ui.Wave5EncoderTest do
       assert components["nested_notes"]["children"] ==
                ["nested_notes_heading", "nested_notes_rows", "nested_notes_add_button"]
 
-      assert components["nested_notes_heading"]["text"] == "Notes"
+      assert components["nested_notes_heading"]["text"] == "### Notes"
 
       assert components["nested_notes_row"]["children"] == [
                "nested_notes_input_body",
@@ -183,16 +184,17 @@ defmodule AshA2ui.Wave5EncoderTest do
                "id" => "nested_notes_input_body",
                "component" => "TextField",
                "label" => "Body",
-               "value" => %{"path" => "body"}
+               "value" => %{"@path" => "body"}
              }
 
       assert components["nested_notes_input_rating"]["variant"] == "number"
 
-      assert components["nested_notes_row_error_body"]["text"] == %{"path" => "_error_body"}
+      assert components["nested_notes_row_error_body"]["text"] == %{"@path" => "_error_body"}
 
-      assert components["nested_notes_add_button"]["action"]["event"] == %{
+      assert components["nested_notes_add_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") == %{
                "name" => "nested_add",
-               "context" => %{"argument" => "notes", "rows" => %{"path" => "/form/notes"}}
+               "context" => %{"argument" => "notes", "rows" => %{"@path" => "/form/notes"}}
              }
     end
 
@@ -211,14 +213,15 @@ defmodule AshA2ui.Wave5EncoderTest do
                %{"label" => "urgent", "value" => tag.id}
              ]
 
-      assert components["nested_tags_picker"]["value"] == %{"path" => "/select/tags/picked"}
+      assert components["nested_tags_picker"]["value"] == %{"@path" => "/select/tags/picked"}
 
-      assert components["nested_tags_add_button"]["action"]["event"] == %{
+      assert components["nested_tags_add_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") == %{
                "name" => "nested_add",
                "context" => %{
                  "argument" => "tags",
-                 "value" => %{"path" => "/select/tags/picked"},
-                 "rows" => %{"path" => "/form/tags"}
+                 "value" => %{"@path" => "/select/tags/picked"},
+                 "rows" => %{"@path" => "/form/tags"}
                }
              }
     end

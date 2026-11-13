@@ -12,34 +12,27 @@ defmodule AshA2ui.MultiTableTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.ResolvedView
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.ReviewItem
+  alias AshA2ui.Test.Surface
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "review",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "review", context)
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _ -> nil
     end)
   end
 
-  defp paths(messages), do: Enum.map(messages, & &1["updateDataModel"]["path"])
+  defp paths(messages), do: for(%{"updateDataModel" => %{"path" => path}} <- messages, do: path)
 
   defp components_by_id(messages) do
     messages
-    |> Enum.find_value(& &1["updateComponents"])
-    |> Map.fetch!("components")
+    |> Surface.components()
     |> Map.new(&{&1["id"], &1})
   end
 
@@ -99,7 +92,7 @@ defmodule AshA2ui.MultiTableTest do
   describe "encoder: component tree" do
     setup do
       messages = AshA2ui.Info.build_surface(ReviewItem)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       %{messages: messages, components: components_by_id(messages)}
     end
 
@@ -145,20 +138,20 @@ defmodule AshA2ui.MultiTableTest do
              }
 
       assert components["record_row_new_items_content"]["children"] == [
-               "table_cell_new_items_name",
-               "table_cell_new_items_count",
+               "table_cell_new_items_name_row",
+               "table_cell_new_items_count_row",
                "row_action_new_items_approve_button",
                "row_action_new_items_destroy_button",
                "view_new_items_button",
                "edit_new_items_button"
              ]
 
-      assert components["table_cell_done_items_state_value"]["text"] == %{"path" => "state"}
+      assert components["table_cell_done_items_state_value"]["text"] == %{"@path" => "state"}
     end
 
     test "headings show the humanized component names", %{components: components} do
-      assert components["table_heading_new_items"]["text"] == "New items"
-      assert components["table_heading_done_items"]["text"] == "Done items"
+      assert components["table_heading_new_items"]["text"] == "## New items"
+      assert components["table_heading_done_items"]["text"] == "## Done items"
     end
 
     test "row action buttons carry component + the whole /query binding", %{
@@ -166,13 +159,16 @@ defmodule AshA2ui.MultiTableTest do
     } do
       assert %{
                "action" => %{
-                 "event" => %{
-                   "name" => "invoke",
-                   "context" => %{
-                     "action" => "approve",
-                     "recordId" => %{"path" => "id"},
-                     "component" => "new_items",
-                     "query" => %{"path" => "/query"}
+                 "functionCall" => %{
+                   "@call" => "ashAction",
+                   "args" => %{
+                     "name" => "invoke",
+                     "context" => %{
+                       "action" => "approve",
+                       "recordId" => %{"@path" => "id"},
+                       "component" => "new_items",
+                       "query" => %{"@path" => "/query"}
+                     }
                    }
                  }
                }
@@ -180,23 +176,26 @@ defmodule AshA2ui.MultiTableTest do
     end
 
     test "query controls are scoped to the table's query path", %{components: components} do
-      assert %{"value" => %{"path" => "/query/new_items/search"}} =
+      assert %{"value" => %{"@path" => "/query/new_items/search"}} =
                components["query_new_items_search_input"]
 
       assert %{
                "action" => %{
-                 "event" => %{
-                   "name" => "query",
-                   "context" => %{
-                     "query" => %{"path" => "/query/new_items"},
-                     "component" => "new_items",
-                     "page" => 1
+                 "functionCall" => %{
+                   "@call" => "ashAction",
+                   "args" => %{
+                     "name" => "query",
+                     "context" => %{
+                       "query" => %{"@path" => "/query/new_items"},
+                       "component" => "new_items",
+                       "page" => 1
+                     }
                    }
                  }
                }
              } = components["query_new_items_apply_button"]
 
-      assert %{"text" => %{"path" => "/query/new_items/_range_text"}} =
+      assert %{"text" => %{"@path" => "/query/new_items/_range_text"}} =
                components["query_new_items_page_text"]
 
       # the query-less table gets no controls
@@ -210,7 +209,7 @@ defmodule AshA2ui.MultiTableTest do
       create_item!("Old", state: :done)
 
       messages = AshA2ui.Info.build_surface(ReviewItem)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       data = value_at(messages, "/")
 
@@ -226,7 +225,7 @@ defmodule AshA2ui.MultiTableTest do
       create_item!("Old", state: :done)
 
       message = AshA2ui.Info.build_data_model(ReviewItem)
-      assert_valid_server_message(message)
+      assert_valid_agent_message(message)
 
       data = message["updateDataModel"]["value"]
       assert [%{"name" => "Fresh"}] = data["records"]["new_items"]
@@ -240,10 +239,10 @@ defmodule AshA2ui.MultiTableTest do
       create_item!("Old", state: :done)
 
       env = envelope("invoke", %{"action" => "approve", "recordId" => item.id})
-      assert_valid_client_message(env)
+      assert_valid_renderer_message(env)
 
       assert {:ok, messages} = ActionHandler.handle(ReviewItem, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       # the update-type row action ran the :approve action itself
       assert Ash.get!(ReviewItem, item.id, authorize?: false).state == :done
@@ -266,7 +265,7 @@ defmodule AshA2ui.MultiTableTest do
       env = envelope("invoke", %{"action" => "destroy", "recordId" => item.id})
 
       assert {:ok, messages} = ActionHandler.handle(ReviewItem, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/records/new_items") == []
       assert [%{"name" => "Old"}] = value_at(messages, "/records/done_items")
@@ -277,7 +276,7 @@ defmodule AshA2ui.MultiTableTest do
       env = envelope("submit_form", %{"values" => %{"name" => "Created", "count" => 1}})
 
       assert {:ok, messages} = ActionHandler.handle(ReviewItem, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert [%{"name" => "Created", "count" => 1}] = value_at(messages, "/records/new_items")
       assert value_at(messages, "/records/done_items") == []
@@ -314,7 +313,7 @@ defmodule AshA2ui.MultiTableTest do
         })
 
       assert {:ok, messages} = ActionHandler.handle(ReviewItem, env)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert paths(messages) == [
                "/records/new_items",

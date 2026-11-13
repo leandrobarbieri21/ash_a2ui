@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-      "surfaceId": "kitchen_sink"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2",
       "components": [
         {
           "children": [
@@ -22,10 +16,16 @@
           "title": "Kitchen sink"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -34,6 +34,7 @@
           "variant": "primary"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "create_text",
           "text": "Create Kitchen sink"
@@ -93,7 +94,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "View"
@@ -103,7 +104,7 @@
               "context": {
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "Edit"
@@ -114,7 +115,7 @@
                 "action": "update",
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "label": "Update"
@@ -125,7 +126,7 @@
                 "action": "destroy",
                 "component": "table",
                 "recordId": {
-                  "path": "id"
+                  "@path": "id"
                 }
               },
               "destructive": true,
@@ -137,14 +138,14 @@
             "context": {
               "component": "table",
               "recordId": {
-                "path": "id"
+                "@path": "id"
               }
             },
             "label": "View"
           },
           "rowId": "id",
           "rows": {
-            "path": "/records"
+            "@path": "/records"
           }
         },
         {
@@ -152,7 +153,7 @@
           "component": "emptyState",
           "id": "empty_state",
           "message": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
@@ -170,13 +171,13 @@
           "component": "recordPanel",
           "id": "record_panel",
           "mode": {
-            "path": "/ui/panel/mode"
+            "@path": "/ui/panel/mode"
           },
           "recordId": {
-            "path": "/ui/panel/record_id"
+            "@path": "/ui/panel/record_id"
           },
           "title": {
-            "path": "/ui/panel/title"
+            "@path": "/ui/panel/title"
           }
         },
         {
@@ -185,7 +186,7 @@
           "id": "field_display_active",
           "label": "Active",
           "value": {
-            "path": "/ui/panel/record/active"
+            "@path": "/ui/panel/record/active"
           }
         },
         {
@@ -194,7 +195,7 @@
           "id": "field_display_count",
           "label": "Count",
           "value": {
-            "path": "/ui/panel/record/count"
+            "@path": "/ui/panel/record/count"
           }
         },
         {
@@ -203,7 +204,7 @@
           "id": "field_display_price",
           "label": "Price",
           "value": {
-            "path": "/ui/panel/record/price"
+            "@path": "/ui/panel/record/price"
           }
         },
         {
@@ -212,7 +213,7 @@
           "id": "field_display_birthday",
           "label": "Birthday",
           "value": {
-            "path": "/ui/panel/record/birthday"
+            "@path": "/ui/panel/record/birthday"
           }
         },
         {
@@ -221,7 +222,7 @@
           "id": "field_display_scheduled_at",
           "label": "Scheduled at",
           "value": {
-            "path": "/ui/panel/record/scheduled_at"
+            "@path": "/ui/panel/record/scheduled_at"
           }
         },
         {
@@ -229,7 +230,7 @@
           "id": "field_display_status",
           "label": "Status",
           "value": {
-            "path": "/ui/panel/record/status"
+            "@path": "/ui/panel/record/status"
           }
         },
         {
@@ -237,7 +238,7 @@
           "id": "field_display_name",
           "label": "Name",
           "value": {
-            "path": "/ui/panel/record/name"
+            "@path": "/ui/panel/record/name"
           }
         },
         {
@@ -261,52 +262,58 @@
           "id": "form_section"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "CheckBox",
           "id": "form_input_active",
           "label": "Active",
           "value": {
-            "path": "/form/active"
+            "@path": "/form/active"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_input_count",
           "label": "Count",
           "value": {
-            "path": "/form/count"
+            "@path": "/form/count"
           },
           "variant": "number"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_input_price",
           "label": "Price",
           "value": {
-            "path": "/form/price"
+            "@path": "/form/price"
           },
           "variant": "number"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "DateTimeInput",
           "enableDate": true,
           "enableTime": false,
           "id": "form_input_birthday",
           "label": "Birthday",
           "value": {
-            "path": "/form/birthday"
+            "@path": "/form/birthday"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "DateTimeInput",
           "enableDate": true,
           "enableTime": true,
           "id": "form_input_scheduled_at",
           "label": "Scheduled at",
           "value": {
-            "path": "/form/scheduled_at"
+            "@path": "/form/scheduled_at"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "ChoicePicker",
           "id": "form_input_status",
           "label": "Status",
@@ -325,86 +332,99 @@
             }
           ],
           "value": {
-            "path": "/form/status"
+            "@path": "/form/status"
           },
           "variant": "mutuallyExclusive"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "TextField",
           "id": "form_input_name",
           "label": "Name",
           "value": {
-            "path": "/form/name"
+            "@path": "/form/name"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_active",
           "text": {
-            "path": "/errors/active"
+            "@path": "/errors/active"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_count",
           "text": {
-            "path": "/errors/count"
+            "@path": "/errors/count"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_price",
           "text": {
-            "path": "/errors/price"
+            "@path": "/errors/price"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_birthday",
           "text": {
-            "path": "/errors/birthday"
+            "@path": "/errors/birthday"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_scheduled_at",
           "text": {
-            "path": "/errors/scheduled_at"
+            "@path": "/errors/scheduled_at"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_status",
           "text": {
-            "path": "/errors/status"
+            "@path": "/errors/status"
           },
           "variant": "caption"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_error_name",
           "text": {
-            "path": "/errors/name"
+            "@path": "/errors/name"
           },
           "variant": "caption"
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "recordId": {
-                  "path": "/form/id"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "action_bar"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "busy": false,
@@ -414,14 +434,20 @@
           "component": "actionBar",
           "id": "action_bar",
           "primaryLabel": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -429,6 +455,7 @@
           "id": "form_cancel_button"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "form_cancel_text",
           "text": "Cancel"
@@ -437,13 +464,14 @@
           "component": "statusBanner",
           "id": "status_banner",
           "kind": {
-            "path": "/ui/feedback/kind"
+            "@path": "/ui/feedback/kind"
           },
           "message": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "children": [
             "action_result_text"
           ],
@@ -451,22 +479,15 @@
           "id": "action_result_panel"
         },
         {
+          "@catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "kitchen_sink"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "kitchen_sink",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Kitchen sink records yet.",
         "_empty_visible": [
           {
@@ -478,11 +499,17 @@
         "options": {},
         "records": [],
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -496,8 +523,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "kitchen_sink"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

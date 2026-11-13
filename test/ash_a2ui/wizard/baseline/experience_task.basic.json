@@ -1,13 +1,7 @@
 [
   {
     "createSurface": {
-      "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
-      "surfaceId": "experience_task"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateComponents": {
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
       "components": [
         {
           "children": [
@@ -27,8 +21,7 @@
         {
           "component": "Text",
           "id": "table_heading",
-          "text": "Task",
-          "variant": "h2"
+          "text": "## Task"
         },
         {
           "children": {
@@ -57,20 +50,25 @@
           "id": "query_search_input",
           "label": "Search",
           "value": {
-            "path": "/query/search"
+            "@path": "/query/search"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "page": 1,
-                "query": {
-                  "path": "/query"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "page": 1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_apply_button"
               },
-              "name": "query"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "query_apply_text",
@@ -109,15 +107,20 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "pageDelta": -1,
-                "query": {
-                  "path": "/query"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "pageDelta": -1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_prev_button"
               },
-              "name": "query"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "query_prev_text",
@@ -133,7 +136,7 @@
           "component": "Text",
           "id": "query_page_text",
           "text": {
-            "path": "/query/_range_text"
+            "@path": "/query/_range_text"
           }
         },
         {
@@ -146,15 +149,20 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "pageDelta": 1,
-                "query": {
-                  "path": "/query"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "pageDelta": 1,
+                  "query": {
+                    "@path": "/query"
+                  }
+                },
+                "name": "query",
+                "sourceComponentId": "query_next_button"
               },
-              "name": "query"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "query_next_text",
@@ -168,9 +176,14 @@
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "start_create"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "start_create",
+                "sourceComponentId": "create_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "create_text",
@@ -190,7 +203,7 @@
         },
         {
           "children": [
-            "table_cell_name",
+            "table_cell_name_row",
             "row_action_destroy_button",
             "view_button",
             "edit_button"
@@ -204,7 +217,7 @@
             "table_cell_name_value"
           ],
           "component": "Row",
-          "id": "table_cell_name"
+          "id": "table_cell_name_row"
         },
         {
           "component": "Text",
@@ -216,23 +229,28 @@
           "component": "Text",
           "id": "table_cell_name_value",
           "text": {
-            "path": "name"
+            "@path": "name"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "action": "destroy",
-                "component": "table",
-                "query": {
-                  "path": "/query"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "action": "destroy",
+                  "component": "table",
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "recordId": {
+                    "@path": "id"
+                  }
                 },
-                "recordId": {
-                  "path": "id"
-                }
+                "name": "invoke",
+                "sourceComponentId": "row_action_destroy_button"
               },
-              "name": "invoke"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "row_action_destroy_text",
@@ -246,14 +264,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "view_record",
+                "sourceComponentId": "view_button"
               },
-              "name": "view_record"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "view_button_text",
@@ -267,14 +290,19 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "component": "table",
-                "recordId": {
-                  "path": "id"
-                }
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "component": "table",
+                  "recordId": {
+                    "@path": "id"
+                  }
+                },
+                "name": "start_edit",
+                "sourceComponentId": "edit_button"
               },
-              "name": "start_edit"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "edit_button_text",
@@ -298,7 +326,7 @@
           "component": "Text",
           "id": "empty_state_text",
           "text": {
-            "path": "_empty_message"
+            "@path": "_empty_message"
           }
         },
         {
@@ -370,7 +398,7 @@
           "component": "Text",
           "id": "panel_view_name_value",
           "text": {
-            "path": "/ui/panel/record/name"
+            "@path": "/ui/panel/record/name"
           }
         },
         {
@@ -394,14 +422,14 @@
           "id": "form_input_name",
           "label": "Name",
           "value": {
-            "path": "/form/name"
+            "@path": "/form/name"
           }
         },
         {
           "component": "Text",
           "id": "form_error_name",
           "text": {
-            "path": "/errors/name"
+            "@path": "/errors/name"
           },
           "variant": "caption"
         },
@@ -409,9 +437,11 @@
           "component": "Text",
           "id": "form_title",
           "text": {
-            "path": "/ui/panel/title"
-          },
-          "variant": "h3"
+            "@call": "formatString",
+            "args": {
+              "value": "### ${/ui/panel/title}"
+            }
+          }
         },
         {
           "children": {
@@ -423,19 +453,24 @@
         },
         {
           "action": {
-            "event": {
-              "context": {
-                "query": {
-                  "path": "/query"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {
+                  "query": {
+                    "@path": "/query"
+                  },
+                  "recordId": {
+                    "@path": "/form/id"
+                  },
+                  "values": {
+                    "@path": "/form"
+                  }
                 },
-                "recordId": {
-                  "path": "/form/id"
-                },
-                "values": {
-                  "path": "/form"
-                }
+                "name": "submit_form",
+                "sourceComponentId": "form_submit_button"
               },
-              "name": "submit_form"
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_submit_text",
@@ -447,14 +482,19 @@
           "component": "Text",
           "id": "form_submit_text",
           "text": {
-            "path": "/ui/panel/primary_label"
+            "@path": "/ui/panel/primary_label"
           }
         },
         {
           "action": {
-            "event": {
-              "context": {},
-              "name": "cancel_record_task"
+            "functionCall": {
+              "@call": "ashAction",
+              "args": {
+                "context": {},
+                "name": "cancel_record_task",
+                "sourceComponentId": "form_cancel_button"
+              },
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
             }
           },
           "child": "form_cancel_text",
@@ -470,7 +510,7 @@
           "component": "Text",
           "id": "status_text",
           "text": {
-            "path": "/ui/feedback/message"
+            "@path": "/ui/feedback/message"
           }
         },
         {
@@ -484,19 +524,11 @@
           "component": "Text",
           "id": "action_result_text",
           "text": {
-            "path": "/ui/action_result_text"
+            "@path": "/ui/feedback/resultText"
           }
         }
       ],
-      "surfaceId": "experience_task"
-    },
-    "version": "v0.9.1"
-  },
-  {
-    "updateDataModel": {
-      "path": "/",
-      "surfaceId": "experience_task",
-      "value": {
+      "dataModel": {
         "_empty_message": "No Task records yet.",
         "_empty_visible": [
           {
@@ -524,11 +556,17 @@
         },
         "records": [],
         "ui": {
-          "action_result": {},
-          "action_result_text": "",
           "feedback": {
-            "kind": null,
-            "message": ""
+            "code": "",
+            "functionCallId": "",
+            "kind": "",
+            "message": "",
+            "result": {},
+            "resultText": ""
+          },
+          "feedback_text": {
+            "pending": "Working…",
+            "slow": "This is taking longer than usual. Still working…"
           },
           "intent": "browse",
           "panel": {
@@ -542,8 +580,9 @@
             "visible": []
           }
         }
-      }
+      },
+      "surfaceId": "experience_task"
     },
-    "version": "v0.9.1"
+    "version": "1.0"
   }
 ]

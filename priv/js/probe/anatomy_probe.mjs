@@ -15,8 +15,8 @@
  * structure) and zero console errors.
  *
  * Fixtures are recorded wire payloads (see the header of
- * anatomy_probe.html; re-record with the mix run one-liners in
- * picker_probe.mjs's pattern).
+ * anatomy_probe.html); re-record them with
+ * `MIX_ENV=test mix run priv/js/probe/record_forms.exs`.
  */
 
 import {cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync} from "node:fs";
@@ -213,7 +213,7 @@ async function main() {
     const surfaceId = window.__surfaceId;
     window.__feed([
       {
-        version: "v0.9.1",
+        version: "1.0",
         updateDataModel: {
           surfaceId,
           path: "/records",
@@ -385,8 +385,8 @@ async function main() {
     await page.evaluate(() => {
       const surfaceId = window.__surfaceId;
       window.__feed([
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/ui/feedback/message", value: "Promotion created."}},
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/ui/feedback/kind", value: "success"}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/ui/feedback/message", value: "Promotion created."}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/ui/feedback/kind", value: "success"}},
       ]);
     });
     await page.waitForTimeout(400);
@@ -416,8 +416,8 @@ async function main() {
     await page.evaluate(() => {
       const surfaceId = window.__surfaceId;
       window.__feed([
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/ui/feedback/message", value: "Refused."}},
-        {version: "v0.9.1", updateDataModel: {surfaceId, path: "/ui/feedback/kind", value: "error"}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/ui/feedback/message", value: "Refused."}},
+        {version: "1.0", updateDataModel: {surfaceId, path: "/ui/feedback/kind", value: "error"}},
       ]);
     });
     await page.waitForTimeout(400);
@@ -511,7 +511,7 @@ async function main() {
     await page.evaluate(() => {
       const surfaceId = window.__surfaceId;
       const sentinel = (path) => ({
-        version: "v0.9.1",
+        version: "1.0",
         updateDataModel: {surfaceId, path, value: [{"id": "on"}]},
       });
       window.__feed([

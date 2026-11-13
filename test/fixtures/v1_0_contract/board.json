@@ -1,0 +1,164 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "contract_board",
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+      "components": [
+        {
+          "id": "root",
+          "component": "Column",
+          "children": [
+            "title",
+            "lanes"
+          ]
+        },
+        {
+          "id": "title",
+          "component": "Text",
+          "text": "## Board"
+        },
+        {
+          "id": "lanes",
+          "component": "Row",
+          "align": "start",
+          "children": {
+            "componentId": "lane",
+            "path": "/lanes"
+          }
+        },
+        {
+          "id": "lane",
+          "component": "Column",
+          "weight": 1,
+          "children": [
+            "lane_title",
+            "lane_cards"
+          ]
+        },
+        {
+          "id": "lane_title",
+          "component": "Text",
+          "text": {
+            "@call": "formatString",
+            "args": {
+              "value": "${title} (${count})"
+            }
+          }
+        },
+        {
+          "id": "lane_cards",
+          "component": "List",
+          "direction": "vertical",
+          "children": {
+            "componentId": "card",
+            "path": "cards"
+          }
+        },
+        {
+          "id": "card",
+          "component": "Card",
+          "child": "card_body"
+        },
+        {
+          "id": "card_body",
+          "component": "Column",
+          "children": [
+            "card_rank",
+            "card_title",
+            "card_move"
+          ]
+        },
+        {
+          "id": "card_rank",
+          "component": "Text",
+          "variant": "caption",
+          "text": {
+            "@call": "@index",
+            "args": {
+              "offset": 1
+            }
+          }
+        },
+        {
+          "id": "card_title",
+          "component": "Text",
+          "text": {
+            "@path": "title"
+          }
+        },
+        {
+          "id": "card_move",
+          "component": "Button",
+          "variant": "borderless",
+          "child": "card_move_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "move_card",
+                "sourceComponentId": "card_move",
+                "context": {
+                  "id": {
+                    "@path": "id"
+                  },
+                  "to": "done"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "card_move_label",
+          "component": "Icon",
+          "name": "arrowForward",
+          "@accessibility": {
+            "label": "Move to Done"
+          }
+        }
+      ],
+      "dataModel": {
+        "lanes": [
+          {
+            "key": "open",
+            "title": "Open",
+            "count": 2,
+            "cards": [
+              {
+                "id": "c1",
+                "title": "Draft"
+              },
+              {
+                "id": "c2",
+                "title": "Spec"
+              }
+            ]
+          },
+          {
+            "key": "done",
+            "title": "Done",
+            "count": 1,
+            "cards": [
+              {
+                "id": "c3",
+                "title": "Vendor"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_board",
+      "path": "/lanes/1/cards/1",
+      "value": {
+        "id": "c1",
+        "title": "Draft"
+      }
+    }
+  }
+]

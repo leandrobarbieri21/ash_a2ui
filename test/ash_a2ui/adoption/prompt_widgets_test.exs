@@ -16,6 +16,7 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Adoption.{Clerk, Job, JobsUI, SearchJobsUI}
+  alias AshA2ui.Test.Messages
 
   @red %{id: "u-red", team: "red"}
 
@@ -36,28 +37,19 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
 
   defp surface(ui) do
     messages = AshA2ui.Info.build_surface(ui, actor: @red)
-    Enum.each(messages, &assert_valid_server_message/1)
-    [_create, components, data] = messages
+    Enum.each(messages, &assert_valid_agent_message/1)
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] = messages
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
+    {Map.new(components, &{&1["id"], &1}), data}
   end
 
   defp envelope(surface_id, name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface_id,
-        "sourceComponentId" => "test",
-        "timestamp" => "2026-10-16T00:00:00Z",
-        "context" => context
-      }
-    }
+    Messages.call(name, surface_id, context, source: "test")
   end
 
   defp write_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)
@@ -69,7 +61,7 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
 
     assert input["component"] == "ChoicePicker"
     assert input["variant"] == "mutuallyExclusive"
-    assert input["value"] == %{"path" => "/prompt/values/assign/clerk_id"}
+    assert input["value"] == %{"@path" => "/prompt/values/assign/clerk_id"}
     assert input["label"] == "Clerk id"
     assert input["options"] |> Enum.map(& &1["label"]) |> Enum.sort() == ["Ravi", "Rhea"]
     assert data["options"]["clerk_id"] == input["options"]
@@ -80,7 +72,7 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
     input = by_id["row_action_reprioritize_prompt_input_priority"]
 
     assert input["component"] == "ChoicePicker"
-    assert input["value"] == %{"path" => "/prompt/values/reprioritize/priority"}
+    assert input["value"] == %{"@path" => "/prompt/values/reprioritize/priority"}
 
     assert input["options"] == [
              %{"label" => "Low", "value" => "low"},
@@ -183,20 +175,21 @@ defmodule AshA2ui.Adoption.PromptWidgetsTest do
       assert by_id[base]["component"] == "Column"
 
       assert by_id["#{base}_selected"]["text"] == %{
-               "path" => "/prompt/select/assign/clerk_id/label"
+               "@path" => "/prompt/select/assign/clerk_id/label"
              }
 
-      assert by_id["#{base}_search_button"]["action"]["event"] == %{
+      assert by_id["#{base}_search_button"]["action"]["functionCall"]["args"]
+             |> Map.delete("sourceComponentId") == %{
                "name" => "option_search",
                "context" => %{
                  "field" => "clerk_id",
-                 "search" => %{"path" => "/prompt/select/assign/clerk_id/search"}
+                 "search" => %{"@path" => "/prompt/select/assign/clerk_id/search"}
                }
              }
 
-      assert by_id["#{base}_option_button"]["action"]["event"]["context"] == %{
+      assert by_id["#{base}_option_button"]["action"]["functionCall"]["args"]["context"] == %{
                "field" => "clerk_id",
-               "value" => %{"path" => "value"},
+               "value" => %{"@path" => "value"},
                "prompt" => "assign"
              }
 

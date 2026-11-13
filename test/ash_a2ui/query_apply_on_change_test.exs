@@ -11,7 +11,7 @@ defmodule AshA2ui.QueryApplyOnChangeTest do
 
   alias AshA2ui.Dynamic
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{BulkPresetsUI, LiveFiltersUI, SortOnlyUI}
+  alias AshA2ui.Test.{BulkPresetsUI, LiveFiltersUI, Messages, SortOnlyUI}
 
   setup do
     previous = Application.get_env(:ash_a2ui, :catalog)
@@ -19,8 +19,10 @@ defmodule AshA2ui.QueryApplyOnChangeTest do
   end
 
   defp build(ui) do
-    [_create, components, data] = AshA2ui.Info.build_surface(ui, authorize?: false)
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}), data}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(ui, authorize?: false)
+
+    {Map.new(components, &{&1["id"], &1}), data}
   end
 
   defp referenced_ids(components) do
@@ -38,29 +40,34 @@ defmodule AshA2ui.QueryApplyOnChangeTest do
   test "without the option the query state has no autoApply" do
     {components, data} = build(BulkPresetsUI)
 
-    refute Map.has_key?(data["updateDataModel"]["value"]["query"], "autoApply")
+    refute Map.has_key?(data["query"], "autoApply")
     assert %{"component" => "Button"} = components["query_apply_button"]
   end
 
   test "apply_on_change puts autoApply in the query state and keeps Apply in the tree" do
     {components, data} = build(LiveFiltersUI)
 
-    assert data["updateDataModel"]["value"]["query"]["autoApply"] == %{"debounceMs" => 300}
+    assert data["query"]["autoApply"] == %{"debounceMs" => 300}
 
-    assert %{"action" => %{"event" => %{"name" => "query", "context" => %{"page" => 1}}}} =
+    assert %{
+             "action" => %{
+               "functionCall" => %{
+                 "@call" => "ashAction",
+                 "args" => %{"name" => "query", "context" => %{"page" => 1}}
+               }
+             }
+           } =
              components["query_apply_button"]
 
     assert "query_apply_button" in components["query_controls_body"]["children"]
   end
 
   test "a query refresh keeps autoApply" do
-    envelope = %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "context" => %{"query" => %{"filters" => %{"status" => "approved"}}, "page" => 1}
-      }
-    }
+    envelope =
+      Messages.call("query", "test_surface", %{
+        "query" => %{"filters" => %{"status" => "approved"}},
+        "page" => 1
+      })
 
     assert {:ok, messages} = AshA2ui.ActionHandler.handle(LiveFiltersUI, envelope, actor: nil)
 
@@ -78,9 +85,11 @@ defmodule AshA2ui.QueryApplyOnChangeTest do
 
     allowlist = Dynamic.allowlist([AshA2ui.Test.BulkTask])
     {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
-    [_create, _components, data] = Dynamic.build_surface(surface, authorize?: false)
 
-    assert data["updateDataModel"]["value"]["query"]["autoApply"] == %{"debounceMs" => 300}
+    [%{"createSurface" => %{"components" => _components, "dataModel" => data}}] =
+      Dynamic.build_surface(surface, authorize?: false)
+
+    assert data["query"]["autoApply"] == %{"debounceMs" => 300}
   end
 
   for catalog <- [:basic, :admin_v1] do

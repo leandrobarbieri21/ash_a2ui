@@ -10,10 +10,11 @@ defmodule AshA2ui.EnumTypeTest do
   use ExUnit.Case, async: true
 
   alias AshA2ui.Test.EnumRecord
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   defp components(messages) do
-    %{"updateComponents" => %{"components" => components}} =
-      Enum.find(messages, &Map.has_key?(&1, "updateComponents"))
+    components = Surface.components(messages)
 
     Map.new(components, &{&1["id"], &1})
   end
@@ -62,15 +63,10 @@ defmodule AshA2ui.EnumTypeTest do
   end
 
   test "submitted enum strings cast through the form action" do
-    envelope = %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "submit_form",
-        "context" => %{
-          "values" => %{"name" => "cast me", "severity" => "very_high", "stage" => ["todo"]}
-        }
-      }
-    }
+    envelope =
+      Messages.call("submit_form", "test_surface", %{
+        "values" => %{"name" => "cast me", "severity" => "very_high", "stage" => ["todo"]}
+      })
 
     assert {:ok, _messages} = AshA2ui.ActionHandler.handle(EnumRecord, envelope, actor: nil)
 
@@ -85,8 +81,10 @@ defmodule AshA2ui.EnumTypeTest do
 
     Ash.create!(EnumRecord, %{name: "neither"}, authorize?: false)
 
-    [_create, _components, data] = AshA2ui.Info.build_surface(EnumRecord, authorize?: false)
-    records = Map.new(data["updateDataModel"]["value"]["records"], &{&1["name"], &1})
+    [%{"createSurface" => %{"components" => _components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(EnumRecord, authorize?: false)
+
+    records = Map.new(data["records"], &{&1["name"], &1})
 
     # a declared label (`Stage`) and a humanized one (`Severity`)
     assert %{"severity" => "Very high", "stage" => "In Progress"} = records["both"]
@@ -102,15 +100,10 @@ defmodule AshA2ui.EnumTypeTest do
     Ash.create!(EnumRecord, %{name: "low one", severity: :low}, authorize?: false)
     Ash.create!(EnumRecord, %{name: "high one", severity: :very_high}, authorize?: false)
 
-    envelope = %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "context" => %{
-          "query" => %{"filters" => %{"severity" => "very_high"}, "page" => 1}
-        }
-      }
-    }
+    envelope =
+      Messages.call("query", "test_surface", %{
+        "query" => %{"filters" => %{"severity" => "very_high"}, "page" => 1}
+      })
 
     assert {:ok, messages} = AshA2ui.ActionHandler.handle(EnumRecord, envelope, actor: nil)
 
@@ -122,13 +115,20 @@ defmodule AshA2ui.EnumTypeTest do
     assert record["severity"] == "Very high"
     assert record["_values"] == %{"severity" => "very_high"}
 
-    bogus = put_in(envelope, ["action", "context", "query", "filters", "severity"], "bogus")
+    bogus =
+      put_in(
+        envelope,
+        ["callAgentFunction", "callFunction", "args", "context", "query", "filters", "severity"],
+        "bogus"
+      )
+
     assert {:error, error_messages} = AshA2ui.ActionHandler.handle(EnumRecord, bogus, actor: nil)
 
     assert [
              %{
                "updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => status}}
-             }
+             },
+             %{"agentFunctionResponse" => %{"error" => %{"code" => "INVALID_ACTION"}}}
            ] =
              error_messages
 

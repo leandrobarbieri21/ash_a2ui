@@ -16,6 +16,7 @@ defmodule AshA2ui.Board.BoardSectionsTest do
   alias AshA2ui.Test.BoardTaskUI
   alias AshA2ui.Test.SeveritySectionsUI
   alias AshA2ui.Test.StatusSectionsUI
+  alias AshA2ui.Test.Surface
 
   defp create_task!(name, attrs) do
     Ash.create!(BoardTask, Map.put(attrs, :name, name), authorize?: false)
@@ -110,14 +111,10 @@ defmodule AshA2ui.Board.BoardSectionsTest do
     {messages, reads} =
       count_reads(fn -> AshA2ui.Info.build_surface(StatusSectionsUI, authorize?: false) end)
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     assert Enum.uniq(reads) == [:board_task]
 
-    records =
-      Enum.find_value(messages, fn
-        %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value["records"]
-        _other -> nil
-      end)
+    records = Surface.data_model(messages)["records"]
 
     assert [%{"name" => "one"}] = records["by_status_open"]
     assert [%{"name" => "two"}] = records["by_status_archived"]
@@ -168,16 +165,16 @@ defmodule AshA2ui.Board.BoardSectionsTest do
     create_task!("only", %{status: :open})
 
     messages = AshA2ui.Info.build_surface(BoardTaskUI, authorize?: false)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
       messages
-      |> Enum.find_value(& &1["updateComponents"])
-      |> Map.fetch!("components")
+      |> Surface.components()
       |> Map.new(&{&1["id"], &1})
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)

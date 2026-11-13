@@ -7,8 +7,7 @@ defmodule AshA2ui.Experience do
 
   ## The /ui reserved state
 
-  The initial data model's `"ui"` region holds (alongside the
-  `"action_result"` / `"action_result_text"` entries):
+  The initial data model's `"ui"` region holds:
 
     * `"intent"` — the client-facing task intent: `"browse"`, `"create"`,
       `"view"`, or `"edit"`.
@@ -17,8 +16,13 @@ defmodule AshA2ui.Experience do
       sentinels (`[]` hidden, one item visible — the exact technique the
       row-action `visible_when` slots use, see `AshA2ui.Conditions`),
       plus `"mode"`, `"title"`, `"primary_label"`, and `"record_id"`.
-    * `"feedback"` — the last action outcome: `"kind"` (`nil`, `"success"`,
-      `"warning"`, or `"error"`) and `"message"`.
+    * `"feedback"` — the outcome of the last action, one map written whole
+      (see `feedback/3`): `"kind"`, `"message"`, `"code"`,
+      `"functionCallId"`, `"result"` and `"resultText"`.
+    * `"feedback_text"` — the words a renderer writes into `"feedback"`
+      itself, in the surface's language: `"pending"` (shown the moment an
+      `ashAction` call goes out) and `"slow"` (shown when the call has not
+      been answered in time; the call is still pending).
 
   ## The task state machine
 
@@ -81,11 +85,8 @@ defmodule AshA2ui.Experience do
   @typedoc "The record task panel modes (`:hidden` for the closed state)."
   @type mode :: :create | :view | :edit | :hidden
 
-  @admin_catalog_id "https://ash-a2ui.dev/catalogs/admin/v1"
-  @basic_catalog_ids [
-    "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
-    "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
-  ]
+  @admin_catalog_id "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2"
+  @feedback_kinds ["", "pending", "success", "warning", "error"]
 
   @doc """
   The configured component catalog: `:basic` (default) or `:admin_v1`
@@ -112,21 +113,26 @@ defmodule AshA2ui.Experience do
   def admin?(%ResolvedView{catalog: catalog}), do: catalog == :admin_v1
 
   @doc """
-  The catalog to build a surface with for a client that sent its A2UI
-  client capabilities (`a2uiClientCapabilities`, the
-  `priv/a2ui/v1_0/client_capabilities.json` shape, or the v0.9 one):
-  pass the result as the `:catalog` option of `AshA2ui.Info.build_surface/2`,
+  The catalog to build a surface with for a renderer that sent its A2UI
+  renderer capabilities (the `priv/a2ui/v1_0/json/renderer_capabilities.json`
+  shape, `%{"1.0" => %{"supportedCatalogIds" => [...]}}`): pass the result
+  as the `:catalog` option of `AshA2ui.Info.build_surface/2`,
   `AshA2ui.Dynamic.build_surface/2` and `AshA2ui.ActionHandler.handle/3`.
 
+  Every surface needs the basic catalog and the ash_a2ui catalog
+  (`AshA2ui.Encoder.ash_catalog_id/0`, which declares the `ashAction`
+  function every server-handled action calls); an admin surface needs the
+  admin catalog too.
+
     * `{:ok, :admin_v1}` — the configured catalog is `:admin_v1` and the
-      client lists the admin catalog id.
-    * `{:ok, :basic}` — otherwise, when the client lists the basic catalog
-      id (v1.0's or v0.9's). The admin catalog extends the basic one, so
-      this is the fallback for a client without the admin catalog.
-    * `{:error, :no_common_catalog}` — the client lists neither, or sent
-      capabilities without a `supportedCatalogIds` list. No surface this
-      library builds can be rendered there; what the client gets instead
-      is the host's choice (text, a link).
+      renderer lists the basic, ash_a2ui and admin catalog ids.
+    * `{:ok, :basic}` — otherwise, when the renderer lists the basic and
+      ash_a2ui catalog ids. This is the fallback for a renderer without
+      the admin catalog.
+    * `{:error, :no_common_catalog}` — the renderer lacks the basic or the
+      ash_a2ui catalog, or sent capabilities without a `supportedCatalogIds`
+      list. No surface this library builds can be rendered there; what the
+      renderer gets instead is the host's choice (text, a link).
 
   `nil` (the client sent no capabilities: no negotiation took place) is the
   configured `catalog/0`, so hosts that never pass capabilities see no
@@ -135,27 +141,17 @@ defmodule AshA2ui.Experience do
   @spec catalog_for(map | nil) :: {:ok, :basic | :admin_v1} | {:error, :no_common_catalog}
   def catalog_for(nil), do: {:ok, catalog()}
 
-  def catalog_for(%{} = capabilities) do
-    ids = supported_catalog_ids(capabilities)
+  def catalog_for(%{"1.0" => %{"supportedCatalogIds" => ids}}) when is_list(ids) do
+    base? = AshA2ui.Encoder.basic_catalog_id() in ids and AshA2ui.Encoder.ash_catalog_id() in ids
 
     cond do
-      catalog() == :admin_v1 and @admin_catalog_id in ids -> {:ok, :admin_v1}
-      Enum.any?(@basic_catalog_ids, &(&1 in ids)) -> {:ok, :basic}
+      base? and catalog() == :admin_v1 and @admin_catalog_id in ids -> {:ok, :admin_v1}
+      base? -> {:ok, :basic}
       true -> {:error, :no_common_catalog}
     end
   end
 
   def catalog_for(_other), do: {:error, :no_common_catalog}
-
-  defp supported_catalog_ids(capabilities) do
-    capabilities
-    |> Map.take(["v1.0", "v0.9"])
-    |> Map.values()
-    |> Enum.flat_map(fn
-      %{"supportedCatalogIds" => ids} when is_list(ids) -> Enum.filter(ids, &is_binary/1)
-      _other -> []
-    end)
-  end
 
   @doc false
   # The admin catalog id emitted on createSurface when the admin emission
@@ -163,18 +159,28 @@ defmodule AshA2ui.Experience do
   def admin_catalog_id, do: @admin_catalog_id
 
   @doc """
-  The admin catalog contract version (`"version"` in
-  `priv/a2ui/admin_v1/catalog.json`). Minor versions are additive within the
-  unchanged `admin_catalog_id/0` — 1.1 added the column presentation hints
+  The admin catalog contract version (`metadata.extensions.ash_a2ui.version`
+  in `priv/a2ui/admin_v1/catalog.json`). 2.0 is the A2UI 1.0 wire: the new
+  `admin_catalog_id/0`, `@path`/`@call` bindings, envelopes sent as
+  `ashAction`, and the `filterPicker` component. Minor versions are additive
+  within one catalog id — 1.1 added the column presentation hints
   (format/align/mono/badge/link), `rowClick`, FieldDisplay `link` and the
   `openSurface` client function; 1.2 added the `rowActions` entries'
   `visiblePath` (per-row `visible_when`) and `prompt` (prompt dialogs);
   1.7 added sortable headers (column `sortable`, the dataGrid's `sort`);
   1.10 added column `help` and `sortField`, the detail line's `helpPath`,
-  pagination page sizes and the extended ChoicePicker/TextField keys.
+  pagination page sizes and the extended ChoicePicker/TextField keys;
+  1.13 added plain links (`{href, label}` with no surface); 1.14 added
+  grouped list rows (column placements `group`/`groupSubtitle`, the
+  dataGrid's `groupIcon`, column `emptyText`); 1.15 added document rows
+  (the `leading` placement) and table footers (`footerNote`, `footerLink`);
+  1.16 added card rows (`layout: "cards"`), the `expandLabel` disclosure
+  label and labeled `pairs` columns; 1.17 added the fieldDisplay `steps`
+  stepper; 1.18 added a table card's own `heading` and `description`. 2.0
+  includes every 1.x addition.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "1.18.0"
+  def admin_catalog_version, do: "2.0.0"
 
   @doc """
   The zero-or-one visibility sentinel value: `[]` (hidden) or a one-item
@@ -192,7 +198,7 @@ defmodule AshA2ui.Experience do
   fresh surface is in browse mode with the record panel closed.
   """
   @spec initial_ui_state(ResolvedView.t()) :: %{String.t() => term}
-  def initial_ui_state(_view) do
+  def initial_ui_state(view) do
     %{
       "/ui/intent" => "browse",
       "/ui/panel/visible" => sentinel(false),
@@ -203,8 +209,10 @@ defmodule AshA2ui.Experience do
       "/ui/panel/submit_visible" => sentinel(false),
       "/ui/panel/form_visible" => sentinel(false),
       "/ui/panel/view_visible" => sentinel(false),
-      "/ui/feedback/kind" => nil,
-      "/ui/feedback/message" => ""
+      "/ui/feedback" => clear_feedback(),
+      "/ui/feedback_text/pending" => L10n.t(view.l10n, msg("Working…")),
+      "/ui/feedback_text/slow" =>
+        L10n.t(view.l10n, msg("This is taking longer than usual. Still working…"))
     }
   end
 
@@ -390,19 +398,45 @@ defmodule AshA2ui.Experience do
   end
 
   @doc """
-  A typed feedback value: `%{"kind" => kind, "message" => message}` where
-  `kind` is `"success"` / `"warning"` (a bulk run that partly succeeded) /
-  `"error"` / `nil`.
-  """
-  @spec feedback(String.t() | nil, String.t()) :: map
-  def feedback(kind, message \\ "")
-  def feedback(kind, message) when is_binary(message), do: %{"kind" => kind, "message" => message}
+  The `/ui/feedback` value: the outcome of the last action, always written
+  whole so no field of an earlier outcome survives.
 
-  @doc """
-  The cleared feedback value (`nil` kind, empty message).
+      %{
+        "kind" => kind,
+        "message" => message,
+        "code" => "",
+        "functionCallId" => "",
+        "result" => %{},
+        "resultText" => ""
+      }
+
+  `kind` is `""` (idle), `"pending"` (written by the renderer while an
+  `ashAction` call is in flight; with `"code" => "TIMEOUT"` once the call
+  has gone unanswered past the renderer's watchdog), `"success"`, `"warning"` (a bulk run that
+  partly succeeded) or `"error"`. `extra` sets any of the other keys:
+  `"code"` (the error code, `""` otherwise), `"functionCallId"` (the
+  `ashAction` call the outcome answers), `"result"` and `"resultText"` (a
+  map-returning generic action's result and its display text).
   """
+  @spec feedback(String.t(), String.t(), map) :: map
+  def feedback(kind, message \\ "", extra \\ %{})
+      when kind in @feedback_kinds and is_binary(message) and is_map(extra) do
+    extra = Map.take(extra, ["code", "functionCallId", "result", "resultText"])
+
+    %{
+      "kind" => kind,
+      "message" => message,
+      "code" => "",
+      "functionCallId" => "",
+      "result" => %{},
+      "resultText" => ""
+    }
+    |> Map.merge(extra)
+  end
+
+  @doc "The idle `/ui/feedback` value (see `feedback/3`)."
   @spec clear_feedback() :: map
-  def clear_feedback, do: feedback(nil, "")
+  def clear_feedback, do: feedback("")
 
   @doc """
   The pagination visibility/range state derived from a `/query` state map

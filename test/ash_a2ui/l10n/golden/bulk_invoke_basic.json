@@ -1,0 +1,175 @@
+[
+  {
+    "updateDataModel": {
+      "path": "/bulk/table/result",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "errors": [
+          {
+            "id": "TASK_BRAVO",
+            "message": "score: must be greater than or equal to 0"
+          }
+        ],
+        "failed": 1,
+        "ok": 2,
+        "refused": 0,
+        "skipped": 0
+      }
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/records",
+      "surfaceId": "bulk_tasks",
+      "value": [
+        {
+          "_actions": [
+            "flag"
+          ],
+          "_selected": false,
+          "_values": {
+            "status": "approved"
+          },
+          "_visible_approve": [],
+          "id": "TASK_ALPHA",
+          "score": 1,
+          "status": "Approved",
+          "title": "alpha"
+        },
+        {
+          "_actions": [
+            "approve",
+            "flag"
+          ],
+          "_selected": false,
+          "_values": {
+            "status": "open"
+          },
+          "_visible_approve": [
+            {
+              "id": "TASK_BRAVO"
+            }
+          ],
+          "id": "TASK_BRAVO",
+          "score": -1,
+          "status": "Open",
+          "title": "bravo"
+        },
+        {
+          "_actions": [
+            "flag"
+          ],
+          "_selected": false,
+          "_values": {
+            "status": "approved"
+          },
+          "_visible_approve": [],
+          "id": "TASK_CHARLIE",
+          "score": 2,
+          "status": "Approved",
+          "title": "charlie"
+        }
+      ]
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/_empty_visible",
+      "surfaceId": "bulk_tasks",
+      "value": []
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/query",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "_next_visible": [],
+        "_pagination_visible": [],
+        "_previous_visible": [],
+        "_range_text": "1–3 of 3",
+        "filters": {},
+        "hasMore": false,
+        "page": 1,
+        "pageSize": 5,
+        "search": "",
+        "sort": {
+          "dir": "asc",
+          "field": "title"
+        },
+        "totalCount": 3
+      }
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/form",
+      "surfaceId": "bulk_tasks",
+      "value": {}
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/errors",
+      "surfaceId": "bulk_tasks",
+      "value": {}
+    },
+    "version": "1.0"
+  },
+  {
+    "updateDataModel": {
+      "path": "/ui/feedback",
+      "surfaceId": "bulk_tasks",
+      "value": {
+        "code": "",
+        "functionCallId": "call-bulk_invoke",
+        "kind": "warning",
+        "message": "Approve: 2 of 3 selected records done; 1 failed.",
+        "result": {
+          "errors": [
+            {
+              "id": "TASK_BRAVO",
+              "message": "score: must be greater than or equal to 0"
+            }
+          ],
+          "failed": 1,
+          "ok": 2,
+          "refused": 0,
+          "skipped": 0
+        },
+        "resultText": ""
+      }
+    },
+    "version": "1.0"
+  },
+  {
+    "agentFunctionResponse": {
+      "functionCallId": "call-bulk_invoke",
+      "value": {
+        "code": "",
+        "functionCallId": "call-bulk_invoke",
+        "kind": "warning",
+        "message": "Approve: 2 of 3 selected records done; 1 failed.",
+        "result": {
+          "errors": [
+            {
+              "id": "TASK_BRAVO",
+              "message": "score: must be greater than or equal to 0"
+            }
+          ],
+          "failed": 1,
+          "ok": 2,
+          "refused": 0,
+          "skipped": 0
+        },
+        "resultText": ""
+      }
+    },
+    "version": "1.0"
+  }
+]

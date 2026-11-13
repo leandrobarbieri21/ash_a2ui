@@ -1,8 +1,8 @@
 defmodule AshA2ui.Test.L10nScenarios do
   @moduledoc false
   # The localization golden scenarios (ADR 0060): the initial build, a
-  # refresh, option lists and action feedback, on v0.9.1 and v1.0, with the
-  # basic and the admin catalog. Shared by the golden test and the
+  # refresh, option lists and action feedback, with the basic and the admin
+  # catalog. Shared by the golden test and the
   # pseudo-locale test, which re-runs them with a translator.
 
   import AshA2ui.Test.BulkHelpers, only: [rows: 2, contexts: 1]
@@ -17,33 +17,33 @@ defmodule AshA2ui.Test.L10nScenarios do
   alias AshA2ui.Test.Experience.Task
   alias AshA2ui.Test.HubContract
   alias AshA2ui.Test.HubUI
+  alias AshA2ui.Test.Messages
 
   # The scenarios, each `{name, catalog, fun}` where `fun.(extra_opts)` returns the
   # messages. `extra_opts` is how the localization tests re-run the same
   # scenarios with a translator.
   def scenarios do
     for {catalog, catalog_tag} <- [basic: "basic", admin_v1: "admin"],
-        {spec, spec_tag} <- [{"0.9.1", "v0_9_1"}, {"1.0", "v1_0"}],
-        {name, fun} <- scenario_funs(spec) do
-      {"#{name}_#{spec_tag}_#{catalog_tag}", catalog, fun}
+        {name, fun} <- scenario_funs() do
+      {"#{name}_#{catalog_tag}", catalog, fun}
     end
   end
 
-  defp scenario_funs(spec) do
+  defp scenario_funs do
     [
-      {"bulk_build", &bulk_build(spec, &1)},
-      {"bulk_refresh", &bulk_refresh(spec, &1)},
-      {"bulk_options", &bulk_options(spec, &1)},
-      {"bulk_invoke", &bulk_invoke(spec, &1)},
-      {"bulk_invoke_one", &bulk_invoke(spec, 1, &1)},
-      {"bulk_invoke_two", &bulk_invoke(spec, 2, &1)},
-      {"bulk_select_page", &bulk_select_page(spec, &1)},
-      {"task_build", &task_build(spec, &1)},
-      {"task_actions", &task_actions(spec, &1)},
-      {"hub_build", &hub_build(spec, &1)},
-      {"hub_no_results", &hub_no_results(spec, &1)},
-      {"board_build", &board_build(spec, &1)},
-      {"enum_build", &enum_build(spec, &1)}
+      {"bulk_build", &bulk_build(&1)},
+      {"bulk_refresh", &bulk_refresh(&1)},
+      {"bulk_options", &bulk_options(&1)},
+      {"bulk_invoke", &bulk_invoke(&1)},
+      {"bulk_invoke_one", &bulk_invoke(1, &1)},
+      {"bulk_invoke_two", &bulk_invoke(2, &1)},
+      {"bulk_select_page", &bulk_select_page(&1)},
+      {"task_build", &task_build(&1)},
+      {"task_actions", &task_actions(&1)},
+      {"hub_build", &hub_build(&1)},
+      {"hub_no_results", &hub_no_results(&1)},
+      {"board_build", &board_build(&1)},
+      {"enum_build", &enum_build(&1)}
     ]
   end
 
@@ -60,13 +60,12 @@ defmodule AshA2ui.Test.L10nScenarios do
   end
 
   @scenario_names for catalog <- ~w(basic admin),
-                      spec <- ~w(v0_9_1 v1_0),
                       name <-
                         ~w(bulk_build bulk_refresh bulk_options bulk_invoke bulk_invoke_one
                            bulk_invoke_two bulk_select_page
                            task_build task_actions hub_build hub_no_results board_build
                            enum_build),
-                      do: "#{name}_#{spec}_#{catalog}"
+                      do: "#{name}_#{catalog}"
 
   def scenario_names, do: @scenario_names
 
@@ -89,16 +88,16 @@ defmodule AshA2ui.Test.L10nScenarios do
     {project, tasks, substitutions}
   end
 
-  defp bulk_opts(spec, project, extra) do
-    [actor: BulkHelpers.actor(), spec_version: spec, context_state: contexts(project)] ++ extra
+  defp bulk_opts(project, extra) do
+    [actor: BulkHelpers.actor(), context_state: contexts(project)] ++ extra
   end
 
-  defp bulk_build(spec, extra) do
+  defp bulk_build(extra) do
     {project, _tasks, subs} = bulk_seed()
-    {Info.build_surface(BulkTasksUI, bulk_opts(spec, project, extra)), subs}
+    {Info.build_surface(BulkTasksUI, bulk_opts(project, extra)), subs}
   end
 
-  defp bulk_refresh(spec, extra) do
+  defp bulk_refresh(extra) do
     {project, _tasks, subs} = bulk_seed()
 
     query_state = %{
@@ -107,12 +106,12 @@ defmodule AshA2ui.Test.L10nScenarios do
       "sort" => %{"field" => "title", "dir" => "desc"}
     }
 
-    opts = bulk_opts(spec, project, [query_state: query_state] ++ extra)
+    opts = bulk_opts(project, [query_state: query_state] ++ extra)
 
     {[Info.build_data_model(BulkTasksUI, opts)], subs}
   end
 
-  defp bulk_options(spec, extra) do
+  defp bulk_options(extra) do
     {project, _tasks, subs} = bulk_seed()
 
     {_outcome, messages} =
@@ -123,16 +122,16 @@ defmodule AshA2ui.Test.L10nScenarios do
           "search" => "Apo",
           "contexts" => contexts(project)
         }),
-        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+        [actor: BulkHelpers.actor()] ++ extra
       )
 
     {messages, subs}
   end
 
-  defp bulk_invoke(spec, extra), do: bulk_invoke(spec, 3, extra)
+  defp bulk_invoke(extra), do: bulk_invoke(3, extra)
 
   # Approves the first `count` tasks: the status line's counts of 1 and 2.
-  defp bulk_invoke(spec, count, extra) do
+  defp bulk_invoke(count, extra) do
     {project, all_tasks, subs} = bulk_seed()
     tasks = Enum.take(all_tasks, count)
 
@@ -145,13 +144,13 @@ defmodule AshA2ui.Test.L10nScenarios do
           "records" => rows(tasks, tasks),
           "contexts" => contexts(project)
         }),
-        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+        [actor: BulkHelpers.actor()] ++ extra
       )
 
     {messages, subs}
   end
 
-  defp bulk_select_page(spec, extra) do
+  defp bulk_select_page(extra) do
     {project, tasks, subs} = bulk_seed()
 
     {_outcome, messages} =
@@ -163,7 +162,7 @@ defmodule AshA2ui.Test.L10nScenarios do
           "records" => rows(tasks, []),
           "contexts" => contexts(project)
         }),
-        [actor: BulkHelpers.actor(), spec_version: spec] ++ extra
+        [actor: BulkHelpers.actor()] ++ extra
       )
 
     {messages, subs}
@@ -172,34 +171,34 @@ defmodule AshA2ui.Test.L10nScenarios do
   # Host display metadata of every kind on one query hub: placeholder,
   # empty states, group and choice labels, column help, a detail line and
   # row labels, over a record whose status is an enumerated value.
-  defp hub_build(spec, extra) do
+  defp hub_build(extra) do
     contract =
       Ash.create!(HubContract, %{name: "alpha", status: :expiring_soon}, authorize?: false)
 
-    opts = [authorize?: false, spec_version: spec] ++ extra
+    opts = [authorize?: false] ++ extra
     {Info.build_surface(HubUI, opts), [{contract.id, "CONTRACT_ALPHA"}]}
   end
 
   # The state a search with no matches shows: the no-results empty state and
   # its clear action.
-  defp hub_no_results(spec, extra) do
+  defp hub_no_results(extra) do
     query_state = %{"search" => "zzz", "page" => 1}
-    opts = [authorize?: false, spec_version: spec, query_state: query_state] ++ extra
+    opts = [authorize?: false, query_state: query_state] ++ extra
     {[Info.build_data_model(HubUI, opts)], []}
   end
 
   # A board whose lanes are an enumerated attribute's values, one heading
   # overridden, and a card whose badge is an enumerated value.
-  defp board_build(spec, extra) do
+  defp board_build(extra) do
     card = Ash.create!(BoardTask, %{name: "card", status: :open, priority: :high})
-    {Info.build_surface(BoardTaskUI, [spec_version: spec] ++ extra), [{card.id, "CARD"}]}
+    {Info.build_surface(BoardTaskUI, extra), [{card.id, "CARD"}]}
   end
 
   # An `Ash.Type.Enum` with explicit labels and one without, in the form
   # pickers and the cells.
-  defp enum_build(spec, extra) do
+  defp enum_build(extra) do
     record = Ash.create!(EnumRecord, %{name: "rec", severity: :very_high, stage: :in_progress})
-    {Info.build_surface(EnumRecord, [spec_version: spec] ++ extra), [{record.id, "RECORD"}]}
+    {Info.build_surface(EnumRecord, extra), [{record.id, "RECORD"}]}
   end
 
   defp task_seed do
@@ -207,17 +206,17 @@ defmodule AshA2ui.Test.L10nScenarios do
     {tasks, Enum.map(tasks, &{&1.id, "TASK_#{String.upcase(&1.name)}"})}
   end
 
-  defp task_build(spec, extra) do
+  defp task_build(extra) do
     {_tasks, subs} = task_seed()
-    {Info.build_surface(Task, [spec_version: spec] ++ extra), subs}
+    {Info.build_surface(Task, extra), subs}
   end
 
   # Every task-panel transition and outcome a reader sees feedback or chrome
   # for: create, a failed create, view, edit, cancel, a query page, a
   # destroy, a malformed message and an unknown action.
-  defp task_actions(spec, extra) do
+  defp task_actions(extra) do
     {[one | _] = _tasks, subs} = task_seed()
-    opts = [spec_version: spec] ++ extra
+    opts = extra
 
     envelopes = [
       {"start_create", %{}},
@@ -244,16 +243,7 @@ defmodule AshA2ui.Test.L10nScenarios do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "experience_task",
-        "sourceComponentId" => "test_component",
-        "timestamp" => "2026-11-04T00:00:00Z",
-        "context" => context
-      }
-    }
+    Messages.call(name, "experience_task", context, id: "call-#{name}")
   end
 
   # --- helpers -------------------------------------------------------------------

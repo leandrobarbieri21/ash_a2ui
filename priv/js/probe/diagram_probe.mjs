@@ -27,7 +27,7 @@
  *
  *     node priv/js/probe/diagram_probe.mjs [--node-modules DIR] [--port N]
  *
- * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.10.x, lit
+ * `--node-modules` is any tree with @a2ui/lit + @a2ui/web_core 0.15.0 or later, lit
  * 3 and mermaid 10-12. Chrome comes from $CHROME, Playwright from
  * $PLAYWRIGHT_NODE_MODULES. Exit code is the verdict.
  */

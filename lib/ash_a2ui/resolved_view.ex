@@ -75,7 +75,6 @@ defmodule AshA2ui.ResolvedView do
     :update_action,
     :query,
     :catalog,
-    spec_version: :v0_9_1,
     component_order: :kind,
     sectioned?: false,
     components: [],
@@ -278,7 +277,6 @@ defmodule AshA2ui.ResolvedView do
           title: String.t() | nil,
           record_label: String.t() | nil,
           catalog: :basic | :admin_v1,
-          spec_version: :v0_9_1 | :v1_0,
           sectioned?: boolean,
           components: [AshA2ui.Component.t()],
           fields: %{atom => AshA2ui.Field.t()},
@@ -314,8 +312,6 @@ defmodule AshA2ui.ResolvedView do
     :authorize?,
     :query_state,
     :context_state,
-    :surface_properties,
-    :spec_version,
     :catalog,
     :link_buttons,
     :as_of,
@@ -338,16 +334,12 @@ defmodule AshA2ui.ResolvedView do
     * `:actor` / `:tenant` / `:authorize?` / `:domain` / `:query_state` /
       `:as_of` — reserved for data loading (see `AshA2ui.Info.build_surface/2`);
       validated and passed through, not consumed by normalization itself.
-    * `:surface_properties` / `:link_buttons` — encoder options (see
+    * `:link_buttons` — an encoder option (see
       `AshA2ui.Info.build_surface/2`); passed through.
-    * `:spec_version` — `"0.9.1"` or `"1.0"`: overrides the surface's
-      declared `spec_version` for this resolve. Transports whose renderer
-      only speaks one protocol version (see the External Transports topic)
-      use this to pin the wire version without touching the DSL.
     * `:catalog` — `:basic` or `:admin_v1`: overrides the configured
       catalog (`AshA2ui.Experience.catalog/0`) for this resolve. Transports
       pass what `AshA2ui.Experience.catalog_for/1` negotiated from the
-      client's capabilities.
+      renderer's capabilities.
     * `:locale` / `:gettext_fn` / `:gettext_backend` / `:metadata_domain` / `:errors_domain` —
       the translator (see `AshA2ui.L10n`). Display labels are translated
       here, once, in the metadata domain, and
@@ -392,7 +384,6 @@ defmodule AshA2ui.ResolvedView do
       record_label: optional_label(resource_or_ui_module, :a2ui_record_label),
       component_order: component_order(resource_or_ui_module),
       catalog: catalog(opts[:catalog]),
-      spec_version: spec_version(resource_or_ui_module, opts[:spec_version]),
       sectioned?: sectioned?,
       components: components,
       fields: fields,
@@ -1331,29 +1322,6 @@ defmodule AshA2ui.ResolvedView do
 
   defp catalog(other),
     do: raise(ArgumentError, "catalog must be :basic or :admin_v1, got: #{inspect(other)}")
-
-  # The declared `spec_version` DSL option, normalized to the version atom
-  # the encoders and handler dispatch on. Defaults to :v0_9_1 (the DSL
-  # default), so pre-1.0 surfaces are untouched. A per-resolve `:spec_version`
-  # override (a transport pinning the wire version) wins over the DSL.
-  defp spec_version(resource_or_ui_module, override) do
-    case override || declared_spec_version(resource_or_ui_module) do
-      "1.0" ->
-        :v1_0
-
-      "0.9.1" ->
-        :v0_9_1
-
-      other ->
-        raise ArgumentError, "spec_version must be \"0.9.1\" or \"1.0\", got: #{inspect(other)}"
-    end
-  end
-
-  # The DSL option has a default, so the Info getter always returns {:ok, _}.
-  defp declared_spec_version(resource_or_ui_module) do
-    {:ok, version} = AshA2ui.Info.a2ui_spec_version(resource_or_ui_module)
-    version
-  end
 
   # A declared action wins; otherwise fall back to the resource's primary
   # action of the matching type. No component of that kind -> no action.

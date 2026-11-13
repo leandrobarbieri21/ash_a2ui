@@ -18,6 +18,8 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
   alias AshA2ui.Dynamic.Error
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.Test.Links.{Note, NotesUI, Participant, PeopleTaskUI, PeopleUI, Person}
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.Surface
 
   @allowlist Dynamic.allowlist([Person, Note, Participant])
 
@@ -56,16 +58,7 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
   end
 
   defp envelope(surface_id, name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => surface_id,
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, surface_id, context)
   end
 
   describe "import → resolve renders like the declared surface" do
@@ -89,7 +82,7 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
 
       for state <- [%{}, AshA2ui.Info.context_state_for(PeopleUI, %{"person" => ada.id})] do
         dynamic = Dynamic.build_surface(surface, context_state: state)
-        Enum.each(dynamic, &assert_valid_server_message/1)
+        Enum.each(dynamic, &assert_valid_agent_message/1)
         assert dynamic == AshA2ui.Info.build_surface(PeopleUI, context_state: state)
       end
 
@@ -120,13 +113,15 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
 
       state = AshA2ui.Info.context_state_for(NotesUI, %{"person" => ada.id, "note" => kickoff.id})
 
-      for opts <- [[], [context_state: state], [spec_version: "1.0"]] do
+      for opts <- [[], [context_state: state]] do
         assert Dynamic.build_surface(surface, opts) == AshA2ui.Info.build_surface(NotesUI, opts)
       end
 
       # the imported link fields validate open_surface exactly as declared
       open = envelope("notes", "open_surface", %{"field" => "subject_id", "surface" => "person"})
-      assert {:ok, []} = Dynamic.handle_action(surface, open)
+
+      assert {:ok, [%{"agentFunctionResponse" => %{"value" => %{}}}]} =
+               Dynamic.handle_action(surface, open)
     end
   end
 
@@ -254,9 +249,9 @@ defmodule AshA2ui.DynamicRelatedLinksTest do
       assert {:ok, surface} = Dynamic.resolve(spec, allowlist: @allowlist)
       state = AshA2ui.Info.context_state_for(surface.dsl_state, %{"person" => ada.id})
       messages = Dynamic.build_surface(surface, context_state: state)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
-      %{"updateDataModel" => %{"value" => %{"records" => records}}} = List.last(messages)
+      %{"records" => records} = Surface.data_model(messages)
       kickoff = Enum.find(records["their_notes"], &(&1["title"] == "Kickoff"))
       assert length(records["their_notes"]) == 2
       assert kickoff["_links"]["subject_id"]["surface"] == "person"

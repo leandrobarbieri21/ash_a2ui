@@ -8,7 +8,7 @@ N-column form sections) and `row_layout` (card-style table rows with a
 title/badge header and a metadata grid). Surfaces that declare neither emit
 exactly the same payload as before — both features are purely additive.
 
-The A2UI v0.9.1 basic catalog has no grid component; grids are expressed the
+The A2UI basic catalog has no grid component; grids are expressed the
 way the spec suggests — `Row`s of equal-`weight` `Column`s (the catalog's
 `weight` property is flex-grow-like and only valid on direct children of a
 `Row`/`Column`). AshA2ui chunks fields into rows of N and pads the last row

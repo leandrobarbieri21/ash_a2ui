@@ -6,7 +6,7 @@ defmodule AshA2ui.Wave4ReferralTest do
   row actions (Modal + `prompt`/`invoke "values"` wire contract), conditional
   row-action visibility (rendering + mandatory handler enforcement), and the
   multi-key calc sort. Every message is validated against the vendored
-  v0.9.1 schemas.
+  A2UI 1.0 schemas.
   """
 
   use ExUnit.Case, async: false
@@ -14,7 +14,7 @@ defmodule AshA2ui.Wave4ReferralTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.ActionHandler
-  alias AshA2ui.Test.{Author, Referral}
+  alias AshA2ui.Test.{Author, Messages, Referral, Surface}
 
   setup do
     referrer = Ash.create!(Author, %{name: "Rita Referrer", email: "rita@referrals.test"})
@@ -54,31 +54,22 @@ defmodule AshA2ui.Wave4ReferralTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "referrals",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "referrals", context)
   end
 
   defp by_path(messages) do
-    Map.new(messages, fn %{"updateDataModel" => %{"path" => path, "value" => value}} ->
-      {path, value}
-    end)
+    for %{"updateDataModel" => %{"path" => path, "value" => value}} <- messages,
+        into: %{},
+        do: {path, value}
   end
 
   defp handle!(name, context) do
     envelope = envelope(name, context)
-    assert_valid_client_message(envelope)
+    assert_valid_renderer_message(envelope)
     result = ActionHandler.handle(Referral, envelope, actor: nil, authorize?: false)
 
     {_ok_or_error, messages} = result
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     result
   end
 
@@ -90,18 +81,15 @@ defmodule AshA2ui.Wave4ReferralTest do
   defp codes(rows), do: rows |> Enum.map(& &1["code"]) |> Enum.sort()
 
   defp components do
-    [_create, %{"updateComponents" => %{"components" => components}}, _data] =
-      AshA2ui.Info.build_surface(Referral, authorize?: false)
-
-    Map.new(components, &{&1["id"], &1})
+    Referral
+    |> AshA2ui.Info.build_surface(authorize?: false)
+    |> Surface.components_by_id()
   end
 
   defp initial_data_model do
-    [_create, _components, %{"updateDataModel" => %{"value" => value}} = message] =
-      AshA2ui.Info.build_surface(Referral, authorize?: false)
-
-    assert_valid_server_message(message)
-    value
+    [message] = AshA2ui.Info.build_surface(Referral, authorize?: false)
+    assert_valid_agent_message(message)
+    Surface.data_model(message)
   end
 
   # --- relationship-path search ----------------------------------------------
@@ -142,7 +130,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "not allowlisted"
@@ -202,7 +191,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ ~s(Preset "everything" is not allowlisted)
@@ -212,7 +202,7 @@ defmodule AshA2ui.Wave4ReferralTest do
       picker = components()["query_preset_picker"]
 
       assert picker["component"] == "ChoicePicker"
-      assert picker["value"] == %{"path" => "/query/preset"}
+      assert picker["value"] == %{"@path" => "/query/preset"}
 
       assert Enum.map(picker["options"], & &1["value"]) ==
                ["active", "pending", "closed", "deleted"]
@@ -271,10 +261,10 @@ defmodule AshA2ui.Wave4ReferralTest do
       # No View/Edit controls: the Referral surface declares no :form, so
       # there is no task panel to open.
       assert components["record_row_content"]["children"] == [
-               "table_cell_code",
-               "table_cell_status",
-               "table_cell_status_label",
-               "table_cell_contact_email",
+               "table_cell_code_row",
+               "table_cell_status_row",
+               "table_cell_status_label_row",
+               "table_cell_contact_email_row",
                "row_action_approve_slot",
                "row_action_decline_slot",
                "row_action_soft_delete_button"
@@ -310,7 +300,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "Approve is not available for this record"
@@ -339,7 +330,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "requires a \"recordId\""
@@ -362,12 +354,14 @@ defmodule AshA2ui.Wave4ReferralTest do
       # The trigger dispatches "prompt" so the server can pre-fill.
       trigger = components["row_action_decline_button"]
 
-      assert trigger["action"]["event"]["name"] == "prompt"
-
-      assert trigger["action"]["event"]["context"] == %{
-               "action" => "decline",
-               "recordId" => %{"path" => "id"},
-               "component" => "table"
+      assert Surface.event(trigger) == %{
+               "name" => "prompt",
+               "sourceComponentId" => "row_action_decline_button",
+               "context" => %{
+                 "action" => "decline",
+                 "recordId" => %{"@path" => "id"},
+                 "component" => "table"
+               }
              }
 
       assert components["row_action_decline_prompt"]["children"] == [
@@ -377,24 +371,27 @@ defmodule AshA2ui.Wave4ReferralTest do
                "row_action_decline_confirm_button"
              ]
 
-      assert components["row_action_decline_prompt_title"]["text"] == "Decline referral"
+      assert components["row_action_decline_prompt_title"]["text"] == "### Decline referral"
 
       input = components["row_action_decline_prompt_input_notes"]
       assert input["component"] == "TextField"
-      assert input["value"] == %{"path" => "/prompt/values/decline/notes"}
+      assert input["value"] == %{"@path" => "/prompt/values/decline/notes"}
 
       error = components["row_action_decline_prompt_error_notes"]
-      assert error["text"] == %{"path" => "/errors/notes"}
+      assert error["text"] == %{"@path" => "/errors/notes"}
 
       confirm = components["row_action_decline_confirm_button"]
-      assert confirm["action"]["event"]["name"] == "invoke"
 
-      assert confirm["action"]["event"]["context"] == %{
-               "action" => "decline",
-               "recordId" => %{"path" => "id"},
-               "component" => "table",
-               "values" => %{"path" => "/prompt/values/decline"},
-               "query" => %{"path" => "/query"}
+      assert Surface.event(confirm) == %{
+               "name" => "invoke",
+               "sourceComponentId" => "row_action_decline_confirm_button",
+               "context" => %{
+                 "action" => "decline",
+                 "recordId" => %{"@path" => "id"},
+                 "component" => "table",
+                 "values" => %{"@path" => "/prompt/values/decline"},
+                 "query" => %{"@path" => "/query"}
+               }
              }
     end
 
@@ -429,7 +426,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "does not declare prompt_fields"
@@ -445,7 +443,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "Decline is not available for this record"
@@ -461,7 +460,8 @@ defmodule AshA2ui.Wave4ReferralTest do
                    "path" => "/ui/feedback",
                    "value" => %{"message" => status}
                  }
-               }
+               },
+               _response
              ] = messages
 
       assert status =~ "not allowed"

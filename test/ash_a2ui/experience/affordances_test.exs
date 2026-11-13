@@ -13,12 +13,13 @@ defmodule AshA2ui.Experience.AffordancesTest do
   alias AshA2ui.Test.Experience.Task
 
   defp surface!(resource) do
-    [_create, components, data] = AshA2ui.Info.build_surface(resource, actor: nil)
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(resource, actor: nil)
 
-    %{"updateDataModel" => %{"value" => model}} = data
+    model = data
 
     comps =
-      Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+      Map.new(components, &{&1["id"], &1})
 
     %{comps: comps, model: model}
   end
@@ -29,7 +30,12 @@ defmodule AshA2ui.Experience.AffordancesTest do
       %{comps: comps, model: model} = surface!(NoUpdate)
 
       # rows offer View...
-      assert %{"action" => %{"event" => %{"name" => "view_record"}}} = comps["view_button"]
+      assert %{
+               "action" => %{
+                 "functionCall" => %{"@call" => "ashAction", "args" => %{"name" => "view_record"}}
+               }
+             } = comps["view_button"]
+
       assert "view_button" in comps["record_row_content"]["children"]
 
       # ...but never Edit
@@ -47,7 +53,15 @@ defmodule AshA2ui.Experience.AffordancesTest do
     test "create action presence gates the create affordance" do
       %{comps: comps, model: model} = surface!(Task)
 
-      assert %{"action" => %{"event" => %{"name" => "start_create"}}} = comps["create_button"]
+      assert %{
+               "action" => %{
+                 "functionCall" => %{
+                   "@call" => "ashAction",
+                   "args" => %{"name" => "start_create"}
+                 }
+               }
+             } = comps["create_button"]
+
       assert %{"text" => "Create Task"} = comps["create_text"]
       assert "create_button" in comps["root"]["children"]
 
@@ -85,7 +99,12 @@ defmodule AshA2ui.Experience.AffordancesTest do
     test "a surface WITH a form keeps its View affordance" do
       %{comps: comps} = surface!(NoUpdate)
 
-      assert %{"action" => %{"event" => %{"name" => "view_record"}}} = comps["view_button"]
+      assert %{
+               "action" => %{
+                 "functionCall" => %{"@call" => "ashAction", "args" => %{"name" => "view_record"}}
+               }
+             } = comps["view_button"]
+
       assert "view_button" in comps["record_row_content"]["children"]
     end
   end

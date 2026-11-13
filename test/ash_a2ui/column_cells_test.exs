@@ -21,9 +21,11 @@ defmodule AshA2ui.ColumnCellsTest do
   end
 
   defp surface(resource) do
-    [_create, components, data] = AshA2ui.Info.build_surface(resource, authorize?: false)
-    by_id = Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
-    {by_id, data["updateDataModel"]["value"]}
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      AshA2ui.Info.build_surface(resource, authorize?: false)
+
+    by_id = Map.new(components, &{&1["id"], &1})
+    {by_id, data}
   end
 
   test "the grid draws the declared columns, with the fields they read from folded in" do
@@ -220,8 +222,11 @@ defmodule AshA2ui.ColumnCellsTest do
 
     allowlist = Dynamic.allowlist([ColumnTask])
     {:ok, surface} = Dynamic.resolve(spec, allowlist: allowlist)
-    [_create, message, _data] = Dynamic.build_surface(surface, authorize?: false)
-    grid = Enum.find(message["updateComponents"]["components"], &(&1["id"] == "data_grid"))
+
+    [%{"createSurface" => %{"components" => message, "dataModel" => _data}}] =
+      Dynamic.build_surface(surface, authorize?: false)
+
+    grid = Enum.find(message, &(&1["id"] == "data_grid"))
     {components, _data} = surface(ColumnTask)
     assert grid["columns"] == components["data_grid"]["columns"]
 

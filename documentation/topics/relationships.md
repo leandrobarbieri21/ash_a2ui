@@ -73,7 +73,7 @@ through its **primary read action with the same `actor:` / `tenant:` /
 `authorize?:` options as the surface itself** — policies apply to option
 reads exactly like every other read. The loaded list lands in two places:
 
-- **inline** in the emitted `ChoicePicker`'s `options` (the v0.9.1 basic
+- **inline** in the emitted `ChoicePicker`'s `options` (the basic
   catalog requires a literal options array), and
 - at the reserved **`/options/<field>`** data-model path as
   `[{"label": string, "value": string}]` — the programmatic mirror (see
@@ -107,9 +107,9 @@ across the declared fields — the same semantics as a query's
 
 ### What is emitted instead of a ChoicePicker
 
-The v0.9.1 basic-catalog `ChoicePicker` only accepts a *literal* inline
-options array — its options cannot be refreshed through a data binding, so
-a searchable ChoicePicker is not protocol-expressible. AshA2ui instead emits
+The basic-catalog `ChoicePicker` only accepts a *literal* inline
+options array (an option's `value` is a plain string, and the list cannot
+be a data binding), so a searchable ChoicePicker is not protocol-expressible. AshA2ui instead emits
 a composite (a `Column` with the id `form_select_<field>`):
 
 - a `Text` showing the current selection's label, bound to
@@ -215,7 +215,7 @@ The form's create and update actions must infer the **same** mode.
 
 `/form/<argument>` is an **array of maps** — one per row, always present
 (initially `[]`). The `List` rendering the rows templates over it. Because
-the v0.9.1 protocol does not guarantee write-back semantics for
+AshA2ui does not rely on write-back semantics for
 template-relative paths on editable inputs, **row mutation is
 server-mediated**: the add/remove buttons carry the current array in their
 action context (a `"rows"` path binding at `/form/<argument>`), and the
@@ -396,8 +396,7 @@ host: by default the shipped hook pushes `"a2ui:open_surface"` and
 [Rendering clients](rendering-clients.md)). Non-web clients read
 `columns[].link.path` and `_links` directly.
 
-The basic catalog has no link component and its `openUrl` function takes
-only a literal URL on v0.9.1, so a to-one link (`link :relationship` or
+The basic catalog has no link component, so a to-one link (`link :relationship` or
 `link {surface, id_path}`) renders with basic components, and only when
 the surface is built with `link_buttons: true` (see
 `AshA2ui.Info.build_surface/2`; `AshA2ui.LiveRenderer` passes it when it
@@ -405,13 +404,14 @@ has an `:open_surface` callback or an `:open_surface_url` template).
 Without it the value stays plain Text. With it, the value Text of a table
 cell, a card row's title or meta value, or a detail value keeps its id
 and binding and becomes the child of a borderless `Button`
-(`<value id>_link`) dispatching the `"open_surface"` action:
+(`<value id>_link`) dispatching the `"open_surface"` action (an `ashAction`
+function call; its `args.name` and `args.context` are shown):
 
 ```json
-{"event": {"name": "open_surface", "context": {
+{"name": "open_surface", "context": {
   "field": "person_name",
-  "surface": {"path": "_links/person_name/surface"},
-  "recordId": {"path": "_links/person_name/recordId"}}}}
+  "surface": {"@path": "_links/person_name/surface"},
+  "recordId": {"@path": "_links/person_name/recordId"}}}
 ```
 
 (details bind `/detail/<context>/_links/<field>/…`). `AshA2ui.ActionHandler`

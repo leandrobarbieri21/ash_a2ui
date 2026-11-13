@@ -10,6 +10,7 @@ defmodule AshA2ui.Diagram.DiagramActionHandlerTest do
 
   alias AshA2ui.ActionHandler
   alias AshA2ui.Test.Diagram.{FlowUI, Visit}
+  alias AshA2ui.Test.Messages
 
   setup do
     on_exit(fn -> Application.delete_env(:ash_a2ui, :link_resolver) end)
@@ -17,16 +18,7 @@ defmodule AshA2ui.Diagram.DiagramActionHandlerTest do
   end
 
   defp envelope(context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "open_surface",
-        "surfaceId" => "visit_flow",
-        "sourceComponentId" => "diagram_flow_marker_label_link",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call("open_surface", "visit_flow", context, source: "diagram_flow_marker_label_link")
   end
 
   defp feedback(messages) do
@@ -45,7 +37,7 @@ defmodule AshA2ui.Diagram.DiagramActionHandlerTest do
     visit = Ash.create!(Visit, %{patient: "Ada Lovelace", node: "triage"}, authorize?: false)
     red = %{team: "red"}
 
-    assert {:ok, []} =
+    assert {:ok, [%{"agentFunctionResponse" => %{"value" => %{}}}]} =
              open(%{"diagram" => "flow", "surface" => "visit", "recordId" => visit.id}, red)
 
     # A surface no marker links to is refused, whatever the client sends.
@@ -73,7 +65,8 @@ defmodule AshA2ui.Diagram.DiagramActionHandlerTest do
              open(%{"diagram" => "flow", "surface" => "visit"}, %{team: "blue"})
 
     # A marker without a link binds no surface: acknowledged, nothing opens.
-    assert {:ok, []} = open(%{"diagram" => "flow", "surface" => ""}, red)
+    assert {:ok, [%{"agentFunctionResponse" => %{"value" => %{}}}]} =
+             open(%{"diagram" => "flow", "surface" => ""}, red)
 
     # A non-string surface is malformed.
     assert {:error, messages} = open(%{"diagram" => "flow", "surface" => 7}, red)

@@ -76,7 +76,7 @@ defmodule AshA2ui.Test.TableDisplays.Result do
 end
 
 defmodule AshA2ui.Test.TableDisplays.TimelineUI do
-  @moduledoc "A timeline of visits over `seen_at`, queried, single table, v0.9.1."
+  @moduledoc "A timeline of visits over `seen_at`, queried, single table."
 
   use AshA2ui.Standalone
 
@@ -102,7 +102,7 @@ defmodule AshA2ui.Test.TableDisplays.MatrixUI do
   @moduledoc """
   A matrix of results: a row per case, a column per candidate (free text, so
   columns come from the data), the outcome in each cell. Queried in `rank`
-  order, single table, v0.9.1.
+  order, single table.
   """
 
   use AshA2ui.Standalone
@@ -132,7 +132,7 @@ end
 defmodule AshA2ui.Test.TableDisplays.ArmMatrixUI do
   @moduledoc """
   A matrix whose columns are an enumerated attribute (`arm`), so every
-  declared arm is a column even with no result, `spec_version "1.0"`.
+  declared arm is a column even with no result.
   """
 
   use AshA2ui.Standalone
@@ -140,7 +140,6 @@ defmodule AshA2ui.Test.TableDisplays.ArmMatrixUI do
   a2ui do
     for_resource AshA2ui.Test.TableDisplays.Result
     surface_id "arm_matrix"
-    spec_version "1.0"
 
     query :results do
       page_size 50

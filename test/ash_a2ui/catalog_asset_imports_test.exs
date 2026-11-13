@@ -1,12 +1,10 @@
 defmodule AshA2ui.CatalogAssetImportsTest do
   @moduledoc """
-  The merged catalog asset must bundle against every `@a2ui` release a host
-  may have installed. `@a2ui/web_core` 0.11.0 exported the basic-catalog
-  element classes (`A2uiBasicTextElement`, `A2uiBasicButtonElement`) from
-  `v0_9/basic_catalog`; 0.10.x and 0.12.0 do not, and a static import of a
-  name the installed package lacks fails the host's esbuild outright. The
-  asset therefore resolves those classes at runtime from the custom-element
-  registry. This guards against the static import coming back.
+  The merged catalog asset must bundle against whichever `@a2ui` release a
+  host has installed. A static import of a name the installed package lacks
+  fails the host's esbuild outright, so the host passes the catalog its
+  `@a2ui` dependencies and the asset resolves element classes at runtime.
+  This guards against a static import coming back.
   """
 
   use ExUnit.Case, async: true

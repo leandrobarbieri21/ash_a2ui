@@ -29,10 +29,6 @@ if Mix.env() == :test do
   config :ash, :validate_domain_resource_inclusion?, false
   config :ash, :validate_domain_config_inclusion?, false
 
-  # SchemaHelper resolves the A2UI spec's cross-file $refs from the vendored
-  # copies in priv/a2ui/v0_9_1 instead of the network.
-  config :ex_json_schema, :remote_schema_resolver, {AshA2ui.Test.SchemaHelper, :resolve_remote}
-
   config :logger, level: :warning
 
   # The calendar time zone tests cut days in real zones (America/Toronto,

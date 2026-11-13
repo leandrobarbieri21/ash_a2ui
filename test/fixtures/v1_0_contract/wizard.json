@@ -1,0 +1,277 @@
+[
+  {
+    "version": "1.0",
+    "createSurface": {
+      "surfaceId": "contract_wizard",
+      "catalogId": "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json",
+      "components": [
+        {
+          "id": "root",
+          "component": "Column",
+          "children": [
+            "steps",
+            "body",
+            "nav"
+          ]
+        },
+        {
+          "id": "steps",
+          "component": "Row",
+          "children": [
+            "step_1",
+            "step_2",
+            "step_3"
+          ]
+        },
+        {
+          "id": "step_1",
+          "component": "Text",
+          "text": "**1. Details**"
+        },
+        {
+          "id": "step_2",
+          "component": "Text",
+          "text": "2. Address"
+        },
+        {
+          "id": "step_3",
+          "component": "Text",
+          "text": "3. Confirm"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "children": [
+            "field_name"
+          ]
+        },
+        {
+          "id": "field_name",
+          "component": "TextField",
+          "label": "Name",
+          "value": {
+            "@path": "/wizard/values/name"
+          },
+          "@checks": [
+            {
+              "condition": {
+                "@call": "required",
+                "args": {
+                  "value": {
+                    "@path": "/wizard/values/name"
+                  }
+                }
+              },
+              "message": "Required"
+            }
+          ]
+        },
+        {
+          "id": "nav",
+          "component": "Row",
+          "justify": "end",
+          "children": [
+            "next"
+          ]
+        },
+        {
+          "id": "next",
+          "component": "Button",
+          "variant": "primary",
+          "child": "next_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "wizard_next",
+                "sourceComponentId": "next",
+                "context": {
+                  "step": {
+                    "@path": "/wizard/step"
+                  },
+                  "values": {
+                    "@path": "/wizard/values"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "next_label",
+          "component": "Text",
+          "text": "Next"
+        }
+      ],
+      "dataModel": {
+        "wizard": {
+          "step": 1,
+          "values": {
+            "name": "",
+            "city": ""
+          }
+        }
+      }
+    }
+  },
+  {
+    "version": "1.0",
+    "updateComponents": {
+      "surfaceId": "contract_wizard",
+      "components": [
+        {
+          "id": "step_1",
+          "component": "Text",
+          "text": "1. Details"
+        },
+        {
+          "id": "step_2",
+          "component": "Text",
+          "text": "**2. Address**"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "children": [
+            "field_city"
+          ]
+        },
+        {
+          "id": "field_city",
+          "component": "TextField",
+          "label": "City",
+          "value": {
+            "@path": "/wizard/values/city"
+          }
+        },
+        {
+          "id": "nav",
+          "component": "Row",
+          "justify": "spaceBetween",
+          "children": [
+            "back",
+            "next"
+          ]
+        },
+        {
+          "id": "back",
+          "component": "Button",
+          "child": "back_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "wizard_back",
+                "sourceComponentId": "back",
+                "context": {
+                  "step": {
+                    "@path": "/wizard/step"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "back_label",
+          "component": "Text",
+          "text": "Back"
+        }
+      ]
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_wizard",
+      "path": "/wizard/step",
+      "value": 2
+    }
+  },
+  {
+    "version": "1.0",
+    "updateComponents": {
+      "surfaceId": "contract_wizard",
+      "components": [
+        {
+          "id": "step_2",
+          "component": "Text",
+          "text": "2. Address"
+        },
+        {
+          "id": "step_3",
+          "component": "Text",
+          "text": "**3. Confirm**"
+        },
+        {
+          "id": "body",
+          "component": "Column",
+          "children": [
+            "summary"
+          ]
+        },
+        {
+          "id": "summary",
+          "component": "Text",
+          "text": {
+            "@call": "formatString",
+            "args": {
+              "value": "Create **${/wizard/values/name}** in ${/wizard/values/city}?"
+            }
+          }
+        },
+        {
+          "id": "nav",
+          "component": "Row",
+          "justify": "spaceBetween",
+          "children": [
+            "back",
+            "finish"
+          ]
+        },
+        {
+          "id": "finish",
+          "component": "Button",
+          "variant": "primary",
+          "child": "finish_label",
+          "action": {
+            "functionCall": {
+              "@call": "ashAction",
+              "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+              "args": {
+                "name": "wizard_finish",
+                "sourceComponentId": "finish",
+                "context": {
+                  "values": {
+                    "@path": "/wizard/values"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "finish_label",
+          "component": "Text",
+          "text": "Create"
+        }
+      ]
+    }
+  },
+  {
+    "version": "1.0",
+    "updateDataModel": {
+      "surfaceId": "contract_wizard",
+      "path": "/wizard/step",
+      "value": 3
+    }
+  },
+  {
+    "version": "1.0",
+    "deleteSurface": {
+      "surfaceId": "contract_wizard"
+    }
+  }
+]

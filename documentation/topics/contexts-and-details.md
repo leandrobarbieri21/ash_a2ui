@@ -97,7 +97,7 @@ Three client actions drive selection (wire contract, frozen):
 
 | Action | Context | Effect |
 |---|---|---|
-| `"context_search"` | `{"context": name, "search": str, "contexts": {"path": "/context"}}` | Rewrites `/options/<name>` (dependency-filtered, allowlisted search) |
+| `"context_search"` | `{"context": name, "search": str, "contexts": {"@path": "/context"}}` | Rewrites `/options/<name>` (dependency-filtered, allowlisted search) |
 | `"context_select"` | `{"context": name, "value": id, "contexts": ..., "query": ...}` | Validates the id through an **authorized read**, cascades, re-emits state |
 | `"context_clear"` | `{"context": name, "contexts": ..., "query": ...}` | Unselects and cascades |
 

@@ -13,7 +13,7 @@ defmodule AshA2ui.DetailRowsTest do
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.Gettext.Metadata
-  alias AshA2ui.Test.{Appointment, AppointmentPageUI, Clinic, Owner}
+  alias AshA2ui.Test.{Appointment, AppointmentPageUI, Clinic, Owner, SchemaHelper, Surface}
 
   setup do
     on_exit(fn ->
@@ -37,7 +37,7 @@ defmodule AshA2ui.DetailRowsTest do
   defp surface(catalog, appointment) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, data] =
+    surface =
       AshA2ui.Info.build_surface(AppointmentPageUI,
         authorize?: false,
         context_state: %{
@@ -45,8 +45,10 @@ defmodule AshA2ui.DetailRowsTest do
         }
       )
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]["detail"]["appointment"]}
+    opts = if catalog == :admin_v1, do: [catalogs: SchemaHelper.admin_catalogs()], else: []
+    SchemaHelper.assert_valid_agent_messages(surface, opts)
+
+    {Surface.components_by_id(surface), Surface.data_model(surface)["detail"]["appointment"]}
   end
 
   test "a badge field's text, tone and help ride in the detail data", %{appointment: appointment} do
@@ -64,9 +66,9 @@ defmodule AshA2ui.DetailRowsTest do
     {components, _detail} = surface(:admin_v1, appointment)
 
     assert %{
-             "badge" => %{"path" => "/detail/appointment/_badge_status"},
-             "badgeTone" => %{"path" => "/detail/appointment/_badge_tone_status"},
-             "badgeHelp" => %{"path" => "/detail/appointment/_badge_help_status"}
+             "badge" => %{"@path" => "/detail/appointment/_badge_status"},
+             "badgeTone" => %{"@path" => "/detail/appointment/_badge_tone_status"},
+             "badgeHelp" => %{"@path" => "/detail/appointment/_badge_help_status"}
            } = components["detail_summary_field_status"]
 
     refute Map.has_key?(components["detail_summary_field_title"], "badge")
@@ -80,7 +82,7 @@ defmodule AshA2ui.DetailRowsTest do
     {components, _detail} = surface(:basic, appointment)
 
     assert components["detail_summary_value_status"]["text"] ==
-             %{"path" => "/detail/appointment/_badge_status"}
+             %{"@path" => "/detail/appointment/_badge_status"}
   end
 
   test "the badge texts and the placeholder are metadata to translate" do

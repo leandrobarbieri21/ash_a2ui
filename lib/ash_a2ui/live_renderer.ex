@@ -26,11 +26,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       (a silent no-op would leave the skeleton up forever).
     - `render/1` renders the hook container
       (`<div id="ash-a2ui-surface" phx-hook="AshA2ui" phx-update="ignore">`).
-    - `handle_event("a2ui:action", envelope, socket)` routes the client
-      `action` envelope through `AshA2ui.ActionHandler.handle/3` and pushes
-      the follow-up messages — for both `{:ok, messages}` and
-      `{:error, messages}` results (error messages carry validation feedback
-      on the reserved `/errors/<field>` and `/ui/feedback` data-model paths).
+    - `handle_event("a2ui:message", message, socket)` takes one A2UI 1.0
+      renderer-to-agent message, verbatim, routes it through
+      `AshA2ui.ActionHandler.handle/3` and pushes the follow-up messages,
+      for both `{:ok, messages}` and `{:error, messages}` results (an
+      action's error messages carry validation feedback on the reserved
+      `/errors/<field>` and `/ui/feedback` data-model paths, and a function
+      call's end with its `agentFunctionResponse`). A
+      `rendererFunctionResponse` is matched to the `callRendererFunction`
+      this LiveView pushed (see "Renderer function calls" below).
     - With `:pubsub` configured it subscribes on the connected mount and
       pushes debounced `AshA2ui.Info.build_data_model/2` refreshes when
       broadcasts arrive (see "PubSub live refresh" below).
@@ -87,6 +91,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         `AshA2ui.Info.build_surface/2` and `AshA2ui.L10n`), e.g.
         `gettext_backend: {MyAppWeb.Gettext, "ash_a2ui"}`. Without either
         translator nothing is translated.
+      * `:on_function_response` (optional) — a 3-arity function
+        `(response, function_name, socket) -> socket` called with each
+        `rendererFunctionResponse` body that answers a
+        `callRendererFunction` this LiveView pushed. See "Renderer function
+        calls".
       * `:surfaces` (optional) — more surfaces this LiveView builds, pushes,
         answers and refreshes beside the main one, as `name: [ui: module,
         context: fun]`. `:ui` is required; `:context` is an optional
@@ -154,9 +163,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         `handle_params/4` (injected by `deep_link`/`time_travel`, or called
         by a host's own) calls it again and rebuilds the surface when the
         selection changed.
-      * **Actions.** `"a2ui:action"` envelopes are routed by
-        `action.surfaceId`: the surface's UI answers through the same
-        handler and options, and its follow-ups are pushed. Its query and
+      * **Calls.** `"a2ui:message"` calls are routed by their
+        `surfaceId` (`callAgentFunction.surfaceId`): the surface's UI
+        answers through the same handler and options, and its follow-ups
+        (ending in the call's `agentFunctionResponse`) are pushed. Its query and
         context state are tracked in `:ash_a2ui_surfaces` (by name), never in
         the main surface's state or the URL. Everything else goes to the
         main UI as before.
@@ -174,6 +184,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         <AshA2ui.LiveRenderer.surface_container id="order" surface="order" primary />
 
     Without `:surfaces`, nothing changes.
+
+    ## Renderer function calls
+
+    An action can answer with a `callRendererFunction` (an export's
+    `downloadFile`). The LiveView remembers the `functionCallId` of every
+    call it pushes, and the renderer answers each with a
+    `rendererFunctionResponse`. A response settles its call: an `error`
+    response is logged at warning level, and the `:on_function_response`
+    callback, when set, receives it. A response whose id matches no pending
+    call (a duplicate, a late answer to a settled call, or an id this
+    LiveView never sent) is logged and dropped.
 
     ## Deep links
 
@@ -215,7 +236,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     The shipped JS hook pushes `"a2ui:open_surface"` when an admin-catalog
     reference link is activated (see `AshA2ui.Links`). Basic-catalog link
-    Buttons dispatch an `"open_surface"` action instead, which
+    Buttons call `ashAction` with the name `"open_surface"` instead, which
     `AshA2ui.ActionHandler` validates against the surface's link fields;
     an accepted one takes the same path. Those Buttons are only rendered
     when this LiveView can navigate (an `:open_surface` callback or an
@@ -242,7 +263,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         `AshA2ui.Info.build_surface/2`.
       * `:data_model_fn` — `(ui, opts -> message)`, defaults to
         `AshA2ui.Info.build_data_model/2`.
-      * `:action_fn` — `(ui, envelope, opts -> {:ok, [message]} |
+      * `:action_fn` — `(ui, message, opts -> {:ok, [message]} |
         {:error, [message]})`, defaults to `AshA2ui.ActionHandler.handle/3`.
       * `:refresh_debounce_ms` — PubSub refresh debounce window, defaults
         to `150`.
@@ -257,6 +278,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       only: [connected?: 1, push_event: 3, push_navigate: 2, push_patch: 2, start_async: 3]
 
     alias Plug.Conn.Query
+
+    require Logger
 
     @messages_event "a2ui:messages"
     @refresh_message {:ash_a2ui, :refresh}
@@ -284,13 +307,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         end
 
         @impl true
-        def handle_event("a2ui:action", envelope, socket) do
-          AshA2ui.LiveRenderer.handle_action(__ash_a2ui_config__(), envelope, socket)
-        end
-
-        @impl true
-        def handle_event("a2ui:function_response", payload, socket) do
-          AshA2ui.LiveRenderer.handle_function_response(__ash_a2ui_config__(), payload, socket)
+        def handle_event("a2ui:message", message, socket) do
+          AshA2ui.LiveRenderer.handle_message(__ash_a2ui_config__(), message, socket)
         end
 
         @impl true
@@ -346,6 +364,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         time_travel: Keyword.get(opts, :time_travel, false),
         open_surface: Keyword.get(opts, :open_surface),
         open_surface_url: Keyword.get(opts, :open_surface_url),
+        on_function_response: Keyword.get(opts, :on_function_response),
         header: Keyword.get(opts, :header, true),
         surfaces: normalize_surfaces(Keyword.get(opts, :surfaces, [])),
         locale_fn: Keyword.get(opts, :locale_fn) || fn _socket -> nil end,
@@ -378,6 +397,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_context_state: nil,
           ash_a2ui_uri: nil,
           ash_a2ui_url_ctx: url_state.ctx,
+          ash_a2ui_pending_calls: %{},
           ash_a2ui_surfaces: %{}
         )
 
@@ -703,68 +723,122 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     @doc false
-    def handle_action(config, envelope, socket) do
-      case action_surface(config, envelope) do
-        nil -> handle_main_action(config, envelope, socket)
-        surface -> handle_surface_action(config, surface, envelope, socket)
+    def handle_message(config, message, socket) do
+      case message_surface(config, message) do
+        nil -> handle_main_message(config, message, socket)
+        surface -> handle_surface_message(config, surface, message, socket)
       end
     end
 
-    # An action addressed to an extra surface (`:surfaces`), by its
-    # `surfaceId`; anything else is the main surface's.
-    defp action_surface(%{surfaces: []}, _envelope), do: nil
+    # A message from an extra surface (`:surfaces`), by the `surfaceId` it
+    # names; anything else (a rendererFunctionResponse names none) is the
+    # main surface's.
+    defp message_surface(%{surfaces: []}, _message), do: nil
 
-    defp action_surface(config, %{"action" => %{"surfaceId" => surface_id}})
-         when is_binary(surface_id) do
-      Enum.find(config.surfaces, &(&1.surface_id == surface_id))
+    defp message_surface(config, message) do
+      case message_surface_id(message) do
+        surface_id when is_binary(surface_id) ->
+          Enum.find(config.surfaces, &(&1.surface_id == surface_id))
+
+        _none ->
+          nil
+      end
     end
 
-    defp action_surface(_config, _envelope), do: nil
+    defp message_surface_id(%{"callAgentFunction" => %{"surfaceId" => surface_id}}),
+      do: surface_id
+
+    defp message_surface_id(%{"action" => %{"surfaceId" => surface_id}}), do: surface_id
+    defp message_surface_id(%{"error" => %{"surfaceId" => surface_id}}), do: surface_id
+    defp message_surface_id(_message), do: nil
 
     # The extra surface's UI answers, with the same call options; its
     # follow-ups are tracked in its own state and never touch the main
     # surface's query/context state or the URL.
-    defp handle_surface_action(config, surface, envelope, socket) do
-      {outcome, messages} = config.action_fn.(surface.ui, envelope, call_opts(socket))
+    defp handle_surface_message(config, surface, message, socket) do
+      {outcome, messages} = config.action_fn.(surface.ui, message, call_opts(socket))
 
       socket =
         socket
         |> update_surface_state(surface.name, &track_states(&1, messages))
         |> push_messages(messages)
 
-      maybe_open_surface(config, outcome, envelope, socket)
+      maybe_open_surface(config, outcome, message, socket)
     end
 
-    defp handle_main_action(config, envelope, socket) do
-      {outcome, messages} = config.action_fn.(config.ui, envelope, call_opts(socket))
+    defp handle_main_message(config, message, socket) do
+      {outcome, messages} = config.action_fn.(config.ui, message, call_opts(socket))
 
-      previous_context = socket.assigns.ash_a2ui_context_state
+      case {outcome, message} do
+        {:ok, %{"rendererFunctionResponse" => response}} ->
+          {:noreply, settle_function_response(config, response, socket)}
 
-      socket =
-        socket
-        |> track_query_state(messages)
-        |> track_context_state(messages)
-        |> push_messages(messages)
-        |> maybe_patch_context(config, previous_context)
+        _action_call_or_refusal ->
+          previous_context = socket.assigns.ash_a2ui_context_state
 
-      maybe_open_surface(config, outcome, envelope, socket)
+          socket =
+            socket
+            |> track_query_state(messages)
+            |> track_context_state(messages)
+            |> push_messages(messages)
+            |> maybe_patch_context(config, previous_context)
+
+          maybe_open_surface(config, outcome, message, socket)
+      end
     end
 
-    # A basic-catalog reference link arrives as an "open_surface" action.
-    # Once the handler accepted it (the field links to that surface for
-    # this actor), it navigates exactly like the "a2ui:open_surface" event
-    # the admin catalog's link cells push.
-    defp maybe_open_surface(
-           config,
-           :ok,
-           %{"action" => %{"name" => "open_surface"} = action},
-           socket
-         ) do
-      context = Map.get(action, "context") || %{}
-      handle_open_surface(config, Map.take(context, ["surface", "recordId"]), socket)
+    # A basic-catalog reference link arrives as an "open_surface" ashAction
+    # call. Once the handler accepted it
+    # (the field links to that surface for this actor), it navigates exactly
+    # like the "a2ui:open_surface" event the admin catalog's link cells push.
+    defp maybe_open_surface(config, :ok, message, socket) do
+      case action_name(message) do
+        {"open_surface", context} when is_map(context) ->
+          handle_open_surface(config, Map.take(context, ["surface", "recordId"]), socket)
+
+        _other ->
+          {:noreply, socket}
+      end
     end
 
-    defp maybe_open_surface(_config, _outcome, _envelope, socket), do: {:noreply, socket}
+    defp maybe_open_surface(_config, _outcome, _message, socket), do: {:noreply, socket}
+
+    defp action_name(%{
+           "callAgentFunction" => %{"callFunction" => %{"args" => %{"name" => name} = args}}
+         }),
+         do: {name, Map.get(args, "context", %{})}
+
+    defp action_name(_message), do: nil
+
+    # A rendererFunctionResponse settles the pending call with its id, once.
+    defp settle_function_response(config, %{"functionCallId" => call_id} = response, socket) do
+      case Map.pop(socket.assigns.ash_a2ui_pending_calls, call_id, :none) do
+        {:none, _pending} ->
+          Logger.warning(
+            "Dropped an A2UI rendererFunctionResponse for #{inspect(call_id)}: no pending call " <>
+              "has that id (a duplicate, a late answer, or an id this LiveView never sent)."
+          )
+
+          socket
+
+        {function_name, pending} ->
+          log_function_error(function_name, call_id, response)
+          socket = assign(socket, :ash_a2ui_pending_calls, pending)
+
+          case config.on_function_response do
+            callback when is_function(callback, 3) -> callback.(response, function_name, socket)
+            _none -> socket
+          end
+      end
+    end
+
+    defp log_function_error(function_name, call_id, %{"error" => %{"code" => code}}) do
+      Logger.warning(
+        "A2UI renderer function #{function_name} (#{inspect(call_id)}) failed: #{code}"
+      )
+    end
+
+    defp log_function_error(_function_name, _call_id, _response), do: :ok
 
     # deep_link: a changed /context is written back to the URL (the ctx
     # params), so the selection is shareable and back-button friendly.
@@ -809,17 +883,6 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         "" -> path || "/"
         encoded -> (path || "/") <> "?" <> encoded
       end
-    end
-
-    @doc """
-    Default handler for the `"a2ui:function_response"` event the shipped JS
-    hook pushes when a v1.0 `callFunction` message asked for a response
-    (`wantResponse: true`). The default is a no-op acknowledgment — a
-    LiveView that pushes `callFunction` messages and cares about the return
-    values overrides `handle_event("a2ui:function_response", payload, socket)`.
-    """
-    def handle_function_response(_config, _payload, socket) do
-      {:noreply, socket}
     end
 
     @doc """
@@ -919,15 +982,38 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    defp push_messages(socket, []), do: socket
+
     defp push_messages(socket, messages) do
-      push_event(socket, @messages_event, %{messages: messages})
+      socket
+      |> track_renderer_calls(messages)
+      |> push_event(@messages_event, %{messages: messages})
+    end
+
+    # Every callRendererFunction pushed is pending until the renderer's
+    # rendererFunctionResponse with its id arrives.
+    defp track_renderer_calls(socket, messages) do
+      calls =
+        for %{"callRendererFunction" => %{"functionCallId" => id, "callFunction" => call}} <-
+              messages,
+            into: %{},
+            do: {id, call["@call"]}
+
+      if calls == %{},
+        do: socket,
+        else:
+          assign(
+            socket,
+            :ash_a2ui_pending_calls,
+            Map.merge(socket.assigns.ash_a2ui_pending_calls, calls)
+          )
     end
 
     # Remembers the last /query state pushed to the client (from the full
-    # data model on mount/refresh — v0.9.1's root updateDataModel or v1.0's
-    # inline createSurface.dataModel — or a /query update in an action
-    # follow-up) so PubSub refreshes can re-run the user's current query
-    # instead of the declared defaults.
+    # data model: the inline createSurface.dataModel on mount, a root
+    # updateDataModel on refresh, or a /query update in an action follow-up)
+    # so PubSub refreshes can re-run the user's current query instead of the
+    # declared defaults.
     defp track_query_state(socket, messages) do
       assign(
         socket,
@@ -942,22 +1028,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         when is_map(value) ->
           value
 
-        %{"updateDataModel" => %{"path" => "/", "value" => %{"query" => value}}}, _acc
-        when is_map(value) ->
-          value
-
-        %{"createSurface" => %{"dataModel" => %{"query" => value}}}, _acc
-        when is_map(value) ->
-          value
-
         # Multi-table surfaces scope follow-ups per table
         # (/query/<component_name>); fold them into the tracked keyed map.
         %{"updateDataModel" => %{"path" => "/query/" <> table, "value" => value}}, acc
         when is_map(value) ->
           Map.put((is_map(acc) && acc) || %{}, table, value)
 
-        _message, acc ->
-          acc
+        message, acc ->
+          root_value(message, "query", acc)
       end)
     end
 
@@ -978,16 +1056,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         when is_map(value) ->
           value
 
-        %{"updateDataModel" => %{"path" => "/", "value" => %{"context" => value}}}, _acc
-        when is_map(value) ->
-          value
-
-        %{"createSurface" => %{"dataModel" => %{"context" => value}}}, _acc
-        when is_map(value) ->
-          value
-
-        _message, acc ->
-          acc
+        message, acc ->
+          root_value(message, "context", acc)
       end)
     end
 
@@ -998,6 +1068,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         | query_state: fold_query_state(state.query_state, messages),
           context_state: fold_context_state(state.context_state, messages)
       }
+    end
+
+    # `key` of a whole data model: createSurface's inline dataModel, or a
+    # root updateDataModel (no path, or "/"). Otherwise the tracked `acc`.
+    defp root_value(%{"createSurface" => %{"dataModel" => %{} = model}}, key, acc),
+      do: map_value(model, key, acc)
+
+    defp root_value(%{"updateDataModel" => %{"value" => %{} = model} = update}, key, acc) do
+      if Map.get(update, "path", "/") == "/", do: map_value(model, key, acc), else: acc
+    end
+
+    defp root_value(_message, _key, acc), do: acc
+
+    defp map_value(model, key, acc) do
+      case Map.get(model, key) do
+        value when is_map(value) -> value
+        _absent -> acc
+      end
     end
 
     defp call_opts(socket) do

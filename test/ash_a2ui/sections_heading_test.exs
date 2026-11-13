@@ -8,7 +8,7 @@ defmodule AshA2ui.SectionsHeadingTest do
   use ExUnit.Case, async: false
 
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.OwnerOverviewUI
+  alias AshA2ui.Test.{OwnerOverviewUI, SchemaHelper, Surface}
 
   setup do
     on_exit(fn -> Application.put_env(:ash_a2ui, :catalog, :basic) end)
@@ -16,8 +16,11 @@ defmodule AshA2ui.SectionsHeadingTest do
 
   defp surface(catalog) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
-    [_create, components, _data] = AshA2ui.Info.build_surface(OwnerOverviewUI, authorize?: false)
-    Map.new(components["updateComponents"]["components"], &{&1["id"], &1})
+
+    OwnerOverviewUI
+    |> AshA2ui.Info.build_surface(authorize?: false)
+    |> Surface.components_by_id()
+    |> Surface.unqualified()
   end
 
   for catalog <- [:admin_v1, :basic] do
@@ -36,19 +39,29 @@ defmodule AshA2ui.SectionsHeadingTest do
                %{
                  "id" => "section_details_heading",
                  "component" => "Text",
-                 "text" => "Overview",
-                 "variant" => "h2"
+                 "text" => "## Overview"
                }
 
-      assert components["section_visits_heading"]["text"] == "Visits"
+      assert components["section_visits_heading"]["text"] == "## Visits"
     end
 
     test "#{catalog}: a labelled card keeps its heading, an unlabelled one has none" do
       components = surface(unquote(catalog))
 
-      assert components["detail_details_heading"]["text"] == "Details"
+      assert components["detail_details_heading"]["text"] == "### Details"
       refute Map.has_key?(components, "detail_contact_heading")
       refute "detail_contact_heading" in components["detail_contact_body"]["children"]
+    end
+  end
+
+  test "the sectioned surfaces validate against their catalogs" do
+    for {catalog, catalogs} <- [admin_v1: SchemaHelper.admin_catalogs(), basic: nil] do
+      Application.put_env(:ash_a2ui, :catalog, catalog)
+      opts = if catalogs, do: [catalogs: catalogs], else: []
+
+      OwnerOverviewUI
+      |> AshA2ui.Info.build_surface(authorize?: false)
+      |> SchemaHelper.assert_valid_agent_messages(opts)
     end
   end
 
@@ -61,10 +74,12 @@ defmodule AshA2ui.SectionsHeadingTest do
   test "surfaces without sections encode no wrappers" do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
 
-    [_create, components, _data] =
-      AshA2ui.Info.build_surface(AshA2ui.Test.RecordPageUI, authorize?: false)
+    ids =
+      AshA2ui.Test.RecordPageUI
+      |> AshA2ui.Info.build_surface(authorize?: false)
+      |> Surface.components()
+      |> Enum.map(& &1["id"])
 
-    ids = Enum.map(components["updateComponents"]["components"], & &1["id"])
     refute Enum.any?(ids, &String.starts_with?(&1, "section_"))
   end
 

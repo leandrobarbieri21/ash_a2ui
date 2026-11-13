@@ -2,7 +2,7 @@ defmodule AshA2ui.Wave6EncoderTest do
   @moduledoc """
   Encoder tests for Wave 6 layout features: card-style table rows
   (`row_layout`) and grouped N-column form grids (`group`), all messages
-  validated against the vendored v0.9.1 JSON Schemas.
+  validated against the vendored A2UI 1.0 JSON Schemas.
   """
 
   use ExUnit.Case, async: false
@@ -11,6 +11,7 @@ defmodule AshA2ui.Wave6EncoderTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Test.{KitchenSink, Promotion}
+  alias AshA2ui.Test.Surface
 
   setup do
     on_exit(fn ->
@@ -23,18 +24,12 @@ defmodule AshA2ui.Wave6EncoderTest do
   end
 
   defp components(messages) do
-    %{"updateComponents" => %{"components" => components}} =
-      Enum.find(messages, &Map.has_key?(&1, "updateComponents"))
+    components = Surface.components(messages)
 
     Map.new(components, &{&1["id"], &1})
   end
 
-  defp data_model(messages) do
-    %{"updateDataModel" => %{"path" => "/", "value" => value}} =
-      Enum.find(messages, &Map.has_key?(&1, "updateDataModel"))
-
-    value
-  end
+  defp data_model(messages), do: Surface.data_model(messages)
 
   describe "row_layout card rows" do
     setup do
@@ -49,7 +44,7 @@ defmodule AshA2ui.Wave6EncoderTest do
     end
 
     test "all messages are schema-valid", %{messages: messages} do
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
     end
 
     test "the templated record_row becomes a Card over a header + meta grid", %{
@@ -68,7 +63,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       assert components["record_row_body"]["children"] ==
                ["record_row_header", "record_row_meta_row_0"]
 
-      refute Map.has_key?(components, "table_cell_name")
+      refute Map.has_key?(components, "table_cell_name_row")
     end
 
     test "the header row holds the title and the badge + actions on the right", %{
@@ -85,8 +80,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       assert components["record_row_title"] == %{
                "id" => "record_row_title",
                "component" => "Text",
-               "text" => %{"path" => "name"},
-               "variant" => "h4",
+               "text" => %{"@call" => "formatString", "args" => %{"value" => "#### ${name}"}},
                "weight" => 1
              }
 
@@ -96,7 +90,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       assert components["record_row_badge"] == %{
                "id" => "record_row_badge",
                "component" => "Text",
-               "text" => %{"path" => "_badge_is_active"},
+               "text" => %{"@path" => "_badge_is_active"},
                "variant" => "caption"
              }
     end
@@ -123,10 +117,10 @@ defmodule AshA2ui.Wave6EncoderTest do
 
       assert components["record_row_meta_label_slug"]["variant"] == "caption"
       assert components["record_row_meta_label_slug"]["text"] == "Slug"
-      assert components["record_row_meta_value_slug"]["text"] == %{"path" => "slug"}
+      assert components["record_row_meta_value_slug"]["text"] == %{"@path" => "slug"}
 
       # format :date on expires_at is honored inside the meta grid
-      assert components["record_row_meta_value_expires_at"]["text"]["call"] == "formatDate"
+      assert components["record_row_meta_value_expires_at"]["text"]["@call"] == "formatDate"
     end
 
     test "rows carry the computed badge display text", %{messages: messages} do
@@ -181,12 +175,11 @@ defmodule AshA2ui.Wave6EncoderTest do
       assert components["form_group_details_heading"] == %{
                "id" => "form_group_details_heading",
                "component" => "Text",
-               "text" => "Details",
-               "variant" => "h3"
+               "text" => "### Details"
              }
 
       # label defaults to the humanized group name
-      assert components["form_group_scheduling_heading"]["text"] == "Scheduling"
+      assert components["form_group_scheduling_heading"]["text"] == "### Scheduling"
     end
 
     test "grouped fields lay out in rows of equal-weight columns", %{messages: messages} do
@@ -208,7 +201,7 @@ defmodule AshA2ui.Wave6EncoderTest do
 
       # the inputs themselves are the unchanged per-field components
       assert components["form_input_name"]["component"] == "TextField"
-      assert components["form_error_name"]["text"] == %{"path" => "/errors/name"}
+      assert components["form_error_name"]["text"] == %{"@path" => "/errors/name"}
     end
 
     test "uneven rows are padded with empty spacer columns" do
@@ -233,7 +226,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       end
 
       messages = AshA2ui.Info.build_surface(UnevenGroupUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       components = components(messages)
 
       assert components["form_group_all_body"]["children"] == [
@@ -276,7 +269,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       end
 
       messages = AshA2ui.Info.build_surface(SingleColumnGroupUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       components = components(messages)
 
       assert components["form_group_details_body"]["children"] == [
@@ -316,7 +309,7 @@ defmodule AshA2ui.Wave6EncoderTest do
       end
 
       messages = AshA2ui.Info.build_surface(HiddenGroupedFieldUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       components = components(messages)
 
       assert components["form_group_details_row_0"]["children"] == [
@@ -354,14 +347,14 @@ defmodule AshA2ui.Wave6EncoderTest do
       end
 
       messages = AshA2ui.Info.build_surface(MultiTableLayoutUI)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       components = components(messages)
 
       assert components["record_row_active_items"]["component"] == "Card"
       assert components["record_row_active_items"]["child"] == "record_row_active_items_body"
 
       assert components["record_row_active_items_badge"]["text"] ==
-               %{"path" => "_badge_is_active"}
+               %{"@path" => "_badge_is_active"}
 
       assert components["record_row_active_items_meta_row_0"]["children"] ==
                [
@@ -379,13 +372,13 @@ defmodule AshA2ui.Wave6EncoderTest do
   describe "backward compatibility" do
     test "surfaces without groups or row_layout keep the frozen flat structure" do
       messages = AshA2ui.Info.build_surface(KitchenSink)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       components = components(messages)
 
       # the flat baseline: Card -> record_row_content Row of labeled cells
       assert components["record_row"]["child"] == "record_row_content"
       assert components["record_row_content"]["component"] == "Row"
-      assert Map.has_key?(components, "table_cell_name")
+      assert Map.has_key?(components, "table_cell_name_row")
       refute Map.has_key?(components, "record_row_body")
 
       assert Enum.take(components["form_fields"]["children"], 2) ==

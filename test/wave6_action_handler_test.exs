@@ -11,6 +11,7 @@ defmodule AshA2ui.Wave6ActionHandlerTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.ActionHandler
+  alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Promotion
 
   setup do
@@ -19,16 +20,7 @@ defmodule AshA2ui.Wave6ActionHandlerTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "promotions",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "promotions", context)
   end
 
   defp value_at(messages, path) do
@@ -47,7 +39,7 @@ defmodule AshA2ui.Wave6ActionHandlerTest do
       })
 
     assert {:ok, messages} = ActionHandler.handle(Promotion, env)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     rows = value_at(messages, "/records")
 

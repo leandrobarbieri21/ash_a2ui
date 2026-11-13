@@ -1563,8 +1563,8 @@ defmodule AshA2ui do
     in-row inputs with a per-cell Save button dispatching the `"edit_cell"`
     client action — the server runs `update_action` on the identified record
     with just that field's value (cast against the action like any client
-    input). On v1.0 surfaces the per-action `actionResponse` handshake gives
-    each cell pending→settled feedback; validation errors are mirrored into
+    input). The Save's outcome is the surface's `/ui/feedback`, like any
+    other write; validation errors are mirrored into
     the failing row's reserved `_error_<field>` key (rendered next to the
     cell) alongside the standard `/errors/<field>` write. Not supported
     together with a `row_layout` (card rows render read-only meta values).
@@ -1667,13 +1667,12 @@ defmodule AshA2ui do
   @export %Spark.Dsl.Entity{
     name: :export,
     describe: """
-    CSV file export for a `:table` or `:report` component (**v1.0-only** —
-    delivery rides the `callFunction` channel): renders an "Export CSV"
-    button dispatching the `"export"` client action; the server re-runs the
-    component's data (a table honors its current query state and context
-    scope; a report its current params) and answers with a `downloadFile`
-    callFunction carrying a base64 `text/csv` data URL (frozen contract —
-    see `AshA2ui.Export`). With `column_select`, per-column checkboxes bound
+    CSV file export for a `:table` or `:report` component: renders an
+    "Export CSV" button dispatching the `"export"` client action; the server
+    re-runs the component's data (a table honors its current query state and
+    context scope; a report its current params) and answers with a
+    `callRendererFunction` to `downloadFile` carrying a base64 `text/csv`
+    data URL (see `AshA2ui.Export`). With `column_select`, per-column checkboxes bound
     under the reserved `/export/<name>/columns/<field>` paths let the user
     pick the exported columns.
     """,
@@ -2370,14 +2369,6 @@ defmodule AshA2ui do
         where the module name is not the word a reader would use.
         """
       ],
-      spec_version: [
-        type: {:in, ["0.9.1", "1.0"]},
-        default: "0.9.1",
-        doc:
-          ~S(The A2UI protocol version the surface speaks: "0.9.1" - the default - or "1.0" ) <>
-            ~S(recommended for new surfaces — inline createSurface, per-action actionResponse ) <>
-            ~S(feedback; requires a v1.0-capable renderer or the shipped hook. See the A2UI 1.0 topic.)
-      ],
       for_resource: [
         type: {:behaviour, Ash.Resource},
         doc:
@@ -2430,7 +2421,7 @@ defmodule AshA2ui do
 
   @moduledoc """
   A Spark DSL extension that declares an A2UI (Agent to UI) surface for an Ash
-  resource, from which `AshA2ui.Info.build_surface/2` generates A2UI v0.9.1
+  resource, from which `AshA2ui.Info.build_surface/2` generates A2UI 1.0
   protocol messages.
 
   Use it directly on a resource:

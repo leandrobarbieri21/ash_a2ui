@@ -5,7 +5,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
   `submit_form`, nested validation-error paths + in-row mirrors, and the
   `start_edit` population of nested rows and select labels, and success
   resets. Every emitted message is validated
-  against the vendored v0.9.1 JSON Schemas.
+  against the vendored A2UI 1.0 JSON Schemas.
   """
 
   use ExUnit.Case, async: false
@@ -14,7 +14,7 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.ActionHandler
-  alias AshA2ui.Test.{Author, Tag, Ticket, TicketNote, TicketSearchUI}
+  alias AshA2ui.Test.{Author, Messages, Tag, Ticket, TicketNote, TicketSearchUI}
 
   setup do
     on_exit(fn ->
@@ -27,13 +27,10 @@ defmodule AshA2ui.Wave5ActionHandlerTest do
   end
 
   defp envelope(name, context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{"name" => name, "surfaceId" => "tickets", "context" => context}
-    }
+    Messages.call(name, "tickets", context)
   end
 
-  defp assert_all_valid(messages), do: Enum.each(messages, &assert_valid_server_message/1)
+  defp assert_all_valid(messages), do: Enum.each(messages, &assert_valid_agent_message/1)
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn

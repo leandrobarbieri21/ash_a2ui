@@ -2,7 +2,7 @@ defmodule AshA2ui.Board.BoardEncoderTest do
   @moduledoc """
   Board rendering (A2UI-105): a `display :board` table emits its lanes side
   by side — a `Row` of lane `Column`s at equal weight, each with its heading and
-  total, card list and pagination — on v0.9.1 and v1.0, schema-validated.
+  total, card list and pagination — schema-validated.
   `display :list` output is unchanged: list-mode sectioned surfaces match
   golden payloads captured from the pre-board base commit (08f8173).
   """
@@ -10,10 +10,12 @@ defmodule AshA2ui.Board.BoardEncoderTest do
   use ExUnit.Case, async: false
 
   import AshA2ui.Test.SchemaHelper
+  import AshA2ui.Test.Surface, only: [unqualified: 1]
 
   alias AshA2ui.Test.BoardTask
   alias AshA2ui.Test.Bucket
   alias AshA2ui.Test.BucketWord
+  alias AshA2ui.Test.Surface
 
   @golden_dir Path.expand("golden", __DIR__)
 
@@ -31,15 +33,16 @@ defmodule AshA2ui.Board.BoardEncoderTest do
 
   defp components_by_id(components), do: Map.new(components, &{&1["id"], &1})
 
-  defp v0_9_1_parts(ui) do
+  defp surface_parts(ui) do
     messages = AshA2ui.Info.build_surface(ui, authorize?: false)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -93,8 +96,7 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     create_task!("charlie", :open)
     create_task!("delta", :claimed)
 
-    # --- v0.9.1 ---
-    {components, value} = v0_9_1_parts(AshA2ui.Test.BoardTaskUI)
+    {components, value} = surface_parts(AshA2ui.Test.BoardTaskUI)
 
     # One root child for the whole board; no per-lane root children.
     assert components["root"]["children"] == ["status_text", "board_board", "action_result_panel"]
@@ -105,7 +107,7 @@ defmodule AshA2ui.Board.BoardEncoderTest do
              "children" => ["board_board_heading", "board_board_lanes"]
            }
 
-    assert components["board_board_heading"]["text"] == "Board"
+    assert components["board_board_heading"]["text"] == "## Board"
 
     # The lanes sit side by side: a Row of lane Columns at equal weight
     # (bounded shares of the board, not sized to their cards).
@@ -137,8 +139,9 @@ defmodule AshA2ui.Board.BoardEncoderTest do
       assert components["lane_#{lane}_header"]["children"] ==
                ["table_heading_#{lane}", "lane_#{lane}_total"]
 
-      assert components["table_heading_#{lane}"]["text"] == label
-      assert components["lane_#{lane}_total"]["text"] == %{"path" => "/_lane_total_#{lane}"}
+      # lanes are h3 Markdown headings, under the board's h2
+      assert components["table_heading_#{lane}"]["text"] == "### " <> label
+      assert components["lane_#{lane}_total"]["text"] == %{"@path" => "/_lane_total_#{lane}"}
 
       assert components["records_list_#{lane}"]["children"] == %{
                "componentId" => "record_row_#{lane}",
@@ -148,8 +151,6 @@ defmodule AshA2ui.Board.BoardEncoderTest do
       # Cards: the row_layout composition under the lane suffix.
       assert components["record_row_#{lane}"]["component"] == "Card"
       assert components["query_#{lane}_pagination"]["component"] == "List"
-      # Lanes never render the stacked list composition's h2 heading.
-      assert components["table_heading_#{lane}"]["variant"] == "h3"
     end
 
     # Totals: the query's totalCount (3 open, though the page holds 2).
@@ -159,9 +160,11 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     assert length(value["records"]["board_open"]) == 2
     assert value["query"]["board_open"]["_pagination_visible"] == [%{"id" => "on"}]
 
-    # --- v1.0 (no query: totals from the row count, no pagination) ---
-    assert [message] = AshA2ui.Info.build_surface(AshA2ui.Test.BoardTaskV1UI, authorize?: false)
-    assert_valid_server_message(message, :v1_0)
+    # --- a board without a query: totals from the row count, no pagination ---
+    assert [message] =
+             AshA2ui.Info.build_surface(AshA2ui.Test.BoardTaskUnqueriedUI, authorize?: false)
+
+    assert_valid_agent_message(message)
 
     create = message["createSurface"]
     v1 = components_by_id(create["components"])
@@ -169,7 +172,6 @@ defmodule AshA2ui.Board.BoardEncoderTest do
     assert v1["board_board_lanes"]["component"] == "Row"
     assert v1["lane_board_open"]["weight"] == 1
     assert v1["board_board_lanes"]["children"] == ["lane_board_open", "lane_board_claimed"]
-    # v1.0 headings are Markdown (the h1-h5 Text variants were dropped).
     assert v1["table_heading_board_open"]["text"] == "### Open"
     assert v1["board_board_heading"]["text"] == "## Board"
 
@@ -188,14 +190,13 @@ defmodule AshA2ui.Board.BoardEncoderTest do
 
     admin =
       admin_messages
-      |> Enum.find_value(& &1["updateComponents"])
-      |> Map.fetch!("components")
+      |> Surface.components()
       |> components_by_id()
 
     assert admin["root"]["component"] == "entityPage"
     assert "board_board" in admin["root"]["children"]
-    assert admin["board_board_lanes"] == components["board_board_lanes"]
-    assert admin["lane_board_open"] == components["lane_board_open"]
+    assert unqualified(admin["board_board_lanes"]) == components["board_board_lanes"]
+    assert unqualified(admin["lane_board_open"]) == components["lane_board_open"]
     Application.delete_env(:ash_a2ui, :catalog)
 
     # --- display :list output is unchanged ---
@@ -206,9 +207,13 @@ defmodule AshA2ui.Board.BoardEncoderTest do
           {AshA2ui.Test.BucketWordsUI, "bucket_words_ui"},
           {AshA2ui.Test.BucketWordsV1UI, "bucket_words_v1_ui"}
         ] do
-      golden = @golden_dir |> Path.join("#{file}.json") |> File.read!()
+      path = Path.join(@golden_dir, "#{file}.json")
+      encoded = normalized_surface(ui, substitutions)
 
-      assert Jason.decode!(normalized_surface(ui, substitutions)) == Jason.decode!(golden),
+      # Re-record on purpose with RECORD_BOARD_GOLDEN=1, as the board goldens.
+      if System.get_env("RECORD_BOARD_GOLDEN"), do: File.write!(path, encoded)
+
+      assert Jason.decode!(encoded) == path |> File.read!() |> Jason.decode!(),
              "#{inspect(ui)} differs from its base golden"
     end
   end

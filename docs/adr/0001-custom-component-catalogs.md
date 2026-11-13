@@ -203,13 +203,13 @@ two component keys can still make two of these ids equal.
 - The id names the major version: the ash_a2ui catalog is `.../ash_a2ui/v1` and the admin
   catalog, at 2.0.0, is `.../admin/v2`. The catalog's contract version sits in
   `metadata.extensions.ash_a2ui`, with its changelog. The renderer module exports the same
-  version (`ADMIN_CATALOG_VERSION`). The admin catalog moves from 1.13.0 to 2.0.0 for the
+  version (`ADMIN_CATALOG_VERSION`). The admin catalog moves from 1.18.0 to 2.0.0 for the
   A2UI 1.0 break, and its id moves as section 3 says.
 - A minor change is additive: a new component or an optional prop. It bumps the version and
   adds a changelog entry.
 - **New wire keys are optional, ignorable, and lose no meaning when ignored.** A renderer or
   swap that does not know a key still draws the value, only less richly. The admin catalog
-  grew this way from 1.8 to 1.13.
+  grew this way from 1.8 to 1.18.
 - A major change is one that removes or renames a component or prop, changes a prop's type
   or meaning, or adds a prop a swap must draw to keep the meaning. The rule above means the
   last should not happen.

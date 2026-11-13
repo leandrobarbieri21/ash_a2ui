@@ -29,6 +29,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       # the `live` macro only records the module as route metadata, so it is
       # safe to reference modules that are loaded later, at test time).
       live("/live-renderer/stubbed", AshA2ui.Test.StubbedLive)
+      live("/live-renderer/function-call", AshA2ui.Test.FunctionCallLive)
       live("/live-renderer/pubsub", AshA2ui.Test.PubsubStubLive)
       live("/live-renderer/defaults", AshA2ui.Test.DefaultsLive)
       live("/live-renderer/query", AshA2ui.Test.QueryDefaultsLive)

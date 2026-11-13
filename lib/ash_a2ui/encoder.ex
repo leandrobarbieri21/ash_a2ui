@@ -1,0 +1,5625 @@
+defmodule AshA2ui.Encoder do
+  @moduledoc """
+  The A2UI 1.0 encoder: builds the agent-to-renderer messages of a surface
+  (`encode_surface/3`, `encode_data_model/3`) and the other messages the
+  library sends (`update_data_model/3`, `call_renderer_function/4`,
+  `agent_function_response/2`).
+
+  A surface is one inline `createSurface` message carrying the component
+  tree and the initial data model. Components come from the 1.0 basic
+  catalog (and, for a `catalog: :admin_v1` surface, the admin catalog).
+  Tables are `List` + `Row` composition, since the basic catalog has no
+  Table component. All keys are string camelCase, children are always id
+  references, and data bindings are `{"@path": ...}` objects.
+
+  ## Actions
+
+  Every server-handled interaction is an `ashAction` function call
+  (`ash_action/3`):
+
+      "action": {"functionCall": {
+        "@call": "ashAction",
+        "catalogId": "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1",
+        "args": {"name": "invoke", "sourceComponentId": "row_action_archive_button",
+                 "context": {"action": "archive", "recordId": {"@path": "id"}}}
+      }}
+
+  The renderer resolves the context's bindings and sends the call to the
+  agent as `callAgentFunction`; `AshA2ui.ActionHandler` answers it with an
+  `agentFunctionResponse` once its data-model updates are out. Below, "event
+  `x`" means an `ashAction` call whose `name` is `x`.
+
+  Headings are Markdown `Text` (`"## Title"`), as the 1.0 basic catalog's
+  Text has no heading variants; the levels named below (h1, h2, …) are the
+  number of `#`s.
+
+  ## Component tree
+
+  The root is a `Column` with id `"root"`. Its children, in order (each only
+  present when the corresponding DSL component is declared):
+
+    * `surface_title` — `Text` (h1) with the declared `title`
+    * `form_slot` — the record task panel (see "The task panel" below)
+    * `status_text` — `Text` bound to `/ui/feedback/message`, the typed
+      outcome of the last action (its kind sits alongside at
+      `/ui/feedback/kind`) — near the top, so an outcome is on screen
+      without scrolling
+    * `context_<name>` — the pickers of declared contexts
+    * then, per `:table` (in declaration order):
+    * `table_heading` — `Text` (h2) with the humanized resource name
+    * `query_controls` — only when the table declares a `query` with search,
+      presets, filters or range filters (a query for sort and page size
+      alone gets no controls): a `Row` of a
+      search `TextField` (`query_search_input`, bound to `/query/search`,
+      omitted when the query has no `search_fields`), a preset `ChoicePicker`
+      (`query_preset_picker`, bound to `/query/preset`, only when the query
+      declares presets — options are the preset names, preceded by an
+      `"All"`/`""` option unless a `default_preset` is declared), one
+      `ChoicePicker` per declared filter not in `hidden_filters`
+      (`query_filter_<name>`, bound to `/query/filters/<name>`, with an
+      `"All"` option first) and a
+      `query_apply_button` (event `query`, context
+      `{"query": {"@path": "/query"}, "page": 1}` — the page-1 reset)
+    * `create_button` — only when the view declares a create action and
+      the table reads the surface's own resource: a primary `Button`
+      dispatching `start_create`, labelled `"Create <Resource>"`
+    * `records_list` — `List` whose children are a template
+      `{"componentId": "record_row", "path": "/records"}`; `record_row` is a
+      `Card` wrapping `record_row_content`, a `Row` of per-field labeled
+      cells — each `table_cell_<field>_row` is a `Row` of a caption `Text`
+      (`table_cell_<field>_label`, the humanized field name) and a value
+      `Text` (`table_cell_<field>_value`, bound to the template-relative
+      path `<field>`, `format: :date` rendered through `formatDate`; with
+      the `link_buttons: true` option (set by `AshA2ui.LiveRenderer` when
+      it can navigate) a to-one reference link wraps that Text in a
+      borderless `Button`,
+      `table_cell_<field>_value_link`, dispatching `open_surface` with
+      `{"field", "surface", "recordId"}` bound to the row's
+      `_links/<field>` — card rows and details do the same) —
+      one `Button` per row action
+      (`row_action_<action>_button`: event `invoke`, context
+      `{"action": "<name>", "recordId": {"@path": "id"}}`), a
+      `row_context_button` ("Select <context>", event `context_select`) on
+      tables declaring `select_context`, and the task controls — only on
+      surfaces with a `:form` component and only on tables over the
+      surface's own resource (related tables are read-only): `view_button`
+      (event `view_record`) and, with a declared `update_action`,
+      `edit_button` (event `start_edit`), both with context
+      `{"recordId": {"@path": "id"}, "component": "<table>"}`. Tables
+      declaring a `row_layout` swap the card's content for a header +
+      metadata-grid structure — see the Layout topic and
+      `card_row_components/5`
+    * `empty_state` — a zero-or-one `List` over the root `_empty_visible`
+      sentinel rendering `empty_state_text` (bound to `_empty_message`,
+      "No <resource> records yet.")
+
+  ## Row-action prompts (prompt_fields)
+
+  A row action whose `action` entity declares `prompt_fields` renders as a
+  `Modal` (`row_action_<action>_modal`) instead of a bare button: the row
+  slot holds the Modal, whose `trigger` is the usual
+  `row_action_<action>_button` — now dispatching event `prompt` with context
+  `{"action": "<name>", "recordId": {"@path": "id"}, "component": "<table>"}`
+  so the server pre-fills `/prompt/values/<action>` — and whose `content` is
+  `row_action_<action>_prompt`, a `Column` of a title `Text`, one input
+  per prompt field (`row_action_<action>_prompt_input_<field>`, bound to
+  the absolute `/prompt/values/<action>/<field>` path; template-relative
+  paths cannot reach the shared prompt state), a per-field error `Text`
+  (bound to `/errors/<field>`) and a confirm `Button`
+  (`row_action_<action>_confirm_button`: event `invoke`, context carrying
+  `"values": {"@path": "/prompt/values/<action>"}` alongside the usual
+  `"action"`/`"recordId"`/`"component"`). Modal open/close is client-side
+  (the protocol has no server-controlled open state); the server
+  contract is only the `prompt` pre-fill and the `invoke` values.
+
+  Each prompt input is the widget a form field of the same type gets
+  (`AshA2ui.ResolvedView.t:prompt_field/0`): a `ChoicePicker` over a
+  relationship (`belongs_to`) field's loaded options or an enumerated
+  argument's choices, a `CheckBox`, a `DateTimeInput`, or a `TextField`. A
+  relationship field with `option_search` renders the searchable-select
+  composite instead (`row_action_<action>_prompt_select_<field>`): selected
+  label and search text at `/prompt/select/<action>/<field>`, results at
+  `/options/<field>`, each result dispatching `option_select` with
+  `"prompt": "<action>"` so the server writes the picked value to
+  `/prompt/values/<action>/<field>`. Values are cast and validated
+  server-side against the action, as for any prompt.
+
+  A relationship field scoped per row by the action's `prompt_options`
+  renders the same composite without inlined options: its result `List`
+  templates over `/prompt/options/<action>/<field>` (the `prompt` pre-fill
+  writes the row's options there, read as the actor through the scope's
+  read action), the search controls appear only with `option_search`, and
+  its `option_select` (and `option_search`) context also carries
+  `"recordId": {"@path": "/prompt/record/<action>"}` — the row the prompt
+  is open on, which the server re-reads before evaluating the scope.
+
+  The prompt Modal closes on its own after a successful confirm under the
+  AshA2ui catalogs (`priv/js/ash_a2ui_catalog.js` and the admin catalog
+  override the basic Modal); a stock basic renderer closes it through its
+  × button only.
+
+  Under the admin catalog the same inputs sit in a `Column`
+  (`row_action<sfx>_<action>_prompt`, a child of the dataGrid) that the
+  action's `rowActions` entry names in its `prompt` (`content`, `title`,
+  `confirmLabel`, and the `open` pre-fill envelope); the grid renders it in
+  a dialog and dispatches the entry's `invoke` envelope on confirm.
+
+  ## Conditional row actions (visible_when)
+
+  A row action whose `action` entity declares `visible_when` conditions is
+  wrapped in `row_action_<action>_slot` — a `List` templated over the
+  row-relative `_visible_<action>` path (`[%{"id" => id}]` when visible,
+  `[]` when hidden, computed server-side; see `AshA2ui.Conditions`).
+  Renderers supporting nested templates render zero or one button per row;
+  rows also carry `"_actions"` (the visible action names) for renderers that
+  don't. Rendering is best-effort — enforcement lives in
+  `AshA2ui.ActionHandler`, which re-evaluates the conditions on every
+  invoke.
+    * `query_pagination` — only when the table declares a `query`: a
+      zero-or-one `List` over `/query/_pagination_visible` (shown only when
+      there is more than one page) rendering a `Row` of
+      `query_prev_slot` / `query_page_text` (the result-range text, bound to
+      `/query/_range_text`) / `query_next_slot`; each slot is a zero-or-one
+      `List` over `/query/_previous_visible` / `/query/_next_visible`
+      holding `query_prev_button` / `query_next_button`, which carry event
+      `query` with context `{"query": {"@path": "/query"}, "pageDelta": -1 | 1}`
+    * `action_result_panel` — `Column` wrapping `action_result_text`, a
+      `Text` bound to `/ui/feedback/resultText` (the display text of
+      map-returning generic action results; empty until an action produces
+      one)
+
+  ## The task panel
+
+  `form_slot` is a zero-or-one `List` over `/ui/panel/visible` holding
+  `form`, a `Card` whose `form_body` Column stacks `form_title` (h3, bound
+  to `/ui/panel/title`), the read-only display `panel_view_slot` (over
+  `/ui/panel/view_visible`; `panel_view_<field>` rows bound to
+  `/ui/panel/record/<field>`), the editable `form_fields_slot` (over
+  `/ui/panel/form_visible`), a `Divider` and the `form_footer` Column of
+  `form_submit_slot` (over `/ui/panel/submit_visible`) and
+  `form_cancel_button` (event `cancel_record_task`).
+
+  `form_fields` holds `form_input_<field>` + `form_error_<field>` pairs.
+  Inputs use the field's resolved widget (`TextField` / `CheckBox` /
+  `ChoicePicker` / `DateTimeInput`), bind `value` to `/form/<field>`, and
+  errors are `Text` (caption) bound to `/errors/<field>`. Relationship
+  selects render as `ChoicePicker`s whose loaded options are emitted inline
+  (the basic catalog's ChoicePicker takes a literal options array) and mirrored
+  at `/options/<field>` in the data model. `form_submit_button` sends
+  `submit_form` with context
+  `{"values": {"@path": "/form"}, "recordId": {"@path": "/form/id"}}`; its
+  label binds `/ui/panel/primary_label` ("Create <Resource>" /
+  "Save changes"). The panel's modes and actions are documented on
+  `AshA2ui.Experience`.
+
+  ## Bulk actions
+
+  A table declaring `bulk_actions` gains a `CheckBox`
+  (`record_row<sfx>_selected`, bound to the row-relative `_selected` path)
+  as the first child of its row (the card header under a `row_layout`), and
+  a toolbar Row `bulk<sfx>_toolbar` right above `records_list<sfx>`: one
+  `bulk<sfx>_<action>_button` per bulk action (event `bulk_invoke`, context
+  `{"action", "component", "records": {"@path": <records path>}}` plus the
+  usual query/contexts bindings), then `bulk<sfx>_select_page_button` and
+  `bulk<sfx>_clear_button` (event `bulk_select` with `"selected"` true /
+  false). Its rows carry `"_selected": false` and the data model a
+  `"bulk"` entry per such table (see `AshA2ui.Bulk`). Under the admin
+  catalog such a table stays basic-composed. Tables without bulk actions
+  are unchanged.
+
+  ## Data model
+
+  The reserved-path value shape (see `topics/data-model-conventions`):
+
+      %{
+        "records" => [%{"id" => ..., "<field>" => ...}, ...],
+        "form" => %{},
+        "errors" => %{},
+        "options" => %{"<field>" => [%{"label" => ..., "value" => ...}]},
+        "ui" => %{
+          "intent" => "browse",
+          "panel" => %{"visible" => [], "mode" => nil, ...},
+          "feedback" => %{"kind" => "", "message" => "", "code" => "",
+                          "functionCallId" => "", "result" => %{}, "resultText" => ""}
+        },
+        "_empty_visible" => [%{"id" => "on"}],
+        "_empty_message" => "No <resource> records yet."
+      }
+
+  The `/ui` task state, the empty-state sentinels and the `/query`
+  pagination sentinels are described on `AshA2ui.Experience`.
+
+  Surfaces with prompt-enabled row actions additionally carry `"prompt"` —
+  `%{"values" => %{"<action>" => %{"<field>" => ""}}}`, plus `"select" =>
+  %{"<action>" => %{"<field>" => %{"search" => "", "label" => ""}}}` when a
+  prompt field is a searchable or per-row scoped relationship select, and
+  `"options" => %{"<action>" => %{"<field>" => []}}` with `"record" =>
+  %{"<action>" => ""}` when one is scoped (`prompt_options`) — and rows of tables
+  with `visible_when` row actions gain the `"_actions"` /
+  `"_visible_<action>"` keys (see the sections above).
+
+  A field with declared choices serializes as its label; the row also carries
+  the value at the reserved `"_values"` key (`%{"<field>" => value}`, only for
+  rewritten fields, absent when there are none).
+
+  `source` table columns serialize by walking the loaded relationship path
+  (`[:user, :email]` -> `record.user.email`); a nil or unloaded relationship
+  serializes to `""`.
+
+  Query-enabled surfaces additionally carry `"query"` — the `/query` state
+  shape documented on `AshA2ui.QueryRunner` — and their `submit_form`/`invoke`
+  contexts include `"query": {"@path": "/query"}` so success refreshes respect
+  the renderer's active search/filters/sort/page.
+
+  Record values are JSON-safe: dates/datetimes via `to_iso8601`, decimals and
+  atoms via `to_string`; enum values in table rows read as their labels.
+
+  ## Wizard steps
+
+  A form declaring `step` entities replaces its field children with the
+  `form_wizard` subtree and carries `/ui/wizard` in the data model; see
+  `AshA2ui.Wizard`. Forms without steps are unchanged.
+  """
+
+  alias Ash.Resource.Info, as: ResourceInfo
+  import AshA2ui.Gettext, only: [msg: 1]
+
+  alias AshA2ui.Experience
+  alias AshA2ui.L10n
+  alias AshA2ui.Label
+  alias AshA2ui.ResolvedView
+
+  @version "1.0"
+  @basic_catalog_id "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
+  @ash_catalog_id "https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1"
+
+  # The admin catalog's own components (priv/a2ui/admin_v1/catalog.json).
+  # Every other component the encoder emits is a basic-catalog component.
+  @admin_components ~w(actionBar calendarView confirmDialog dataGrid emptyState entityPage
+                       fieldDisplay filterPicker formSection liveDiagram pagination recordPanel
+                       statusBanner)
+
+  @numeric_types [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
+
+  ## The wire contract
+
+  @doc ~S(The A2UI protocol version every message carries: `"1.0"`.)
+  @spec version() :: String.t()
+  def version, do: @version
+
+  @doc "The catalog id of the A2UI 1.0 basic catalog."
+  @spec basic_catalog_id() :: String.t()
+  def basic_catalog_id, do: @basic_catalog_id
+
+  @doc """
+  The catalog id of ash_a2ui's own function catalog
+  (`priv/a2ui/v1_0/catalogs/ash_a2ui/catalog.json`): `ashAction`, which a
+  renderer sends to the agent as `callAgentFunction`, and `downloadFile`,
+  which the agent asks the renderer to run with `callRendererFunction`.
+  """
+  @spec ash_catalog_id() :: String.t()
+  def ash_catalog_id, do: @ash_catalog_id
+
+  @doc """
+  Encodes the surface: one inline `createSurface` message carrying the
+  component tree and the initial data model, so the surface paints once.
+
+  The surface's `catalogId` is the basic catalog, or the admin catalog for
+  a surface built with `catalog: :admin_v1`. Components from the other
+  catalog carry `@catalogId` (see `with_catalog/2`).
+  """
+  @spec encode_surface(ResolvedView.t(), [map] | map, keyword) :: [map]
+  def encode_surface(resolved_view, records, opts) do
+    catalog_id = surface_catalog_id(resolved_view)
+
+    components =
+      resolved_view
+      |> with_openable_links(opts)
+      |> with_diagram_sources(opts)
+      |> components(select_options(resolved_view, opts))
+      |> without_header(opts)
+      |> Enum.map(&with_catalog(&1, catalog_id))
+
+    [
+      %{
+        "version" => @version,
+        "createSurface" => %{
+          "surfaceId" => resolved_view.surface_id,
+          "catalogId" => catalog_id,
+          "components" => components,
+          "dataModel" => data_model(resolved_view, records, opts)
+        }
+      }
+    ]
+  end
+
+  # `header: false`: the page around the surface already owns its heading
+  # (a host layout with its own <h1>), so the surface leaves its own out
+  # instead of rendering a second one. Basic: the `surface_title` Text and
+  # its root child go. Admin: the entityPage keeps its title (still the
+  # page's name for the payload) and carries `headerVisible: false`, so the
+  # renderer skips its header (title and description). Default: unchanged.
+  defp without_header(components, opts) do
+    if Keyword.get(opts, :header, true) == false do
+      components
+      |> Enum.reject(&(&1["id"] == "surface_title"))
+      |> Enum.map(fn
+        %{"component" => "entityPage"} = page ->
+          Map.put(page, "headerVisible", false)
+
+        %{"id" => "root", "children" => children} = root when is_list(children) ->
+          %{root | "children" => List.delete(children, "surface_title")}
+
+        component ->
+          component
+      end)
+    else
+      components
+    end
+  end
+
+  # The admin catalog (`catalog: :admin_v1`) surfaces declare their own
+  # catalog id; everything else is the basic catalog.
+  defp surface_catalog_id(view) do
+    if Experience.admin?(view), do: Experience.admin_catalog_id(), else: @basic_catalog_id
+  end
+
+  @doc """
+  Encodes a data-only refresh: one `updateDataModel` message, usable for
+  PubSub-driven refresh pushes.
+
+  By default it replaces the whole data model (`path: "/"`) with the full
+  reserved-path value shape, resetting `form`, `errors` and `ui`. Pass
+  `scope: :records` to replace only `/records`, which keeps in-flight form
+  state on the renderer.
+  """
+  @spec encode_data_model(ResolvedView.t(), [map] | map, keyword) :: map
+  def encode_data_model(resolved_view, records, opts) do
+    case Keyword.get(opts, :scope, :full) do
+      :records ->
+        update_data_model(
+          resolved_view.surface_id,
+          "/records",
+          records_value(resolved_view, records, opts)
+        )
+
+      :full ->
+        update_data_model(resolved_view.surface_id, "/", data_model(resolved_view, records, opts))
+    end
+  end
+
+  @doc """
+  One `updateDataModel` message writing `value` at `path` (a JSON Pointer;
+  `"/"` is the whole data model). `value` is always sent: `nil` deletes the
+  key at `path`.
+  """
+  @spec update_data_model(String.t(), String.t(), term) :: map
+  def update_data_model(surface_id, path, value) when is_binary(surface_id) and is_binary(path) do
+    %{
+      "version" => @version,
+      "updateDataModel" => %{"surfaceId" => surface_id, "path" => path, "value" => value}
+    }
+  end
+
+  @doc """
+  A `callRendererFunction` message asking the renderer to run the catalog
+  function `name` with `args` against `surface_id`'s data model, under a
+  fresh `functionCallId`. The renderer answers with a
+  `rendererFunctionResponse` carrying the same id.
+
+  Options:
+
+    * `:catalog_id` — the catalog declaring the function. Defaults to
+      `ash_catalog_id/0` (`downloadFile`).
+    * `:function_call_id` — overrides the generated id.
+
+  Only a function its catalog lets the agent call (`allowedCallers`
+  `agentOnly` or `rendererOrAgent`) may be sent this way. Anything that can
+  be said as data (status, errors, selection) belongs in `updateDataModel`
+  instead: a function call is imperative and invisible to the data model.
+  """
+  @spec call_renderer_function(String.t(), String.t(), map, keyword) :: map
+  def call_renderer_function(surface_id, name, args, opts \\ [])
+      when is_binary(surface_id) and is_binary(name) and is_map(args) do
+    %{
+      "version" => @version,
+      "callRendererFunction" => %{
+        "surfaceId" => surface_id,
+        "functionCallId" => Keyword.get_lazy(opts, :function_call_id, &function_call_id/0),
+        "callFunction" => %{
+          "@call" => name,
+          "catalogId" => Keyword.get(opts, :catalog_id, @ash_catalog_id),
+          "args" => args
+        }
+      }
+    }
+  end
+
+  defp function_call_id do
+    "fc_" <> Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)
+  end
+
+  @doc """
+  An `agentFunctionResponse` answering the renderer's `callAgentFunction`
+  `function_call_id`: `{:ok, value}` returns `value`, `{:error, code,
+  message}` the error object.
+  """
+  @spec agent_function_response(String.t(), {:ok, term} | {:error, String.t(), String.t()}) ::
+          map
+  def agent_function_response(function_call_id, {:ok, value}) when is_binary(function_call_id) do
+    %{
+      "version" => @version,
+      "agentFunctionResponse" => %{"functionCallId" => function_call_id, "value" => value}
+    }
+  end
+
+  def agent_function_response(function_call_id, {:error, code, message})
+      when is_binary(function_call_id) and is_binary(code) and is_binary(message) do
+    %{
+      "version" => @version,
+      "agentFunctionResponse" => %{
+        "functionCallId" => function_call_id,
+        "error" => %{"code" => code, "message" => message}
+      }
+    }
+  end
+
+  @doc """
+  The `Action` of every server-handled interaction: a function call to
+  `ashAction` in the ash_a2ui catalog. The renderer sends it to the agent as
+  `callAgentFunction`, and `AshA2ui.ActionHandler` answers it with an
+  `agentFunctionResponse` after its data-model updates.
+
+  `name` and `context` are the action name and its context (literals and
+  `{"@path" => ...}` bindings the renderer resolves before sending);
+  `source_component_id` is the id of the component the action sits on.
+  """
+  @spec ash_action(String.t(), map, String.t()) :: map
+  def ash_action(name, context, source_component_id)
+      when is_binary(name) and is_map(context) and is_binary(source_component_id) do
+    %{
+      "functionCall" => %{
+        "@call" => "ashAction",
+        "catalogId" => @ash_catalog_id,
+        "args" => %{
+          "name" => name,
+          "sourceComponentId" => source_component_id,
+          "context" => context
+        }
+      }
+    }
+  end
+
+  @doc """
+  Qualifies `component` for a surface whose default catalog is
+  `surface_catalog_id`. A component's catalog is the `@catalogId` it already
+  names, else the catalog declaring its kind: the admin catalog for the admin
+  components, the basic catalog for everything else. A component from
+  another catalog (a basic component on an admin surface) gets `@catalogId`,
+  and the function calls inside it that name no catalog get its catalog too,
+  because an unqualified call resolves against the surface's default. A
+  component from the surface's own catalog carries no `@catalogId`.
+  """
+  @spec with_catalog(map, String.t()) :: map
+  def with_catalog(%{"component" => kind} = component, surface_catalog_id) do
+    case component["@catalogId"] || component_catalog_id(kind) do
+      ^surface_catalog_id ->
+        Map.delete(component, "@catalogId")
+
+      catalog_id ->
+        component
+        |> Map.new(fn {key, value} -> {key, qualify_calls(value, catalog_id)} end)
+        |> Map.put("@catalogId", catalog_id)
+    end
+  end
+
+  defp component_catalog_id(kind) when kind in @admin_components,
+    do: Experience.admin_catalog_id()
+
+  defp component_catalog_id(_kind), do: @basic_catalog_id
+
+  # System functions (`@index`) belong to no catalog.
+  defp qualify_calls(%{"@call" => "@" <> _} = call, _catalog_id), do: call
+
+  defp qualify_calls(%{"@call" => _} = call, catalog_id) do
+    call
+    |> Map.new(fn {key, value} -> {key, qualify_calls(value, catalog_id)} end)
+    |> Map.put_new("catalogId", catalog_id)
+  end
+
+  defp qualify_calls(%{} = map, catalog_id),
+    do: Map.new(map, fn {key, value} -> {key, qualify_calls(value, catalog_id)} end)
+
+  defp qualify_calls(list, catalog_id) when is_list(list),
+    do: Enum.map(list, &qualify_calls(&1, catalog_id))
+
+  defp qualify_calls(other, _catalog_id), do: other
+
+  @doc """
+  The `text` of a level-`level` heading `Text`: the 1.0 basic catalog's
+  Text has no heading variants and renders its text as Markdown, so a
+  literal heading is `"## Title"` and a bound one interpolates its path
+  through `formatString` (`"## ${/path}"`). A function-call text (a
+  formatted date) stays as it is.
+  """
+  @spec heading(1..6, String.t() | map) :: String.t() | map
+  def heading(level, text) when is_binary(text),
+    do: String.duplicate("#", level) <> " " <> text
+
+  def heading(_level, %{"@call" => _} = call), do: call
+
+  def heading(level, %{"@path" => path}) do
+    %{
+      "@call" => "formatString",
+      "args" => %{"value" => String.duplicate("#", level) <> " ${" <> path <> "}"}
+    }
+  end
+
+  # The full data model: the reserved-path value shape.
+  defp data_model(view, records, opts) do
+    %{
+      "records" => records_value(view, records, opts),
+      "form" => ResolvedView.initial_form(view),
+      "errors" => %{},
+      "options" => options_data(view, opts),
+      "ui" => %{}
+    }
+    |> put_query_state(view, opts)
+    |> put_prompt_state(view)
+    |> put_select_state(view)
+    |> put_context_data(view, opts)
+    |> put_report_state(view)
+    |> put_export_state(view)
+    |> put_bulk_state(view)
+    |> put_experience_state(view)
+    |> put_lane_totals(view)
+    |> put_matrix_data(view)
+    |> put_wizard_state(view)
+    |> put_diagram_state(view, opts)
+  end
+
+  # The value at "/records": on single-table surfaces the serialized row
+  # list (records arrive as a list); on multi-table surfaces an object keyed
+  # by table component name (records arrive as %{table_name => [record]},
+  # see AshA2ui.Info) — every declared table gets a key, missing ones [].
+  defp records_value(view, records, opts) do
+    if ResolvedView.multi_table?(view) do
+      unless is_map(records) do
+        raise ArgumentError,
+              "multi-table surfaces expect records as a map keyed by table component " <>
+                "name (%{table_name => [record]}), got: #{inspect(records)}"
+      end
+
+      Map.new(view.tables, fn table ->
+        rows = Map.get(records, table.name, [])
+        links = table_links(view, table, opts)
+        {to_string(table.name), Enum.map(rows, &serialize_record(view, table, &1, links))}
+      end)
+    else
+      table = List.first(view.tables)
+      links = table_links(view, table, opts)
+      Enum.map(records, &serialize_record(view, table, &1, links))
+    end
+  end
+
+  # The per-render link context of a table's linked fields (nil without
+  # any — rows then carry no "_links" key).
+  defp table_links(_view, nil, _opts), do: nil
+
+  defp table_links(view, table, opts),
+    do: AshA2ui.Links.context(table.resource, view.fields, table.component.fields, opts)
+
+  # Basic-catalog reference links: which to-one link fields (`link
+  # :relationship` / `link {surface, id_path}`) of each table and detail
+  # resolve to a surface for this render's actor — the
+  # `AshA2ui.LinkResolver`'s per-field answer, the same one the row data's
+  # `_links` come from. Each table/detail scope carries its set under
+  # `:openable_links` for the component pass only (the data model is
+  # encoded from the unannotated view). A vetoed field keeps its plain value
+  # Text; `links` (to-many) fields stay plain text in the basic catalog.
+  # Opt-in (`link_buttons: true`): a Button only helps when the transport
+  # navigates on an accepted "open_surface", so without the option every
+  # value stays plain Text, as before link Buttons existed.
+  defp with_openable_links(view, opts) do
+    if Keyword.get(opts, :link_buttons, false) == true do
+      annotate_openable_links(view, opts)
+    else
+      view
+    end
+  end
+
+  defp annotate_openable_links(view, opts) do
+    tables =
+      Enum.map(view.tables, fn table ->
+        Map.put(
+          table,
+          :openable_links,
+          openable_links(view, table.resource, table.component.fields, opts)
+        )
+      end)
+
+    details =
+      Enum.map(view.details, fn detail ->
+        resource = view.contexts[detail.context].resource
+        Map.put(detail, :openable_links, openable_links(view, resource, detail.fields, opts))
+      end)
+
+    %{view | tables: tables, details: details}
+  end
+
+  defp openable_links(view, resource, fields, opts) do
+    case AshA2ui.Links.context(resource, view.fields, fields, opts) do
+      %{specs: specs} ->
+        for %{field: field, surface: surface, cardinality: cardinality} <- specs,
+            is_binary(surface) and cardinality in [:one, :path],
+            into: MapSet.new(),
+            do: field
+
+      nil ->
+        MapSet.new()
+    end
+  end
+
+  # The component pass needs each diagram's mermaid source (a static
+  # prop) and the link-button switch; AshA2ui.Info loaded the sources once
+  # under `:diagram_values` (direct encoder calls render an empty source).
+  defp with_diagram_sources(%{diagrams: []} = view, _opts), do: view
+
+  defp with_diagram_sources(view, opts) do
+    loaded = Keyword.get(opts, :diagram_values) || %{}
+    link_buttons? = Keyword.get(opts, :link_buttons, false) == true
+
+    diagrams =
+      Enum.map(view.diagrams, fn diagram ->
+        %{
+          diagram
+          | rendered_source: get_in(loaded, [diagram.name, :source]) || "",
+            link_buttons?: link_buttons?
+        }
+      end)
+
+    %{view | diagrams: diagrams}
+  end
+
+  # The reserved /diagram state: each diagram's markers and node list (see
+  # AshA2ui.Diagram). Omitted entirely on surfaces without diagrams (frozen
+  # shape unchanged).
+  defp put_diagram_state(value, %{diagrams: []}, _opts), do: value
+
+  defp put_diagram_state(value, view, opts) do
+    loaded = Keyword.get(opts, :diagram_values) || %{}
+
+    state =
+      Map.new(view.diagrams, fn diagram ->
+        {to_string(diagram.name),
+         get_in(loaded, [diagram.name, :state]) || AshA2ui.Diagram.empty_state()}
+      end)
+
+    Map.put(value, "diagram", state)
+  end
+
+  # Relationship prompt fields render their loaded option list inline (the
+  # basic ChoicePicker takes literal options only), so the component pass
+  # carries each one's list on the prompt field.
+  defp put_prompt_options(view, options) do
+    prompts =
+      Map.new(view.prompts, fn {action, fields} ->
+        {action,
+         Enum.map(fields, fn
+           %{widget: :select, name: name} = field ->
+             Map.put(field, :options, Map.get(options, name, []))
+
+           field ->
+             field
+         end)}
+      end)
+
+    %{view | prompts: prompts}
+  end
+
+  # --- select options ---
+
+  # Options for relationship selects and pick_existing nested forms are
+  # loaded by the caller (`AshA2ui.Info`) and passed via `opts[:options]` as
+  # `%{name => [%{"label" => _, "value" => _}]}`. Direct encoder calls
+  # without the option fall back to empty option lists per source.
+  defp select_options(view, opts) do
+    context_defaults =
+      for {name, %{picker: true}} <- view.contexts, into: %{}, do: {name, []}
+
+    defaults =
+      view
+      |> ResolvedView.option_sources()
+      |> Map.new(fn {name, _source} -> {name, []} end)
+      |> Map.merge(context_defaults)
+
+    Map.merge(defaults, Keyword.get(opts, :options) || %{})
+  end
+
+  # The reserved /report state (per-report params + rows). Omitted entirely
+  # on surfaces without :report components (frozen shape unchanged).
+  defp put_report_state(value, view) do
+    case ResolvedView.report_state(view) do
+      state when state == %{} ->
+        value
+
+      state ->
+        value
+        |> Map.put("report", state)
+        # The report's loading row shows while this holds its one entry
+        # (AshA2ui.Loading); empty until a host or the hook says rows are coming.
+        |> Map.update!("ui", &Map.put(&1, "loading_visible", []))
+    end
+  end
+
+  # The reserved /export state (per-component column selection, all checked
+  # initially). Omitted entirely on surfaces without column-selectable
+  # exports (frozen shape unchanged).
+  defp put_export_state(value, view) do
+    case ResolvedView.export_state(view) do
+      state when state == %{} -> value
+      state -> Map.put(value, "export", state)
+    end
+  end
+
+  # The reserved /bulk state (per-table last bulk result, see
+  # AshA2ui.Bulk). Omitted entirely on surfaces without bulk actions
+  # (frozen shape unchanged).
+  defp put_bulk_state(value, view) do
+    case AshA2ui.Bulk.state(view) do
+      state when state == %{} -> value
+      state -> Map.put(value, "bulk", state)
+    end
+  end
+
+  # The reserved /select state (searchable-select search text + selected
+  # label, pick_existing search text + picked value). Omitted entirely on
+  # surfaces without wave-5 relationship inputs (frozen shape unchanged).
+  defp put_select_state(value, view) do
+    case ResolvedView.select_state(view) do
+      state when state == %{} -> value
+      state -> Map.put(value, "select", state)
+    end
+  end
+
+  # The `/options/<field>` data-model mirror of the inline ChoicePicker
+  # options (string keys, same list shape).
+  defp options_data(view, opts) do
+    view
+    |> select_options(opts)
+    |> Map.new(fn {name, options} -> {to_string(name), options} end)
+  end
+
+  # The reserved /context and /detail state (see AshA2ui.ContextRunner):
+  # the caller-resolved values when given (AshA2ui.Info passes them after
+  # loading under the carried :context_state), the empty initial shapes
+  # otherwise. Omitted entirely on context-less surfaces (frozen shape
+  # unchanged).
+  defp put_context_data(value, view, opts) do
+    if ResolvedView.contexts?(view) do
+      value
+      |> Map.put(
+        "context",
+        Keyword.get(opts, :context_values) || ResolvedView.context_state(view)
+      )
+      |> put_detail_data(view, opts)
+    else
+      value
+    end
+  end
+
+  defp put_detail_data(value, view, opts) do
+    case ResolvedView.detail_state(view) do
+      state when state == %{} ->
+        value
+
+      state ->
+        resolved =
+          Map.new(
+            Keyword.get(opts, :detail_values) || %{},
+            fn {name, detail_value} -> {to_string(name), detail_value} end
+          )
+
+        Map.put(value, "detail", Map.merge(state, resolved))
+    end
+  end
+
+  # --- component tree ---
+
+  # Multi-table id scheme: single-table surfaces keep the frozen unsuffixed
+  # ids ("records_list", "table_cell_<field>_row", "query_apply_button", ...);
+  # multi-table surfaces infix the table component name right after the id's
+  # leading noun ("records_list_<name>", "table_cell_<name>_<field>_row",
+  # "query_<name>_apply_button", ...) — see the sfx/1-using call sites.
+  defp components(view, options) do
+    view = put_prompt_options(view, options)
+
+    if Experience.admin?(view) do
+      admin_components(view, options)
+    else
+      basic_components(view, options)
+    end
+  end
+
+  defp basic_components(view, options) do
+    form = Enum.find(view.components, &(&1.name == :form))
+
+    context_sections =
+      Enum.flat_map(view.context_order, &context_picker_components(view, view.contexts[&1]))
+
+    table_sections =
+      view.tables
+      |> Enum.reject(&AshA2ui.Board.lane?/1)
+      |> Enum.flat_map(fn table ->
+        sfx = table_suffix(view, table)
+
+        table_components(view, table, sfx) ++
+          query_components(view, table, sfx) ++
+          create_button_components(view, table, sfx) ++
+          calendar_components(view, table, sfx) ++
+          table_export_components(view, table, sfx) ++
+          table_descendants(view, table, sfx) ++
+          empty_state_components(view, table, sfx)
+      end)
+      |> Kernel.++(board_components(view))
+
+    detail_sections = Enum.flat_map(view.details, &detail_components(view, &1))
+    report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
+    diagram_sections = Enum.flat_map(view.diagrams, &basic_diagram_components(view, &1))
+
+    form_components = (form && form_components(view, form)) || []
+    {_ids, section_wrappers} = basic_section_children(view)
+
+    root = %{
+      "id" => "root",
+      "component" => "Column",
+      "children" => root_children(view, form)
+    }
+
+    status = %{
+      "id" => "status_text",
+      "component" => "Text",
+      "text" => %{"@path" => "/ui/feedback/message"}
+    }
+
+    [
+      root
+      | surface_title_components(view) ++
+          context_sections ++
+          diagram_sections ++
+          table_sections ++
+          detail_sections ++ report_sections ++ section_wrappers ++ form_components
+    ] ++
+      form_descendants(view, form, options) ++ [status | action_result_components()]
+  end
+
+  # The surface title, as the first root child. Titles are declared
+  # on every surface and were silently dropped in basic mode — only the
+  # admin entityPage consumed them — leaving pages without an h1 and the
+  # first heading mislabeling the page (the CLIN-10 audit's finding #4).
+  # The merged catalog's Text override carries the display tier for this
+  # exact id; the wire shape is a plain heading Text either way.
+  defp surface_title_components(view) do
+    if is_binary(view.title) and view.title != "" do
+      [
+        %{
+          "id" => "surface_title",
+          "component" => "Text",
+          "text" => heading(1, view.title)
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  # --- admin catalog composition (catalog :admin_v1) ---
+
+  # The admin emission upgrades the CORE subtree — collection → dataGrid
+  # (+ emptyState + pagination), form → recordPanel (+ fieldDisplays,
+  # formSection + actionBar), status → statusBanner, root → entityPage —
+  # and keeps everything else basic: context pickers and query controls are
+  # basic by contract, the create affordance stays a basic button, the
+  # action-result panel is untouched, and advanced-feature subtrees
+  # (dynamic sections, export, inline editing, nested forms, reports,
+  # details) emit their basic composition byte-equal (see
+  # notes/2026-09-07-admin-catalog-contract.md). Action envelopes are the
+  # exact A2UI-101 shapes — the handler learns nothing new.
+  defp admin_components(view, options) do
+    form = Enum.find(view.components, &(&1.name == :form))
+
+    context_sections =
+      Enum.flat_map(view.context_order, &context_picker_components(view, view.contexts[&1]))
+
+    {table_section_lists, table_children_lists} =
+      view.tables
+      |> Enum.map(&admin_table_section(view, &1, options))
+      |> Enum.unzip()
+
+    table_sections = List.flatten(table_section_lists)
+
+    {section_children, section_wrappers} =
+      view
+      |> admin_section_children(Enum.zip(view.tables, table_children_lists))
+      |> group_sections(view)
+
+    detail_sections = Enum.flat_map(view.details, &admin_detail_components(view, &1))
+    report_sections = Enum.flat_map(view.reports, &report_components(view, &1))
+    diagram_sections = Enum.map(view.diagrams, &admin_diagram_component(view, &1))
+
+    {form_sections, form_children} = admin_form_sections(view, form, options)
+
+    root = %{
+      "id" => "root",
+      "component" => "entityPage",
+      "title" => Experience.surface_title(view),
+      # Record-task panel first (zero jank: an open task is
+      # front-and-center), the typed-feedback banner right below it (the
+      # near-action outcome home), then context pickers, tables, details.
+      "children" =>
+        form_children ++
+          ["status_banner"] ++
+          context_children(view) ++
+          diagram_children(view) ++
+          section_children ++ ["action_result_panel"]
+    }
+
+    [
+      root
+      | context_sections ++
+          diagram_sections ++
+          table_sections ++
+          detail_sections ++ report_sections ++ section_wrappers ++ form_sections
+    ] ++ [admin_status_banner() | action_result_components()]
+  end
+
+  defp context_children(view) do
+    for name <- view.context_order, view.contexts[name].picker, do: "context_#{name}"
+  end
+
+  # The root children of the surface's sections. `component_order :kind` (the
+  # default, frozen) places every table before the detail and report cards;
+  # `:declared` follows the components' declaration order, a table's ids
+  # where it was declared (an expanded section set's tables at their
+  # template, in order).
+  defp admin_section_children(%{component_order: :declared} = view, table_children) do
+    Enum.map(view.components, fn
+      %{name: :table} = component ->
+        {component, for({%{component: ^component}, ids} <- table_children, id <- ids, do: id)}
+
+      other ->
+        {other, card_children(other)}
+    end)
+  end
+
+  defp admin_section_children(view, table_children) do
+    Enum.map(table_children, fn {table, ids} -> {table.component, ids} end) ++
+      Enum.map(view.components, &{&1, card_children(&1)})
+  end
+
+  # Consecutive components naming the same `section` share one wrapper: a
+  # Column (`section_<first key>`) holding the section's heading, its note
+  # when a component declares a `section_note`, and the components' root
+  # ids. Returns the root ids, with each run replaced by its wrapper, and the
+  # wrapper components. Components without a section (and components
+  # contributing no root ids) pass through.
+  defp group_sections(pairs, view) do
+    pairs
+    |> Enum.reject(fn {_component, ids} -> ids == [] end)
+    |> Enum.chunk_by(fn {component, _ids} -> Map.get(component, :section) end)
+    |> Enum.map(&section_run(&1, view))
+    |> Enum.unzip()
+    |> then(fn {ids, wrappers} -> {List.flatten(ids), List.flatten(wrappers)} end)
+  end
+
+  defp section_run([{first, _ids} | _rest] = run, view) do
+    ids = Enum.flat_map(run, &elem(&1, 1))
+
+    case Map.get(first, :section) do
+      nil ->
+        {ids, []}
+
+      section ->
+        base = "section_#{AshA2ui.Component.key(first)}"
+        note = section_note(run, base)
+        header = ["#{base}_heading" | Enum.map(note, & &1["id"])]
+
+        {[base],
+         [
+           %{"id" => base, "component" => "Column", "children" => header ++ ids},
+           %{
+             "id" => "#{base}_heading",
+             "component" => "Text",
+             "text" => heading(2, Label.translate(view.l10n, section))
+           }
+           | note
+         ]}
+    end
+  end
+
+  # The section's note under its heading: the first component's in the run
+  # that declares one, bound to its context's record.
+  defp section_note(run, base) do
+    Enum.find_value(run, [], fn {component, _ids} ->
+      with note when not is_nil(note) <- Map.get(component, :section_note),
+           context when not is_nil(context) <- AshA2ui.Component.note_context(component) do
+        [
+          %{
+            "id" => "#{base}_note",
+            "component" => "Text",
+            "text" => %{"@path" => "/detail/#{context}/#{note}"},
+            "variant" => "caption"
+          }
+        ]
+      else
+        _none -> nil
+      end
+    end)
+  end
+
+  defp card_children(%{name: :detail} = component),
+    do: ["detail_#{AshA2ui.Component.key(component)}"]
+
+  defp card_children(%{name: :report} = component),
+    do: ["report_#{AshA2ui.Component.key(component)}"]
+
+  defp card_children(_table_or_form), do: []
+
+  # A table whose whole subtree upgrades to the semantic components: no
+  # dynamic sections, no export controls, no inline cell editing — the
+  # contract's advanced-feature list. Everything else (and the form's
+  # nested_form case below) falls back to its byte-equal basic subtree.
+  # Expanded section tables carry `section` (their template's `sections`
+  # key is gone), so both mark a dynamic table set.
+  defp admin_core_table?(table) do
+    is_nil(Map.get(table, :sections)) and is_nil(Map.get(table, :section)) and
+      is_nil(table.export) and is_nil(table.editable) and not AshA2ui.Bulk.enabled?(table) and
+      not AshA2ui.Timeline.timeline?(table) and not AshA2ui.Matrix.matrix?(table)
+  end
+
+  # Board lanes fall back to the basic board composition (the board
+  # container rides on its template's first lane).
+  defp admin_table_section(view, %{component: %{display: :board}} = table, _options) do
+    {board_lane_components(view, table), component_root_children(view, table.component)}
+  end
+
+  defp admin_table_section(view, table, _options) do
+    sfx = table_suffix(view, table)
+
+    if admin_core_table?(table) do
+      {query_control_components(view, table, sfx) ++
+         create_button_components(view, table, sfx) ++
+         admin_calendar_components(view, table, sfx) ++
+         admin_data_grid_components(view, table, sfx),
+       ((query_controls?(table) && ["query#{sfx}_controls"]) || []) ++
+         create_button_ids(view, table, sfx) ++ [admin_collection_id(table, sfx)]}
+    else
+      {table_components(view, table, sfx) ++
+         query_components(view, table, sfx) ++
+         create_button_components(view, table, sfx) ++
+         calendar_components(view, table, sfx) ++
+         table_export_components(view, table, sfx) ++
+         table_descendants(view, table, sfx) ++
+         empty_state_components(view, table, sfx), component_root_children(view, table.component)}
+    end
+  end
+
+  # The form subtree: recordPanel (+ fieldDisplay children for view mode,
+  # formSection + actionBar for create/edit) on core surfaces; the
+  # byte-equal basic form_slot composition when nested forms or wizard
+  # steps are declared.
+  defp admin_form_sections(_view, nil, _options), do: {[], []}
+
+  defp admin_form_sections(view, form, options) do
+    if form.nested_forms == [] and form.steps == [] do
+      {[admin_record_panel(form) | admin_panel_descendants(view, form, options)],
+       ["record_panel"]}
+    else
+      {form_components(view, form) ++ form_descendants(view, form, options), ["form_slot"]}
+    end
+  end
+
+  defp admin_status_banner do
+    %{
+      "id" => "status_banner",
+      "component" => "statusBanner",
+      "kind" => %{"@path" => "/ui/feedback/kind"},
+      "message" => %{"@path" => "/ui/feedback/message"}
+    }
+  end
+
+  defp admin_data_grid_components(view, table, sfx) do
+    pagination_children = if table.query, do: ["pagination#{sfx}"], else: []
+    {prompt_ids, prompt_components} = admin_prompt_contents(view, table, sfx)
+
+    data_grid =
+      %{
+        "id" => "data_grid#{sfx}",
+        "component" => "dataGrid",
+        "columns" => admin_columns(view, table),
+        "rows" => %{"@path" => table.records_path},
+        "rowId" => "id",
+        "label" => Experience.collection_label(view, table),
+        "rowActions" => admin_row_actions(view, table, sfx),
+        "children" => ["empty_state#{sfx}" | pagination_children] ++ prompt_ids
+      }
+      |> put_row_click(view, table)
+      |> maybe_put("layout", grid_layout(table.component.display))
+      |> maybe_put("expandLabel", expand_label(view, table.component.row_layout))
+      |> maybe_put(
+        "groupIcon",
+        table.component.row_layout && table.component.row_layout.group_icon
+      )
+      |> put_grid_header(view, table.component)
+      |> put_grid_footer(view, table.component)
+      |> put_grid_sort(view, table)
+      |> drop_inline_duplicate(view, table)
+
+    [
+      data_grid,
+      admin_empty_state(view, table, sfx) | admin_pagination_components(view, table, sfx)
+    ] ++
+      prompt_components
+  end
+
+  # The prompt contents of the grid's prompt row actions: one Column of the
+  # prompt's inputs (the same widgets the basic Modal holds) per action,
+  # children of the grid that its renderer shows in the prompt dialog.
+  defp admin_prompt_contents(view, table, sfx) do
+    table.row_actions
+    |> Enum.filter(&Map.has_key?(view.prompts, &1))
+    |> Enum.map(fn action ->
+      base = "row_action#{sfx}_#{action}"
+      {children, components} = prompt_field_components(view, action, base)
+
+      {"#{base}_prompt",
+       [%{"id" => "#{base}_prompt", "component" => "Column", "children" => children} | components]}
+    end)
+    |> Enum.unzip()
+    |> then(fn {ids, components} -> {ids, List.flatten(components)} end)
+  end
+
+  # Whole-row click: the row's primary action — the master/detail select
+  # (`select_context`) when declared, else View when the surface has a
+  # record panel. The envelope is byte-identical to the matching rowActions
+  # entry, so clicking a row is exactly clicking that button.
+  #
+  # A `primary_action` draws that envelope as one button per row (`inline`),
+  # its label and variant read from the row (`_primary_label`,
+  # `_primary_variant`), in place of the rowActions entry it mirrors.
+  defp put_row_click(grid, view, table) do
+    case row_click(view, table) do
+      nil -> grid
+      entry -> Map.put(grid, "rowClick", put_primary_action(entry, table))
+    end
+  end
+
+  defp row_click(view, table) do
+    case select_context_entries(view, table) do
+      [entry | _] ->
+        entry
+
+      [] ->
+        if record_controls?(view, table),
+          do: admin_row_envelope(t(view, msg("View")), "view_record", table)
+    end
+  end
+
+  defp put_primary_action(entry, %{
+         component: %{primary_action: %AshA2ui.PrimaryAction{} = action}
+       }) do
+    entry
+    |> Map.merge(%{
+      "labelPath" => "_primary_label",
+      "variantPath" => "_primary_variant",
+      "inline" => true
+    })
+    |> maybe_put("width", Map.get(action, :width))
+  end
+
+  defp put_primary_action(entry, _table), do: entry
+
+  # The inline button already is the row click, so the rowActions entry the
+  # row click mirrors (View, or the select_context entry) is left out: one
+  # button per row, not the same action twice.
+  defp drop_inline_duplicate(
+         grid,
+         view,
+         %{component: %{primary_action: %AshA2ui.PrimaryAction{}}} = table
+       ) do
+    entry = row_click(view, table)
+    Map.update!(grid, "rowActions", fn actions -> Enum.reject(actions, &(&1 == entry)) end)
+  end
+
+  defp drop_inline_duplicate(grid, _view, _table), do: grid
+
+  # The row data of a table's primary action: its label and variant for this
+  # row (see `AshA2ui.PrimaryAction.row_data/3`), the row click's own label
+  # standing in for values without one.
+  defp primary_action_data(_view, %{component: %{primary_action: nil}}, _record), do: %{}
+
+  defp primary_action_data(view, table, record) do
+    case row_click(view, table) do
+      nil ->
+        %{}
+
+      entry ->
+        AshA2ui.PrimaryAction.row_data(
+          table.component.primary_action,
+          record,
+          entry["label"],
+          view.l10n
+        )
+    end
+  end
+
+  # One column per visible field, derived exactly like the basic Row/Card
+  # composition derives its cells: the declared field order (or the row
+  # layout's title/badge/meta sequence for card-style rows). Paths are
+  # row-relative — rows are items of the records list, like the record_row
+  # template.
+  defp admin_columns(view, table) do
+    layout = table.component.row_layout
+    columns = Map.new(table.component.columns, &{&1.name, &1})
+
+    table
+    |> grid_column_fields()
+    |> Enum.map(fn field ->
+      %{"label" => view.fields[field].label, "path" => to_string(field)}
+      |> put_column_presentation(view, table.resource, field)
+      |> put_column_badge(layout, field)
+      |> put_column_placement(layout, field)
+      |> put_column_pairs(view, field)
+      |> put_empty_text(view, field)
+      |> put_link_binding(view, field, "_links/#{field}")
+      |> put_column_sortable(table, field, columns[field])
+      |> put_column_cells(columns[field], view.l10n)
+    end)
+  end
+
+  # Catalog 1.12 list rows and 1.16 cards: a layout the admin dataGrid draws
+  # instead of its grid.
+  defp grid_layout(:rows), do: "rows"
+  defp grid_layout(:cards), do: "cards"
+  defp grid_layout(_display), do: nil
+
+  # Catalog 1.16: the words on the disclosure that opens the expand fields.
+  defp expand_label(view, %{expand_label: label}) when is_binary(label),
+    do: Label.translate(view.l10n, label)
+
+  defp expand_label(_view, _layout), do: nil
+
+  # Catalog 1.16: a field whose value is a list of {term, value} pairs.
+  defp put_column_pairs(column, view, field) do
+    case view.fields[field] do
+      %{pairs: true} -> Map.put(column, "pairs", true)
+      _other -> column
+    end
+  end
+
+  # Catalog 1.18: the table card's own header and the caption under it, above
+  # the rows. Only when declared: `label` names the section and always rides
+  # on the grid, so a renderer could not tell it from the default.
+  defp put_grid_header(grid, view, component) do
+    grid
+    |> maybe_put("heading", card_text(view, Map.get(component, :heading)))
+    |> maybe_put("description", card_text(view, Map.get(component, :description)))
+  end
+
+  defp card_text(view, text) when is_binary(text), do: Label.translate(view.l10n, text)
+  defp card_text(_view, _none), do: nil
+
+  # The basic catalog has no card header: the heading and caption are Texts
+  # drawn just before the table's collection.
+  defp card_header_ids(component, sfx) do
+    child_if(Map.get(component, :heading), "table#{sfx}_card_heading") ++
+      child_if(Map.get(component, :description), "table#{sfx}_card_description")
+  end
+
+  defp card_header_components(view, component, sfx) do
+    heading =
+      with text when is_binary(text) <- Map.get(component, :heading) do
+        %{
+          "id" => "table#{sfx}_card_heading",
+          "component" => "Text",
+          "text" => heading(3, Label.translate(view.l10n, text))
+        }
+      end
+
+    description =
+      with text when is_binary(text) <- Map.get(component, :description) do
+        %{
+          "id" => "table#{sfx}_card_description",
+          "component" => "Text",
+          "text" => Label.translate(view.l10n, text),
+          "variant" => "caption"
+        }
+      end
+
+    Enum.reject([heading, description], &is_nil/1)
+  end
+
+  # Catalog 1.15: the line under a table's rows, in its card: the context
+  # record's footer_note and a footer_link.
+  defp put_grid_footer(grid, view, component) do
+    note =
+      with field when not is_nil(field) <- Map.get(component, :footer_note),
+           context when not is_nil(context) <- AshA2ui.Component.note_context(component) do
+        %{"@path" => "/detail/#{context}/#{field}"}
+      end
+
+    link =
+      case Map.get(component, :footer_link) do
+        [_ | _] = link ->
+          %{"href" => link[:href], "label" => Label.translate(view.l10n, link[:label])}
+
+        _none ->
+          nil
+      end
+
+    grid |> maybe_put("footerNote", note) |> maybe_put("footerLink", link)
+  end
+
+  # Catalog 1.12: a row layout's trailing and expand fields say where a
+  # list-rows renderer draws them; 1.14 adds the group's header fields, 1.15
+  # the leading code.
+  defp put_column_placement(column, nil, _field), do: column
+
+  defp put_column_placement(column, layout, field) do
+    cond do
+      field in layout.trailing -> Map.put(column, "placement", "trailing")
+      field in layout.expand -> Map.put(column, "placement", "expand")
+      field == layout.leading -> Map.put(column, "placement", "leading")
+      field == layout.group_by -> Map.put(column, "placement", "group")
+      field == layout.group_subtitle -> Map.put(column, "placement", "groupSubtitle")
+      true -> column
+    end
+  end
+
+  @doc false
+  # The fields the admin dataGrid draws a column for, in order. Shared with
+  # `AshA2ui.Manifest`, so the manifest's columns are the grid's.
+  @spec grid_column_fields(ResolvedView.table()) :: [atom]
+  def grid_column_fields(table) do
+    fields =
+      case {table.component.row_layout, Map.get(table.component, :column_order, :layout)} do
+        {nil, _order} ->
+          table.component.fields
+
+        {_layout, :fields} ->
+          # The primary action's label source rides in the row for the
+          # button; it is not a column of its own.
+          table.component.fields -- primary_action_sources(table.component)
+
+        {layout, _order} ->
+          [layout.title, layout.badge]
+          |> Enum.reject(&is_nil/1)
+          |> Kernel.++(layout.meta ++ layout.trailing ++ layout.expand)
+          |> Kernel.++(
+            Enum.reject([layout.leading, layout.group_by, layout.group_subtitle], &is_nil/1)
+          )
+          |> Enum.uniq()
+      end
+
+    fields -- AshA2ui.Column.folded_fields(table.component.columns)
+  end
+
+  defp primary_action_sources(%{primary_action: %{label_from: field}}) when not is_nil(field),
+    do: [field]
+
+  defp primary_action_sources(_component), do: []
+
+  # A column the table's query lets sort (`sortable`) says so; the grid's
+  # `sort` binding (put_grid_sort/3) carries the current sort and the
+  # envelope a header click sends.
+  defp put_column_sortable(column, %{query: %{sortable: sortable}}, field, cells) do
+    column =
+      case cells && Map.get(cells, :sort_by) do
+        nil ->
+          if field in sortable, do: Map.put(column, "sortable", true), else: column
+
+        sort_by ->
+          # A column sorted by another field (`sort_by`) says which.
+          if sort_by in sortable,
+            do: Map.merge(column, %{"sortable" => true, "sortField" => to_string(sort_by)}),
+            else: column
+      end
+
+    # A sortable column whose first direction is not ascending says which.
+    case {column["sortable"], cells && Map.get(cells, :sort_first)} do
+      {true, :desc} -> Map.put(column, "sortFirst", "desc")
+      _other -> column
+    end
+  end
+
+  defp put_column_sortable(column, _table, _field, _cells), do: column
+
+  # Sortable headers (1.7): the current sort (`/query/sort`, `{field, dir}`
+  # or nil) and the `query` envelope a header click dispatches — the Apply
+  # envelope (page 1), which the renderer sends with the new sort set in the
+  # resolved query state. The server validates the sort against the same
+  # `sortable` allowlist. Absent when no column sorts.
+  defp put_grid_sort(grid, view, %{query: %{sortable: [_ | _]}} = table) do
+    action = %{
+      "name" => "query",
+      "context" =>
+        %{"query" => %{"@path" => table.query_path}, "page" => 1}
+        |> Map.put("component", to_string(table.name))
+        |> put_contexts_binding(view)
+    }
+
+    sort =
+      %{"path" => "#{table.query_path}/sort", "action" => action}
+      |> maybe_put("reset", if(Map.get(table.query, :sort_reset, false), do: true))
+
+    Map.put(grid, "sort", sort)
+  end
+
+  defp put_grid_sort(grid, _view, _table), do: grid
+
+  # A `column` entity's cell hints (catalog 1.8, all optional): the
+  # subtitle and count fields are read straight off the row; the icon and
+  # detail line are the server-computed `_icon_*` / `_detail_*` row keys
+  # (`AshA2ui.Column.row_data/2`). The fields a column reads from are
+  # folded into it and left out as columns of their own.
+  defp put_column_cells(column, nil, _l10n), do: column
+
+  defp put_column_cells(column, cells, l10n) do
+    name = cells.name
+
+    column
+    |> maybe_put("subtitle", cells.subtitle && %{"path" => to_string(cells.subtitle)})
+    |> maybe_put("icon", cells.icon && icon_binding(name, cells))
+    |> maybe_put("more", cells.more && more_binding(name, cells))
+    |> maybe_put("detail", cells.detail && detail_binding(name, cells))
+    |> maybe_put("caption", Map.get(cells, :caption) && caption_binding(cells, l10n))
+    |> maybe_put("help", AshA2ui.Column.help(cells, l10n))
+    |> maybe_put("width", Map.get(cells, :width))
+    |> maybe_put("moreNoun", translate_declared(l10n, Map.get(cells, :more_noun)))
+  end
+
+  defp more_binding(name, cells) do
+    values? = not is_nil(Map.get(cells, :more_values))
+
+    %{"path" => to_string(cells.more), "textPath" => "_more_text_#{name}"}
+    |> maybe_put("valuesPath", if(values?, do: "_more_values_#{name}"))
+    |> maybe_put("captionPath", if(values?, do: "_more_caption_#{name}"))
+    |> maybe_put("labelPath", if(values?, do: "_more_label_#{name}"))
+  end
+
+  # The third line: the caption field, read off the row, and the column's
+  # words for it (`{date}` / `{value}` filled by the renderer).
+  defp caption_binding(cells, l10n) do
+    %{"path" => to_string(cells.caption)}
+    |> maybe_put("text", translate_declared(l10n, Map.get(cells, :caption_text)))
+  end
+
+  defp icon_binding(name, cells) do
+    %{"path" => "_icon_#{name}", "labelPath" => "_icon_label_#{name}"}
+    |> maybe_put("tonePath", if(cells.icon_tones != [], do: "_icon_tone_#{name}"))
+  end
+
+  defp detail_binding(name, cells) do
+    icons? = cells.detail_icon_names != []
+
+    %{"path" => "_detail_#{name}"}
+    |> maybe_put("datePath", cells.detail_date && to_string(cells.detail_date))
+    |> maybe_put("iconPath", if(icons?, do: "_detail_icon_#{name}"))
+    |> maybe_put("iconTonePath", if(icons?, do: "_detail_icon_tone_#{name}"))
+    |> maybe_put("helpPath", if(Map.get(cells, :detail_help), do: "_detail_help_#{name}"))
+  end
+
+  # Per-type presentation hints (additive; renderers that read only
+  # label/path are unaffected): `format` (number/datetime/boolean, as
+  # FieldDisplay), `align: "end"` for numbers, `mono: true` for identifiers.
+  # Link columns render labels, never raw ids — no mono there.
+  defp put_column_presentation(column, view, resource, field) do
+    format = display_format(view, resource, field)
+
+    column
+    |> maybe_put("format", format)
+    |> maybe_put("align", if(format == "number", do: "end"))
+    |> maybe_put("mono", if(identifier?(view, resource, field), do: true))
+  end
+
+  defp identifier?(view, resource, field) do
+    not AshA2ui.Links.link_field?(view.fields[field]) and
+      (field == :id or attribute_type(resource, field) in [Ash.Type.UUID, Ash.Type.UUIDv7])
+  end
+
+  # The row_layout badge column renders as a pill: its text is the
+  # server-computed `_badge_<field>` row key (the badge_text mapping), its
+  # tone the `_badge_tone_<field>` key when `badge_tones` are declared, its
+  # tooltip the `_badge_help_<field>` key when `badge_help` is.
+  defp put_column_badge(column, %{badge: field} = layout, field) do
+    badge =
+      %{"path" => "_badge_#{field}"}
+      |> maybe_put("tonePath", if(layout.badge_tones != [], do: "_badge_tone_#{field}"))
+      |> maybe_put(
+        "helpPath",
+        if(Map.get(layout, :badge_help, []) != [], do: "_badge_help_#{field}")
+      )
+
+    Map.put(column, "badge", badge)
+  end
+
+  defp put_column_badge(column, _layout, _field), do: column
+
+  # Linked fields name their `_links` entry. A dataGrid column's
+  # descriptors (link, badge, icon, subtitle, more, detail, caption, sort)
+  # name row-relative locations with plain `path` keys the admin renderer
+  # reads per row; they are not bindings. A fieldDisplay's link is an
+  # absolute `@path` binding the renderer resolves like its value.
+  defp put_link_binding(component, view, field, "/" <> _ = path) do
+    if AshA2ui.Links.link_field?(view.fields[field]),
+      do: Map.put(component, "link", %{"@path" => path}),
+      else: component
+  end
+
+  defp put_link_binding(component, view, field, path) do
+    if AshA2ui.Links.link_field?(view.fields[field]),
+      do: Map.put(component, "link", %{"path" => path}),
+      else: component
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # The row action envelopes, reusing the exact context shapes the
+  # basic record controls and invoke/confirm buttons emit: View always;
+  # Edit when the view has an update action; declared row actions as their
+  # existing invoke envelopes (the prompt-fields confirm envelope when the
+  # action declares prompt_fields) — destructive: true when the action is
+  # a destroy, so the renderer confirms through ConfirmDialog and
+  # dispatches the envelope unchanged.
+  defp admin_row_actions(view, table, sfx) do
+    # View only when the surface has a record panel to open (formless
+    # surfaces ship no dead affordance); Edit only with a declared update
+    # action; neither on a related table — the same gates the basic
+    # emission applies.
+    controls? = record_controls?(view, table)
+
+    view_entries =
+      if controls?, do: [admin_row_envelope(t(view, msg("View")), "view_record", table)], else: []
+
+    edit_entries =
+      if controls? and view.update_action,
+        do: [admin_row_envelope(t(view, msg("Edit")), "start_edit", table)],
+        else: []
+
+    declared_entries =
+      Enum.map(table.row_actions, fn action ->
+        setting = Map.get(view.actions, action)
+
+        context =
+          %{
+            "action" => to_string(action),
+            "recordId" => %{"@path" => "id"},
+            "component" => to_string(table.name)
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+          |> put_admin_prompt_values(setting)
+
+        %{
+          "label" => ResolvedView.action_label(view, action),
+          "action" => "invoke",
+          "context" => context
+        }
+        |> maybe_destructive(view.resource, action)
+        |> put_visible_path(setting, action)
+        |> put_admin_prompt(view, table, action, setting, sfx)
+      end)
+
+    view_entries ++ select_context_entries(view, table) ++ edit_entries ++ declared_entries
+  end
+
+  # The master/detail row button (`select_context`): the same
+  # `context_select` envelope the basic composition's per-row button
+  # dispatches, so selecting a row into a context — and with it the
+  # `:detail` components bound to that context — works on admin surfaces
+  # too. Without it an admin grid silently dropped the only way to fill a
+  # pickerless context.
+  defp select_context_entries(_view, %{select_context: nil}), do: []
+
+  defp select_context_entries(view, table) do
+    name = table.select_context
+
+    [
+      %{
+        "label" => context_select_label(view, name),
+        "action" => "context_select",
+        "context" =>
+          %{
+            "context" => to_string(name),
+            "value" => %{"@path" => "id"},
+            "component" => to_string(table.name)
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+      }
+    ]
+  end
+
+  defp admin_row_envelope(label, action, table) do
+    %{
+      "label" => label,
+      "action" => action,
+      "context" => %{
+        "recordId" => %{"@path" => "id"},
+        "component" => to_string(table.name)
+      }
+    }
+  end
+
+  defp put_admin_prompt_values(context, %{prompt_fields: [_ | _], name: name}) do
+    Map.put(context, "values", %{"@path" => "/prompt/values/#{name}"})
+  end
+
+  defp put_admin_prompt_values(context, _setting), do: context
+
+  # A visible_when action names the row-relative `_visible_<action>` key
+  # (non-empty on the rows it applies to) so the grid hides it per row, as
+  # the basic composition's visibility slot does.
+  defp put_visible_path(entry, %{visible_when: [_ | _]}, action),
+    do: Map.put(entry, "visiblePath", "_visible_#{action}")
+
+  defp put_visible_path(entry, _setting, _action), do: entry
+
+  # A prompt action's entry carries its prompt: the grid child holding the
+  # inputs, the dialog heading, and the `prompt` pre-fill envelope the grid
+  # dispatches on open (the basic trigger button's exact context). Confirm
+  # dispatches the entry itself — the invoke with the "values" binding.
+  defp put_admin_prompt(entry, view, table, action, %{prompt_fields: [_ | _]} = setting, sfx) do
+    Map.put(entry, "prompt", %{
+      "content" => "row_action#{sfx}_#{action}_prompt",
+      "title" => prompt_title(view, action, setting),
+      "confirmLabel" => t(view, msg("Confirm")),
+      "open" => %{
+        "action" => "prompt",
+        "context" => %{
+          "action" => to_string(action),
+          "recordId" => %{"@path" => "id"},
+          "component" => to_string(table.name)
+        }
+      }
+    })
+  end
+
+  defp put_admin_prompt(entry, _view, _table, _action, _setting, _sfx), do: entry
+
+  defp maybe_destructive(envelope, resource, action) do
+    case ResourceInfo.action(resource, action) do
+      %Ash.Resource.Actions.Destroy{} -> Map.put(envelope, "destructive", true)
+      _other -> envelope
+    end
+  end
+
+  defp admin_empty_state(view, table, sfx) do
+    %{
+      "id" => "empty_state#{sfx}",
+      "component" => "emptyState",
+      "message" => %{"@path" => "_empty_message#{sfx}"},
+      "children" => []
+    }
+    |> put_declared_empty_state(view, table)
+  end
+
+  # A query declaring `empty_state` (1.10): title, message and icon bind the
+  # `/query` state's `emptyState` (the runner picks no-results, preset or
+  # plain), and with a `no_results_state` `clear_action` the component
+  # carries the clear action (`{label, action}`, the query envelope at page
+  # 1), shown while `clearVisible`.
+  defp put_declared_empty_state(component, view, %{query: %{empty_state: [_ | _]}} = table) do
+    base = "#{table.query_path}/emptyState"
+    query = table.query
+
+    component
+    |> Map.merge(%{
+      "title" => %{"@path" => "#{base}/title"},
+      "message" => %{"@path" => "#{base}/message"},
+      "icon" => %{"@path" => "#{base}/icon"}
+    })
+    |> maybe_put(
+      "clearAction",
+      case query.no_results_state && Keyword.get(query.no_results_state, :clear_action) do
+        label when is_binary(label) ->
+          %{
+            "label" => Label.translate(view.l10n, label),
+            "action" => %{
+              "name" => "query",
+              "context" =>
+                %{"query" => %{"@path" => table.query_path}, "page" => 1}
+                |> Map.put("component", to_string(table.name))
+                |> put_contexts_binding(view)
+            }
+          }
+
+        _none ->
+          nil
+      end
+    )
+    |> then(fn component ->
+      if Map.has_key?(component, "clearAction"),
+        do: Map.put(component, "clearVisible", %{"@path" => "#{base}/clear"}),
+        else: component
+    end)
+  end
+
+  defp put_declared_empty_state(component, _view, _table), do: component
+
+  # The pagination component binds PLAIN values — the query state's
+  # boolean keys (no zero-or-one sentinel lists). prev/next dispatch the
+  # existing query envelope with pageDelta -1/+1 (unchanged handler
+  # contract); the context shape matches the basic prev/next buttons.
+  defp admin_pagination_components(_view, %{query: nil}, _sfx), do: []
+
+  defp admin_pagination_components(view, table, sfx) do
+    query_path = table.query_path
+
+    [
+      %{
+        "id" => "pagination#{sfx}",
+        "component" => "pagination",
+        "page" => %{"@path" => "#{query_path}/page"},
+        "pageSize" => %{"@path" => "#{query_path}/pageSize"},
+        "total" => %{"@path" => "#{query_path}/totalCount"},
+        "hasNext" => %{"@path" => "#{query_path}/hasMore"},
+        "visible" => %{"@path" => "#{query_path}/paginationVisible"},
+        "previousVisible" => %{"@path" => "#{query_path}/previousVisible"},
+        "nextVisible" => %{"@path" => "#{query_path}/nextVisible"},
+        "rangeText" => %{"@path" => "#{query_path}/_range_text"},
+        "previousAction" => admin_page_action(table, -1, view),
+        "nextAction" => admin_page_action(table, 1, view)
+      }
+      |> put_page_size_options(table, view)
+    ]
+  end
+
+  # `page_size_options`: the sizes the reader may pick and the envelope the
+  # renderer sends after writing the picked size to `pageSize` (the Apply
+  # envelope: page 1).
+  defp put_page_size_options(pagination, %{query: %{page_size_options: []}}, _view),
+    do: pagination
+
+  defp put_page_size_options(pagination, table, view) do
+    Map.merge(pagination, %{
+      "pageSizeOptions" => table.query.page_size_options |> Enum.uniq() |> Enum.sort(),
+      "pageSizeAction" => %{
+        "name" => "query",
+        "context" =>
+          %{"query" => %{"@path" => table.query_path}, "page" => 1}
+          |> Map.put("component", to_string(table.name))
+          |> put_contexts_binding(view)
+      }
+    })
+  end
+
+  defp admin_page_action(table, page_delta, view) do
+    %{
+      "name" => "query",
+      "context" =>
+        %{"query" => %{"@path" => table.query_path}, "pageDelta" => page_delta}
+        |> Map.put("component", to_string(table.name))
+        |> put_contexts_binding(view)
+    }
+  end
+
+  defp admin_record_panel(form) do
+    %{
+      "id" => "record_panel",
+      "component" => "recordPanel",
+      "mode" => %{"@path" => "/ui/panel/mode"},
+      "title" => %{"@path" => "/ui/panel/title"},
+      "recordId" => %{"@path" => "/ui/panel/record_id"},
+      "children" =>
+        Enum.map(form.fields, &"field_display_#{&1}") ++ ["form_section", "action_bar"]
+    }
+  end
+
+  defp admin_panel_descendants(view, form, options) do
+    field_displays = Enum.map(form.fields, &admin_field_display(view, &1))
+
+    form_section = %{
+      "id" => "form_section",
+      "component" => "formSection",
+      "children" => form_field_children(view, form)
+    }
+
+    inputs =
+      Enum.map(form.fields, fn field ->
+        if searchable_select?(view, field) do
+          searchable_select_components(view, field)
+        else
+          form_input(view, field, options)
+        end
+      end)
+
+    errors = Enum.map(form.fields, &form_error/1)
+
+    action_bar = %{
+      "id" => "action_bar",
+      "component" => "actionBar",
+      "primaryLabel" => %{"@path" => "/ui/panel/primary_label"},
+      "busy" => false,
+      "action" => submit_action(view, "action_bar"),
+      "children" => ["form_cancel_button"]
+    }
+
+    field_displays ++
+      [form_section | List.flatten(inputs) ++ errors ++ group_components(view, form)] ++
+      [action_bar | cancel_components(view)]
+  end
+
+  defp admin_field_display(view, field) do
+    display = %{
+      "id" => "field_display_#{field}",
+      "component" => "fieldDisplay",
+      "label" => view.fields[field].label,
+      # the view task's read-only display values (view_record writes them;
+      # /form is the edit buffer and stays untouched in view mode)
+      "value" => %{"@path" => "/ui/panel/record/#{field}"}
+    }
+
+    display
+    |> maybe_put("format", admin_display_format(view, field))
+    |> put_link_binding(view, field, "/ui/panel/record/_links/#{field}")
+  end
+
+  # The optional format hint: boolean/datetime from the resolved widget,
+  # number from the field type; text (the default) is omitted.
+  defp admin_display_format(view, field), do: display_format(view, view.resource, field)
+
+  # The FieldDisplay/column `format` of a field on `resource` (the surface's
+  # resource for grids and panels, the context's for details).
+  @datetime_types [
+    Ash.Type.Date,
+    Ash.Type.UtcDatetime,
+    Ash.Type.UtcDatetimeUsec,
+    Ash.Type.NaiveDatetime,
+    Ash.Type.DateTime
+  ]
+
+  defp display_format(view, resource, field) do
+    declared = view.fields[field]
+
+    cond do
+      AshA2ui.Links.link_field?(declared) and not resource_field?(resource, field) -> nil
+      declared && declared.widget == :check_box -> "boolean"
+      declared && declared.widget == :date_time_input -> "datetime"
+      true -> type_format(attribute_type(resource, field))
+    end
+  end
+
+  defp type_format(type) when type in @numeric_types, do: "number"
+  defp type_format(type) when type in @datetime_types, do: "datetime"
+  defp type_format(Ash.Type.Boolean), do: "boolean"
+  defp type_format(_type), do: nil
+
+  defp resource_field?(resource, field) do
+    not is_nil(ResourceInfo.attribute(resource, field)) or
+      not is_nil(ResourceInfo.calculation(resource, field)) or
+      not is_nil(ResourceInfo.aggregate(resource, field))
+  end
+
+  # Admin details: the same Card/Column/heading shell as the basic
+  # composition, with each field a FieldDisplay — typed formatting,
+  # link-aware (`link` binds `/detail/<context>/_links/<field>`), and
+  # list-aware (multi-line / bulleted text renders as a list).
+  defp admin_detail_components(view, detail) do
+    base = "detail_#{detail.name}"
+    resource = view.contexts[detail.context].resource
+
+    fields =
+      Enum.map(detail.fields, fn field ->
+        %{
+          "id" => "#{base}_field_#{field}",
+          "component" => "fieldDisplay",
+          "label" => detail_field_label(view, field),
+          "value" => %{"@path" => "/detail/#{detail.context}/#{field}"}
+        }
+        |> maybe_put("format", display_format(view, resource, field))
+        |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
+        |> put_detail_badge(view, field, "/detail/#{detail.context}/")
+        |> put_detail_steps(view, field, "/detail/#{detail.context}/")
+        |> put_empty_text(view, field)
+        |> put_field_note(view, field)
+        |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
+      end)
+
+    {heading_ids, heading} = detail_heading(view, detail, base)
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => heading_ids ++ Enum.map(detail.fields, &"#{base}_field_#{&1}")
+      }
+      | heading ++ fields
+    ]
+  end
+
+  defp table_suffix(view, table) do
+    if ResolvedView.multi_table?(view), do: "_#{table.name}", else: ""
+  end
+
+  # Catalog 1.12: a badge field draws its value as a badge on a detail card,
+  # each part bound to the `_badge_*` key a row layout's badge uses, under the
+  # context's /detail path.
+  defp put_detail_badge(display, view, field, base) do
+    declared = view.fields[field]
+
+    if ResolvedView.badge_field?(declared),
+      do: put_badge_bindings(display, declared, base),
+      else: display
+  end
+
+  # Catalog 1.17: a steps field draws its value as a numbered stepper,
+  # bound to the normalized `_steps_<field>` list (see AshA2ui.Steps).
+  defp put_detail_steps(display, view, field, base) do
+    case view.fields[field] do
+      %{steps: true} -> Map.put(display, "steps", %{"@path" => "#{base}_steps_#{field}"})
+      _other -> display
+    end
+  end
+
+  defp put_badge_bindings(display, %{name: field, badge_tones: tones, badge_help: help}, base) do
+    display
+    |> Map.put("badge", %{"@path" => "#{base}_badge_#{field}"})
+    |> maybe_put("badgeTone", if(tones != [], do: %{"@path" => "#{base}_badge_tone_#{field}"}))
+    |> maybe_put("badgeHelp", if(help != [], do: %{"@path" => "#{base}_badge_help_#{field}"}))
+  end
+
+  defp put_field_note(display, view, field) do
+    case view.fields[field] do
+      %{note: note} when is_binary(note) ->
+        Map.put(display, "note", Label.translate(view.l10n, note))
+
+      _none ->
+        display
+    end
+  end
+
+  defp put_empty_text(display, view, field) do
+    case view.fields[field] do
+      %{empty_text: text} when is_binary(text) ->
+        Map.put(display, "emptyText", Label.translate(view.l10n, text))
+
+      _none ->
+        display
+    end
+  end
+
+  # Root order: the optional surface title
+  # (`surface_title`, emitted only when the declaration carries one) leads,
+  # then the record-task panel (`form_slot`) — opening a create/view/edit
+  # task puts the form front-and-center instead of below every table (the
+  # visibility gate keeps it out of the browse layout, so the position only
+  # matters when a task is open) — and the feedback region (`status_text`,
+  # the single authoritative outcome line bound to /ui/feedback/message)
+  # follows: a near-action home, above the tables, so an invoke success or
+  # refusal is on screen without scrolling to the page bottom (the audit's
+  # offscreen-feedback finding; the panel-first ordering carries it into
+  # view when a task is
+  # open). Tables/details follow.
+  defp root_children(view, form) do
+    context_children =
+      for name <- view.context_order, view.contexts[name].picker, do: "context_#{name}"
+
+    {component_children, _wrappers} = basic_section_children(view)
+
+    form_child = if form, do: ["form_slot"], else: []
+
+    title_child(view) ++
+      form_child ++
+      ["status_text"] ++
+      context_children ++
+      diagram_children(view) ++ component_children ++ ["action_result_panel"]
+  end
+
+  defp basic_section_children(view) do
+    view.components
+    |> Enum.map(&{&1, component_root_children(view, &1)})
+    |> group_sections(view)
+  end
+
+  # The title child — present exactly when surface_title_components/1
+  # emits the component (the same guard, so the two can never disagree).
+  defp title_child(view) do
+    if is_binary(view.title) and view.title != "", do: ["surface_title"], else: []
+  end
+
+  # A board's lanes share one root child, the board container, placed at
+  # its first lane.
+  defp component_root_children(view, %{name: :table, display: :board} = component) do
+    table = Enum.find(view.tables, &(&1.component == component))
+
+    case AshA2ui.Board.template_lanes(view.tables, table.section.template) do
+      [^table | _rest] -> [board_id(table)]
+      _later_lane -> []
+    end
+  end
+
+  defp component_root_children(view, %{name: :table} = component) do
+    table = Enum.find(view.tables, &(&1.component == component))
+    sfx = table_suffix(view, table)
+
+    ["table_heading#{sfx}"] ++
+      child_if(query_controls?(table), "query#{sfx}_controls") ++
+      create_button_ids(view, table, sfx) ++
+      child_if(AshA2ui.Bulk.enabled?(table), AshA2ui.Bulk.toolbar_id(sfx)) ++
+      child_if(AshA2ui.Calendar.calendar?(table), "calendar#{sfx}") ++
+      card_header_ids(component, sfx) ++
+      [collection_id(table, sfx)] ++
+      empty_state_ids(view, table, sfx) ++
+      child_if(table.query, "query#{sfx}_pagination") ++
+      child_if(table.export, "export#{sfx}_controls")
+  end
+
+  defp component_root_children(_view, %{name: :detail} = component),
+    do: ["detail_#{AshA2ui.Component.key(component)}"]
+
+  defp component_root_children(_view, %{name: :report} = component),
+    do: ["report_#{AshA2ui.Component.key(component)}"]
+
+  defp component_root_children(_view, _form), do: []
+
+  defp collection_id(table, sfx) do
+    if AshA2ui.Matrix.matrix?(table), do: "matrix#{sfx}", else: "records_list#{sfx}"
+  end
+
+  # `[id]` when the feature is present (truthy), `[]` otherwise.
+  defp child_if(present, _id) when present in [nil, false], do: []
+  defp child_if(_present, id), do: [id]
+
+  # The result panel displays map-returning generic action results: a Column
+  # wrapping a Text bound to /ui/feedback/resultText (see
+  # topics/data-model-conventions). Empty text renders nothing.
+  defp action_result_components do
+    [
+      %{
+        "id" => "action_result_panel",
+        "component" => "Column",
+        "children" => ["action_result_text"]
+      },
+      %{
+        "id" => "action_result_text",
+        "component" => "Text",
+        "text" => %{"@path" => "/ui/feedback/resultText"}
+      }
+    ]
+  end
+
+  # --- experience-layer affordances ---
+
+  # The create affordance (only when the view declares a create action):
+  # a Button dispatching `start_create`, placed right after the query
+  # controls. A related table lists another resource's records, so the
+  # surface's create affordance does not belong under it.
+  defp create_button_ids(view, table, sfx) do
+    if create_affordance?(view, table), do: ["create#{sfx}_button"], else: []
+  end
+
+  defp create_button_components(view, table, sfx) do
+    if create_affordance?(view, table) do
+      [
+        %{
+          "id" => "create#{sfx}_button",
+          "component" => "Button",
+          "variant" => "primary",
+          "child" => "create#{sfx}_text",
+          "action" => ash_action("start_create", %{}, "create#{sfx}_button")
+        },
+        %{
+          "id" => "create#{sfx}_text",
+          "component" => "Text",
+          "text" => Experience.create_label(view)
+        }
+      ]
+    else
+      []
+    end
+  end
+
+  defp create_affordance?(view, table),
+    do: not is_nil(view.create_action) and not related_table?(view, table)
+
+  # A related table (`resource` on the component) is a read-only view of
+  # another resource's records, scoped by a context: the surface's task
+  # panel (create / view / edit) works on the surface's own resource, so
+  # neither its create affordance nor its View/Edit row controls apply.
+  defp related_table?(view, table), do: table.resource != view.resource
+
+  # The per-table empty state: a zero-or-one List over the root
+  # `_empty_visible` sentinel (see AshA2ui.Experience) rendering the
+  # "No <resource> records yet." Text — toggled by every records rewrite.
+  defp empty_state_ids(_view, _table, sfx), do: ["empty_state#{sfx}"]
+
+  defp empty_state_components(view, table, sfx) do
+    [
+      %{
+        "id" => "empty_state#{sfx}",
+        "component" => "List",
+        "children" => %{
+          "componentId" => "empty_state#{sfx}_text",
+          "path" => Experience.empty_visible_path(view, table)
+        }
+      },
+      %{
+        "id" => "empty_state#{sfx}_text",
+        "component" => "Text",
+        "text" => %{"@path" => "_empty_message#{sfx}"}
+      }
+    ]
+  end
+
+  # Single-table headings show the humanized resource name (frozen); each
+  # multi-table section is headed by its humanized component name — except
+  # the expanded tables of a dynamic table set, which are headed by their
+  # section record's label (see AshA2ui.Sections).
+  defp table_components(view, table, sfx) do
+    heading =
+      case Map.get(table, :section) do
+        %{label: label} ->
+          label
+
+        _not_a_section ->
+          if ResolvedView.multi_table?(view) or table.component.label,
+            do: AshA2ui.Experience.component_label(view, table.component, table.name),
+            else: Label.translate(view.l10n, Label.resource_name(view.resource))
+      end
+
+    [
+      %{
+        "id" => "table_heading#{sfx}",
+        "component" => "Text",
+        "text" => heading(2, heading)
+      }
+      | card_header_components(view, table.component, sfx) ++ collection_components(table, sfx)
+    ] ++ bulk_toolbar_components(view, table, sfx)
+  end
+
+  # A table's collection: the templated records list, or a matrix's grid
+  # (see AshA2ui.Matrix).
+  defp collection_components(table, sfx) do
+    if AshA2ui.Matrix.matrix?(table) do
+      AshA2ui.Matrix.components(table, sfx)
+    else
+      [
+        %{
+          "id" => "records_list#{sfx}",
+          "component" => "List",
+          "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
+        }
+      ]
+    end
+  end
+
+  # The bulk-action toolbar above the list (tables with bulk_actions only;
+  # see AshA2ui.Bulk). Its action contexts carry the usual query/contexts
+  # bindings, like row-action invokes.
+  defp bulk_toolbar_components(view, table, sfx) do
+    if AshA2ui.Bulk.enabled?(table) do
+      AshA2ui.Bulk.toolbar_components(
+        table,
+        sfx,
+        fn context -> context |> put_query_binding(view) |> put_contexts_binding(view) end,
+        &ResolvedView.action_label(view, &1),
+        view.l10n
+      )
+    else
+      []
+    end
+  end
+
+  # --- boards (display :board) ---
+
+  # A board renders its template's lanes side by side: the container Column
+  # (`board_<template>`: an h2 heading, the create affordance, and a Row of
+  # lane Columns). Every lane Column carries layout weight 1, so the lanes
+  # share the board's width equally instead of sizing to their cards (a
+  # horizontal List wraps each child in an inline-block that shrinks to its
+  # content). The AshA2ui merged catalog scrolls the lanes Row inside the
+  # board below a minimum lane width (see priv/js/ash_a2ui_catalog.js and
+  # `--a2ui-board-lane-min-width`). Each lane Column (`lane<sfx>`) holds a
+  # header Row (the lane heading Text plus its total, bound to
+  # `/_lane_total_<lane>`), the lane's query controls when its query
+  # declares any, the card list, the empty state, the pagination and the
+  # export controls. Card rows, row actions, visibility slots and the query
+  # buttons are the list composition's, under the lane's runtime suffix.
+  defp board_components(view) do
+    view.tables
+    |> Enum.filter(&AshA2ui.Board.lane?/1)
+    |> Enum.flat_map(&board_lane_components(view, &1))
+  end
+
+  defp board_lane_components(view, table) do
+    sfx = table_suffix(view, table)
+    controls? = query_controls?(table)
+
+    lane = %{
+      "id" => "lane#{sfx}",
+      "component" => "Column",
+      "weight" => 1,
+      "children" => lane_children(view, table, sfx, controls?)
+    }
+
+    header =
+      lane_header_components(table, sfx) ++
+        [
+          %{
+            "id" => "lane#{sfx}_total",
+            "component" => "Text",
+            "text" => %{"@path" => AshA2ui.Board.total_path(table)},
+            "variant" => "caption"
+          },
+          %{
+            "id" => "records_list#{sfx}",
+            "component" => "List",
+            "children" => %{"componentId" => "record_row#{sfx}", "path" => table.records_path}
+          }
+        ]
+
+    controls = if controls?, do: query_control_components(view, table, sfx), else: []
+
+    board_container_components(view, table) ++
+      [lane | header] ++
+      controls ++
+      pagination_components(view, table, sfx) ++
+      table_export_components(view, table, sfx) ++
+      table_descendants(view, table, sfx) ++
+      empty_state_components(view, table, sfx)
+  end
+
+  # A lane's header Row: its heading (h3) and total. A swimlaned board's
+  # cell is headed by its stage column and its swimlane row instead, so its
+  # header holds the cell total alone.
+  defp lane_header_components(%{section: %{swimlane: %{}}}, sfx) do
+    [
+      %{
+        "id" => "lane#{sfx}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["lane#{sfx}_total"]
+      }
+    ]
+  end
+
+  defp lane_header_components(table, sfx) do
+    [
+      %{
+        "id" => "lane#{sfx}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["table_heading#{sfx}", "lane#{sfx}_total"]
+      },
+      %{
+        "id" => "table_heading#{sfx}",
+        "component" => "Text",
+        "text" => heading(3, table.section.label)
+      }
+    ]
+  end
+
+  # The container is emitted once, with the template's first lane (on a
+  # swimlaned board, its first cell).
+  defp board_container_components(view, %{section: %{swimlane: %{}}} = table) do
+    case AshA2ui.Board.template_lanes(view.tables, table.section.template) do
+      [^table | _rest] = cells -> swimlane_board_components(view, table, cells)
+      _later_cell -> []
+    end
+  end
+
+  defp board_container_components(view, table) do
+    case AshA2ui.Board.template_lanes(view.tables, table.section.template) do
+      [^table | _rest] = lanes ->
+        template = table.section.template
+        board = board_id(table)
+
+        [
+          %{
+            "id" => board,
+            "component" => "Column",
+            "children" =>
+              ["#{board}_heading"] ++
+                create_button_ids(view, table, "_#{template}") ++ ["#{board}_lanes"]
+          },
+          %{
+            "id" => "#{board}_heading",
+            "component" => "Text",
+            "text" => heading(2, Label.resolve(view.l10n, nil, template))
+          },
+          %{
+            "id" => "#{board}_lanes",
+            "component" => "Row",
+            "align" => "start",
+            "children" => Enum.map(lanes, &"lane#{table_suffix(view, &1)}")
+          }
+        ] ++ create_button_components(view, table, "_#{template}")
+
+      _later_lane ->
+        []
+    end
+  end
+
+  defp board_id(table), do: "board_#{table.section.template}"
+
+  # A swimlaned board keeps the stage columns side by side and splits
+  # vertically into swimlane rows. `board_<template>_lanes` is a Column
+  # (inside the merged catalog's scroll frame): first
+  # `board_<template>_stages`, a Row of stage Columns (`stage_<lane>`, weight
+  # 1, each with a header Row of the stage heading and its
+  # `/_lane_total_<lane>` total), then one `swimlane_<swimlane>` Column per
+  # swimlane: a header Row (`swimlane_<swimlane>_heading` h3 and the
+  # `/_swimlane_total_<swimlane>` total) over `swimlane_<swimlane>_cells`, a
+  # Row of the swimlane's cell Columns (`lane_<cell>`) at weight 1, so each
+  # cell sits under its stage. The swimlane's tone is data
+  # (`/_swimlane_tone_<swimlane>`): the basic catalog has no colour props,
+  # and the merged catalog paints the row from it.
+  defp swimlane_board_components(view, table, cells) do
+    template = table.section.template
+    board = board_id(table)
+    {rows, columns} = AshA2ui.Board.grid(cells)
+
+    container = [
+      %{
+        "id" => board,
+        "component" => "Column",
+        "children" =>
+          ["#{board}_heading"] ++
+            create_button_ids(view, table, "_#{template}") ++ ["#{board}_lanes"]
+      },
+      %{
+        "id" => "#{board}_heading",
+        "component" => "Text",
+        "text" => heading(2, Label.resolve(view.l10n, nil, template))
+      },
+      %{
+        "id" => "#{board}_lanes",
+        "component" => "Column",
+        "children" =>
+          ["#{board}_stages"] ++
+            Enum.map(rows, fn {swimlane, _cells} -> "swimlane_#{swimlane}" end)
+      },
+      %{
+        "id" => "#{board}_stages",
+        "component" => "Row",
+        "align" => "start",
+        "children" => Enum.map(columns, fn {lane, _cells} -> "stage_#{lane}" end)
+      }
+    ]
+
+    stages = Enum.flat_map(columns, fn {lane, [cell | _rest]} -> stage_components(lane, cell) end)
+
+    swimlanes =
+      Enum.flat_map(rows, fn {swimlane, [cell | _rest] = row_cells} ->
+        swimlane_components(view, swimlane, cell.section.swimlane, row_cells)
+      end)
+
+    container ++ stages ++ swimlanes ++ create_button_components(view, table, "_#{template}")
+  end
+
+  defp stage_components(lane, cell) do
+    [
+      %{
+        "id" => "stage_#{lane}",
+        "component" => "Column",
+        "weight" => 1,
+        "children" => ["stage_#{lane}_header"]
+      },
+      %{
+        "id" => "stage_#{lane}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["stage_#{lane}_heading", "stage_#{lane}_total"]
+      },
+      %{
+        "id" => "stage_#{lane}_heading",
+        "component" => "Text",
+        "text" => heading(3, cell.section.label)
+      },
+      %{
+        "id" => "stage_#{lane}_total",
+        "component" => "Text",
+        "text" => %{"@path" => AshA2ui.Board.stage_total_path(lane)},
+        "variant" => "caption"
+      }
+    ]
+  end
+
+  defp swimlane_components(view, name, swimlane, cells) do
+    id = "swimlane_#{name}"
+
+    [
+      %{
+        "id" => id,
+        "component" => "Column",
+        "children" => ["#{id}_header", "#{id}_cells"]
+      },
+      %{
+        "id" => "#{id}_header",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["#{id}_heading", "#{id}_total"]
+      },
+      %{
+        "id" => "#{id}_heading",
+        "component" => "Text",
+        "text" => heading(3, swimlane.label)
+      },
+      %{
+        "id" => "#{id}_total",
+        "component" => "Text",
+        "text" => %{"@path" => AshA2ui.Board.swimlane_total_path(name)},
+        "variant" => "caption"
+      },
+      %{
+        "id" => "#{id}_cells",
+        "component" => "Row",
+        "align" => "start",
+        "children" => Enum.map(cells, &"lane#{table_suffix(view, &1)}")
+      }
+    ]
+  end
+
+  defp lane_children(view, table, sfx, controls?) do
+    ["lane#{sfx}_header"] ++
+      ((controls? && ["query#{sfx}_controls"]) || []) ++
+      ["records_list#{sfx}"] ++
+      empty_state_ids(view, table, sfx) ++
+      ((table.query && ["query#{sfx}_pagination"]) || []) ++
+      ((table.export && ["export#{sfx}_controls"]) || [])
+  end
+
+  # Tables and lanes show query controls only when there is something to
+  # control: a query used for page size or default sort alone adds no Card
+  # (it would hold nothing but Apply).
+  defp query_controls?(%{query: nil}), do: false
+
+  defp query_controls?(%{query: query}) do
+    query.search_fields != [] or preset_picker?(query) or filter_pickers(query) != [] or
+      query.range_filters != []
+  end
+
+  # --- calendars (display :calendar) ---
+
+  # A calendar is a queried table whose read covers the visible window (see
+  # AshA2ui.Calendar). The basic composition keeps the table's own list,
+  # rows, pagination and empty state, and adds the window controls above
+  # the list (`calendar<sfx>`, a Column):
+  #
+  #   * a nav Row: Previous / the window label / Next / Today, each a
+  #     `query` Button (`windowDelta` -1/+1, `anchor` "today");
+  #   * on month and week calendars, the days of the window that hold
+  #     records (a horizontal List over `/query/<table>/window/marks`), each
+  #     a `query` Button picking its day (`date`), then a Row with the
+  #     picked day (or the window) and an "All days" Button clearing it.
+  #
+  # Each row starts with its `_calendar_when` text. The list itself is the
+  # agenda: the window's records, or the picked day's.
+  defp calendar_components(view, table, sfx) do
+    if AshA2ui.Calendar.calendar?(table),
+      do: basic_calendar_components(view, table, sfx),
+      else: []
+  end
+
+  defp basic_calendar_components(view, table, sfx) do
+    base = "calendar#{sfx}"
+    window_path = "#{table.query_path}/window"
+    days? = table.calendar.granularity != :day
+
+    calendar = %{
+      "id" => base,
+      "component" => "Column",
+      "children" => ["#{base}_nav"] ++ ((days? && ["#{base}_days", "#{base}_scope"]) || [])
+    }
+
+    nav = [
+      %{
+        "id" => "#{base}_nav",
+        "component" => "Row",
+        "align" => "center",
+        "children" =>
+          [
+            "#{base}_prev_button",
+            "#{base}_label",
+            "#{base}_next_button",
+            "#{base}_today_button"
+          ] ++ granularity_button_ids(base, table)
+      },
+      %{
+        "id" => "#{base}_label",
+        "component" => "Text",
+        "text" => heading(3, %{"@path" => "#{window_path}/label"})
+      }
+    ]
+
+    sizes = granularity_buttons(base, table, view)
+
+    buttons =
+      calendar_button(
+        "#{base}_prev",
+        t(view, msg("Previous")),
+        table,
+        %{"windowDelta" => -1},
+        view
+      ) ++
+        calendar_button("#{base}_next", t(view, msg("Next")), table, %{"windowDelta" => 1}, view) ++
+        calendar_button(
+          "#{base}_today",
+          t(view, msg("Today")),
+          table,
+          %{"anchor" => "today"},
+          view
+        ) ++
+        sizes
+
+    days =
+      if days? do
+        [
+          %{
+            "id" => "#{base}_days",
+            "component" => "List",
+            "direction" => "horizontal",
+            "children" => %{
+              "componentId" => "#{base}_day_button",
+              "path" => "#{window_path}/marks"
+            }
+          },
+          %{
+            "id" => "#{base}_scope",
+            "component" => "Row",
+            "align" => "center",
+            "children" => ["#{base}_scope_label", "#{base}_all_button"]
+          },
+          %{
+            "id" => "#{base}_scope_label",
+            "component" => "Text",
+            "text" => heading(4, %{"@path" => "#{window_path}/scopeLabel"})
+          }
+        ] ++
+          day_button(base, table, view) ++
+          calendar_button("#{base}_all", t(view, msg("All days")), table, %{"date" => ""}, view)
+      else
+        []
+      end
+
+    [calendar | nav] ++ buttons ++ days
+  end
+
+  # One Button per window size the calendar may switch to (none without a
+  # switch). The ids carry "granularity" so the Day switch never meets the
+  # per-day template Button (`<base>_day_button`).
+  defp granularity_button_ids(base, table) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] -> []
+      sizes -> Enum.map(sizes, &"#{base}_granularity_#{&1}_button")
+    end
+  end
+
+  defp granularity_buttons(base, table, view) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] ->
+        []
+
+      sizes ->
+        Enum.flat_map(sizes, fn size ->
+          calendar_button(
+            "#{base}_granularity_#{size}",
+            granularity_label(view, size),
+            table,
+            %{"granularity" => to_string(size)},
+            view
+          )
+        end)
+    end
+  end
+
+  defp granularity_label(view, :month), do: t(view, msg("Month"))
+  defp granularity_label(view, :week), do: t(view, msg("Week"))
+  defp granularity_label(view, :day), do: t(view, msg("Day"))
+
+  # A day of the window, templated over its mark (`date`, `label`).
+  defp day_button(base, table, view) do
+    [
+      query_button("#{base}_day", table, %{"date" => %{"@path" => "date"}}, view),
+      %{"id" => "#{base}_day_text", "component" => "Text", "text" => %{"@path" => "label"}}
+    ]
+  end
+
+  defp calendar_button(id_prefix, label, table, context, view) do
+    [
+      query_button(id_prefix, table, context, view),
+      %{"id" => "#{id_prefix}_text", "component" => "Text", "text" => label}
+    ]
+  end
+
+  # Prepends the row's `_calendar_when` (calendars) or `_timeline_when`
+  # (timelines) Text to the row (the card header under a row_layout, the
+  # content Row otherwise).
+  defp with_calendar_when(components, table, sfx) do
+    when_path =
+      cond do
+        AshA2ui.Calendar.calendar?(table) -> "_calendar_when"
+        AshA2ui.Timeline.timeline?(table) -> "_timeline_when"
+        true -> nil
+      end
+
+    if when_path do
+      when_id = "record_row#{sfx}_when"
+
+      host_id =
+        if table.component.row_layout,
+          do: "record_row#{sfx}_header",
+          else: "record_row#{sfx}_content"
+
+      text = %{
+        "id" => when_id,
+        "component" => "Text",
+        "text" => %{"@path" => when_path},
+        "variant" => "caption"
+      }
+
+      Enum.map(components, fn
+        %{"id" => ^host_id, "children" => children} = host ->
+          %{host | "children" => [when_id | children]}
+
+        other ->
+          other
+      end) ++ [text]
+    else
+      components
+    end
+  end
+
+  # The admin collection of a core table: its dataGrid, or on a calendar
+  # the calendarView wrapping it.
+  defp admin_collection_id(table, sfx) do
+    if AshA2ui.Calendar.calendar?(table), do: "calendar#{sfx}", else: "data_grid#{sfx}"
+  end
+
+  # The admin calendar (catalog 1.3): a `calendarView` showing the window
+  # as a month or week grid with the days that hold records marked, and
+  # the table's own dataGrid (the window's records, or the picked day's)
+  # as its child. Moving the window and picking a day dispatch
+  # `windowAction` — the same `query` envelope the basic buttons send —
+  # with `anchor` / `date` added by the renderer.
+  defp admin_calendar_components(view, table, sfx) do
+    if AshA2ui.Calendar.calendar?(table) do
+      [
+        %{
+          "id" => "calendar#{sfx}",
+          "component" => "calendarView",
+          "label" => Experience.collection_label(view, table),
+          "granularity" => to_string(table.calendar.granularity),
+          "window" => %{"@path" => "#{table.query_path}/window"},
+          "windowAction" => %{
+            "name" => "query",
+            "context" =>
+              %{"query" => %{"@path" => table.query_path}, "component" => to_string(table.name)}
+              |> put_contexts_binding(view)
+          },
+          "children" => ["data_grid#{sfx}"]
+        }
+        |> put_granularities(table)
+      ]
+    else
+      []
+    end
+  end
+
+  # Only a calendar that can switch size carries `granularities` (1.5).
+  defp put_granularities(component, table) do
+    case AshA2ui.Calendar.switchable(table.calendar) do
+      [_only] -> component
+      sizes -> Map.put(component, "granularities", Enum.map(sizes, &Atom.to_string/1))
+    end
+  end
+
+  # --- live diagrams (see AshA2ui.Diagram) ---
+
+  # Diagrams sit after the context pickers, before the tables, in
+  # declaration order.
+  defp diagram_children(view), do: Enum.map(view.diagrams, &diagram_id/1)
+
+  defp diagram_id(diagram), do: "diagram_#{diagram.name}"
+
+  # The admin catalog's liveDiagram (catalog 1.4): the mermaid source as a
+  # static prop, the markers (keyed by node id) and the node list bound to
+  # /diagram/<name>. The renderer loads mermaid only when it appears.
+  defp admin_diagram_component(view, diagram) do
+    path = AshA2ui.Diagram.data_path(diagram.name)
+
+    %{
+      "id" => diagram_id(diagram),
+      "component" => "liveDiagram",
+      "label" => AshA2ui.Diagram.label(diagram, view.l10n),
+      "source" => diagram.rendered_source,
+      "markers" => %{"@path" => "#{path}/markers"},
+      "nodes" => %{"@path" => "#{path}/nodes"},
+      "error" => %{"@path" => "#{path}/error"}
+    }
+    |> maybe_put("description", translate_declared(view.l10n, diagram.description))
+  end
+
+  # The basic composition (and any basic renderer's view of a diagram): a
+  # heading, the unavailable message, and a List of the nodes that hold
+  # markers, each a Card with the node label over a List of its markers
+  # (initials, label, status). With `link_buttons: true` a linked marker's
+  # label is a borderless Button dispatching "open_surface" with the
+  # diagram's name — the handler accepts only a surface the diagram's own
+  # markers link to for this actor.
+  defp basic_diagram_components(view, diagram) do
+    base = diagram_id(diagram)
+    path = AshA2ui.Diagram.data_path(diagram.name)
+    description = (diagram.description && ["#{base}_description"]) || []
+
+    [
+      %{
+        "id" => base,
+        "component" => "Column",
+        "children" => ["#{base}_heading"] ++ description ++ ["#{base}_error", "#{base}_nodes"]
+      },
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" => heading(2, AshA2ui.Diagram.label(diagram, view.l10n))
+      },
+      %{"id" => "#{base}_error", "component" => "Text", "text" => %{"@path" => "#{path}/error"}},
+      %{
+        "id" => "#{base}_nodes",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_node", "path" => "#{path}/nodes"}
+      },
+      %{"id" => "#{base}_node", "component" => "Card", "child" => "#{base}_node_body"},
+      %{
+        "id" => "#{base}_node_body",
+        "component" => "Column",
+        "children" => ["#{base}_node_label", "#{base}_node_markers"]
+      },
+      %{
+        "id" => "#{base}_node_label",
+        "component" => "Text",
+        "text" => heading(4, %{"@path" => "label"})
+      },
+      %{
+        "id" => "#{base}_node_markers",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_marker", "path" => "markers"}
+      }
+    ] ++ description_components(view, diagram, base) ++ marker_components(view, diagram, base)
+  end
+
+  defp description_components(_view, %{description: nil}, _base), do: []
+
+  defp description_components(view, diagram, base) do
+    [
+      %{
+        "id" => "#{base}_description",
+        "component" => "Text",
+        "text" => Label.translate(view.l10n, diagram.description)
+      }
+    ]
+  end
+
+  defp marker_components(view, diagram, base) do
+    label_id = "#{base}_marker_label"
+    label_child = if diagram.link_buttons?, do: "#{label_id}_link", else: label_id
+
+    [
+      %{
+        "id" => "#{base}_marker",
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["#{base}_marker_initials", label_child, "#{base}_marker_status"]
+      },
+      %{
+        "id" => "#{base}_marker_initials",
+        "component" => "Text",
+        "text" => %{"@path" => "initials"},
+        "variant" => "caption"
+      },
+      %{"id" => label_id, "component" => "Text", "text" => %{"@path" => "label"}},
+      %{
+        "id" => "#{base}_marker_status",
+        "component" => "Text",
+        "text" => %{"@path" => "statusLabel"},
+        "variant" => "caption"
+      }
+    ] ++ marker_link_button(view, diagram, label_id)
+  end
+
+  defp marker_link_button(_view, %{link_buttons?: false}, _label_id), do: []
+
+  defp marker_link_button(view, diagram, label_id) do
+    [
+      %{
+        "id" => "#{label_id}_link",
+        "component" => "Button",
+        "variant" => "borderless",
+        "child" => label_id,
+        "action" =>
+          ash_action(
+            "open_surface",
+            put_contexts_binding(
+              %{
+                "diagram" => to_string(diagram.name),
+                "surface" => %{"@path" => "link/surface"},
+                "recordId" => %{"@path" => "link/recordId"}
+              },
+              view
+            ),
+            "#{label_id}_link"
+          )
+      }
+    ]
+  end
+
+  # --- query controls (search / filters / pagination) ---
+
+  # The `"query"` action wire contract: every control sends
+  # `{"query": {"@path": <the table's query path>}}` — the current query
+  # state — plus the source `"component"` and either a literal page reset
+  # (`"page" => 1`, Apply) or a relative page change (`"pageDelta" => -1 | 1`,
+  # prev/next). The server validates everything against the declared
+  # allowlist (`AshA2ui.QueryRunner`).
+  defp query_components(view, table, sfx) do
+    query_control_components(view, table, sfx) ++
+      pagination_components(view, table, sfx)
+  end
+
+  # The search/preset/filter/range controls plus the Apply button — the
+  # query section MINUS pagination (the admin emission composes its own
+  # semantic pagination, so it consumes this variant directly).
+  defp query_control_components(view, table, sfx) do
+    if query_controls?(table), do: query_control_card(view, table, sfx), else: []
+  end
+
+  defp query_control_card(view, table, sfx) do
+    query = table.query
+    search = (query.search_fields != [] && [search_input(view, table, sfx)]) || []
+    presets = (preset_picker?(query) && [preset_picker(view, query, table, sfx)]) || []
+    filters = Enum.flat_map(filter_pickers(query), &filter_picker(view, table, &1, sfx))
+    ranges = Enum.flat_map(query.range_filters, &range_inputs(view, table, &1, sfx))
+
+    # Query controls render as a Card (`query<sfx>_controls`, the id root
+    # children reference) over a `_body` Row — section chrome on every
+    # renderer, same shape as form groups and the context/detail sections.
+    # `controls_card false` emits the Row itself under the Card's id.
+    card = %{
+      "id" => "query#{sfx}_controls",
+      "component" => "Card",
+      "child" => "query#{sfx}_controls_body"
+    }
+
+    # `align: "end"` bottom-aligns the controls, so inputs with a label above
+    # them and the Apply button without one sit on one baseline.
+    controls = %{
+      "id" =>
+        if(query.controls_card == false,
+          do: "query#{sfx}_controls",
+          else: "query#{sfx}_controls_body"
+        ),
+      "component" => "Row",
+      "align" => "end",
+      "children" =>
+        Enum.map(search ++ presets ++ filters ++ ranges, & &1["id"]) ++
+          ["query#{sfx}_apply_button"]
+    }
+
+    chrome = if query.controls_card == false, do: [controls], else: [card, controls]
+
+    chrome ++ search ++ presets ++ filters ++ ranges ++ apply_button(view, table, sfx)
+  end
+
+  # The search placeholder rides only on the admin catalog's TextField (the
+  # basic TextField takes no placeholder); the label stays, as the input's
+  # accessible name.
+  defp search_input(view, table, sfx) do
+    %{
+      "id" => "query#{sfx}_search_input",
+      "component" => "TextField",
+      "label" => t(view, msg("Search")),
+      "value" => %{"@path" => "#{table.query_path}/search"}
+    }
+    |> maybe_put(
+      "placeholder",
+      if(Experience.admin?(view),
+        do: translate_declared(view.l10n, table.query.search_placeholder)
+      )
+    )
+  end
+
+  # The preset picker sends only the preset NAME over the wire — the
+  # predicates live server-side. With a default_preset the option set is
+  # closed (no "" escape back to the unscoped base read); without one an
+  # "All" option ("" = no preset) comes first, mirroring the filter pickers.
+  # A query's presets get a picker unless the page selects them itself
+  # (`preset_picker false`); the presets apply either way.
+  defp preset_picker?(query), do: query.presets != [] and query.preset_picker != false
+
+  defp preset_picker(view, query, table, sfx) do
+    preset_options =
+      Enum.map(
+        query.presets,
+        &%{"label" => Label.resolve(view.l10n, nil, &1.name), "value" => to_string(&1.name)}
+      )
+
+    options =
+      if query.default_preset do
+        preset_options
+      else
+        [%{"label" => t(view, msg("All")), "value" => ""} | preset_options]
+      end
+
+    %{
+      "id" => "query#{sfx}_preset_picker",
+      "component" => "ChoicePicker",
+      "label" => t(view, msg("View")),
+      "variant" => "mutuallyExclusive",
+      "value" => %{"@path" => "#{table.query_path}/preset"},
+      "options" => options
+    }
+  end
+
+  # Every filter gets a picker unless the page sets it itself
+  # (`hidden_filters`); the filter applies either way.
+  defp filter_pickers(query), do: AshA2ui.Query.filter_names(query) -- query.hidden_filters
+
+  # A filter's ChoicePicker. Multi-select filters (`multi_select_filters`)
+  # take `multipleSelection` and no "All" option. The admin catalog's
+  # picker also carries what the basic one cannot: the hint, the facet
+  # counts binding, grouped options, and a path filter's options bound from
+  # the query state (`dynamicOptions`). Under the basic catalog groups
+  # flatten to their leaves and path filters get no picker.
+  defp filter_picker(view, table, name, sfx) do
+    query = table.query
+    admin? = Experience.admin?(view)
+    path? = AshA2ui.Query.path_filter?(query, name)
+    multi? = AshA2ui.Query.multi_select?(query, name)
+
+    if path? and not admin? do
+      []
+    else
+      all = if multi?, do: [], else: [%{"label" => t(view, msg("All")), "value" => ""}]
+      options = if path?, do: [], else: filter_options(view, query, name, admin?)
+
+      [
+        %{
+          "id" => "query#{sfx}_filter_#{name}",
+          "component" => "ChoicePicker",
+          "label" => filter_label(view, query, name),
+          "variant" => if(multi?, do: "multipleSelection", else: "mutuallyExclusive"),
+          "value" => %{"@path" => "#{table.query_path}/filters/#{name}"},
+          "options" => all ++ options
+        }
+        |> put_admin_filter_hints(admin?, view, table, name)
+      ]
+    end
+  end
+
+  defp put_admin_filter_hints(picker, false, _view, _table, _name), do: picker
+
+  # Under the admin catalog a filter picker is the admin catalog's
+  # filterPicker: a ChoicePicker with a hint, facet counts, dynamic options
+  # and grouped options. It has its own name because two catalogs declaring
+  # one component name make a mixed surface ambiguous.
+  defp put_admin_filter_hints(picker, true, view, table, name) do
+    query = table.query
+
+    picker
+    |> Map.put("component", "filterPicker")
+    |> maybe_put("hint", filter_hint(view, query, name))
+    |> maybe_put(
+      "counts",
+      if(name in AshA2ui.Query.faceted_filters(query),
+        do: %{"@path" => "#{table.query_path}/facets/#{name}"}
+      )
+    )
+    |> maybe_put(
+      "dynamicOptions",
+      if(AshA2ui.Query.path_filter?(query, name),
+        do: %{"@path" => "#{table.query_path}/options/#{name}"}
+      )
+    )
+  end
+
+  defp filter_hint(view, query, name) do
+    case Keyword.get(query.filter_hints, name) do
+      nil -> nil
+      hint -> Label.translate(view.l10n, hint)
+    end
+  end
+
+  # `filter_labels`, else the field's declared label, else the humanized
+  # name (the field label defaults to the same humanized name).
+  defp filter_label(view, query, name) do
+    case {Keyword.get(query.filter_labels, name), view.fields[name]} do
+      {label, _field} when is_binary(label) -> Label.translate(view.l10n, label)
+      {_none, %{label: label}} when is_binary(label) -> label
+      _none -> Label.resolve(view.l10n, nil, name)
+    end
+  end
+
+  defp filter_options(view, query, field, admin?) do
+    resource = view.resource
+
+    options =
+      if attribute_type(resource, field) == Ash.Type.Boolean do
+        [
+          %{"label" => t(view, msg("True")), "value" => "true"},
+          %{"label" => t(view, msg("False")), "value" => "false"}
+        ]
+      else
+        choice_options(view, resource, field)
+      end
+
+    case {Keyword.get(query.filter_groups, field), admin?} do
+      {groups, true} when is_list(groups) and groups != [] ->
+        group_options(view, query, field, groups, options)
+
+      _ungrouped ->
+        options
+    end
+  end
+
+  # Grouped options: each group (`{"label", "value", "group": true}`) is
+  # placed where its first leaf would be, followed by its leaves in the
+  # group's order, each carrying `"parent"`. Ungrouped options keep their
+  # place.
+  defp group_options(view, query, field, groups, options) do
+    by_value = Map.new(options, &{&1["value"], &1})
+
+    parent_of =
+      for {group, leaves} <- groups, leaf <- leaves, into: %{} do
+        {to_string(leaf), group}
+      end
+
+    {emitted, _seen} =
+      Enum.reduce(options, {[], MapSet.new()}, fn option, {acc, seen} ->
+        value = option["value"]
+
+        case Map.get(parent_of, value) do
+          nil ->
+            {[option | acc], seen}
+
+          group ->
+            emit_group({acc, seen}, group, {view, query, field, groups, by_value})
+        end
+      end)
+
+    Enum.reverse(emitted)
+  end
+
+  # A group is emitted once, at its first leaf: its option and its leaves
+  # (each carrying `"parent"`), reversed for `group_options/5`'s accumulator.
+  defp emit_group({acc, seen}, group, ctx) do
+    if MapSet.member?(seen, group) do
+      {acc, seen}
+    else
+      {group_with_leaves(ctx, group) ++ acc, MapSet.put(seen, group)}
+    end
+  end
+
+  defp group_with_leaves({view, query, field, groups, by_value}, group) do
+    leaves =
+      groups
+      |> Keyword.fetch!(group)
+      |> Enum.map(&Map.put(by_value[to_string(&1)], "parent", to_string(group)))
+
+    group_option = %{
+      "label" => group_label(view, query, field, group),
+      "value" => to_string(group),
+      "group" => true
+    }
+
+    Enum.reverse(leaves) ++ [group_option]
+  end
+
+  defp group_label(view, query, field, group) do
+    declared = query.group_labels |> Keyword.get(field, []) |> Keyword.get(group)
+
+    (declared && Label.translate(view.l10n, declared)) ||
+      Map.get(choice_labels(view, view.resource, field), to_string(group)) ||
+      Label.resolve(view.l10n, nil, group)
+  end
+
+  # Each range_filters field emits a from/to TextField pair bound to the
+  # frozen /query/ranges/<field>/from|to paths; the shared Apply button
+  # submits them with the rest of the query state.
+  defp range_inputs(view, table, field, sfx) do
+    label = Label.resolve(view.l10n, nil, field)
+
+    Enum.map([{"from", msg("%{field} from")}, {"to", msg("%{field} to")}], fn {side, template} ->
+      %{
+        "id" => "query#{sfx}_range_#{field}_#{side}",
+        "component" => "TextField",
+        "label" => t(view, template, field: label),
+        "value" => %{"@path" => "#{table.query_path}/ranges/#{field}/#{side}"}
+      }
+    end)
+  end
+
+  defp apply_button(view, table, sfx) do
+    [
+      query_button("query#{sfx}_apply", table, %{"page" => 1}, view),
+      %{"id" => "query#{sfx}_apply_text", "component" => "Text", "text" => t(view, msg("Apply"))}
+    ]
+  end
+
+  defp pagination_components(_view, %{query: nil}, _sfx), do: []
+
+  # Pagination: the row hides behind the `_pagination_visible` sentinel
+  # (a zero-or-one List, same technique as the row-action visibility slots —
+  # see AshA2ui.Experience), the prev/next buttons each hide behind their
+  # own sentinel, and the page number becomes the result-range text. The
+  # Button ids are unchanged so themes keep working; the slot paths are
+  # absolute because the sentinels live on the /query state itself, not on
+  # the template item.
+  defp pagination_components(view, table, sfx) do
+    query_path = table.query_path
+
+    [
+      %{
+        "id" => "query#{sfx}_pagination",
+        "component" => "List",
+        "children" => %{
+          "componentId" => "query#{sfx}_pagination_row",
+          "path" => "#{query_path}/_pagination_visible"
+        }
+      },
+      %{
+        "id" => "query#{sfx}_pagination_row",
+        "component" => "Row",
+        "children" => [
+          "query#{sfx}_prev_slot",
+          "query#{sfx}_page_text",
+          "query#{sfx}_next_slot"
+        ]
+      },
+      %{
+        "id" => "query#{sfx}_prev_slot",
+        "component" => "List",
+        "children" => %{
+          "componentId" => "query#{sfx}_prev_button",
+          "path" => "#{query_path}/_previous_visible"
+        }
+      },
+      query_button("query#{sfx}_prev", table, %{"pageDelta" => -1}, view),
+      %{
+        "id" => "query#{sfx}_prev_text",
+        "component" => "Text",
+        "text" => t(view, msg("Previous"))
+      },
+      %{
+        "id" => "query#{sfx}_page_text",
+        "component" => "Text",
+        "text" => %{"@path" => "#{query_path}/_range_text"}
+      },
+      %{
+        "id" => "query#{sfx}_next_slot",
+        "component" => "List",
+        "children" => %{
+          "componentId" => "query#{sfx}_next_button",
+          "path" => "#{query_path}/_next_visible"
+        }
+      },
+      query_button("query#{sfx}_next", table, %{"pageDelta" => 1}, view),
+      %{"id" => "query#{sfx}_next_text", "component" => "Text", "text" => t(view, msg("Next"))}
+    ]
+  end
+
+  defp query_button(id_prefix, table, context, view) do
+    context =
+      context
+      |> Map.put("query", %{"@path" => table.query_path})
+      |> Map.put("component", to_string(table.name))
+      |> put_contexts_binding(view)
+
+    %{
+      "id" => "#{id_prefix}_button",
+      "component" => "Button",
+      "child" => "#{id_prefix}_text",
+      "action" => ash_action("query", context, "#{id_prefix}_button")
+    }
+  end
+
+  # Write-action contexts carry the current /query (on multi-table surfaces:
+  # the whole per-table state map) so success refreshes can re-read with the
+  # client's active search/filters/sort/page.
+  defp put_query_binding(context, view) do
+    if Enum.any?(view.tables, & &1.query) do
+      Map.put(context, "query", %{"@path" => "/query"})
+    else
+      context
+    end
+  end
+
+  # Action contexts on context-enabled surfaces carry the current /context
+  # map, so server reads (refreshes, query, context cascades) run under the
+  # client's active selections. Context-less surfaces are unchanged (frozen
+  # contract).
+  defp put_contexts_binding(context, view) do
+    if ResolvedView.contexts?(view) do
+      Map.put(context, "contexts", %{"@path" => "/context"})
+    else
+      context
+    end
+  end
+
+  # A matrix templates no record rows (see AshA2ui.Matrix).
+  defp table_descendants(view, table, sfx) do
+    if AshA2ui.Matrix.matrix?(table),
+      do: [],
+      else: record_row_descendants(view, table, sfx)
+  end
+
+  defp record_row_descendants(view, table, sfx) do
+    {action_ids, action_components} =
+      table.row_actions
+      |> Enum.map(&row_action_components(view, table, &1, sfx))
+      |> Enum.unzip()
+
+    # The context-select button (master/detail hook) rides along with the
+    # row-action anchors in either layout, as do the View/Edit row controls.
+    {context_select_ids, context_select_components} = context_select_button(view, table, sfx)
+    {control_ids, control_components} = row_controls(view, table, sfx)
+
+    action_ids = action_ids ++ context_select_ids ++ control_ids
+
+    row_components =
+      case table.component.row_layout do
+        nil -> flat_row_components(view, table, action_ids, sfx)
+        layout -> card_row_components(view, table, layout, action_ids, sfx)
+      end
+
+    # Bulk tables add the row CheckBox, calendars the row's date text
+    # (no-ops otherwise).
+    row_components =
+      row_components
+      |> AshA2ui.Bulk.with_row_checkbox(table, sfx, view.l10n)
+      |> with_calendar_when(table, sfx)
+
+    row_components ++
+      List.flatten(action_components) ++ context_select_components ++ control_components
+  end
+
+  # The row controls tail: View — only when a form panel exists to show
+  # the record in (a View button on a formless surface is dead wire weight
+  # — the audit's 7 dead buttons) — plus Edit when the view declares an
+  # update action. Related tables get neither (see related_table?/2).
+  defp row_controls(view, table, sfx) do
+    if record_controls?(view, table),
+      do: view_edit_controls(view, table, sfx),
+      else: {[], []}
+  end
+
+  defp view_edit_controls(view, table, sfx) do
+    {view_id, view_components} =
+      record_control(table, "view#{sfx}_button", "view_record", t(view, msg("View")))
+
+    {edit_ids, edit_components} =
+      if view.update_action do
+        {id, components} =
+          record_control(table, "edit#{sfx}_button", "start_edit", t(view, msg("Edit")))
+
+        {[id], components}
+      else
+        {[], []}
+      end
+
+    {[view_id | edit_ids], view_components ++ edit_components}
+  end
+
+  # Whether the surface has a record-task panel for view_record to open:
+  # the form component's panel is the only view target.
+  defp form_target?(view) do
+    Enum.any?(view.components, &(&1.name == :form))
+  end
+
+  # Whether a table's rows get the View/Edit task controls: a panel to open
+  # them in, over the surface's own resource.
+  defp record_controls?(view, table), do: form_target?(view) and not related_table?(view, table)
+
+  # One record control: a Button dispatching `event` with the row's
+  # recordId binding, plus its label Text.
+  defp record_control(table, id, event, label) do
+    components = [
+      %{
+        "id" => id,
+        "component" => "Button",
+        "child" => "#{id}_text",
+        "action" =>
+          ash_action(
+            event,
+            %{
+              "recordId" => %{"@path" => "id"},
+              "component" => to_string(table.name)
+            },
+            id
+          )
+      },
+      %{"id" => "#{id}_text", "component" => "Text", "text" => label}
+    ]
+
+    {id, components}
+  end
+
+  # Each record renders as a Card (chrome themed via --a2ui-card-*)
+  # wrapping the actual Row of labeled cells; the List template still points
+  # at record_row, so this stays invisible to the data model and actions.
+  defp flat_row_components(view, table, action_ids, sfx) do
+    fields = table.component.fields
+    cell_ids = Enum.map(fields, &cell_id(&1, sfx))
+
+    card = %{
+      "id" => "record_row#{sfx}",
+      "component" => "Card",
+      "child" => "record_row#{sfx}_content"
+    }
+
+    row = %{
+      "id" => "record_row#{sfx}_content",
+      "component" => "Row",
+      "children" => cell_ids ++ action_ids
+    }
+
+    [card, row | Enum.flat_map(fields, &cell(view, table, &1, sfx))]
+  end
+
+  # Card-style rows (row_layout): the templated record_row becomes a Card
+  # whose Column body holds a header Row — the title Text (weight 1) and a
+  # right-hand Row of the badge Text (when declared) plus the row's action
+  # anchors and select button — above the meta grid (see grid_components/4:
+  # Rows of equal-weight Columns, each a caption label over the bound value).
+  defp card_row_components(view, table, layout, action_ids, sfx) do
+    base = "record_row#{sfx}"
+
+    badge =
+      if layout.badge do
+        [
+          %{
+            "id" => "#{base}_badge",
+            "component" => "Text",
+            "text" => %{"@path" => "_badge_#{layout.badge}"},
+            "variant" => "caption"
+          }
+        ]
+      else
+        []
+      end
+
+    {meta_row_ids, meta_components} =
+      grid_components("#{base}_meta", layout.columns, card_meta_fields(layout), fn field ->
+        {value_id, value_components} =
+          linked_value(
+            table,
+            field,
+            %{
+              "id" => "#{base}_meta_value_#{field}",
+              "component" => "Text",
+              "text" => cell_text(view.fields[field])
+            },
+            ""
+          )
+
+        {["#{base}_meta_label_#{field}", value_id],
+         [
+           %{
+             "id" => "#{base}_meta_label_#{field}",
+             "component" => "Text",
+             "text" => view.fields[field].label,
+             "variant" => "caption"
+           }
+           | value_components
+         ]}
+      end)
+
+    {title_id, title_components} =
+      linked_value(
+        table,
+        layout.title,
+        %{
+          "id" => "#{base}_title",
+          "component" => "Text",
+          "text" => heading(4, cell_text(view.fields[layout.title])),
+          "weight" => 1
+        },
+        ""
+      )
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => ["#{base}_header" | meta_row_ids]
+      },
+      %{
+        "id" => "#{base}_header",
+        "component" => "Row",
+        "justify" => "spaceBetween",
+        "align" => "center",
+        "children" => [title_id, "#{base}_header_right"]
+      }
+    ] ++
+      title_components ++
+      [
+        %{
+          "id" => "#{base}_header_right",
+          "component" => "Row",
+          "align" => "center",
+          "children" => Enum.map(badge, & &1["id"]) ++ action_ids
+        }
+      ] ++ badge ++ meta_components
+  end
+
+  # The basic card has no leading or trailing slot, disclosure or group
+  # header: those fields join its metadata grid.
+  defp card_meta_fields(layout) do
+    Enum.uniq(
+      Enum.reject([layout.leading, layout.group_by, layout.group_subtitle], &is_nil/1) ++
+        layout.meta ++ layout.trailing ++ layout.expand
+    )
+  end
+
+  # An N-column grid: items chunked into Rows of `columns` equal-weight cell
+  # Columns (each holding the ids `cell_fun` returns for its item), the last
+  # row padded with empty spacer Columns so cells stay aligned.
+  defp grid_components(base, columns, items, cell_fun) do
+    items
+    |> Enum.chunk_every(columns)
+    |> Enum.with_index()
+    |> Enum.map(fn {row_items, index} ->
+      cells =
+        Enum.map(row_items, fn item ->
+          {children, components} = cell_fun.(item)
+
+          {"#{base}_cell_#{item}",
+           [
+             %{
+               "id" => "#{base}_cell_#{item}",
+               "component" => "Column",
+               "weight" => 1,
+               "children" => children
+             }
+             | components
+           ]}
+        end)
+
+      spacers =
+        for spacer <- length(row_items)..(columns - 1)//1 do
+          {"#{base}_spacer_#{index}_#{spacer}",
+           [
+             %{
+               "id" => "#{base}_spacer_#{index}_#{spacer}",
+               "component" => "Column",
+               "weight" => 1,
+               "children" => []
+             }
+           ]}
+        end
+
+      {cell_ids, cell_components} = Enum.unzip(cells ++ spacers)
+
+      {"#{base}_row_#{index}",
+       [
+         %{
+           "id" => "#{base}_row_#{index}",
+           "component" => "Row",
+           "children" => cell_ids
+         }
+         | List.flatten(cell_components)
+       ]}
+    end)
+    |> Enum.unzip()
+    |> then(fn {row_ids, components} -> {row_ids, List.flatten(components)} end)
+  end
+
+  # A table with `select_context` gets a per-row Button dispatching
+  # `context_select` for the named context with the row's id — the
+  # master/detail hook: the row's record becomes the context's selection,
+  # cascading like a picker selection would.
+  defp context_select_button(_view, %{select_context: nil}, _sfx), do: {[], []}
+
+  defp context_select_button(view, table, sfx) do
+    name = table.select_context
+    base = "row_context#{sfx}_button"
+
+    components = [
+      %{
+        "id" => base,
+        "component" => "Button",
+        "child" => "row_context#{sfx}_text",
+        "action" =>
+          ash_action(
+            "context_select",
+            %{
+              "context" => to_string(name),
+              "value" => %{"@path" => "id"}
+            }
+            |> put_query_binding(view)
+            |> put_contexts_binding(view),
+            base
+          )
+      },
+      %{
+        "id" => "row_context#{sfx}_text",
+        "component" => "Text",
+        "text" => context_select_label(view, name)
+      }
+    ]
+
+    {[base], components}
+  end
+
+  # The select_context row button's label, in both compositions: it makes
+  # the row's record the context's selection (filling the detail panels and
+  # related tables bound to it) — "Select <context>", not "View", which is
+  # the task panel's own row control.
+  defp context_select_label(view, name),
+    do:
+      Label.translate(
+        view.l10n,
+        "Select " <> String.downcase(Label.humanize(name)),
+        "select_context"
+      )
+
+  # A cell is a labeled pair: a caption Text with the humanized field name
+  # and a body Text bound to the field value — so generated rows read
+  # "Name: Fido" instead of a bare value soup. Fields listed in the table's
+  # `editable` config render as editable cells instead (see
+  # editable_cell/4).
+  defp cell(view, table, field_name, sfx) do
+    if field_name in editable_fields(table) do
+      editable_cell(view, table, field_name, sfx)
+    else
+      field = view.fields[field_name]
+      base = cell_base(field_name, sfx)
+
+      {value_id, value_components} =
+        linked_value(
+          table,
+          field_name,
+          %{"id" => "#{base}_value", "component" => "Text", "text" => cell_text(field)},
+          ""
+        )
+
+      [
+        %{
+          "id" => cell_id(field_name, sfx),
+          "component" => "Row",
+          "children" => ["#{base}_label", value_id]
+        },
+        %{
+          "id" => "#{base}_label",
+          "component" => "Text",
+          "text" => Label.resolve(view.l10n, nil, field_name),
+          "variant" => "caption"
+        }
+        | value_components
+      ]
+    end
+  end
+
+  # A cell's component ids: `table_cell<sfx>_<field>` followed by the part's
+  # role (`_row` for the cell's own Row, `_label`, `_value`, `_input`, ...).
+  # Every id ends in a role and no role ends another, so two fields can
+  # never share an id (`status` and `status_label` give
+  # `table_cell_status_label` and `table_cell_status_label_row`).
+  defp cell_base(field_name, sfx), do: "table_cell#{sfx}_#{field_name}"
+  defp cell_id(field_name, sfx), do: cell_base(field_name, sfx) <> "_row"
+
+  # A to-one reference link in the basic catalog: the value Text becomes
+  # the child of a borderless Button (`<value id>_link`, any layout weight
+  # moved onto it) dispatching `open_surface` with the field name and the
+  # bound `_links/<field>` surface and record id (`links_prefix` is "" for
+  # template-relative rows, "/detail/<context>/" for details). The server
+  # validates the field/surface pair (not the record id — the opened
+  # surface authorizes its read) and the transport navigates — the
+  # `open_surface_url` / `:open_surface` contract the admin catalog's link
+  # cells reach through `"a2ui:open_surface"` (see `AshA2ui.LiveRenderer`).
+  # A row without a link for the field (nil reference, unreadable target)
+  # sends no surface, which the handler acknowledges without navigating.
+  # Fields that do not link in this render keep the bare value Text.
+  defp linked_value(scope, field, %{"id" => value_id} = value, links_prefix) do
+    if MapSet.member?(Map.get(scope, :openable_links, MapSet.new()), field) do
+      {weight, value} = Map.pop(value, "weight")
+
+      button =
+        %{
+          "id" => "#{value_id}_link",
+          "component" => "Button",
+          "variant" => "borderless",
+          "child" => value_id,
+          "action" =>
+            ash_action(
+              "open_surface",
+              %{
+                "field" => to_string(field),
+                "surface" => %{"@path" => "#{links_prefix}_links/#{field}/surface"},
+                "recordId" => %{"@path" => "#{links_prefix}_links/#{field}/recordId"}
+              },
+              "#{value_id}_link"
+            )
+        }
+        |> maybe_put("weight", weight)
+
+      {button["id"], [button, value]}
+    else
+      {value_id, [value]}
+    end
+  end
+
+  defp editable_fields(table) do
+    case Map.get(table, :editable) do
+      %{fields: fields} -> fields
+      _not_editable -> []
+    end
+  end
+
+  # An editable cell (inline cell editing): a TextField bound to the
+  # template-relative field path — edits stay in the client row until
+  # committed — a Save Button dispatching `edit_cell` with the row's id and
+  # this field's current value, and an error Text bound to the row's
+  # reserved `_error_<field>` mirror (written by the handler when the
+  # commit's validation fails; empty otherwise). The Save's outcome is the
+  # surface's /ui/feedback, like every other write.
+  defp editable_cell(view, table, field_name, sfx) do
+    field = view.fields[field_name]
+    base = cell_base(field_name, sfx)
+
+    [
+      %{
+        "id" => cell_id(field_name, sfx),
+        "component" => "Row",
+        "align" => "center",
+        "children" => ["#{base}_input", "#{base}_save_button", "#{base}_error"]
+      },
+      %{
+        "id" => "#{base}_input",
+        "component" => "TextField",
+        "label" => field.label,
+        "value" => %{"@path" => to_string(field_name)}
+      },
+      %{
+        "id" => "#{base}_save_button",
+        "component" => "Button",
+        "child" => "#{base}_save_text",
+        "action" =>
+          ash_action(
+            "edit_cell",
+            %{
+              "recordId" => %{"@path" => "id"},
+              "component" => to_string(table.name),
+              "field" => to_string(field_name),
+              "value" => %{"@path" => to_string(field_name)}
+            }
+            |> put_query_binding(view)
+            |> put_contexts_binding(view),
+            "#{base}_save_button"
+          )
+      },
+      %{"id" => "#{base}_save_text", "component" => "Text", "text" => t(view, msg("Save"))},
+      %{
+        "id" => "#{base}_error",
+        "component" => "Text",
+        "text" => %{"@path" => "_error_#{field_name}"},
+        "variant" => "caption"
+      }
+    ]
+  end
+
+  # Template-relative binding: paths inside a List item template resolve
+  # against the item object, so plain "<field>" (no leading /).
+  defp cell_text(%{format: :date} = field) do
+    %{
+      "@call" => "formatDate",
+      "args" => %{
+        "value" => %{"@path" => to_string(field.name)},
+        "format" => "MMM d, yyyy"
+      }
+    }
+  end
+
+  defp cell_text(field), do: %{"@path" => to_string(field.name)}
+
+  # One row action's components plus the id placed in the row's children:
+  # a plain invoke Button by default; a Modal (trigger button + prompt
+  # content) when the action declares prompt_fields; either wrapped in a
+  # visibility slot (a List templated over the row-relative
+  # `_visible_<action>` path) when the action declares visible_when.
+  defp row_action_components(view, table, action, sfx) do
+    setting = Map.get(view.actions, action)
+    prompt? = match?(%{prompt_fields: [_ | _]}, setting)
+    conditional? = match?(%{visible_when: [_ | _]}, setting)
+    base = "row_action#{sfx}_#{action}"
+
+    inner_id = if prompt?, do: "#{base}_modal", else: "#{base}_button"
+    anchor_id = if conditional?, do: "#{base}_slot", else: inner_id
+
+    button =
+      if prompt? do
+        prompt_trigger_button(view, table, action, base) ++
+          prompt_components(view, table, action, base, setting)
+      else
+        invoke_button(view, table, action, base)
+      end
+
+    slot = if conditional?, do: [visibility_slot(base, inner_id, action)], else: []
+
+    {anchor_id, button ++ slot}
+  end
+
+  defp invoke_button(view, table, action, base) do
+    [
+      %{
+        "id" => "#{base}_button",
+        "component" => "Button",
+        "child" => "#{base}_text",
+        "action" =>
+          ash_action(
+            "invoke",
+            %{
+              "action" => to_string(action),
+              "recordId" => %{"@path" => "id"},
+              "component" => to_string(table.name)
+            }
+            |> put_query_binding(view)
+            |> put_contexts_binding(view),
+            "#{base}_button"
+          )
+      },
+      %{
+        "id" => "#{base}_text",
+        "component" => "Text",
+        "text" => ResolvedView.action_label(view, action)
+      }
+    ]
+  end
+
+  # The Modal's trigger: opening is client-side (interacting with the
+  # trigger), while the `prompt` event lets the server pre-fill
+  # /prompt/values/<action> and clear stale /errors.
+  defp prompt_trigger_button(view, table, action, base) do
+    [
+      %{
+        "id" => "#{base}_button",
+        "component" => "Button",
+        "child" => "#{base}_text",
+        "action" =>
+          ash_action(
+            "prompt",
+            %{
+              "action" => to_string(action),
+              "recordId" => %{"@path" => "id"},
+              "component" => to_string(table.name)
+            },
+            "#{base}_button"
+          )
+      },
+      %{
+        "id" => "#{base}_text",
+        "component" => "Text",
+        "text" => ResolvedView.action_label(view, action)
+      }
+    ]
+  end
+
+  # The Modal and its content: a title, one input per prompt field bound to
+  # the absolute /prompt/values/<action>/<field> path (template-relative
+  # paths cannot reach the shared prompt state), a per-field error Text, and
+  # the confirm Button whose invoke context carries the "values" binding.
+  defp prompt_components(view, table, action, base, setting) do
+    title = prompt_title(view, action, setting)
+    {field_children, field_components} = prompt_field_components(view, action, base)
+
+    [
+      %{
+        "id" => "#{base}_modal",
+        "component" => "Modal",
+        "trigger" => "#{base}_button",
+        "content" => "#{base}_prompt"
+      },
+      %{
+        "id" => "#{base}_prompt",
+        "component" => "Column",
+        "children" => ["#{base}_prompt_title" | field_children] ++ ["#{base}_confirm_button"]
+      },
+      %{
+        "id" => "#{base}_prompt_title",
+        "component" => "Text",
+        "text" => heading(3, title)
+      }
+    ] ++
+      field_components ++
+      [
+        %{
+          "id" => "#{base}_confirm_button",
+          "component" => "Button",
+          "variant" => "primary",
+          "child" => "#{base}_confirm_text",
+          "action" =>
+            ash_action(
+              "invoke",
+              %{
+                "action" => to_string(action),
+                "recordId" => %{"@path" => "id"},
+                "component" => to_string(table.name),
+                "values" => %{"@path" => "/prompt/values/#{action}"}
+              }
+              |> put_query_binding(view)
+              |> put_contexts_binding(view),
+              "#{base}_confirm_button"
+            )
+        },
+        %{
+          "id" => "#{base}_confirm_text",
+          "component" => "Text",
+          "text" => t(view, msg("Confirm"))
+        }
+      ]
+  end
+
+  # One prompt's inputs, shared by both compositions: per prompt field the
+  # widget a form field of that type gets (see ResolvedView.prompt_field)
+  # and its error Text. Returns {child ids, components}.
+  defp prompt_field_components(view, action, base) do
+    fields = Map.get(view.prompts, action, [])
+
+    children =
+      Enum.flat_map(fields, &[prompt_input_id(base, &1), "#{base}_prompt_error_#{&1.name}"])
+
+    components =
+      Enum.flat_map(fields, fn field ->
+        prompt_input(view, action, base, field) ++
+          [
+            %{
+              "id" => "#{base}_prompt_error_#{field.name}",
+              "component" => "Text",
+              "text" => %{"@path" => "/errors/#{field.name}"},
+              "variant" => "caption"
+            }
+          ]
+      end)
+
+    {children, components}
+  end
+
+  defp prompt_input_id(base, field) do
+    if searchable_prompt_field?(field) or scoped_prompt_field?(field),
+      do: "#{base}_prompt_select_#{field.name}",
+      else: "#{base}_prompt_input_#{field.name}"
+  end
+
+  defp prompt_input(view, action, base, field) do
+    props = %{
+      "id" => "#{base}_prompt_input_#{field.name}",
+      "label" => field.label,
+      "value" => %{"@path" => "/prompt/values/#{action}/#{field.name}"}
+    }
+
+    case field.widget do
+      :select ->
+        prompt_select_input(view, action, base, field, props)
+
+      :choice_picker ->
+        options =
+          Enum.map(field.choices, fn {value, label} ->
+            %{"label" => label, "value" => to_string(value)}
+          end)
+
+        [choice_picker(props, options)]
+
+      :check_box ->
+        [Map.put(props, "component", "CheckBox")]
+
+      :date_time_input ->
+        [
+          props
+          |> Map.put("component", "DateTimeInput")
+          |> Map.put("enableDate", true)
+          |> Map.put("enableTime", not field.date_only?)
+        ]
+
+      _text_field ->
+        text_field = Map.put(props, "component", "TextField")
+        [if(field.numeric?, do: Map.put(text_field, "variant", "number"), else: text_field)]
+    end
+  end
+
+  # A relationship prompt field: the per-row option list when scoped, the
+  # searchable composite with option_search, else a ChoicePicker over the
+  # surface-wide options.
+  defp prompt_select_input(view, action, base, field, props) do
+    cond do
+      scoped_prompt_field?(field) -> scoped_prompt_select_components(view, action, base, field)
+      searchable_prompt_field?(field) -> prompt_select_components(view, action, base, field)
+      true -> [choice_picker(props, Map.get(field, :options, []))]
+    end
+  end
+
+  defp choice_picker(props, options) do
+    props
+    |> Map.put("component", "ChoicePicker")
+    |> Map.put("variant", "mutuallyExclusive")
+    |> Map.put("options", options)
+  end
+
+  # A searchable relationship prompt field: the searchable-select composite
+  # (label, selected label, search controls, result list) over prompt-scoped
+  # state — the selection writes /prompt/values/<action>/<field> server-side
+  # (option_select with "prompt"), never the form.
+  defp prompt_select_components(view, action, base, field) do
+    id = "#{base}_prompt_select_#{field.name}"
+    state = "/prompt/select/#{action}/#{field.name}"
+
+    [
+      %{
+        "id" => id,
+        "component" => "Column",
+        "children" => ["#{id}_label", "#{id}_selected", "#{id}_controls", "#{id}_options"]
+      },
+      %{"id" => "#{id}_label", "component" => "Text", "text" => heading(4, field.label)},
+      %{
+        "id" => "#{id}_selected",
+        "component" => "Text",
+        "text" => %{"@path" => "#{state}/label"}
+      },
+      %{
+        "id" => "#{id}_controls",
+        "component" => "Row",
+        "children" => ["#{id}_search_input", "#{id}_search_button"]
+      }
+    ] ++
+      search_controls(view, id, to_string(field.name), "#{state}/search") ++
+      option_list(id, "/options/#{field.name}", %{
+        "name" => "option_select",
+        "context" => %{
+          "field" => to_string(field.name),
+          "value" => %{"@path" => "value"},
+          "prompt" => to_string(action)
+        }
+      })
+  end
+
+  # A relationship prompt field scoped per row (the action's
+  # `prompt_options`): the option-list composite over the prompt's own
+  # options, `/prompt/options/<action>/<field>`, which the `prompt` pre-fill
+  # writes for the row it opens on (a basic ChoicePicker takes literal
+  # options only, and inlining them would list every row's options). Its
+  # option_select — and, when searchable, its option_search — carries the
+  # row the prompt is open on (`/prompt/record/<action>`, written by the
+  # pre-fill), which the server re-reads before evaluating the scope.
+  defp scoped_prompt_select_components(view, action, base, field) do
+    id = "#{base}_prompt_select_#{field.name}"
+    state = "/prompt/select/#{action}/#{field.name}"
+    record = %{"@path" => "/prompt/record/#{action}"}
+    searchable? = searchable_prompt_field?(field)
+
+    controls =
+      if searchable? do
+        [
+          %{
+            "id" => "#{id}_controls",
+            "component" => "Row",
+            "children" => ["#{id}_search_input", "#{id}_search_button"]
+          }
+          | id
+            |> then(&search_controls(view, &1, to_string(field.name), "#{state}/search"))
+            |> Enum.map(&scope_search_event(&1, "#{id}_search_button", action, record))
+        ]
+      else
+        []
+      end
+
+    children =
+      ["#{id}_label", "#{id}_selected"] ++
+        if(searchable?, do: ["#{id}_controls"], else: []) ++ ["#{id}_options"]
+
+    [
+      %{"id" => id, "component" => "Column", "children" => children},
+      %{"id" => "#{id}_label", "component" => "Text", "text" => heading(4, field.label)},
+      %{"id" => "#{id}_selected", "component" => "Text", "text" => %{"@path" => "#{state}/label"}}
+    ] ++
+      controls ++
+      option_list(id, "/prompt/options/#{action}/#{field.name}", %{
+        "name" => "option_select",
+        "context" => %{
+          "field" => to_string(field.name),
+          "value" => %{"@path" => "value"},
+          "prompt" => to_string(action),
+          "recordId" => record
+        }
+      })
+  end
+
+  defp scope_search_event(%{"id" => id} = component, id, action, record) do
+    update_in(component, ["action", "functionCall", "args", "context"], fn context ->
+      context
+      |> Map.put("prompt", to_string(action))
+      |> Map.put("recordId", record)
+    end)
+  end
+
+  defp scope_search_event(component, _search_button_id, _action, _record), do: component
+
+  # Zero-or-one nested template: `_visible_<action>` on the row is either
+  # [] or [%{"id" => id}], so the slot renders the action only when the
+  # server computed it visible (and the item's "id" keeps the
+  # template-relative recordId binding working).
+  defp visibility_slot(base, inner_id, action) do
+    %{
+      "id" => "#{base}_slot",
+      "component" => "List",
+      "children" => %{"componentId" => inner_id, "path" => "_visible_#{action}"}
+    }
+  end
+
+  defp form_components(view, form) do
+    field_children = form_field_children(view, form)
+    nested_children = Enum.map(form.nested_forms, &"nested_#{&1.name}")
+
+    # The panel's content splits by task mode: the editable form fields
+    # live behind the /ui/panel/form_visible gate (create/edit), the
+    # read-only record display behind /ui/panel/view_visible (view) — so a
+    # view task renders the derived display, never an empty editable form.
+    #
+    # The panel is carded: the form is the heaviest task surface on
+    # the page and floated uncared on the page background (the CLIN-10
+    # audit's finding #3) while the group sections 30 lines below already
+    # had the Card anatomy. The `form` id is kept (the hook's panel-reveal
+    # PANEL_IDS contract) — it becomes the Card, its content moves under a
+    # `form_body` Column, and the submit/cancel pair gains a footer zone
+    # (Divider + `form_footer` Column) so the card closes like the digest's
+    # CardFooter instead of trailing loose buttons.
+    body_children = [
+      "form_title",
+      "panel_view_slot",
+      "form_fields_slot",
+      "form_footer_divider",
+      "form_footer"
+    ]
+
+    footer_components = [
+      %{"id" => "form_footer_divider", "component" => "Divider"},
+      %{
+        "id" => "form_footer",
+        "component" => "Column",
+        "children" => ["form_submit_slot", "form_cancel_button"]
+      }
+    ]
+
+    [
+      %{
+        "id" => "form_slot",
+        "component" => "List",
+        "children" => %{"componentId" => "form", "path" => "/ui/panel/visible"}
+      },
+      %{"id" => "form", "component" => "Card", "child" => "form_body"},
+      %{
+        "id" => "form_body",
+        "component" => "Column",
+        "children" => body_children
+      }
+      | footer_components ++ panel_mode_slots(view, form, field_children, nested_children)
+    ] ++ group_components(view, form) ++ wizard_components(view, form)
+  end
+
+  # The mode-gated panel content: the read-only record display (view
+  # task) and the editable form fields (create/edit tasks), each behind its
+  # zero-or-one sentinel — exactly one of them renders at a time. The
+  # submit/cancel pair keeps its own gating (submit_visible / the open
+  # panel), so view offers Cancel alone while edit offers the pair.
+  defp panel_mode_slots(view, form, field_children, nested_children) do
+    List.flatten([
+      %{
+        "id" => "panel_view_slot",
+        "component" => "List",
+        "children" => %{"componentId" => "panel_view", "path" => "/ui/panel/view_visible"}
+      },
+      panel_view(view, form),
+      %{
+        "id" => "form_fields_slot",
+        "component" => "List",
+        "children" => %{"componentId" => "form_fields", "path" => "/ui/panel/form_visible"}
+      },
+      %{
+        "id" => "form_fields",
+        "component" => "Column",
+        "children" => field_children ++ nested_children
+      }
+    ])
+  end
+
+  # The view task's derived display: one caption/value pair per form field,
+  # bound to the `/ui/panel/record` values the handler writes on
+  # view_record — the same values the form would have shown, but as bound
+  # Texts (nothing editable). Nested-form rows are edit machinery and stay
+  # out of the display.
+  defp panel_view(view, form) do
+    rows =
+      Enum.flat_map(form.fields, fn field ->
+        [
+          %{
+            "id" => "panel_view_#{field}",
+            "component" => "Row",
+            "children" => ["panel_view_#{field}_label", "panel_view_#{field}_value"]
+          },
+          %{
+            "id" => "panel_view_#{field}_label",
+            "component" => "Text",
+            "text" => view.fields[field].label,
+            "variant" => "caption"
+          },
+          %{
+            "id" => "panel_view_#{field}_value",
+            "component" => "Text",
+            "text" => %{"@path" => "/ui/panel/record/#{field}"}
+          }
+        ]
+      end)
+
+    [
+      %{
+        "id" => "panel_view",
+        "component" => "Column",
+        "children" => Enum.map(form.fields, &"panel_view_#{&1}")
+      }
+      | rows
+    ]
+  end
+
+  defp field_anchor_ids(view, field) do
+    anchor =
+      if searchable_select?(view, field),
+        do: "form_select_#{field}",
+        else: "form_input_#{field}"
+
+    [anchor, "form_error_#{field}"]
+  end
+
+  # A stepped form's fields render inside its wizard pages.
+  defp form_field_children(_view, %{steps: [_ | _]}), do: AshA2ui.Wizard.field_children()
+
+  # The ordering contract with groups: walking the form's effective field
+  # order, an ungrouped field renders its input/error pair in place, and a
+  # group renders (whole, in the group's own field order) at the position of
+  # its first member — later members are already covered by the group.
+  defp form_field_children(view, %{groups: []} = form) do
+    Enum.flat_map(form.fields, &field_anchor_ids(view, &1))
+  end
+
+  defp form_field_children(view, form) do
+    form.fields
+    |> Enum.flat_map_reduce(MapSet.new(), fn field, seen ->
+      case Enum.find(form.groups, &(field in &1.fields)) do
+        nil -> {field_anchor_ids(view, field), seen}
+        %{name: name} -> group_anchor(name, seen)
+      end
+    end)
+    |> elem(0)
+  end
+
+  # The group anchor appears once — at its first member's position.
+  defp group_anchor(name, seen) do
+    if MapSet.member?(seen, name) do
+      {[], seen}
+    else
+      {["form_group_#{name}"], MapSet.put(seen, name)}
+    end
+  end
+
+  # One Card-wrapped section per group: a heading Text (h3) over the fields.
+  # Single-column groups hold the input/error pairs directly; multi-column
+  # groups lay them out in the shared grid shape (see grid_components/4).
+  defp group_components(view, form) do
+    Enum.flat_map(form.groups, &group_section(view, &1))
+  end
+
+  defp group_section(view, group) do
+    base = "form_group_#{group.name}"
+    {grid_children, grid_components} = group_grid(view, group, base)
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => ["#{base}_heading" | grid_children]
+      },
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" => heading(3, group.label)
+      }
+    ] ++ grid_components
+  end
+
+  defp group_grid(view, %{columns: 1} = group, _base) do
+    {Enum.flat_map(group.fields, &field_anchor_ids(view, &1)), []}
+  end
+
+  defp group_grid(view, group, base) do
+    grid_components(base, group.columns, group.fields, fn field ->
+      {field_anchor_ids(view, field), []}
+    end)
+  end
+
+  # Stepped forms (see AshA2ui.Wizard): the wizard Column, its step pages
+  # and Back/Next controls. Inputs stay the encoder's own field anchors.
+  defp wizard_components(view, form),
+    do: AshA2ui.Wizard.components(view, form, &field_anchor_ids(view, &1))
+
+  defp searchable_select?(view, field_name) do
+    match?(%{search_fields: [_ | _]}, view.selects[field_name])
+  end
+
+  defp form_descendants(_view, nil, _options), do: []
+
+  defp form_descendants(view, form, options) do
+    inputs =
+      Enum.map(form.fields, fn field ->
+        if searchable_select?(view, field) do
+          searchable_select_components(view, field)
+        else
+          form_input(view, field, options)
+        end
+      end)
+
+    nested =
+      Enum.flat_map(form.nested_forms, fn entity ->
+        nested_form_components(view, view.nested_forms[entity.name], options)
+      end)
+
+    errors = Enum.map(form.fields, &form_error/1)
+
+    List.flatten(inputs) ++ nested ++ errors ++ form_task_descendants(view)
+  end
+
+  # The form's task affordances: the panel heading (bound to
+  # /ui/panel/title), the submit gated behind the /ui/panel/submit_visible
+  # sentinel with its label bound to /ui/panel/primary_label (so it
+  # disappears in view mode), and the Cancel button dispatching
+  # `cancel_record_task`.
+  defp form_task_descendants(view) do
+    [
+      %{
+        "id" => "form_title",
+        "component" => "Text",
+        "text" => heading(3, %{"@path" => "/ui/panel/title"})
+      },
+      %{
+        "id" => "form_submit_slot",
+        "component" => "List",
+        "children" => %{
+          "componentId" => "form_submit_button",
+          "path" => "/ui/panel/submit_visible"
+        }
+      }
+    ] ++
+      submit_button(view, %{"@path" => "/ui/panel/primary_label"}) ++
+      cancel_components(view)
+  end
+
+  # The Cancel button (basic form and the admin ActionBar secondary):
+  # dispatches the existing cancel_record_task envelope.
+  defp cancel_components(view) do
+    [
+      %{
+        "id" => "form_cancel_button",
+        "component" => "Button",
+        "child" => "form_cancel_text",
+        "action" => ash_action("cancel_record_task", %{}, "form_cancel_button")
+      },
+      %{"id" => "form_cancel_text", "component" => "Text", "text" => t(view, msg("Cancel"))}
+    ]
+  end
+
+  defp submit_button(view, label) do
+    [
+      %{
+        "id" => "form_submit_button",
+        "component" => "Button",
+        "variant" => "primary",
+        "child" => "form_submit_text",
+        "action" => submit_action(view, "form_submit_button")
+      },
+      %{"id" => "form_submit_text", "component" => "Text", "text" => label}
+    ]
+  end
+
+  # The submit_form action, shared by the basic submit button and the admin
+  # ActionBar's primary action.
+  defp submit_action(view, source_component_id) do
+    context =
+      %{
+        "values" => %{"@path" => "/form"},
+        "recordId" => %{"@path" => "/form/id"}
+      }
+      |> put_query_binding(view)
+      |> put_contexts_binding(view)
+
+    ash_action("submit_form", context, source_component_id)
+  end
+
+  # --- searchable selects ---
+
+  # A relationship select with `option_search` renders as a composite instead
+  # of a static ChoicePicker: the current selection's label (bound to
+  # /select/<field>/label), a search TextField (bound to
+  # /select/<field>/search) with a Button dispatching `option_search`, and a
+  # result List templated over /options/<field> whose per-option Button
+  # dispatches `option_select` with the template-relative option "value".
+  # Selection round-trips through the server, which validates the value
+  # against the destination (authorized read) and writes /form/<field> plus
+  # the resolved label — labels never come from the client.
+  defp searchable_select_components(view, field_name) do
+    base = "form_select_#{field_name}"
+    field = view.fields[field_name]
+
+    [
+      %{
+        "id" => base,
+        "component" => "Column",
+        "children" => [
+          "#{base}_label",
+          "#{base}_selected",
+          "#{base}_controls",
+          "#{base}_options"
+        ]
+      },
+      %{"id" => "#{base}_label", "component" => "Text", "text" => heading(4, field.label)},
+      %{
+        "id" => "#{base}_selected",
+        "component" => "Text",
+        "text" => %{"@path" => "/select/#{field_name}/label"}
+      },
+      %{
+        "id" => "#{base}_controls",
+        "component" => "Row",
+        "children" => ["#{base}_search_input", "#{base}_search_button"]
+      }
+    ] ++
+      search_controls(view, base, to_string(field_name)) ++
+      option_list(base, "/options/#{field_name}", %{
+        "name" => "option_select",
+        "context" => %{
+          "field" => to_string(field_name),
+          "value" => %{"@path" => "value"}
+        }
+      })
+  end
+
+  # The shared search input + button pair: the button's `option_search`
+  # context carries the current search text via a data binding and the
+  # select/picker name as "field".
+  defp search_controls(view, base, name, search_path \\ nil) do
+    search_path = search_path || "/select/#{name}/search"
+
+    [
+      %{
+        "id" => "#{base}_search_input",
+        "component" => "TextField",
+        "label" => t(view, msg("Search")),
+        "value" => %{"@path" => search_path}
+      },
+      %{
+        "id" => "#{base}_search_button",
+        "component" => "Button",
+        "child" => "#{base}_search_text",
+        "action" =>
+          ash_action(
+            "option_search",
+            %{
+              "field" => name,
+              "search" => %{"@path" => search_path}
+            },
+            "#{base}_search_button"
+          )
+      },
+      %{"id" => "#{base}_search_text", "component" => "Text", "text" => t(view, msg("Search"))}
+    ]
+  end
+
+  # The option result List: templated over the options path, one Button per
+  # option whose child Text binds the template-relative "label" and whose
+  # ashAction context carries the template-relative "value".
+  defp option_list(base, options_path, call) do
+    [
+      %{
+        "id" => "#{base}_options",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_option_button", "path" => options_path}
+      },
+      %{
+        "id" => "#{base}_option_button",
+        "component" => "Button",
+        "variant" => "borderless",
+        "child" => "#{base}_option_text",
+        "action" => ash_action(call["name"], call["context"], "#{base}_option_button")
+      },
+      %{
+        "id" => "#{base}_option_text",
+        "component" => "Text",
+        "text" => %{"@path" => "label"}
+      }
+    ]
+  end
+
+  # --- contexts and details ---
+
+  # A picker context renders as a surface-level composite mirroring the
+  # searchable-select pattern: a Card (`context_<name>`, the root child)
+  # over a `_body` Column holding a label, the current selection (bound to
+  # /context/<name>/label) with a Clear button (`context_clear`), a search
+  # TextField (bound to /context/<name>/search) with a Button dispatching
+  # `context_search` when the context declares option_search, and a result
+  # List templated over /options/<name> whose per-option Button dispatches
+  # `context_select` with the template-relative option "value". Every
+  # context action carries the current /context map (and /query state on
+  # query-enabled surfaces) so the server cascades under the client's
+  # active state. Pickerless contexts (`picker false`) emit nothing — they
+  # are selected through a table's `select_context` button.
+  defp context_picker_components(_view, %{picker: false}), do: []
+
+  defp context_picker_components(view, context) do
+    base = "context_#{context.name}"
+    name = to_string(context.name)
+    searchable? = context.search_fields != []
+
+    # The section renders as a Card (keeping the frozen `context_<name>` id
+    # root children reference) over a `_body` Column holding the composite —
+    # card chrome for every renderer; enhanced catalogs (see
+    # priv/js/ash_a2ui_catalog.js) upgrade the body to a combobox.
+    card = %{
+      "id" => base,
+      "component" => "Card",
+      "child" => "#{base}_body"
+    }
+
+    section = %{
+      "id" => "#{base}_body",
+      "component" => "Column",
+      "children" =>
+        ["#{base}_label", "#{base}_selected_row"] ++
+          ((searchable? && ["#{base}_controls"]) || []) ++ ["#{base}_options"]
+    }
+
+    header = [
+      card,
+      section,
+      %{
+        "id" => "#{base}_label",
+        "component" => "Text",
+        "text" => heading(3, context.label)
+      },
+      %{
+        "id" => "#{base}_selected_row",
+        "component" => "Row",
+        "children" => ["#{base}_selected", "#{base}_clear_button"]
+      },
+      %{
+        "id" => "#{base}_selected",
+        "component" => "Text",
+        "text" => %{"@path" => "/context/#{name}/label"}
+      },
+      %{
+        "id" => "#{base}_clear_button",
+        "component" => "Button",
+        "variant" => "borderless",
+        "child" => "#{base}_clear_text",
+        "action" =>
+          ash_action(
+            "context_clear",
+            %{"context" => name}
+            |> put_query_binding(view)
+            |> put_contexts_binding(view),
+            "#{base}_clear_button"
+          )
+      },
+      %{"id" => "#{base}_clear_text", "component" => "Text", "text" => t(view, msg("Clear"))}
+    ]
+
+    controls =
+      if searchable? do
+        [
+          %{
+            "id" => "#{base}_controls",
+            "component" => "Row",
+            "children" => ["#{base}_search_input", "#{base}_search_button"]
+          },
+          %{
+            "id" => "#{base}_search_input",
+            "component" => "TextField",
+            "label" => t(view, msg("Search")),
+            "value" => %{"@path" => "/context/#{name}/search"}
+          },
+          %{
+            "id" => "#{base}_search_button",
+            "component" => "Button",
+            "child" => "#{base}_search_text",
+            "action" =>
+              ash_action(
+                "context_search",
+                %{
+                  "context" => name,
+                  "search" => %{"@path" => "/context/#{name}/search"}
+                }
+                |> put_contexts_binding(view),
+                "#{base}_search_button"
+              )
+          },
+          %{
+            "id" => "#{base}_search_text",
+            "component" => "Text",
+            "text" => t(view, msg("Search"))
+          }
+        ]
+      else
+        []
+      end
+
+    options =
+      option_list(base, "/options/#{name}", %{
+        "name" => "context_select",
+        "context" =>
+          %{
+            "context" => name,
+            "value" => %{"@path" => "value"}
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+      })
+
+    header ++ controls ++ options
+  end
+
+  # A :detail component renders its context's selected record: a heading
+  # and one label/value Row per field, each value Text bound to the
+  # absolute /detail/<context>/<field> path (an unselected context renders
+  # empty values — the server writes %{}).
+  defp detail_components(view, detail) do
+    base = "detail_#{detail.name}"
+
+    field_rows =
+      Enum.flat_map(detail.fields, fn field ->
+        {value_id, value_components} = detail_value(view, detail, base, field)
+
+        [
+          %{
+            "id" => "#{base}_field_#{field}",
+            "component" => "Row",
+            "children" => ["#{base}_label_#{field}", value_id]
+          },
+          %{
+            "id" => "#{base}_label_#{field}",
+            "component" => "Text",
+            "text" => heading(5, detail_field_label(view, field))
+          }
+          | value_components
+        ]
+      end)
+
+    {heading_ids, heading} = detail_heading(view, detail, base)
+
+    [
+      %{
+        "id" => base,
+        "component" => "Card",
+        "child" => "#{base}_body"
+      },
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => heading_ids ++ Enum.map(detail.fields, &"#{base}_field_#{&1}")
+      }
+      | heading ++ field_rows
+    ]
+  end
+
+  # A steps field (catalog 1.17) falls back to one plain Text row per step,
+  # templated over the normalized `_steps_<field>` list: each row is the
+  # step's whole `line` ("1. Placed · Complete · 3 Nov 2026").
+  defp detail_value(view, detail, base, field) do
+    case view.fields[field] do
+      %{steps: true} -> steps_value(detail, base, field)
+      _other -> plain_detail_value(view, detail, base, field)
+    end
+  end
+
+  defp steps_value(detail, base, field) do
+    value_id = "#{base}_value_#{field}"
+
+    {value_id,
+     [
+       %{
+         "id" => value_id,
+         "component" => "Column",
+         "children" => %{
+           "componentId" => "#{base}_step_#{field}",
+           "path" => "/detail/#{detail.context}/_steps_#{field}"
+         }
+       },
+       %{
+         "id" => "#{base}_step_#{field}",
+         "component" => "Text",
+         "text" => %{"@path" => "line"}
+       }
+     ]}
+  end
+
+  defp plain_detail_value(view, detail, base, field) do
+    linked_value(
+      detail,
+      field,
+      %{
+        "id" => "#{base}_value_#{field}",
+        "component" => "Text",
+        "text" => %{"@path" => detail_value_path(view, detail, field)}
+      },
+      "/detail/#{detail.context}/"
+    )
+  end
+
+  # A detail card's heading: its label, else its humanized name — none when
+  # it sits in a `section` without a label of its own (the section's heading
+  # names it).
+  defp detail_heading(_view, %{component: %{section: section, label: nil}}, _base)
+       when is_binary(section),
+       do: {[], []}
+
+  defp detail_heading(view, detail, base) do
+    {["#{base}_heading"],
+     [
+       %{
+         "id" => "#{base}_heading",
+         "component" => "Text",
+         "text" =>
+           heading(3, AshA2ui.Experience.component_label(view, detail.component, detail.name))
+       }
+     ]}
+  end
+
+  # A badge field shows its badge text (the declared or humanized label), not
+  # the raw value.
+  defp detail_value_path(view, detail, field) do
+    if ResolvedView.badge_field?(view.fields[field]),
+      do: "/detail/#{detail.context}/_badge_#{field}",
+      else: "/detail/#{detail.context}/#{field}"
+  end
+
+  defp detail_field_label(view, field) do
+    case view.fields[field] do
+      %{label: label} when is_binary(label) -> label
+      _undeclared -> Label.resolve(view.l10n, nil, field)
+    end
+  end
+
+  # --- reports ---
+
+  # A :report component renders as a Card (`report_<name>`, the root child)
+  # over a Column: a heading, one TextField per param (bound to the reserved
+  # /report/<name>/params/<param> path), a Run Button dispatching the
+  # `"report"` action with the current params, and a result List templated
+  # over /report/<name>/rows — each row a Row of caption-labeled cells, one
+  # per declared field, bound template-relative to the row map's keys.
+  defp report_components(view, report) do
+    base = "report_#{report.name}"
+
+    param_inputs =
+      Enum.map(report.params, fn param ->
+        %{
+          "id" => "#{base}_param_#{param}",
+          "component" => "TextField",
+          "label" => report_field_label(view, param),
+          "value" => %{"@path" => "#{report.path}/params/#{param}"}
+        }
+        |> maybe_put(
+          "placeholder",
+          if(AshA2ui.Experience.admin?(view),
+            do: translate_declared(view.l10n, Keyword.get(report.param_placeholders, param))
+          )
+        )
+      end)
+
+    cells =
+      Enum.flat_map(report.fields, fn field ->
+        cell_base = "#{base}_cell_#{field}"
+
+        [
+          %{
+            "id" => cell_base,
+            "component" => "Row",
+            "children" => ["#{cell_base}_label", "#{cell_base}_value"]
+          },
+          %{
+            "id" => "#{cell_base}_label",
+            "component" => "Text",
+            "text" => report_field_label(view, field),
+            "variant" => "caption"
+          },
+          %{
+            "id" => "#{cell_base}_value",
+            "component" => "Text",
+            "text" => %{"@path" => to_string(field)}
+          }
+        ]
+      end)
+
+    export_section =
+      if report.export do
+        export_components(view, report, "#{base}_export", %{
+          "component" => to_string(report.name),
+          "params" => %{"@path" => "#{report.path}/params"}
+        })
+      else
+        []
+      end
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" =>
+          ["#{base}_heading"] ++
+            Enum.map(report.params, &"#{base}_param_#{&1}") ++
+            ["#{base}_run_button", "#{base}_loading", "#{base}_list"] ++
+            ((report.export && ["#{base}_export_controls"]) || [])
+      },
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" =>
+          heading(3, AshA2ui.Experience.component_label(view, report.component, report.name))
+      },
+      %{
+        "id" => "#{base}_run_button",
+        "component" => "Button",
+        "child" => "#{base}_run_text",
+        "action" =>
+          ash_action(
+            "report",
+            %{
+              "component" => to_string(report.name),
+              "params" => %{"@path" => "#{report.path}/params"}
+            },
+            "#{base}_run_button"
+          )
+      },
+      %{"id" => "#{base}_run_text", "component" => "Text", "text" => t(view, msg("Run"))},
+      # Shown only while the reserved /ui/loading_visible holds its one entry
+      # (AshA2ui.Loading): the rows are on their way, so an empty list is not
+      # "no rows". A renderer may draw the item as a spinner; the stock fallback
+      # is the Row with its text.
+      %{
+        "id" => "#{base}_loading",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_loading_item", "path" => "/ui/loading_visible"}
+      },
+      %{
+        "id" => "#{base}_loading_item",
+        "component" => "Row",
+        "children" => ["#{base}_loading_text"]
+      },
+      %{"id" => "#{base}_loading_text", "component" => "Text", "text" => t(view, msg("Loading"))},
+      %{
+        "id" => "#{base}_list",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_row", "path" => "#{report.path}/rows"}
+      },
+      %{
+        "id" => "#{base}_row",
+        "component" => "Card",
+        "child" => "#{base}_row_content"
+      },
+      %{
+        "id" => "#{base}_row_content",
+        "component" => "Row",
+        "children" => Enum.map(report.fields, &"#{base}_cell_#{&1}")
+      }
+    ] ++ param_inputs ++ cells ++ export_section
+  end
+
+  defp report_field_label(view, field) do
+    case view.fields[field] do
+      %{label: label} when is_binary(label) -> label
+      _undeclared -> Label.resolve(view.l10n, nil, field)
+    end
+  end
+
+  # --- CSV export (see AshA2ui.Export) ---
+
+  # A table's export controls: the section-level Row referenced from the
+  # root children ("export<sfx>_controls"). The action context carries the
+  # source component plus the table conventions (current query state,
+  # active contexts) so the export honors what the user sees.
+  defp table_export_components(_view, %{export: nil}, _sfx), do: []
+
+  defp table_export_components(view, table, sfx) do
+    context =
+      %{"component" => to_string(table.name)}
+      |> put_query_binding(view)
+      |> put_contexts_binding(view)
+
+    export_components(view, table, "export#{sfx}", context)
+  end
+
+  # The shared export chrome of a table or report: an optional CheckBox per
+  # exportable column (bound to the reserved /export/<name>/columns/<field>
+  # paths — the frozen column-selection state) and the Export CSV Button
+  # dispatching the "export" client action. A successful export answers
+  # with the `downloadFile` callRendererFunction (see AshA2ui.Export).
+  defp export_components(view, component, base, context) do
+    export = component.export
+
+    checkboxes =
+      if export.column_select do
+        Enum.map(export.columns, fn column ->
+          %{
+            "id" => "#{base}_column_#{column}",
+            "component" => "CheckBox",
+            "label" => report_field_label(view, column),
+            "value" => %{"@path" => "/export/#{component.name}/columns/#{column}"}
+          }
+        end)
+      else
+        []
+      end
+
+    context =
+      if export.column_select do
+        Map.put(context, "columns", %{"@path" => "/export/#{component.name}/columns"})
+      else
+        context
+      end
+
+    [
+      %{
+        "id" => "#{base}_controls",
+        "component" => "Row",
+        "align" => "center",
+        "children" => Enum.map(checkboxes, & &1["id"]) ++ ["#{base}_button"]
+      },
+      %{
+        "id" => "#{base}_button",
+        "component" => "Button",
+        "child" => "#{base}_button_text",
+        "action" => ash_action("export", context, "#{base}_button")
+      },
+      %{
+        "id" => "#{base}_button_text",
+        "component" => "Text",
+        "text" => t(view, msg("Export CSV"))
+      }
+    ] ++ checkboxes
+  end
+
+  # --- nested forms ---
+
+  # One nested-form section per `nested_form` entity: a heading, the current
+  # rows (a List templated over /form/<argument> — every row map carries the
+  # server-generated "_row" key the remove button's context binds), and the
+  # mode-specific add mechanism. All row mutations round-trip through the
+  # stateless `nested_add` / `nested_remove` actions, whose contexts carry
+  # the current rows via a {"@path": "/form/<argument>"} binding; the server
+  # rewrites the array wholesale.
+  defp nested_form_components(view, nested, options) do
+    base = "nested_#{nested.argument}"
+
+    header = [
+      %{
+        "id" => "#{base}_heading",
+        "component" => "Text",
+        "text" => heading(3, nested.label)
+      }
+    ]
+
+    case nested.mode do
+      :create_inline ->
+        [nested_section(base, ["#{base}_heading", "#{base}_rows", "#{base}_add_button"])] ++
+          header ++
+          nested_rows(view, base, nested, create_inline_row(view, nested, base)) ++
+          nested_add_button(view, base, nested, %{
+            "argument" => to_string(nested.argument),
+            "rows" => %{"@path" => "/form/#{nested.argument}"}
+          })
+
+      :pick_existing ->
+        picker = pick_existing_picker(view, nested, base, options)
+
+        [nested_section(base, ["#{base}_heading", "#{base}_rows" | picker.children])] ++
+          header ++ nested_rows(view, base, nested, pick_existing_row(base)) ++ picker.components
+    end
+  end
+
+  defp nested_section(base, children) do
+    %{"id" => base, "component" => "Column", "children" => children}
+  end
+
+  defp nested_rows(view, base, nested, {row_children, row_components}) do
+    [
+      %{
+        "id" => "#{base}_rows",
+        "component" => "List",
+        "children" => %{"componentId" => "#{base}_row", "path" => "/form/#{nested.argument}"}
+      },
+      %{"id" => "#{base}_row", "component" => "Row", "children" => row_children}
+    ] ++ row_components ++ nested_remove_button(view, base, nested)
+  end
+
+  # create_inline rows: one widget-mapped input per nested field bound to the
+  # template-relative field path (conforming renderers resolve it to the
+  # index-addressed /form/<argument>/<index>/<field> for two-way binding),
+  # plus a per-field error Text bound to the row's "_error_<field>" mirror.
+  defp create_inline_row(view, nested, base) do
+    children =
+      Enum.flat_map(nested.fields, fn field ->
+        ["#{base}_input_#{field}", "#{base}_row_error_#{field}"]
+      end) ++ ["#{base}_remove_button"]
+
+    inputs = Enum.map(nested.fields, &nested_input(view, nested, base, &1))
+
+    errors =
+      Enum.map(nested.fields, fn field ->
+        %{
+          "id" => "#{base}_row_error_#{field}",
+          "component" => "Text",
+          "text" => %{"@path" => "_error_#{field}"},
+          "variant" => "caption"
+        }
+      end)
+
+    {children, inputs ++ errors}
+  end
+
+  defp pick_existing_row(base) do
+    {
+      ["#{base}_row_label", "#{base}_remove_button"],
+      [
+        %{
+          "id" => "#{base}_row_label",
+          "component" => "Text",
+          "text" => %{"@path" => "label"}
+        }
+      ]
+    }
+  end
+
+  # The pick_existing add mechanism: with option_search a search input +
+  # result List whose option Buttons dispatch `nested_add` directly with the
+  # template-relative option "value"; without one a ChoicePicker of the
+  # loaded options (inline, limit-capped — the basic catalog constraint) bound to
+  # /select/<argument>/picked plus an Add button carrying that binding.
+  defp pick_existing_picker(view, %{search_fields: [_ | _]} = nested, base, _options) do
+    name = to_string(nested.argument)
+
+    %{
+      children: ["#{base}_controls", "#{base}_options"],
+      components:
+        [
+          %{
+            "id" => "#{base}_controls",
+            "component" => "Row",
+            "children" => ["#{base}_search_input", "#{base}_search_button"]
+          }
+        ] ++
+          search_controls(view, base, name) ++
+          option_list(base, "/options/#{nested.argument}", %{
+            "name" => "nested_add",
+            "context" => %{
+              "argument" => name,
+              "value" => %{"@path" => "value"},
+              "rows" => %{"@path" => "/form/#{nested.argument}"}
+            }
+          })
+    }
+  end
+
+  defp pick_existing_picker(view, nested, base, options) do
+    picker = %{
+      "id" => "#{base}_picker",
+      "component" => "ChoicePicker",
+      "label" => t(view, msg("Add")),
+      "variant" => "mutuallyExclusive",
+      "value" => %{"@path" => "/select/#{nested.argument}/picked"},
+      "options" => Map.fetch!(options, nested.argument)
+    }
+
+    %{
+      children: ["#{base}_picker", "#{base}_add_button"],
+      components:
+        [picker] ++
+          nested_add_button(view, base, nested, %{
+            "argument" => to_string(nested.argument),
+            "value" => %{"@path" => "/select/#{nested.argument}/picked"},
+            "rows" => %{"@path" => "/form/#{nested.argument}"}
+          })
+    }
+  end
+
+  defp nested_add_button(view, base, _nested, context) do
+    [
+      %{
+        "id" => "#{base}_add_button",
+        "component" => "Button",
+        "child" => "#{base}_add_text",
+        "action" => ash_action("nested_add", context, "#{base}_add_button")
+      },
+      %{"id" => "#{base}_add_text", "component" => "Text", "text" => t(view, msg("Add"))}
+    ]
+  end
+
+  defp nested_remove_button(view, base, nested) do
+    [
+      %{
+        "id" => "#{base}_remove_button",
+        "component" => "Button",
+        "child" => "#{base}_remove_text",
+        "action" =>
+          ash_action(
+            "nested_remove",
+            %{
+              "argument" => to_string(nested.argument),
+              "row" => %{"@path" => "_row"},
+              "rows" => %{"@path" => "/form/#{nested.argument}"}
+            },
+            "#{base}_remove_button"
+          )
+      },
+      %{"id" => "#{base}_remove_text", "component" => "Text", "text" => t(view, msg("Remove"))}
+    ]
+  end
+
+  # Nested inputs widget-map against the *destination* resource's attribute
+  # types (the parent surface's field entities don't apply inside rows).
+  defp nested_input(view, nested, base, field) do
+    binding = %{"@path" => to_string(field)}
+    label = Label.resolve(view.l10n, nil, field)
+    id = "#{base}_input_#{field}"
+    base_props = %{"id" => id, "label" => label, "value" => binding}
+
+    type = attribute_type(nested.destination, field)
+    constraints = attribute_constraints(nested.destination, field)
+
+    case AshA2ui.TypeMapper.widget_for(type || Ash.Type.String, constraints) do
+      :check_box ->
+        Map.put(base_props, "component", "CheckBox")
+
+      :choice_picker ->
+        base_props
+        |> Map.put("component", "ChoicePicker")
+        |> Map.put("variant", "mutuallyExclusive")
+        |> Map.put("options", choice_options(view, nested.destination, field))
+
+      :date_time_input ->
+        base_props
+        |> Map.put("component", "DateTimeInput")
+        |> Map.put("enableDate", true)
+        |> Map.put("enableTime", not date_only?(nested.destination, field))
+
+      _text_field ->
+        text_field = Map.put(base_props, "component", "TextField")
+
+        if numeric?(nested.destination, field) do
+          Map.put(text_field, "variant", "number")
+        else
+          text_field
+        end
+    end
+  end
+
+  defp form_input(view, field_name, options) do
+    field = view.fields[field_name]
+    binding = %{"@path" => "/form/#{field_name}"}
+
+    base = %{"id" => "form_input_#{field_name}", "label" => field.label, "value" => binding}
+
+    case field.widget do
+      :check_box ->
+        Map.put(base, "component", "CheckBox")
+
+      :choice_picker ->
+        base
+        |> Map.put("component", "ChoicePicker")
+        |> Map.put("variant", "mutuallyExclusive")
+        |> Map.put("options", picker_options(view, field_name, options))
+
+      :date_time_input ->
+        base
+        |> Map.put("component", "DateTimeInput")
+        |> Map.put("enableDate", true)
+        |> Map.put("enableTime", not date_only?(view.resource, field_name))
+
+      _text_field ->
+        text_field = Map.put(base, "component", "TextField")
+
+        if numeric?(view.resource, field_name) do
+          Map.put(text_field, "variant", "number")
+        else
+          text_field
+        end
+    end
+  end
+
+  defp form_error(field_name) do
+    %{
+      "id" => "form_error_#{field_name}",
+      "component" => "Text",
+      "text" => %{"@path" => "/errors/#{field_name}"},
+      "variant" => "caption"
+    }
+  end
+
+  # Relationship selects use the loaded option list; enum-constrained
+  # attributes keep their static `one_of` options. The basic-catalog
+  # ChoicePicker only accepts a literal options array (each option's `value`
+  # is a plain string, no data binding), so loaded options are emitted inline
+  # here and mirrored at /options/<field> in the data model.
+  defp picker_options(view, field_name, options) do
+    if Map.has_key?(view.selects, field_name) do
+      Map.fetch!(options, field_name)
+    else
+      choice_options(view, view.resource, field_name)
+    end
+  end
+
+  defp choice_options(view, resource, field_name) do
+    resource
+    |> AshA2ui.TypeMapper.choices(field_name, view.l10n)
+    |> Enum.map(fn {value, label} -> %{"label" => label, "value" => to_string(value)} end)
+  end
+
+  defp numeric?(resource, field_name),
+    do: attribute_type(resource, field_name) in @numeric_types
+
+  defp date_only?(resource, field_name),
+    do: attribute_type(resource, field_name) == Ash.Type.Date
+
+  # Filterable fields may be attributes or (expression-backed) calculations;
+  # both carry a type + constraints for picker options and variants.
+  defp attribute_type(resource, field_name) do
+    case ResourceInfo.attribute(resource, field_name) ||
+           ResourceInfo.calculation(resource, field_name) do
+      %{type: type} -> Ash.Type.get_type(type)
+      nil -> nil
+    end
+  end
+
+  defp attribute_constraints(resource, field_name) do
+    case ResourceInfo.attribute(resource, field_name) ||
+           ResourceInfo.calculation(resource, field_name) do
+      %{constraints: constraints} when is_list(constraints) -> constraints
+      _ -> []
+    end
+  end
+
+  # --- /query state ---
+
+  # The initial data model carries the query state under "query": the single
+  # table's state map, or (multi-table) an object keyed by table component
+  # name covering every query-attached table. Callers that ran the queries
+  # (AshA2ui.Info) pass the real state via `:query_state`; direct encoder
+  # calls fall back to the declared defaults with counts derived from the
+  # records at hand. Omitted entirely when no table declares a query.
+  defp put_query_state(value, view, opts) do
+    query_tables = Enum.filter(view.tables, & &1.query)
+
+    cond do
+      query_tables == [] ->
+        value
+
+      ResolvedView.multi_table?(view) ->
+        states = Keyword.get(opts, :query_state) || %{}
+
+        Map.put(
+          value,
+          "query",
+          Map.new(query_tables, fn table ->
+            rows = value["records"][to_string(table.name)] || []
+
+            {to_string(table.name),
+             Map.get(states, table.name) || default_state(view, table, rows)}
+          end)
+        )
+
+      true ->
+        state =
+          Keyword.get(opts, :query_state) ||
+            default_state(view, hd(query_tables), value["records"])
+
+        Map.put(value, "query", state)
+    end
+  end
+
+  defp default_state(view, table, records) do
+    AshA2ui.QueryRunner.state(
+      table.query,
+      AshA2ui.QueryRunner.default_params(table),
+      length(records),
+      false,
+      view.l10n
+    )
+  end
+
+  # The reserved /prompt state: one empty values map per prompt-enabled row
+  # action, so the Modal inputs always have a bindable path. Omitted
+  # entirely on surfaces without prompts (frozen shape unchanged).
+  defp put_prompt_state(value, view) do
+    prompt_values =
+      for {name, %{prompt_fields: [_ | _] = fields}} <- view.actions, into: %{} do
+        {to_string(name), Map.new(fields, &{to_string(&1), ""})}
+      end
+
+    prompt_selects =
+      for {name, fields} <- view.prompts,
+          composite =
+            Enum.filter(fields, &(searchable_prompt_field?(&1) or scoped_prompt_field?(&1))),
+          composite != [],
+          into: %{} do
+        {to_string(name),
+         Map.new(composite, &{to_string(&1.name), %{"search" => "", "label" => ""}})}
+      end
+
+    # Scoped prompt fields (prompt_options): the row's options and the row
+    # itself, both written by the `prompt` pre-fill; empty until a prompt
+    # opens.
+    prompt_options =
+      for {name, fields} <- view.prompts,
+          scoped = Enum.filter(fields, &scoped_prompt_field?/1),
+          scoped != [],
+          into: %{} do
+        {to_string(name), Map.new(scoped, &{to_string(&1.name), []})}
+      end
+
+    state =
+      %{"values" => prompt_values}
+      |> put_unless_empty("select", prompt_selects)
+      |> put_unless_empty("options", prompt_options)
+      |> put_unless_empty("record", Map.new(prompt_options, fn {name, _fields} -> {name, ""} end))
+
+    if prompt_values == %{}, do: value, else: Map.put(value, "prompt", state)
+  end
+
+  defp put_unless_empty(map, _key, empty) when map_size(empty) == 0, do: map
+  defp put_unless_empty(map, key, value), do: Map.put(map, key, value)
+
+  defp searchable_prompt_field?(%{widget: :select, select: %{search_fields: [_ | _]}}), do: true
+  defp searchable_prompt_field?(_field), do: false
+
+  defp scoped_prompt_field?(%{widget: :select, select: %{scope: %{}}}), do: true
+  defp scoped_prompt_field?(_field), do: false
+
+  # The reserved /ui/wizard state (step 0) — only on surfaces whose form
+  # declares steps (frozen shape unchanged everywhere else).
+  defp put_wizard_state(value, view) do
+    if AshA2ui.Wizard.stepped?(view) do
+      Map.update!(value, "ui", &Map.put(&1, "wizard", AshA2ui.Wizard.state(view, 0)))
+    else
+      value
+    end
+  end
+
+  # --- experience-layer state ---
+
+  # The experience layer's part of the initial data model: the `/ui`
+  # task-mode region (intent / panel / feedback, see AshA2ui.Experience),
+  # per-table empty-state sentinels, and the pagination sentinels on every
+  # query state. Sentinels are re-derived from the rows at hand, so explicit
+  # `:query_state` opts (states carried from the client) are adorned the
+  # same way.
+  defp put_experience_state(value, view) do
+    value
+    |> Map.update!("ui", &Map.merge(&1, Experience.ui_data(view)))
+    |> put_empty_state(view)
+    |> put_pagination_sentinels(view)
+  end
+
+  defp put_empty_state(value, view) do
+    Enum.reduce(view.tables, value, fn table, acc ->
+      sfx = table_suffix(view, table)
+      rows = rows_at(value, view, table)
+
+      acc
+      |> Map.put("_empty_visible#{sfx}", Experience.sentinel(rows == []))
+      |> Map.put("_empty_message#{sfx}", Experience.empty_message(view, table))
+    end)
+  end
+
+  defp put_pagination_sentinels(value, view) do
+    query_tables = Enum.filter(view.tables, & &1.query)
+
+    cond do
+      query_tables == [] ->
+        value
+
+      ResolvedView.multi_table?(view) ->
+        Map.update!(value, "query", fn states ->
+          Map.new(states, &adorned_table_state(&1, value, view, query_tables))
+        end)
+
+      true ->
+        [single] = query_tables
+
+        Map.update!(
+          value,
+          "query",
+          &adorned_query_state(view, &1, value |> rows_at(view, single) |> length())
+        )
+    end
+  end
+
+  # The pagination sentinels plus — when the admin catalog is selected —
+  # the plain boolean pagination props the semantic Pagination component
+  # binds (a no-op under the basic catalog).
+  defp adorned_query_state(view, state, count) do
+    state
+    |> Experience.with_pagination_sentinels(count, view.l10n)
+    |> Experience.with_admin_pagination_booleans(count, view)
+  end
+
+  defp adorned_table_state({name, state}, value, view, query_tables) do
+    table = Enum.find(query_tables, &(to_string(&1.name) == name))
+    count = value |> rows_at(view, table) |> length()
+
+    {name, adorned_query_state(view, state, count)}
+  end
+
+  defp rows_at(value, view, table) do
+    if ResolvedView.multi_table?(view) do
+      value["records"][to_string(table.name)] || []
+    else
+      value["records"] || []
+    end
+  end
+
+  # Matrix tables carry their grid at the reserved /_matrix_<table> path
+  # (see AshA2ui.Matrix); a no-op on surfaces without matrices.
+  defp put_matrix_data(value, view) do
+    view.tables
+    |> Enum.filter(&AshA2ui.Matrix.matrix?/1)
+    |> Enum.reduce(value, fn table, value ->
+      Map.put(
+        value,
+        String.trim_leading(AshA2ui.Matrix.path(table), "/"),
+        matrix_data(view, table, rows_at(value, view, table))
+      )
+    end)
+  end
+
+  @doc false
+  # The grid of a matrix table over its serialized rows, with the field
+  # labels this surface shows (shared with AshA2ui.ActionHandler's refresh).
+  @spec matrix_data(ResolvedView.t(), ResolvedView.table(), [map]) :: map
+  def matrix_data(view, table, rows) do
+    config = table.matrix
+
+    labels =
+      Map.new([config.row_field], fn field ->
+        {field,
+         (view.fields[field] && view.fields[field].label) ||
+           Label.resolve(view.l10n, nil, field)}
+      end)
+
+    AshA2ui.Matrix.data(table, rows, labels, view.l10n)
+  end
+
+  # Board lanes carry their total at the reserved /_lane_total_<lane> path
+  # (see AshA2ui.Board); a no-op on surfaces without boards.
+  # A swimlaned board adds its swimlane-row and stage-column totals (sums of
+  # their cells') and each swimlane's tone at /_swimlane_tone_<swimlane>.
+  defp put_lane_totals(value, view) do
+    lanes = Enum.filter(view.tables, &AshA2ui.Board.lane?/1)
+
+    totals =
+      Map.new(lanes, fn table ->
+        rows = rows_at(value, view, table)
+        state = table.query && get_in(value, ["query", to_string(table.name)])
+        {table.name, AshA2ui.Board.total_text(length(rows), state)}
+      end)
+
+    lane_totals = Map.new(lanes, &{"_lane_total_#{&1.name}", Map.fetch!(totals, &1.name)})
+
+    swimlane_data =
+      for {path, text} <- AshA2ui.Board.aggregate_totals(lanes, totals),
+          into: %{},
+          do: {String.trim_leading(path, "/"), text}
+
+    tones =
+      for table <- lanes,
+          AshA2ui.Board.cell?(table),
+          swimlane = table.section.swimlane,
+          into: %{},
+          do:
+            {String.trim_leading(AshA2ui.Board.swimlane_tone_path(swimlane.name), "/"),
+             swimlane.tone}
+
+    value |> Map.merge(lane_totals) |> Map.merge(swimlane_data) |> Map.merge(tones)
+  end
+
+  # --- record serialization ---
+
+  @doc false
+  # One table row, as both the initial render and every handler refresh
+  # (`AshA2ui.ActionHandler`) emit it — a single implementation, so a
+  # refreshed row can never read differently from the row it replaces
+  # (enum labels, links, badges, visibility and bulk keys alike).
+  # `links` is the table's `AshA2ui.Links.context/4` (nil without linked
+  # fields).
+  @spec serialize_row(ResolvedView.t(), ResolvedView.table() | nil, struct, term) :: map
+  def serialize_row(view, table, record, links), do: serialize_record(view, table, record, links)
+
+  defp serialize_record(view, table, record, links) do
+    field_names =
+      case table do
+        %{component: %{fields: fields}} when is_list(fields) ->
+          fields
+
+        %{resource: resource} ->
+          resource |> ResourceInfo.public_attributes() |> Enum.map(& &1.name)
+
+        nil ->
+          view.fields |> Map.values() |> Enum.reject(& &1.hidden) |> Enum.map(& &1.name)
+      end
+
+    row = field_values(view, record, [:id | field_names] ++ AshA2ui.Matrix.fields(table))
+
+    row
+    |> Map.merge((table && AshA2ui.Conditions.row_visibility(view, table, record)) || %{})
+    |> Map.merge(
+      AshA2ui.RowLayout.badge_data(table && table.component.row_layout, record, view.l10n)
+    )
+    |> Map.merge(
+      AshA2ui.Column.row_data((table && table.component.columns) || [], record, view.l10n)
+    )
+    |> Map.merge(AshA2ui.Links.row_data(links, record, row))
+    |> Map.merge(AshA2ui.Bulk.row_data(table))
+    |> Map.merge(AshA2ui.Calendar.row_data(table, record))
+    |> Map.merge(AshA2ui.Timeline.row_data(table, record))
+    |> Map.merge(primary_action_data(view, table, record))
+  end
+
+  # The row's fields, plus the values of rewritten choices at `_values`
+  # (absent when there are none).
+  defp field_values(view, record, names) do
+    {row, choice_values} =
+      names
+      |> Enum.uniq()
+      |> Enum.reduce({%{}, %{}}, fn name, {row, choice_values} ->
+        key = to_string(name)
+
+        case field_value(view, record, name) do
+          {:choice, value, label} ->
+            {Map.put(row, key, label), Map.put(choice_values, key, value)}
+
+          {:value, value} ->
+            {Map.put(row, key, value), choice_values}
+        end
+      end)
+
+    if choice_values == %{}, do: row, else: Map.put(row, "_values", choice_values)
+  end
+
+  # `source` columns read through the loaded relationship path (nil-safe: a
+  # nil or unloaded relationship serializes to ""); plain fields read the
+  # record key directly. A declared choice comes back as both its value and
+  # its label (`{:choice, value, label}`), anything else as `{:value, value}`.
+  defp field_value(view, record, name) do
+    case view.fields[name] do
+      %{source: [_ | _] = source} ->
+        {:value, record |> walk_source(source) |> source_safe()}
+
+      field ->
+        case AshA2ui.Links.virtual_value(field, record) do
+          {:ok, value} ->
+            {:value, value}
+
+          :not_virtual ->
+            # The record's own resource: a related table's rows are not the surface's.
+            record
+            |> Map.get(name)
+            |> json_safe()
+            |> humanize_choice(view, record.__struct__, name)
+        end
+    end
+  end
+
+  # An enum reaches the wire as its bare atom name, so a grid cell read
+  # `direct_user_and_team` while the form picker for the SAME field, on the same
+  # surface, read "Direct user and team" -- `choice_options/2` has always
+  # labelled these. This is that treatment on the display side: one vocabulary
+  # per field rather than two.
+  #
+  # `Ash.Type.Enum.label/1` first, so an enum that declares its own words keeps
+  # them; humanized underscores otherwise. Only values the field actually
+  # declares are rewritten, so anything unrecognised passes through untouched
+  # rather than being mangled by a guess.
+  #
+  # The cell shows the label, so a client that keys its own words by value (a
+  # translated label, a status detail line) gets the value too: rows carry it
+  # at the reserved `_values/<field>` key, for rewritten fields only.
+  defp humanize_choice(value, view, resource, name) when is_binary(value) do
+    case choice_labels(view, resource, name) do
+      %{^value => label} -> {:choice, value, label}
+      _ -> {:value, value}
+    end
+  end
+
+  defp humanize_choice(value, _view, _resource, _name), do: {:value, value}
+
+  defp choice_labels(view, resource, name) do
+    resource
+    |> AshA2ui.TypeMapper.choices(name, view.l10n)
+    |> Map.new(fn {value, label} -> {to_string(value), label} end)
+  end
+
+  defp walk_source(record, [attribute]), do: Map.get(record, attribute)
+
+  defp walk_source(record, [relationship | rest]) do
+    case Map.get(record, relationship) do
+      %Ash.NotLoaded{} -> nil
+      nil -> nil
+      related -> walk_source(related, rest)
+    end
+  end
+
+  defp source_safe(nil), do: ""
+  defp source_safe(value), do: json_safe(value)
+
+  # A calculation/aggregate that slipped past `loads` must not leak an
+  # inspect()-ed struct onto the wire.
+  defp json_safe(%Ash.NotLoaded{}), do: nil
+  defp json_safe(%Ash.CiString{} = ci), do: to_string(ci)
+  defp json_safe(%Decimal{} = decimal), do: Decimal.to_string(decimal)
+  defp json_safe(%Date{} = date), do: Date.to_iso8601(date)
+  defp json_safe(%DateTime{} = datetime), do: DateTime.to_iso8601(datetime)
+  defp json_safe(%NaiveDateTime{} = naive), do: NaiveDateTime.to_iso8601(naive)
+  defp json_safe(%Time{} = time), do: Time.to_iso8601(time)
+
+  defp json_safe(value) when is_atom(value) and not is_boolean(value) and not is_nil(value),
+    do: to_string(value)
+
+  # A struct whose type has no Jason implementation (a MapSet from a custom
+  # Ash type, a value type a host lib introduced...) and any tuple (an
+  # Ash.Type.Tuple value) cannot reach the JSON wire. Rather than crashing
+  # the transport with a Jason.EncodeError — or silently vanishing — render
+  # a readable placeholder naming the type, so the surface author can pick a
+  # renderable field or add a Jason implementation. (Jason's fallback Any
+  # implementation is exactly the one that raises for unimplemented structs,
+  # so an explicit implementation — derived or hand-written — is honored.)
+  # Nested positions inside maps/lists are not walked: those shapes are the
+  # reserved-path contract.
+  defp json_safe(value) when is_struct(value) do
+    if Jason.Encoder.impl_for(value) == Jason.Encoder.Any do
+      unsupported_type(value)
+    else
+      value
+    end
+  end
+
+  defp json_safe(value) when is_tuple(value), do: unsupported_type(value)
+
+  defp json_safe(value), do: value
+
+  defp unsupported_type(value) when is_struct(value),
+    do: "unsupported type: #{value.__struct__ |> Module.split() |> List.last()}"
+
+  defp unsupported_type(_value), do: "unsupported type: tuple"
+
+  # A library-owned string for the reader, translated with the surface's
+  # translator (see AshA2ui.L10n). Every chrome literal passes through here
+  # exactly once, where it is emitted.
+  defp t(%{l10n: l10n}, msgid, bindings \\ []), do: L10n.t(l10n, msgid, bindings)
+
+  # A declared display string, translated in the metadata domain; `nil`
+  # stays `nil`.
+  defp translate_declared(_l10n, nil), do: nil
+  defp translate_declared(l10n, text), do: Label.translate(l10n, text)
+
+  defp prompt_title(view, action, setting),
+    do:
+      translate_declared(view.l10n, setting.prompt_title) ||
+        ResolvedView.action_label(view, action)
+end

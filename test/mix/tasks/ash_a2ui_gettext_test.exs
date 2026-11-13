@@ -27,7 +27,7 @@ defmodule Mix.Tasks.AshA2ui.GettextTest do
 
       assert Enum.any?(
                elem(messages["Cancel"], 1),
-               &(&1 =~ ~r{^lib/ash_a2ui/encoder/v0_9_1\.ex:\d+$})
+               &(&1 =~ ~r{^lib/ash_a2ui/encoder\.ex:\d+$})
              )
 
       assert Map.has_key?(messages, "%{first}–%{last} of %{total}")

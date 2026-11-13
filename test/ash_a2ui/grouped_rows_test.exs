@@ -13,7 +13,7 @@ defmodule AshA2ui.GroupedRowsTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.Dynamic.Importer
-  alias AshA2ui.Test.{Appointment, Clinic, GroupedVisitsUI, Owner}
+  alias AshA2ui.Test.{Appointment, Clinic, GroupedVisitsUI, Owner, SchemaHelper}
 
   setup do
     on_exit(fn ->
@@ -31,14 +31,18 @@ defmodule AshA2ui.GroupedRowsTest do
     %{owner: owner}
   end
 
+  # The one createSurface, validated against the 1.0 schemas and the
+  # catalogs it uses (basic, or admin with basic and ash_a2ui).
   defp build(catalog, opts \\ []) do
     Application.put_env(:ash_a2ui, :catalog, catalog)
 
-    [_create, components, data] =
+    [%{"createSurface" => surface} = message] =
       AshA2ui.Info.build_surface(GroupedVisitsUI, [authorize?: false] ++ opts)
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
+    catalogs = if catalog == :admin_v1, do: SchemaHelper.admin_catalogs()
+    SchemaHelper.assert_valid_agent_message(message, catalogs: catalogs)
+
+    {Map.new(surface["components"], &{&1["id"], &1}), surface["dataModel"]}
   end
 
   defp selected(owner),
@@ -91,7 +95,7 @@ defmodule AshA2ui.GroupedRowsTest do
     assert ["section_visits_heading", "section_visits_note" | _tables] =
              components["section_visits"]["children"]
 
-    assert components["section_visits_note"]["text"] == %{"path" => "/detail/owner/name"}
+    assert components["section_visits_note"]["text"] == %{"@path" => "/detail/owner/name"}
     assert components["section_visits_note"]["variant"] == "caption"
     assert data["detail"]["owner"]["name"] == "Ada"
   end

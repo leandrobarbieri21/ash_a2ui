@@ -1,20 +1,17 @@
 defmodule AshA2ui.Wizard.WizardEncoderTest do
   @moduledoc """
   A2UI-106/AC-1: a stepped form encodes the /ui/wizard state and the
-  wizard composition on v0.9.1 and v1.0, and forms without steps carry none
-  of it.
+  wizard composition, and forms without steps carry none of it.
   """
 
   use ExUnit.Case, async: false
 
   import AshA2ui.Test.SchemaHelper
 
-  alias AshA2ui.Encoder.V0_9_1
+  alias AshA2ui.Encoder
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Enrollment
-  alias AshA2ui.Test.EnrollmentV1UI
   alias AshA2ui.Test.KitchenSink
-  alias AshA2ui.Test.KitchenSinkV1UI
 
   setup do
     on_exit(fn ->
@@ -24,16 +21,14 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
     :ok
   end
 
-  # Full surfaces of forms without steps, captured from the base branch
-  # (notes/pyro-maniac-borrowings, 08f8173) before wizard steps existed:
-  # v0.9.1 and v1.0, under the basic and admin catalogs. (Re-baselined when
-  # experience v1 and /ui/status were removed: the only change is the
-  # dropped `ui.status` key.)
+  # Full surfaces of forms without steps, under the basic and admin
+  # catalogs. First captured before wizard steps existed (08f8173);
+  # re-baselined when /ui/status was removed and again for the A2UI 1.0
+  # wire, each time with no change to the forms themselves.
   @baseline_dir Path.expand("baseline", __DIR__)
 
   @baseline_fixtures [
     {"kitchen_sink", KitchenSink},
-    {"kitchen_sink_v1", KitchenSinkV1UI},
     {"experience_task", AshA2ui.Test.Experience.Task},
     {"ticket", AshA2ui.Test.Ticket},
     {"ticket_search", AshA2ui.Test.TicketSearchUI}
@@ -44,20 +39,13 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
     {"admin", :admin_v1}
   ]
 
-  defp v0_9_1(module) do
-    [create, components, data] = AshA2ui.Info.build_surface(module)
-    Enum.each([create, components, data], &assert_valid_server_message/1)
+  defp parts(module) do
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}} = create] =
+      AshA2ui.Info.build_surface(module)
 
-    {Map.new(components["updateComponents"]["components"], &{&1["id"], &1}),
-     data["updateDataModel"]["value"]}
-  end
+    assert_valid_agent_message(create)
 
-  defp v1_0(module) do
-    [create] = AshA2ui.Info.build_surface(module)
-    assert_valid_server_message(create, :v1_0)
-    payload = create["createSurface"]
-
-    {Map.new(payload["components"], &{&1["id"], &1}), payload["dataModel"]}
+    {Map.new(components, &{&1["id"], &1}), data}
   end
 
   defp assert_wizard_state(model) do
@@ -114,7 +102,7 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
     # the review step is a read-only summary of /form
     assert "form_review_name" in comps["form_step_confirm"]["children"]
-    assert comps["form_review_team_value"]["text"] == %{"path" => "/form/team"}
+    assert comps["form_review_team_value"]["text"] == %{"@path" => "/form/team"}
 
     refute Enum.any?(
              comps["form_step_confirm"]["children"],
@@ -127,54 +115,56 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
              "form_wizard_next_slot"
            ]
 
-    assert %{"event" => %{"name" => "wizard_back", "context" => back}} =
+    assert %{
+             "functionCall" => %{
+               "@call" => "ashAction",
+               "args" => %{"name" => "wizard_back", "context" => back}
+             }
+           } =
              comps["form_wizard_back_button"]["action"]
 
-    assert back["index"] == %{"path" => "/ui/wizard/index"}
+    assert back["index"] == %{"@path" => "/ui/wizard/index"}
 
-    assert %{"event" => %{"name" => "wizard_next", "context" => next}} =
+    assert %{
+             "functionCall" => %{
+               "@call" => "ashAction",
+               "args" => %{"name" => "wizard_next", "context" => next}
+             }
+           } =
              comps["form_wizard_next_button"]["action"]
 
-    assert next["values"] == %{"path" => "/form"}
-    assert next["index"] == %{"path" => "/ui/wizard/index"}
+    assert next["values"] == %{"@path" => "/form"}
+    assert next["index"] == %{"@path" => "/ui/wizard/index"}
   end
 
   @tag ac: "A2UI-106/AC-1"
-  test "encodes steps for both versions" do
-    {comps, model} = v0_9_1(Enrollment)
+  test "encodes steps" do
+    {comps, model} = parts(Enrollment)
     assert_wizard_state(model)
     assert_wizard_components(comps)
 
-    {comps_v1, model_v1} = v1_0(EnrollmentV1UI)
-    assert_wizard_state(model_v1)
-    assert_wizard_components(comps_v1)
-    assert comps_v1["form_wizard_next_button"]["action"]["event"]["wantResponse"] == true
-
     # The wizard is the panel's form content; the Next label is the panel's
     # primary label and the submit keeps the panel's submit gate.
-    for comps <- [comps, comps_v1] do
-      assert comps["form_fields"]["children"] == ["form_wizard"]
-      assert comps["form_wizard_next_text"]["text"] == %{"path" => "/ui/panel/primary_label"}
-      refute Map.has_key?(comps, "form_wizard_submit_slot")
+    assert comps["form_fields"]["children"] == ["form_wizard"]
+    assert comps["form_wizard_next_text"]["text"] == %{"@path" => "/ui/panel/primary_label"}
+    refute Map.has_key?(comps, "form_wizard_submit_slot")
 
-      assert comps["form_submit_slot"]["children"] == %{
-               "componentId" => "form_submit_button",
-               "path" => "/ui/panel/submit_visible"
-             }
-    end
+    assert comps["form_submit_slot"]["children"] == %{
+             "componentId" => "form_submit_button",
+             "path" => "/ui/panel/submit_visible"
+           }
   end
 
   @tag ac: "A2UI-106/AC-1"
   test "forms without steps carry no wizard state or components" do
-    for {comps, model} <- [v0_9_1(KitchenSink), v1_0(KitchenSinkV1UI)] do
-      refute Map.has_key?(model["ui"], "wizard")
+    {comps, model} = parts(KitchenSink)
+    refute Map.has_key?(model["ui"], "wizard")
 
-      refute Enum.any?(Map.keys(comps), fn id ->
-               String.starts_with?(id, "form_wizard") or String.starts_with?(id, "form_step_")
-             end)
+    refute Enum.any?(Map.keys(comps), fn id ->
+             String.starts_with?(id, "form_wizard") or String.starts_with?(id, "form_step_")
+           end)
 
-      assert List.first(comps["form_fields"]["children"]) == "form_input_active"
-    end
+    assert List.first(comps["form_fields"]["children"]) == "form_input_active"
   end
 
   @tag ac: "A2UI-106/AC-1"
@@ -186,14 +176,16 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
         Enum.map(components, &%{&1 | steps: []})
       end)
 
-    [_create, components, data] = V0_9_1.encode_surface(plain, [], [])
-    ids = Enum.map(components["updateComponents"]["components"], & &1["id"])
+    [%{"createSurface" => %{"components" => components, "dataModel" => data}}] =
+      Encoder.encode_surface(plain, [], [])
+
+    ids = Enum.map(components, & &1["id"])
 
     refute Enum.any?(ids, &String.starts_with?(&1, "form_wizard"))
-    refute Map.has_key?(data["updateDataModel"]["value"]["ui"], "wizard")
+    refute Map.has_key?(data["ui"], "wizard")
 
     fields =
-      Enum.find(components["updateComponents"]["components"], &(&1["id"] == "form_fields"))
+      Enum.find(components, &(&1["id"] == "form_fields"))
 
     assert fields["children"] == [
              "form_input_name",
@@ -216,6 +208,10 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
       path = Path.join(@baseline_dir, "#{fixture}.#{config}.json")
       encoded = module |> AshA2ui.Info.build_surface() |> Jason.encode!() |> Jason.decode!()
 
+      # Re-record on purpose with RECORD_WIZARD_BASELINE=1.
+      if System.get_env("RECORD_WIZARD_BASELINE"),
+        do: File.write!(path, Jason.encode!(encoded, pretty: true))
+
       assert encoded == path |> File.read!() |> Jason.decode!(),
              "#{fixture} (#{config}) no longer matches #{Path.relative_to_cwd(path)}"
     end
@@ -223,13 +219,13 @@ defmodule AshA2ui.Wizard.WizardEncoderTest do
 
   @tag ac: "A2UI-106/AC-1"
   test "the review step shows a searchable select's label, not its id" do
-    {comps, model} = v0_9_1(AshA2ui.Test.TicketWizardUI)
+    {comps, model} = parts(AshA2ui.Test.TicketWizardUI)
 
     assert comps["form_review_author_id_value"]["text"] == %{
-             "path" => "/select/author_id/label"
+             "@path" => "/select/author_id/label"
            }
 
-    assert comps["form_review_subject_value"]["text"] == %{"path" => "/form/subject"}
+    assert comps["form_review_subject_value"]["text"] == %{"@path" => "/form/subject"}
     assert model["select"]["author_id"] == %{"search" => "", "label" => ""}
   end
 end

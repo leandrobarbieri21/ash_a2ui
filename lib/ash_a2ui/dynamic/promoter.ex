@@ -189,13 +189,11 @@ defmodule AshA2ui.Dynamic.Promoter do
   @spec generate(map, module, module, %{String.t() => module}, keyword) :: String.t()
   def generate(spec, module, resource, allowlist, opts) do
     surface_id = Keyword.get_lazy(opts, :surface_id, fn -> default_surface_id(module) end)
-    spec_version = Keyword.get(opts, :spec_version, "0.9.1")
 
     body =
       [
         "for_resource #{inspect(resource)}",
         ~s(surface_id "#{surface_id}"),
-        spec_version != "0.9.1" && ~s(spec_version "#{spec_version}"),
         Enum.map(Map.get(spec, "contexts", []), &context_block(&1, allowlist)),
         Enum.map(Map.get(spec, "queries", []), &query_block/1),
         Enum.map(Map.get(spec, "components", []), &component_block(&1, allowlist)),

@@ -29,3 +29,6 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 ash_a2ui-*.tar
 
+
+# The @a2ui runtime the node tests drive (npm ci --prefix test/js).
+/test/js/node_modules/

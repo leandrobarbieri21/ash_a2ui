@@ -18,6 +18,7 @@ defmodule AshA2ui.Calendar.CalendarPresetTest do
   alias AshA2ui.Preset
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Calendar.{Event, PresetUI}
+  alias AshA2ui.Test.Messages
 
   @config %{
     date_field: :starts_on,
@@ -82,16 +83,7 @@ defmodule AshA2ui.Calendar.CalendarPresetTest do
   end
 
   defp envelope(context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "surfaceId" => "calendar_presets",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => Map.put(context, "component", "schedule")
-      }
-    }
+    Messages.call("query", "calendar_presets", Map.put(context, "component", "schedule"))
   end
 
   defp query(state, extra \\ %{}) do
@@ -100,12 +92,13 @@ defmodule AshA2ui.Calendar.CalendarPresetTest do
     assert {:ok, messages} =
              ActionHandler.handle(PresetUI, envelope(context), actor: nil, authorize?: false)
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
     messages
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)

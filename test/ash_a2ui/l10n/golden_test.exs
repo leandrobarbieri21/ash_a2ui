@@ -1,10 +1,10 @@
 defmodule AshA2ui.L10n.GoldenTest do
   @moduledoc """
   Protocol goldens for localization (ADR 0060): the initial build, a
-  refresh, option lists and action feedback, on v0.9.1 and v1.0, with the
-  basic and the admin catalog. The payloads were captured on the base the
-  localization work started from (e6af377), so without a translator the
-  output stays byte-identical to it.
+  refresh, option lists and action feedback, with the basic and the admin
+  catalog. The payloads were first captured on the base the localization
+  work started from (e6af377) and re-recorded for the A2UI 1.0 wire; without
+  a translator the output stays byte-identical to them.
 
   Re-record (only on purpose) with
   `RECORD_L10N_GOLDEN=1 mix test test/ash_a2ui/l10n/golden_test.exs`.

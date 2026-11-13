@@ -8,21 +8,16 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
   use ExUnit.Case, async: false
 
+  import AshA2ui.Test.SchemaHelper
+
   alias AshA2ui.ActionHandler
+  alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.Protected
   alias AshA2ui.Test.Experience.Task
+  alias AshA2ui.Test.Messages
 
   defp envelope(name, context \\ %{}) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => name,
-        "surfaceId" => "experience_task",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => context
-      }
-    }
+    Messages.call(name, "experience_task", context, id: "call-1")
   end
 
   defp by_path(messages) do
@@ -76,10 +71,10 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
 
       values = by_path(messages)
 
-      assert values["/ui/feedback"] == %{
-               "kind" => "success",
-               "message" => "Created successfully."
-             }
+      assert values["/ui/feedback"] ==
+               Experience.feedback("success", "Created successfully.", %{
+                 "functionCallId" => "call-1"
+               })
 
       assert values["/ui/intent"] == "browse"
       assert values["/ui/panel"]["visible"] == []
@@ -105,10 +100,10 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
       values = by_path(messages)
 
       # typed success on the path the status Text binds...
-      assert values["/ui/feedback"] == %{
-               "kind" => "success",
-               "message" => "Destroy completed."
-             }
+      assert values["/ui/feedback"] ==
+               Experience.feedback("success", "Destroy completed.", %{
+                 "functionCallId" => "call-1"
+               })
 
       # ...with the classic status text still flowing alongside (the
       # programmatic contract, unchanged)...
@@ -176,9 +171,6 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
       %{"updateDataModel" => %{"path" => "/ui/feedback", "value" => %{"message" => value}}} ->
         value =~ "not authorized"
 
-      %{"updateDataModel" => %{"path" => "/ui/response", "value" => %{"message" => value}}} ->
-        value =~ "not authorized"
-
       _other ->
         false
     end)
@@ -210,55 +202,41 @@ defmodule AshA2ui.Experience.FeedbackAndValidationTest do
       refute Map.has_key?(values, "/ui/panel")
     end
 
-    test "a malformed envelope and an unknown action" do
-      assert {:error, messages} = ActionHandler.handle(Task, %{"bogus" => true})
-      assert_error_feedback(messages, "Malformed action message")
+    test "a malformed message is refused; an unknown action reaches the feedback" do
+      assert {:error, []} = ActionHandler.handle(Task, %{"bogus" => true})
 
       assert {:error, messages} = ActionHandler.handle(Task, envelope("explode"))
       assert_error_feedback(messages, ~s(Unknown action "explode"))
     end
 
     test "a query allowlist rejection" do
-      envelope = %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => "query",
-          "context" => %{"query" => %{"sort" => %{"field" => "category", "dir" => "asc"}}}
-        }
-      }
+      envelope =
+        Messages.call("query", "test_surface", %{
+          "query" => %{"sort" => %{"field" => "category", "dir" => "asc"}}
+        })
 
       assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.Paginated, envelope)
       values = assert_error_feedback(messages, "category")
       refute Map.has_key?(values, "/records")
     end
 
-    test "on v1.0 the rejection keeps the /ui/response contract and mirrors into /ui/feedback" do
-      envelope = %{
-        "version" => "v1.0",
-        "action" => %{
-          "name" => "explode",
-          "surfaceId" => "kitchen_sink_v1",
-          "sourceComponentId" => "test_component",
-          "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-          "actionId" => "a-1",
-          "wantResponse" => true,
-          "context" => %{}
-        }
-      }
+    test "a rejected ashAction call is answered with the feedback's code and message" do
+      call = Messages.call("explode", "kitchen_sink_v1", %{}, id: "a-1")
 
-      assert {:error, [response | messages]} =
-               ActionHandler.handle(AshA2ui.Test.KitchenSinkV1UI, envelope)
+      assert {:error, messages} = ActionHandler.handle(AshA2ui.Test.KitchenSinkV1UI, call)
+      assert_valid_agent_messages(messages)
 
-      assert response["actionResponse"]["error"]["code"] == "INVALID_ACTION"
+      feedback = by_path(messages)["/ui/feedback"]
 
-      values = by_path(messages)
-      assert values["/ui/response"]["status"] == "error"
-      assert values["/ui/response"]["message"] =~ "Unknown action"
+      assert %{"kind" => "error", "code" => "UNKNOWN_ACTION", "functionCallId" => "a-1"} =
+               feedback
 
-      assert values["/ui/feedback"] == %{
-               "kind" => "error",
-               "message" => values["/ui/response"]["message"]
-             }
+      assert feedback["message"] =~ "Unknown action"
+
+      assert %{"agentFunctionResponse" => %{"functionCallId" => "a-1", "error" => error}} =
+               List.last(messages)
+
+      assert error == %{"code" => "UNKNOWN_ACTION", "message" => feedback["message"]}
     end
   end
 end

@@ -415,8 +415,8 @@ defmodule AshA2ui.QueryRunner do
   search/filters/pagination — total counts and `hasMore` respect it.
 
   The first argument is anything carrying the queried-read shape —
-  `AshA2ui.ResolvedView.t/0` itself, or one resolved table of a
-  multi-table view (`AshA2ui.ResolvedView.table/0`).
+  an `AshA2ui.ResolvedView` itself, or one resolved table of a
+  multi-table view (`t:AshA2ui.ResolvedView.table/0`).
   """
   @spec run(
           ResolvedView.t() | ResolvedView.table(),
@@ -673,7 +673,7 @@ defmodule AshA2ui.QueryRunner do
   table without a query), which reads through the table's read action.
 
   `run/4` builds on it, and so does the authorized re-read of a bulk
-  selection (`AshA2ui.Bulk.read_selected/5`), so a selection is re-read
+  selection (`AshA2ui.Bulk.read_selected/6`), so a selection is re-read
   through the same action and preset predicate as the page it came from.
   """
   @spec preset_read(ResolvedView.t() | ResolvedView.table(), params | nil, keyword) ::

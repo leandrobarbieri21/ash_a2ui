@@ -38,7 +38,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
                  "records" => rows(tasks, tasks)
                })
 
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert value_at(messages, "/ui/feedback")["message"] ==
                "Action #{inspect(action)} is not allowed: it is not listed in the view's " <>
@@ -73,7 +73,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
                "contexts" => contexts(project)
              })
 
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     # only the id the authorized, scoped re-read returned was written
     assert reload!(allowed).status == :rejected
@@ -116,7 +116,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
              ~r/^Too many records selected \(6\)/
 
     for messages <- [empty_messages, oversized_messages] do
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
       refute Enum.any?(paths(messages), &String.starts_with?(&1, "/records"))
       refute Enum.any?(paths(messages), &String.starts_with?(&1, "/bulk"))
     end
@@ -142,7 +142,7 @@ defmodule AshA2ui.Bulk.BulkSecurityTest do
       # the archived rows the table shows are written and the active one,
       # which that view never showed, is refused
       assert {:ok, messages} = preset_invoke("reject", rows(selection, selection), nil)
-      Enum.each(messages, &assert_valid_server_message/1)
+      Enum.each(messages, &assert_valid_agent_message/1)
 
       assert statuses(archived) == [:rejected, :rejected]
       assert statuses([active]) == [:open]

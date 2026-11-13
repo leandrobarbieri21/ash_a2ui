@@ -18,6 +18,8 @@ defmodule AshA2ui.Calendar.CalendarGranularityTest do
   alias AshA2ui.Dynamic.Importer
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.Calendar.{Event, MonthUI, SwitchUI}
+  alias AshA2ui.Test.Messages
+  alias AshA2ui.Test.SchemaHelper
 
   setup do
     on_exit(fn -> Application.delete_env(:ash_a2ui, :catalog) end)
@@ -82,20 +84,12 @@ defmodule AshA2ui.Calendar.CalendarGranularityTest do
   end
 
   defp envelope(context) do
-    %{
-      "version" => "v0.9.1",
-      "action" => %{
-        "name" => "query",
-        "surfaceId" => "calendar_switch",
-        "sourceComponentId" => "test_component",
-        "timestamp" => DateTime.to_iso8601(DateTime.utc_now()),
-        "context" => Map.put(context, "component", "schedule")
-      }
-    }
+    Messages.call("query", "calendar_switch", Map.put(context, "component", "schedule"))
   end
 
   defp value_at(messages, path) do
     Enum.find_value(messages, fn
+      %{"createSurface" => %{"dataModel" => value}} when path == "/" -> value
       %{"updateDataModel" => %{"path" => ^path, "value" => value}} -> value
       _other -> nil
     end)
@@ -126,7 +120,7 @@ defmodule AshA2ui.Calendar.CalendarGranularityTest do
                authorize?: false
              )
 
-    Enum.each(week, &assert_valid_server_message/1)
+    Enum.each(week, &assert_valid_agent_message/1)
     window = value_at(week, "/query")["window"]
 
     assert {window["granularity"], window["from"], window["to"]} ==
@@ -174,15 +168,19 @@ defmodule AshA2ui.Calendar.CalendarGranularityTest do
     by_id = SwitchUI |> AshA2ui.Info.build_surface(authorize?: false) |> components_by_id()
 
     assert Enum.take(by_id["calendar_nav"]["children"], -3) ==
-             ~w(calendar_month_button calendar_week_button calendar_day_button)
+             ~w(calendar_granularity_month_button calendar_granularity_week_button
+                calendar_granularity_day_button)
 
-    assert by_id["calendar_week_button"]["action"]["event"]["context"]["granularity"] == "week"
-    assert by_id["calendar_week_text"]["text"] == "Week"
+    assert by_id["calendar_granularity_week_button"]["action"]["functionCall"]["args"]["context"][
+             "granularity"
+           ] == "week"
+
+    assert by_id["calendar_granularity_week_text"]["text"] == "Week"
 
     # A calendar without a switch has no size Buttons.
     plain = MonthUI |> AshA2ui.Info.build_surface(authorize?: false) |> components_by_id()
     assert Map.has_key?(plain, "calendar_nav")
-    refute Map.has_key?(plain, "calendar_month_button")
+    refute Map.has_key?(plain, "calendar_granularity_month_button")
 
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
     admin = SwitchUI |> AshA2ui.Info.build_surface(authorize?: false) |> components_by_id()
@@ -194,12 +192,8 @@ defmodule AshA2ui.Calendar.CalendarGranularityTest do
 
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    schema =
-      catalog["components"]["calendarView"]
-      |> Map.put("$defs", catalog["$defs"] || %{})
-      |> ExJsonSchema.Schema.resolve()
-
-    assert ExJsonSchema.Validator.validate(schema, view) == :ok
+    assert SchemaHelper.validate_catalog_component(catalog, "calendarView", view) ==
+             :ok
   end
 
   test "composed surfaces carry granularities both ways" do

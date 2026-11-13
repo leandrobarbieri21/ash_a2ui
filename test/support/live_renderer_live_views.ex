@@ -7,96 +7,93 @@
 if Code.ensure_loaded?(Phoenix.LiveView) do
   defmodule AshA2ui.Test.LiveRendererFixtures do
     @moduledoc """
-    Hand-written, schema-valid A2UI v0.9.1 message fixtures plus a tiny
+    Hand-written, schema-valid A2UI 1.0 message fixtures plus a tiny
     listener mailbox so the stub `surface_fn`/`data_model_fn`/`action_fn`
     injected into the test LiveViews can report their calls back to the
     test process (registered via the `:live_renderer_test_listener` app env).
     """
 
-    @catalog_id "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
+    alias AshA2ui.Experience
+    alias AshA2ui.Test.Messages
+
+    @catalog_id "https://a2ui.org/specification/v1_0/catalogs/basic/catalog.json"
     @surface_id "minimal_standalone"
 
     def surface_id, do: @surface_id
 
     def create_surface do
       %{
-        "version" => "v0.9.1",
-        "createSurface" => %{"surfaceId" => @surface_id, "catalogId" => @catalog_id}
-      }
-    end
-
-    def update_components do
-      %{
-        "version" => "v0.9.1",
-        "updateComponents" => %{
+        "version" => "1.0",
+        "createSurface" => %{
           "surfaceId" => @surface_id,
+          "catalogId" => @catalog_id,
           "components" => [
             %{"id" => "root", "component" => "Column", "children" => ["title"]},
             %{"id" => "title", "component" => "Text", "text" => "Providers"}
-          ]
+          ],
+          "dataModel" => %{"records" => [%{"id" => "1", "name" => "Acme"}]}
         }
       }
     end
 
-    def update_data_model do
-      %{
-        "version" => "v0.9.1",
-        "updateDataModel" => %{
-          "surfaceId" => @surface_id,
-          "path" => "/records",
-          "value" => [%{"id" => "1", "name" => "Acme"}]
-        }
-      }
-    end
+    def update_data_model, do: write("/records", [%{"id" => "1", "name" => "Acme"}])
 
-    def surface_messages, do: [create_surface(), update_components(), update_data_model()]
+    def surface_messages, do: [create_surface()]
 
-    def action_ok_messages do
-      [
-        update_data_model(),
-        %{
-          "version" => "v0.9.1",
-          "updateDataModel" => %{
-            "surfaceId" => @surface_id,
-            "path" => "/ui/feedback",
-            "value" => %{"kind" => "success", "message" => "saved"}
-          }
-        }
-      ]
-    end
+    def action_ok_messages,
+      do: [update_data_model(), write("/ui/feedback", Experience.feedback("success", "saved"))]
 
     def action_error_messages do
       [
-        %{
-          "version" => "v0.9.1",
-          "updateDataModel" => %{
-            "surfaceId" => @surface_id,
-            "path" => "/errors/name",
-            "value" => "has already been taken"
-          }
-        },
-        %{
-          "version" => "v0.9.1",
-          "updateDataModel" => %{
-            "surfaceId" => @surface_id,
-            "path" => "/ui/feedback",
-            "value" => %{"kind" => "error", "message" => "error"}
-          }
-        }
+        write("/errors/name", "has already been taken"),
+        write(
+          "/ui/feedback",
+          Experience.feedback("error", "error", %{"code" => "VALIDATION_FAILED"})
+        )
       ]
     end
 
-    def action_envelope(name \\ "submit_form", context \\ %{"form" => %{"name" => "Acme"}}) do
+    # The export's downloadFile call, as AshA2ui.ActionHandler pushes it.
+    def download_call(call_id) do
       %{
-        "version" => "v0.9.1",
-        "action" => %{
-          "name" => name,
+        "version" => "1.0",
+        "callRendererFunction" => %{
           "surfaceId" => @surface_id,
-          "sourceComponentId" => "form_submit",
-          "timestamp" => "2026-07-10T12:00:00Z",
-          "context" => context
+          "functionCallId" => call_id,
+          "callFunction" => %{
+            "@call" => "downloadFile",
+            "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+            "args" => %{"filename" => "rows.csv", "dataUrl" => "data:text/csv;base64,YQ=="}
+          }
         }
       }
+    end
+
+    def function_response(call_id, outcome \\ {:ok, nil})
+
+    def function_response(call_id, {:ok, value}),
+      do: %{
+        "version" => "1.0",
+        "rendererFunctionResponse" => %{"functionCallId" => call_id, "value" => value}
+      }
+
+    def function_response(call_id, {:error, code}),
+      do: %{
+        "version" => "1.0",
+        "rendererFunctionResponse" => %{
+          "functionCallId" => call_id,
+          "error" => %{"code" => code, "message" => "could not save"}
+        }
+      }
+
+    def write(path, value),
+      do: %{
+        "version" => "1.0",
+        "updateDataModel" => %{"surfaceId" => @surface_id, "path" => path, "value" => value}
+      }
+
+    def action_envelope(name \\ "submit_form", context \\ %{"form" => %{"name" => "Acme"}}) do
+      Messages.call(name, @surface_id, context, source: "form_submit")
     end
 
     def notify(message) do
@@ -135,12 +132,34 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Fixtures.notify({:action_fn, ui, envelope, opts})
 
       case envelope do
-        %{"action" => %{"context" => %{"fail" => true}}} ->
+        %{
+          "callAgentFunction" => %{
+            "callFunction" => %{"args" => %{"context" => %{"fail" => true}}}
+          }
+        } ->
           {:error, Fixtures.action_error_messages()}
 
-        _ ->
+        %{
+          "callAgentFunction" => %{
+            "callFunction" => %{"args" => %{"context" => %{"export" => call_id}}}
+          }
+        } ->
+          {:ok, [Fixtures.download_call(call_id)]}
+
+        %{"callAgentFunction" => _call} ->
           {:ok, Fixtures.action_ok_messages()}
+
+        # Function responses, errors and malformed messages: the real
+        # handler validates them.
+        _other ->
+          AshA2ui.ActionHandler.handle(ui, envelope, opts)
       end
+    end
+
+    # The `on_function_response:` callback: reports the settled call.
+    def function_response(response, function_name, socket) do
+      Fixtures.notify({:on_function_response, function_name, response})
+      socket
     end
 
     # `:surfaces` stubs: the fixture messages addressed to the UI's own
@@ -189,12 +208,14 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # selected person id from the envelope (deep-link push_patch tests).
     def notes_context_action(ui, envelope, opts) do
       Fixtures.notify({:action_fn, ui, envelope, opts})
-      value = get_in(envelope, ["action", "context", "value"]) || ""
+
+      value =
+        get_in(envelope, ["callAgentFunction", "callFunction", "args", "context", "value"]) || ""
 
       {:ok,
        [
          %{
-           "version" => "v0.9.1",
+           "version" => "1.0",
            "updateDataModel" => %{
              "surfaceId" => "notes",
              "path" => "/context",
@@ -215,7 +236,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       {:ok,
        [
          %{
-           "version" => "v0.9.1",
+           "version" => "1.0",
            "updateDataModel" => %{
              "surfaceId" => Fixtures.surface_id(),
              "path" => "/context",
@@ -238,6 +259,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       surface_fn: &Stubs.surface/2,
       data_model_fn: &Stubs.data_model/2,
       action_fn: &Stubs.action/3
+  end
+
+  defmodule AshA2ui.Test.FunctionCallLive do
+    @moduledoc false
+
+    # Renderer function calls: the stub answers an action whose context
+    # carries "export" with a downloadFile callRendererFunction, and the
+    # LiveView settles the rendererFunctionResponse that answers it.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.MinimalUI,
+      surface_fn: &Stubs.surface/2,
+      action_fn: &Stubs.action/3,
+      on_function_response: &Stubs.function_response/3
   end
 
   defmodule AshA2ui.Test.PubsubStubLive do
@@ -266,7 +302,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     # Real defaults against the query-enabled fixture, proving the "query"
     # action needs no LiveRenderer changes: it flows through the same
-    # "a2ui:action" event into AshA2ui.ActionHandler.handle/3.
+    # "a2ui:message" event into AshA2ui.ActionHandler.handle/3.
     use AshA2ui.LiveRenderer, ui: AshA2ui.Test.Paginated
   end
 

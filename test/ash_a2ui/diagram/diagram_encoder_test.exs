@@ -1,7 +1,7 @@
 defmodule AshA2ui.Diagram.DiagramEncoderTest do
   @moduledoc """
   Live-diagram payloads (A2UI-108): the basic fallback (a List of nodes with
-  their markers) on v0.9.1 and v1.0, schema-validated and basic-catalog
+  their markers), schema-validated and basic-catalog
   only; the `/diagram/<name>` state with markers keyed by node id and
   server-resolved links; the admin `liveDiagram`; and refreshes that move
   markers, as the actor.
@@ -12,6 +12,8 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
   import AshA2ui.Test.SchemaHelper
 
   alias AshA2ui.Test.Diagram.{Flow, FlowUI, FlowV1UI, MalformedUI, Visit}
+  alias AshA2ui.Test.SchemaHelper
+  alias AshA2ui.Test.Surface
 
   setup do
     on_exit(fn ->
@@ -33,13 +35,14 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
 
   defp parts(ui, opts) do
     messages = AshA2ui.Info.build_surface(ui, [authorize?: false] ++ opts)
-    Enum.each(messages, &assert_valid_server_message/1)
+    Enum.each(messages, &assert_valid_agent_message/1)
 
     components =
-      messages |> Enum.find_value(& &1["updateComponents"]) |> Map.fetch!("components")
+      Surface.components(messages)
 
     value =
       Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => value}} -> value
         %{"updateDataModel" => %{"path" => "/", "value" => value}} -> value
         _other -> nil
       end)
@@ -50,14 +53,14 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
   defp labels(markers), do: Enum.map(markers, & &1["label"])
 
   @tag ac: "A2UI-108/AC-3"
-  test "encodes the basic fallback for both versions" do
+  test "encodes the basic fallback" do
     ada = visit!("Ada Lovelace", "triage", :waiting)
     visit!("Alan Turing", "triage", :active)
     visit!("Grace Hopper", "exam", :executing)
 
     Application.put_env(:ash_a2ui, :open_surface_url, "/s/{surface}/{recordId}")
 
-    # --- v0.9.1 ---
+    # --- a module source ---
     {components, value} = parts(FlowUI, [])
 
     # Diagrams sit after the context pickers, before the tables.
@@ -77,7 +80,7 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
              "diagram_flow_nodes"
            ]
 
-    assert components["diagram_flow_heading"]["text"] == "Visits in flight"
+    assert components["diagram_flow_heading"]["text"] == "## Visits in flight"
 
     assert components["diagram_flow_nodes"]["children"] == %{
              "componentId" => "diagram_flow_node",
@@ -132,9 +135,9 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
 
     assert hd(diagram["markers"]["exam"])["tone"] == "accent"
 
-    # --- v1.0 (an MFA source, and a source that fails) ---
+    # --- an MFA source, and a source that fails ---
     assert [message] = AshA2ui.Info.build_surface(FlowV1UI, authorize?: false)
-    assert_valid_server_message(message, :v1_0)
+    assert_valid_agent_message(message)
 
     create = message["createSurface"]
     v1 = components_by_id(create["components"])
@@ -162,7 +165,7 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
     {components, _value} = parts(FlowUI, link_buttons: true)
 
     basic =
-      "priv/a2ui/v0_9_1/catalogs/basic/catalog.json"
+      "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json"
       |> File.read!()
       |> Jason.decode!()
       |> Map.fetch!("components")
@@ -184,12 +187,17 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
              "variant" => "borderless",
              "child" => "diagram_flow_marker_label",
              "action" => %{
-               "event" => %{
-                 "name" => "open_surface",
-                 "context" => %{
-                   "diagram" => "flow",
-                   "surface" => %{"path" => "link/surface"},
-                   "recordId" => %{"path" => "link/recordId"}
+               "functionCall" => %{
+                 "@call" => "ashAction",
+                 "catalogId" => AshA2ui.Encoder.ash_catalog_id(),
+                 "args" => %{
+                   "sourceComponentId" => "diagram_flow_marker_label_link",
+                   "name" => "open_surface",
+                   "context" => %{
+                     "diagram" => "flow",
+                     "surface" => %{"@path" => "link/surface"},
+                     "recordId" => %{"@path" => "link/recordId"}
+                   }
                  }
                }
              }
@@ -205,8 +213,7 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
 
     by_id =
       messages
-      |> Enum.find_value(& &1["updateComponents"])
-      |> Map.fetch!("components")
+      |> Surface.components()
       |> components_by_id()
 
     assert by_id["root"]["component"] == "entityPage"
@@ -218,9 +225,9 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
              "label" => "Visits in flight",
              "description" => "Where every visit is right now.",
              "source" => Flow.source(),
-             "markers" => %{"path" => "/diagram/flow/markers"},
-             "nodes" => %{"path" => "/diagram/flow/nodes"},
-             "error" => %{"path" => "/diagram/flow/error"}
+             "markers" => %{"@path" => "/diagram/flow/markers"},
+             "nodes" => %{"@path" => "/diagram/flow/nodes"},
+             "error" => %{"@path" => "/diagram/flow/error"}
            }
 
     # No basic fallback components under the admin catalog.
@@ -228,12 +235,12 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
 
     catalog = "priv/a2ui/admin_v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    schema =
-      catalog["components"]["liveDiagram"]
-      |> Map.put("$defs", catalog["$defs"] || %{})
-      |> ExJsonSchema.Schema.resolve()
-
-    assert ExJsonSchema.Validator.validate(schema, by_id["diagram_flow"]) == :ok
+    assert SchemaHelper.validate_catalog_component(
+             catalog,
+             "liveDiagram",
+             by_id["diagram_flow"]
+           ) ==
+             :ok
   end
 
   @tag ac: "A2UI-108/AC-5"
@@ -253,14 +260,14 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
     # ...and a full data-model refresh (what a PubSub-driven LiveRenderer
     # refresh pushes) carries the moved marker.
     refresh = AshA2ui.Info.build_data_model(FlowUI, actor: red, authorize?: false)
-    assert_valid_server_message(refresh)
+    assert_valid_agent_message(refresh)
     markers = refresh["updateDataModel"]["value"]["diagram"]["flow"]["markers"]
     assert Map.keys(markers) == ["exam"]
     assert hd(markers["exam"])["status"] == "executing"
 
     # refresh_messages/2 writes just /diagram/<name>.
     assert [message] = AshA2ui.Diagram.refresh_messages(FlowUI, actor: red)
-    assert_valid_server_message(message)
+    assert_valid_agent_message(message)
     assert message["updateDataModel"]["path"] == "/diagram/flow"
     assert labels(message["updateDataModel"]["value"]["markers"]["exam"]) == ["Ada Lovelace"]
 
@@ -268,10 +275,10 @@ defmodule AshA2ui.Diagram.DiagramEncoderTest do
     assert [blue_message] = AshA2ui.Diagram.refresh_messages(FlowUI, actor: blue)
     assert labels(blue_message["updateDataModel"]["value"]["markers"]["exam"]) == ["Bea Blue"]
 
-    # v1.0 surfaces get v1.0 writes.
+    # The MFA-sourced surface refreshes as its own 1.0 writes.
     assert [v1_flow, v1_offline] = AshA2ui.Diagram.refresh_messages(FlowV1UI, actor: red)
-    assert_valid_server_message(v1_flow, :v1_0)
-    assert v1_flow["version"] == "v1.0"
+    assert_valid_agent_message(v1_flow)
+    assert v1_flow["version"] == "1.0"
     assert v1_offline["updateDataModel"]["value"]["error"] == "This diagram is unavailable."
   end
 

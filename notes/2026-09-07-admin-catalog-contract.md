@@ -7,7 +7,7 @@
 
 ## Identity & configuration
 
-- Catalog id: `https://ash-a2ui.dev/catalogs/admin/v1`
+- Catalog id: `https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2`
 - Selection: `config :ash_a2ui, :catalog, :basic | :admin_v1` (default `:basic`).
   App-wide only for this iteration — no per-surface DSL option yet (negotiation
   arrives with the host integration).
@@ -156,7 +156,7 @@ both wire versions (the AC-5 behavior from A2UI-101).
 `priv/js/ash_admin_catalog.js` exports `createAshAdminCatalog(deps)`,
 mirroring the `createAshA2ui_catalog` pattern (`priv/js/ash_a2ui_catalog.js`):
 same-Lit-instance discipline, registration under the admin catalog id so a
-surface declaring `catalogId: https://ash-a2ui.dev/catalogs/admin/v1`
+surface declaring `catalogId: https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2`
 resolves its components. Study `@a2ui/lit` in the host
 (its `assets/node_modules/@a2ui/lit/`, READ-ONLY) for
 the registration surface. No new build tooling in this library — plain ES

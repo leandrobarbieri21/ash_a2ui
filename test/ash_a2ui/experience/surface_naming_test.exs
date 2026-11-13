@@ -37,9 +37,10 @@ defmodule AshA2ui.Experience.SurfaceNamingTest do
   defp view!(resource), do: ResolvedView.resolve(resource, [])
 
   defp root_title!(resource) do
-    [_create, components, _data] = AshA2ui.Info.build_surface(resource, actor: nil)
+    [%{"createSurface" => %{"components" => components, "dataModel" => _data}}] =
+      AshA2ui.Info.build_surface(resource, actor: nil)
 
-    components["updateComponents"]["components"]
+    components
     |> Enum.find(&(&1["component"] == "entityPage"))
     |> Map.fetch!("title")
   end

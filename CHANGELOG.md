@@ -10,6 +10,126 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Breaking: A2UI 1.0 only
+
+ash_a2ui now speaks A2UI protocol 1.0 and nothing else. Support for v0.9.1,
+the per-surface version switch and every layer that adapted between the two
+are removed. There is no deprecation path. Surfaces keep their DSL; what
+changes is the wire format and the way a host wires the renderer.
+
+**Removed**
+
+- The `spec_version` DSL option, `spec_version:` on `AshA2ui.Dynamic.resolve/2`,
+  `AshA2ui.Info.build_surface/2` and `AshA2ui.ActionHandler.handle/3`, and
+  `AshA2ui.Info.encoder`. There is one encoder, `AshA2ui.Encoder`;
+  `AshA2ui.Encoder.V0_9_1` and `AshA2ui.Encoder.V1_0` are gone, as is the
+  `AshA2ui.Encoder` behaviour.
+- The AG-UI transport: `AshA2ui.AgUi`, `usage-rules/ag-ui.md` and the
+  CopilotKit wiring documentation. A2UI over AG-UI/CopilotKit carried v0.9
+  payloads only.
+- The v0.9.1 vendored schemas (`priv/a2ui/v0_9_1/`), the JS adapter
+  `priv/js/ash_a2ui_messages.js`, `AshA2ui.Encoder.V1_0.call_function/3`
+  (use `AshA2ui.Encoder.call_renderer_function/4`) and
+  `AshA2ui.LiveRenderer.handle_function_response` (use the
+  `:on_function_response` option).
+- `actionResponse`, `wantResponse`, `actionId`, the `callFunction` and
+  `functionResponse` messages, `surfaceProperties` and `theme` (and the
+  `surface_properties:` build option). 1.0 removed them.
+- The reserved data-model paths `/ui/response`, `/ui/action_result` and
+  `/ui/action_result_text`.
+- `ex_json_schema` (test only). The suite validates with JSV, a JSON Schema
+  draft 2020-12 validator.
+
+**Changed on the wire**
+
+- The version string is `"1.0"` on every message (`"v0.9.1"` and `"v1.0"`
+  are invalid).
+- A surface is one inline `createSurface` carrying `components` and
+  `dataModel`; `AshA2ui.Info.build_surface/2` returns a one-element list.
+  `updateDataModel` always carries `value` (`null` deletes).
+- Bindings are `{"@path": ...}`, function calls `{"@call": ..., "args": ...}`,
+  and the component envelope keys are `@accessibility`, `@checks`,
+  `@catalogId` and `@metadata`. Headings are Markdown `Text`.
+- Every server-handled control is an `ashAction` function call against the
+  ash_a2ui catalog. The renderer sends a `callAgentFunction`; the handler
+  answers with an `agentFunctionResponse` (last in the reply) carrying the
+  same `functionCallId`. A plain `action` event is refused: nothing runs,
+  and `/ui/feedback` gets an `UNKNOWN_FUNCTION` error. The encoder never
+  emitted one, and the hook no longer sends one (`actionMessage` is gone
+  from `ash_a2ui_protocol.js`; `actionSpec`/`dispatchActionSpec` read and
+  send `ashAction` calls only).
+- Outcomes live in one map at `/ui/feedback`:
+  `{kind, message, code, functionCallId, result, resultText}`, always written
+  whole. `kind` is `""` when idle (it was `null`).
+- The shipped hook writes a pending `/ui/feedback` the moment an `ashAction`
+  call goes out, except for the quiet actions
+  (`AshA2ui.ActionHandler.quiet_actions/0`: reads, searches, picker and
+  panel steps), which the handler also leaves untouched unless they fail
+  and answers with an empty `value`. A call unanswered after
+  `actionTimeoutMs` shows a slow notice that stays pending
+  (`code: "TIMEOUT"`), so busy controls stay busy until the real outcome.
+  The pending and slow words come from `/ui/feedback_text`, which the
+  server writes in the surface's language (new msgids "Working…" and
+  "This is taking longer than usual. Still working…").
+- The CSV export is a `callRendererFunction` calling `downloadFile`; the
+  renderer answers with a `rendererFunctionResponse`.
+- The ash_a2ui catalog is a 1.0 catalog definition (`@call` keys,
+  `allowedCallers`, `protocolVersion`); the admin catalog is declared the
+  same way, and its surfaces mix basic components in with `@catalogId`.
+- The catalog ids move to the package's home:
+  `https://github.com/lukegalea/ash_a2ui/catalogs/ash_a2ui/v1` and
+  `https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2`. A catalog id
+  names its contract's major version.
+- The admin catalog contract is 2.0.0
+  (`AshA2ui.Experience.admin_catalog_version/0`) and includes 1.13 (plain
+  links), 1.14 (grouped list rows and section notes), 1.15 (document rows
+  and table footers), 1.16 (card rows), 1.17 (step fields) and 1.18 (table
+  card headers), all below.
+  Its version and changelog live under `metadata.extensions.ash_a2ui`, the
+  prefixed extension key the 1.0 spec asks for. It declares `filterPicker`,
+  the query filter picker admin surfaces emit, and the `more` tag's
+  `textPath`, `captionPath` and `labelPath`; it includes everything 1.12 and
+  earlier added.
+- Component ids that could collide are renamed: a table cell's own `Row` is
+  `table_cell_<field>_row` (its caption and value keep
+  `table_cell_<field>_label` and `_value`), and a calendar's granularity
+  switch Buttons are `calendar_granularity_<size>_button`. Every surface's
+  ids are unique, which the 1.0 renderer enforces.
+- The vendored specification is now upstream `a2ui-project/a2ui` at a pinned
+  commit (`priv/a2ui/v1_0/NOTES.md`), under `priv/a2ui/v1_0/json/` with the
+  basic catalog at `catalogs/basic/v1/catalog.json`.
+
+**Migrating a host app**
+
+1. Delete every `spec_version "..."` line from your `a2ui` blocks and every
+   `spec_version:` option from your calls. Nothing replaces them.
+2. If you pattern-match on messages, expect one `createSurface` instead of
+   three messages, `"version" => "1.0"`, and `{"@path": ...}` bindings.
+3. If you read `/ui/response`, `/ui/action_result` or
+   `/ui/action_result_text`, read `/ui/feedback` (`message`, `result`,
+   `resultText`).
+4. In a hand-written LiveView or controller, hand every renderer message to
+   `AshA2ui.ActionHandler.handle/3` and push all the returned messages back,
+   for `{:ok, _}` and `{:error, _}` alike. Replace the `"a2ui:action"` and
+   `"a2ui:function_response"` LiveView events with the single
+   `"a2ui:message"` event. `AshA2ui.LiveRenderer` already does this.
+5. In `assets/js/app.js`, import from the `@a2ui/lit` and `@a2ui/web_core`
+   root entry points (`import "@a2ui/lit"`,
+   `import {Catalog, MessageProcessor} from "@a2ui/web_core"`,
+   `import {basicCatalog} from "@a2ui/web_core/catalogs/basic/v1"`), drop the
+   `/v0_9` imports, and pass `Catalog` to `configureAshA2ui`. The
+   `"ash-a2ui:action-response"` DOM event's `actionId` field is now
+   `functionCallId`. Host-registered renderer functions move into a catalog
+   of their own.
+6. Use an `@a2ui/lit` / `@a2ui/web_core` release that implements the pinned
+   specification text (the `@`-prefixed envelope keys, required
+   `TextField.value`, agent-function routing). Published 0.15.0 predates
+   them and drops a surface that carries an `@`-prefixed key. See
+   [The A2UI 1.0 wire contract](documentation/topics/a2ui-1-0.md).
+7. If you used the AG-UI transport, serve surfaces over your own endpoint
+   with `AshA2ui.Info.build_surface/2` and `AshA2ui.ActionHandler.handle/3`
+   (see Rendering Clients).
+
 ### Bug Fixes:
 
 - **A host passing its own assigns to `surface_container/1` renders.** A
@@ -52,8 +172,9 @@ Requires Elixir 1.20 or later.
   `data-a2ui-surface`) and `primary` (`data-a2ui-primary`) attrs; the
   defaults render the same markup as before. The JS hook reads them: a
   container with a `surface` takes only that surface's messages and binds
-  only that surface, a v1.0 `actionResponse` goes to the hook that sent the
-  action, and messages that name no surface (`callFunction`) go to the
+  only that surface, an `agentFunctionResponse` goes to the hook that sent
+  the `callAgentFunction` with its `functionCallId`, and messages that name
+  no surface (a `callRendererFunction` without a `surfaceId`) go to the
   primary container. Before, every hook on a page took every
   `"a2ui:messages"` push, so two hooks drew the same surface. A page with
   no `surface` and no `primary` routes as before.
@@ -64,8 +185,8 @@ Requires Elixir 1.20 or later.
   and refreshes beside the main one. Each is built in its own async task as
   the same actor, tenant, `as_of` and locale, with `header: false`, its
   context selection from the optional `(params, socket)` function and
-  rebuilt when `handle_params` changes it. `"a2ui:action"` events are
-  routed by `surfaceId` to the surface's UI, whose query and context state
+  rebuilt when `handle_params` changes it. `"a2ui:message"` calls are
+  routed by their `surfaceId` to the surface's UI, whose query and context state
   are tracked apart from the main surface's. A PubSub refresh rebuilds
   every surface. The host writes only the containers and the context
   function, and no `handle_event` of its own. Without `:surfaces`, nothing
@@ -80,8 +201,8 @@ Requires Elixir 1.20 or later.
   rows are still being fetched, with `AshA2ui.Loading.messages/3` to set it. A
   `:report` component now carries a loading row (`report_<name>_loading`,
   templated over `/ui/loading_visible`), so an empty report no longer reads as
-  "no rows" while its rows are on the way. The hook sets the flag from a `query`
-  or `report` click until the server answers; a host that runs a report's rows
+  "no rows" while its rows are on the way. The hook sets the flag while a
+  `query` or `report` call it sent is unanswered; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
 - **Admin catalog 1.18: table card headers.** A table's `heading` is the
@@ -94,8 +215,8 @@ Requires Elixir 1.20 or later.
   renderer could not tell a declared card header from that default. Several
   tables under one `section` heading can each carry their own. The stock
   renderer draws the grid as one card with the header on top, in every
-  layout and above the empty state; the basic catalog draws them as an `h3`
-  and a caption Text just before the table. Verified: tables only, and not
+  layout and above the empty state; the basic catalog draws them as a
+  level-3 Markdown heading Text and a caption Text just before the table. Verified: tables only, and not
   on a board. The `Component` struct gains `heading` and `description`.
 
 - **Admin catalog 1.17: step fields.** A field's `steps true` marks a value
@@ -136,7 +257,7 @@ Requires Elixir 1.20 or later.
   table's `footer_note :field` (a field of its context record, read and
   refreshed like a `section_note`) and `footer_link href: ..., label: ...`
   draw under its rows, in its card: the dataGrid carries `footerNote` (a
-  binding to `/detail/<context>/<field>`) and `footerLink` (`{href, label}`,
+  binding, `{"@path": "/detail/<context>/<field>"}`) and `footerLink` (`{href, label}`,
   the label translated). The basic catalog leaves the footer out. Verified:
   `download` only with `link_url`; footers only on tables; a footer note
   from one context whose resource has it. The `RowLayout` struct gains
@@ -155,7 +276,7 @@ Requires Elixir 1.20 or later.
   too (`emptyText`), for a list row's empty value. A component's `section_note :field` draws a field of its
   context's record (a `:detail`'s context, or the one context a related
   table's `context_filter` names) under its section's heading
-  (`section_<key>_note`, a caption Text bound to `/detail/<context>/<field>`),
+  (`section_<key>_note`, a caption Text bound to `{"@path": "/detail/<context>/<field>"}`),
   read and refreshed with that record. Verified: the group options only with
   a `group_by` among the table's fields; a note only with a `section` and a
   context whose resource has it. The `RowLayout` struct gains `group_by`,
@@ -292,7 +413,7 @@ Requires Elixir 1.20 or later.
   not pass it.
 
 - **A canvas registry can state what running an action does.** The
-  optional `AshA2ui.Canvas.Registry.consequence/3` callback receives the
+  optional `AshA2ui.Canvas.Registry.consequence` callback receives the
   resource, the action name and the consequence the library derived from
   the action's type, and returns `:read`, `:mutation` or `:destructive`
   (which makes the capability's `confirmation` `:required`). It applies to
@@ -888,7 +1009,7 @@ Requires Elixir 1.20 or later.
   conditional pagination, empty states, typed feedback, h1 title, carded
   form) is now the only composition. Removed outright, with no shim and no
   deprecation path:
-  - the `:experience_version` setting and `AshA2ui.Experience.version/0`,
+  - the `:experience_version` setting and `AshA2ui.Experience.version`,
     `v2?/0` and `effective_admin?/0` (use `admin?/0`; the admin catalog is
     active exactly when `catalog: :admin_v1` is selected). A leftover
     `experience_version` in host config is ignored.
@@ -1110,7 +1231,7 @@ Requires Elixir 1.20 or later.
   or nested forms keep those subtrees byte-equal to the basic-v2
   composition — only the core upgrades. The catalog definition ships at
   `priv/a2ui/admin_v1/catalog.json` (catalog id
-  `https://ash-a2ui.dev/catalogs/admin/v1`); the Lit renderer registration
+  `https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2` since 2.0); the Lit renderer registration
   ships separately as `priv/js/ash_admin_catalog.js`
   (`createAshAdminCatalog(deps)`). The action handler learns nothing new —
   zero new action names or dispatch clauses.

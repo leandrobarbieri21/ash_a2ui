@@ -1,8 +1,8 @@
 # Reports and CSV export
 
 Covers `:report` components (aggregate/report queries over generic Ash
-actions) and `export` blocks (server-generated CSV via the v1.0
-`downloadFile` callFunction). Full topic: `reports-and-exports`.
+actions) and `export` blocks (server-generated CSV via a
+`callRendererFunction` calling `downloadFile`). Full topic: `reports-and-exports`.
 
 ## `:report` components
 
@@ -32,8 +32,9 @@ actions) and `export` blocks (server-generated CSV via the v1.0
   must be among `params`.
 - The action runs actor-scoped with the surface's `authorize?` — scope
   inside the action's `run` via `context.actor` where needed.
-- Results land wholesale at `/report/<name>/rows`. On v1.0 the
-  `actionResponse` carries `{"result": {"count": n}}`.
+- Results land wholesale at `/report/<name>/rows`. The `/ui/feedback`
+  written for the run (and the `agentFunctionResponse` answering an
+  `ashAction` call) carries `"result": {"count": n}`.
 - Reports cannot carry table/form options (`query`, `row_actions`,
   `read_action`, `sections`, `editable`, …) — compile-time verified.
 - Multiple reports per surface are fine (name them:
@@ -42,9 +43,9 @@ actions) and `export` blocks (server-generated CSV via the v1.0
 
 ## `export` blocks (CSV)
 
-- `export` goes on a `:table` or `:report` component and is **v1.0-only**
-  (`spec_version "1.0"` required — compile-time verified). Delivery is the
-  frozen `downloadFile` callFunction contract: args
+- `export` goes on a `:table` or `:report` component. Delivery is a
+  `callRendererFunction` calling the ash_a2ui catalog's `downloadFile`
+  (`allowedCallers: agentOnly`), args
   `{"filename", "mimeType", "dataUrl"}` (or `"url"` for hosts that upload
   and sign). The shipped hook implements `downloadFile` as a built-in; the
   shipped extension catalog (`priv/a2ui/v1_0/catalogs/ash_a2ui/`) declares

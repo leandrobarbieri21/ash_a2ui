@@ -115,8 +115,8 @@ diagram is a `liveDiagram`:
 
 ```json
 {"id": "diagram_flight", "component": "liveDiagram", "label": "Visits in flight",
- "source": "flowchart TD\n  …", "markers": {"path": "/diagram/flight/markers"},
- "nodes": {"path": "/diagram/flight/nodes"}, "error": {"path": "/diagram/flight/error"}}
+ "source": "flowchart TD\n  …", "markers": {"@path": "/diagram/flight/markers"},
+ "nodes": {"@path": "/diagram/flight/nodes"}, "error": {"@path": "/diagram/flight/error"}}
 ```
 
 The renderer draws the source once with mermaid, using
