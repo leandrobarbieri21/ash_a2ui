@@ -11,6 +11,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     import Phoenix.ConnTest
     import Phoenix.LiveViewTest
 
+    alias AshA2ui.Test.Links.NotesUI
     alias AshA2ui.Test.LiveRendererFixtures, as: Fixtures
     alias AshA2ui.Test.{MinimalUI, SchemaHelper}
     alias Plug.Conn.Query
@@ -573,6 +574,223 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         assert render_hook(view, "a2ui:open_surface", %{"surface" => "person"}) =~
                  "ash-a2ui-surface"
+      end
+    end
+
+    describe "additional surfaces (:surfaces)" do
+      setup do
+        alias AshA2ui.Test.Links.{Note, Participant, Person}
+
+        for resource <- [Participant, Note, Person] do
+          resource
+          |> Ash.read!(authorize?: false)
+          |> Enum.each(&Ash.destroy!(&1, authorize?: false))
+        end
+
+        %{
+          ada: Ash.create!(Person, %{name: "Ada"}, authorize?: false),
+          grace: Ash.create!(Person, %{name: "Grace"}, authorize?: false)
+        }
+      end
+
+      test "each surface is built and pushed with its own surfaceId", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/surfaces")
+
+        assert_push_event(
+          view,
+          "a2ui:messages",
+          %{messages: [%{"createSurface" => %{"surfaceId" => "minimal_standalone"}} | _] = main},
+          1_000
+        )
+
+        assert_push_event(
+          view,
+          "a2ui:messages",
+          %{messages: [%{"createSurface" => %{"surfaceId" => "notes"}} | _] = notes},
+          1_000
+        )
+
+        Enum.each(main ++ notes, &SchemaHelper.assert_valid_server_message/1)
+        assert Enum.all?(notes, &(surface_id_of(&1) == "notes"))
+
+        assert_receive {:surface_fn, MinimalUI, main_opts}, 1_000
+        assert_receive {:surface_fn, NotesUI, notes_opts}, 1_000
+
+        # The same actor and tenant; the extra surface never draws a header.
+        for opts <- [main_opts, notes_opts] do
+          assert opts[:actor] == :stub_actor
+          assert opts[:tenant] == :stub_tenant
+        end
+
+        assert notes_opts[:header] == false
+        refute Keyword.has_key?(main_opts, :header)
+        # no selection from the context function: built with none
+        refute Keyword.has_key?(notes_opts, :context_state)
+      end
+
+      test "the context function's selection is validated and used", %{conn: conn, ada: ada} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/surfaces?person=#{ada.id}")
+
+        assert_receive {:surface_fn, NotesUI, opts}, 1_000
+        assert %{"person" => %{"value" => value, "label" => "Ada"}} = opts[:context_state]
+        assert value == ada.id
+
+        # the main surface's URL state is its own: no ctx params, no context
+        assert_receive {:surface_fn, MinimalUI, main_opts}, 1_000
+        refute Keyword.has_key?(main_opts, :context_state)
+      end
+
+      test "an extra surface's action is answered by its UI and leaves the main state alone", %{
+        conn: conn,
+        ada: ada
+      } do
+        {:ok, view, _html} = live(conn, "/live-renderer/surfaces")
+        await_bootstraps(view)
+        before = :sys.get_state(view.pid).socket.assigns
+
+        envelope = context_select("notes", ada.id)
+        render_hook(view, "a2ui:action", envelope)
+
+        assert_receive {:action_fn, NotesUI, ^envelope, opts}
+        assert opts[:actor] == :stub_actor
+        assert opts[:tenant] == :stub_tenant
+        refute_receive {:action_fn, MinimalUI, _, _}, 50
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [%{"updateDataModel" => %{"surfaceId" => "notes", "path" => "/context"}}]
+        })
+
+        assigns = :sys.get_state(view.pid).socket.assigns
+        assert assigns.ash_a2ui_query_state == before.ash_a2ui_query_state
+        assert assigns.ash_a2ui_context_state == before.ash_a2ui_context_state
+        assert assigns.ash_a2ui_url_ctx == before.ash_a2ui_url_ctx
+        assert assigns.ash_a2ui_surfaces.notes.context_state["person"]["value"] == ada.id
+      end
+
+      test "a main-surface action goes to the main UI as before", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/surfaces")
+        await_bootstraps(view)
+        before = :sys.get_state(view.pid).socket.assigns.ash_a2ui_surfaces
+
+        envelope = Fixtures.action_envelope()
+        render_hook(view, "a2ui:action", envelope)
+
+        assert_receive {:action_fn, MinimalUI, ^envelope, _opts}
+        refute_receive {:action_fn, NotesUI, _, _}, 50
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [_, %{"updateDataModel" => %{"path" => "/ui/feedback"}}]
+        })
+
+        assert :sys.get_state(view.pid).socket.assigns.ash_a2ui_surfaces == before
+      end
+
+      test "a PubSub refresh rebuilds every surface with its own state", %{conn: conn, ada: ada} do
+        {:ok, view, _html} = live(conn, "/live-renderer/surfaces")
+        await_bootstraps(view)
+
+        render_hook(view, "a2ui:action", context_select("notes", ada.id))
+        assert_push_event(view, "a2ui:messages", %{messages: [_context]})
+
+        Phoenix.PubSub.broadcast(
+          AshA2ui.Test.PubSub,
+          "ash_a2ui_test:surfaces",
+          %Ash.Notifier.Notification{resource: AshA2ui.Test.Minimal}
+        )
+
+        assert_receive {:data_model_fn, MinimalUI, main_opts}, 1_000
+        assert_receive {:data_model_fn, NotesUI, notes_opts}, 1_000
+        refute Keyword.has_key?(main_opts, :context_state)
+        assert notes_opts[:context_state]["person"]["value"] == ada.id
+
+        assert_push_event(view, "a2ui:messages", %{messages: [main, notes]}, 1_000)
+        assert surface_id_of(main) == "minimal_standalone"
+        assert surface_id_of(notes) == "notes"
+      end
+
+      test "a params change that changes the selection rebuilds the extra surface", %{
+        conn: conn,
+        ada: ada,
+        grace: grace
+      } do
+        {:ok, view, _html} = live(conn, "/live-renderer/surfaces?person=#{ada.id}")
+        await_bootstraps(view)
+        assert_receive {:surface_fn, MinimalUI, _opts}, 1_000
+        assert_receive {:surface_fn, NotesUI, _opts}, 1_000
+
+        render_patch(view, "/live-renderer/surfaces?person=#{ada.id}&tab=other")
+        refute_receive {:surface_fn, _, _}, 100
+
+        render_patch(view, "/live-renderer/surfaces?person=#{grace.id}")
+        assert_receive {:surface_fn, NotesUI, opts}, 1_000
+        assert opts[:context_state]["person"]["label"] == "Grace"
+        refute_received {:surface_fn, MinimalUI, _}
+
+        assert_push_event(
+          view,
+          "a2ui:messages",
+          %{messages: [%{"createSurface" => %{"surfaceId" => "notes"}} | _]},
+          1_000
+        )
+      end
+
+      test "without :surfaces the pushes are exactly the main surface's", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/stubbed")
+
+        assert_push_event(view, "a2ui:messages", payload, 1_000)
+        assert payload == %{messages: Fixtures.surface_messages()}
+        refute_push_event(view, "a2ui:messages", _, 200)
+
+        assert_receive {:surface_fn, MinimalUI, _opts}
+        refute_receive {:surface_fn, _, _}, 50
+        assert :sys.get_state(view.pid).socket.assigns.ash_a2ui_surfaces == %{}
+
+        envelope = Fixtures.action_envelope()
+        render_hook(view, "a2ui:action", envelope)
+        assert_push_event(view, "a2ui:messages", payload)
+        assert payload == %{messages: Fixtures.action_ok_messages()}
+      end
+
+      test "a :context that is not a 2-arity function is refused" do
+        assert_raise ArgumentError, ~r/:context must be a 2-arity function/, fn ->
+          AshA2ui.LiveRenderer.build_config(
+            ui: MinimalUI,
+            surfaces: [notes: [ui: NotesUI, context: fn _socket -> %{} end]]
+          )
+        end
+      end
+
+      defp await_bootstraps(view) do
+        assert_push_event(
+          view,
+          "a2ui:messages",
+          %{messages: [%{"createSurface" => %{"surfaceId" => "minimal_standalone"}} | _]},
+          1_000
+        )
+
+        assert_push_event(
+          view,
+          "a2ui:messages",
+          %{messages: [%{"createSurface" => %{"surfaceId" => "notes"}} | _]},
+          1_000
+        )
+      end
+
+      defp context_select(surface_id, value) do
+        %{
+          "version" => "v0.9.1",
+          "action" => %{
+            "name" => "context_select",
+            "surfaceId" => surface_id,
+            "sourceComponentId" => "person_picker",
+            "timestamp" => "2026-11-12T12:00:00Z",
+            "context" => %{"context" => "person", "value" => value}
+          }
+        }
+      end
+
+      defp surface_id_of(message) do
+        message |> Map.delete("version") |> Map.values() |> hd() |> Map.fetch!("surfaceId")
       end
     end
 
