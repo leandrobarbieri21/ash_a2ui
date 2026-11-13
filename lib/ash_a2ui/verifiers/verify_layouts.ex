@@ -495,7 +495,10 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
   end
 
   defp referenced_fields(layout) do
-    Enum.reject([layout.title, layout.badge, layout.group_by, layout.group_subtitle], &is_nil/1) ++
+    Enum.reject(
+      [layout.title, layout.badge, layout.leading, layout.group_by, layout.group_subtitle],
+      &is_nil/1
+    ) ++
       (layout.meta || []) ++ layout.trailing ++ layout.expand
   end
 

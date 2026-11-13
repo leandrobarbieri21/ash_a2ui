@@ -25,6 +25,8 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     * every `:detail` component names a declared `context` and renders
       public attributes / calculations / aggregates of that context's
       resource,
+    * a table's `footer_note` and `footer_link` stay on tables, and a
+      `footer_note` is read like a `section_note`,
     * a component's `section_note` comes with a `section` and one context
       (`AshA2ui.Component.note_context/1`) whose resource has it as a
       public attribute, calculation or aggregate,
@@ -57,7 +59,7 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
          :ok <- verify_contexts(contexts, module),
          :ok <- verify_tables(components, contexts, dsl_state, module),
          :ok <- verify_details(components, names, contexts, dsl_state, module) do
-      verify_section_notes(components, contexts, module)
+      verify_notes(components, contexts, module)
     end
   end
 
@@ -509,42 +511,53 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
 
   # --- section notes -------------------------------------------------------------
 
-  defp verify_section_notes(components, contexts, module) do
+  defp verify_notes(components, contexts, module) do
     by_name = Map.new(contexts, &{&1.name, &1})
 
-    components
-    |> Enum.reject(&is_nil(&1.section_note))
-    |> Enum.find_value(:ok, &section_note_error(&1, by_name, module))
+    for component <- components,
+        option <- [:section_note, :footer_note, :footer_link],
+        Map.get(component, option),
+        detail = note_problem(option, component, by_name),
+        detail != nil,
+        reduce: :ok do
+      :ok -> note_error(option, component, detail, module)
+      error -> error
+    end
   end
 
-  defp section_note_error(component, by_name, module) do
-    key = AshA2ui.Component.key(component)
-    context = by_name[AshA2ui.Component.note_context(component)]
+  defp note_problem(:section_note, %{section: nil}, _by_name), do: "needs a section to sit under"
 
-    detail =
-      cond do
-        is_nil(component.section) ->
-          "needs a section to sit under"
+  defp note_problem(option, %{name: name}, _by_name)
+       when option in [:footer_note, :footer_link] and name != :table,
+       do: "is for tables: it sits in the table's card, under its rows"
 
-        is_nil(context) ->
-          "needs one context to read it from: a :detail's context, or a table whose " <>
-            "context_filter names exactly one context"
+  defp note_problem(:footer_link, _component, _by_name), do: nil
 
-        not detail_renderable?(context.resource, component.section_note) ->
-          "#{inspect(component.section_note)} is not a public attribute, calculation, or " <>
+  defp note_problem(option, component, by_name) do
+    field = Map.get(component, option)
+
+    case by_name[AshA2ui.Component.note_context(component)] do
+      nil ->
+        "needs one context to read it from: a :detail's context, or a table whose " <>
+          "context_filter names exactly one context"
+
+      context ->
+        unless detail_renderable?(context.resource, field) do
+          "#{inspect(field)} is not a public attribute, calculation, or " <>
             "aggregate of the context's resource #{inspect(context.resource)}"
+        end
+    end
+  end
 
-        true ->
-          nil
-      end
+  defp note_error(option, component, detail, module) do
+    key = AshA2ui.Component.key(component)
 
-    detail &&
-      {:error,
-       DslError.exception(
-         module: module,
-         path: [:a2ui, :component, key, :section_note],
-         message: "section_note on component #{inspect(key)} #{detail}"
-       )}
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :component, key, option],
+       message: "#{option} on component #{inspect(key)} #{detail}"
+     )}
   end
 
   # --- shared helpers ------------------------------------------------------------

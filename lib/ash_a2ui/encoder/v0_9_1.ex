@@ -934,6 +934,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "groupIcon",
         table.component.row_layout && table.component.row_layout.group_icon
       )
+      |> put_grid_footer(view, table.component)
       |> put_grid_sort(view, table)
       |> drop_inline_duplicate(view, table)
 
@@ -1058,14 +1059,37 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     end)
   end
 
+  # Catalog 1.15: the line under a table's rows, in its card: the context
+  # record's footer_note and a footer_link.
+  defp put_grid_footer(grid, view, component) do
+    note =
+      with field when not is_nil(field) <- Map.get(component, :footer_note),
+           context when not is_nil(context) <- AshA2ui.Component.note_context(component) do
+        %{"path" => "/detail/#{context}/#{field}"}
+      end
+
+    link =
+      case Map.get(component, :footer_link) do
+        [_ | _] = link ->
+          %{"href" => link[:href], "label" => Label.translate(view.l10n, link[:label])}
+
+        _none ->
+          nil
+      end
+
+    grid |> maybe_put("footerNote", note) |> maybe_put("footerLink", link)
+  end
+
   # Catalog 1.12: a row layout's trailing and expand fields say where a
-  # list-rows renderer draws them; 1.14 adds the group's header fields.
+  # list-rows renderer draws them; 1.14 adds the group's header fields, 1.15
+  # the leading code.
   defp put_column_placement(column, nil, _field), do: column
 
   defp put_column_placement(column, layout, field) do
     cond do
       field in layout.trailing -> Map.put(column, "placement", "trailing")
       field in layout.expand -> Map.put(column, "placement", "expand")
+      field == layout.leading -> Map.put(column, "placement", "leading")
       field == layout.group_by -> Map.put(column, "placement", "group")
       field == layout.group_subtitle -> Map.put(column, "placement", "groupSubtitle")
       true -> column
@@ -1091,7 +1115,9 @@ defmodule AshA2ui.Encoder.V0_9_1 do
           [layout.title, layout.badge]
           |> Enum.reject(&is_nil/1)
           |> Kernel.++(layout.meta ++ layout.trailing ++ layout.expand)
-          |> Kernel.++(Enum.reject([layout.group_by, layout.group_subtitle], &is_nil/1))
+          |> Kernel.++(
+            Enum.reject([layout.leading, layout.group_by, layout.group_subtitle], &is_nil/1)
+          )
           |> Enum.uniq()
       end
 
@@ -3135,11 +3161,11 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       ] ++ badge ++ meta_components
   end
 
-  # The basic card has no trailing slot, disclosure or group header: the
-  # group's fields, trailing and expand fields join its metadata grid.
+  # The basic card has no leading or trailing slot, disclosure or group
+  # header: those fields join its metadata grid.
   defp card_meta_fields(layout) do
     Enum.uniq(
-      Enum.reject([layout.group_by, layout.group_subtitle], &is_nil/1) ++
+      Enum.reject([layout.leading, layout.group_by, layout.group_subtitle], &is_nil/1) ++
         layout.meta ++ layout.trailing ++ layout.expand
     )
   end

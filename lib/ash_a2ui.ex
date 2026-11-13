@@ -146,6 +146,14 @@ defmodule AshA2ui do
         Table/detail only.
         """
       ],
+      download: [
+        type: :boolean,
+        doc: """
+        With `link_url`: the link downloads its address (a file) instead of
+        opening it. The link entry carries `"download" => true` (admin catalog
+        1.15); the stock renderer draws an `<a download>`. Only with `link_url`.
+        """
+      ],
       link_label: [
         type: :atom,
         doc: """
@@ -1267,8 +1275,8 @@ defmodule AshA2ui do
         type: {:list, :atom},
         doc: """
         The fields rendered in the card's labeled metadata grid, in order.
-        Defaults to the table's fields minus `title`, `badge`, `trailing`,
-        `expand`, `group_by` and `group_subtitle`.
+        Defaults to the table's fields minus `title`, `badge`, `leading`,
+        `trailing`, `expand`, `group_by` and `group_subtitle`.
         """
       ],
       trailing: [
@@ -1293,11 +1301,20 @@ defmodule AshA2ui do
         basic card shows them in its metadata grid.
         """
       ],
+      leading: [
+        type: :atom,
+        doc: """
+        A field drawn before the title as a short code: a file's type
+        ("PDF"), a unit. The admin dataGrid's column for it carries
+        `"placement": "leading"` (admin catalog 1.15); the basic card shows it
+        in its metadata grid.
+        """
+      ],
       group_by: [
         type: :atom,
         doc: """
         A field whose value heads a group of rows: consecutive rows sharing
-        it render under one header (a property over its lines). Order the
+        it render under one header (a warehouse over its items). Order the
         rows so each group's rows are together (the table's read action or
         query sort). The admin dataGrid's column for it carries
         `"placement": "group"`; the basic card shows it in its metadata grid.
@@ -1306,7 +1323,7 @@ defmodule AshA2ui do
       group_subtitle: [
         type: :atom,
         doc: """
-        A field drawn under the group's header (a property's address), taken
+        A field drawn under the group's header (a warehouse's address), taken
         from the group's first row. Needs `group_by`. Its admin dataGrid
         column carries `"placement": "groupSubtitle"`.
         """
@@ -1724,11 +1741,34 @@ defmodule AshA2ui do
         metadata domain.
         """
       ],
+      footer_note: [
+        type: :atom,
+        doc: """
+        A field of the table's context record drawn inside the table's card,
+        under its rows ("2 versions on file. Details shown come from the
+        latest."): read and refreshed with that record, like `section_note`,
+        from the one context the table's `context_filter` names. The admin
+        dataGrid binds it as `footerNote` (catalog 1.15); the basic catalog
+        leaves it out. Tables only.
+        """
+      ],
+      footer_link: [
+        type:
+          {:keyword_list,
+           [href: [type: :string, required: true], label: [type: :string, required: true]]},
+        doc: """
+        A link drawn beside the `footer_note` (or alone) under the table's
+        rows: `footer_link href: "#history", label: "All versions"`. The label
+        translates in the metadata domain. The admin dataGrid carries it as
+        `footerLink` (`{href, label}`, catalog 1.15); the basic catalog leaves
+        it out. Tables only.
+        """
+      ],
       section_note: [
         type: :atom,
         doc: """
         A field of the component's context record drawn under its section's
-        heading, muted ("3 contract lines · 2 properties"): a `:detail`'s
+        heading, muted ("12 items · 3 warehouses"): a `:detail`'s
         `context`, or the one context a related table's `context_filter`
         names. Read with the context's record at `/detail/<context>/<field>`;
         the section's first component that declares one supplies it. Needs
