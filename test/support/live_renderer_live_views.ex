@@ -143,6 +143,42 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # `:surfaces` stubs: the fixture messages addressed to the UI's own
+    # surface id, so a page with two surfaces gets two distinguishable
+    # bootstraps.
+    def scoped_surface(ui, opts) do
+      Fixtures.notify({:surface_fn, ui, opts})
+      Enum.map(Fixtures.surface_messages(), &readdress(&1, ui))
+    end
+
+    def scoped_data_model(ui, opts) do
+      Fixtures.notify({:data_model_fn, ui, opts})
+      readdress(Fixtures.update_data_model(), ui)
+    end
+
+    # The notes surface answers a context_select by rewriting its /context
+    # (as the real handler does); the main surface answers as `action/3`.
+    def scoped_action(AshA2ui.Test.Links.NotesUI = ui, envelope, opts) do
+      notes_context_action(ui, envelope, opts)
+    end
+
+    def scoped_action(ui, envelope, opts), do: action(ui, envelope, opts)
+
+    # The selection the notes surface is built with: the URL's `?person=`.
+    def notes_selection(params, _socket) when is_map(params),
+      do: %{person: params["person"]}
+
+    def notes_selection(_not_mounted_at_router, _socket), do: nil
+
+    defp readdress(message, ui) do
+      surface_id = AshA2ui.ResolvedView.surface_id(ui)
+
+      Map.new(message, fn
+        {"version", _} = version -> version
+        {kind, payload} -> {kind, Map.put(payload, "surfaceId", surface_id)}
+      end)
+    end
+
     # Reference-link navigation callback (`open_surface:`).
     def open_surface(args, socket) do
       Fixtures.notify({:open_surface, args})
@@ -312,6 +348,29 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       ui: AshA2ui.Test.MinimalUI,
       open_surface: &Stubs.open_surface/2,
       surface_fn: &Stubs.surface/2
+  end
+
+  defmodule AshA2ui.Test.SurfacesLive do
+    @moduledoc false
+
+    # A main surface plus an extra one (`:surfaces`): the notes surface,
+    # selected by the URL's `?person=`, built, pushed, answered and
+    # refreshed by the LiveRenderer with no host code. deep_link injects
+    # handle_params, so a patch to another person rebuilds the notes.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.MinimalUI,
+      actor_fn: &Stubs.actor/1,
+      tenant_fn: &Stubs.tenant/1,
+      deep_link: true,
+      pubsub: [module: AshA2ui.Test.PubSub, topics: ["ash_a2ui_test:surfaces"]],
+      surfaces: [
+        notes: [ui: AshA2ui.Test.Links.NotesUI, context: &Stubs.notes_selection/2]
+      ],
+      surface_fn: &Stubs.scoped_surface/2,
+      data_model_fn: &Stubs.scoped_data_model/2,
+      action_fn: &Stubs.scoped_action/3
   end
 
   defmodule AshA2ui.Test.LocalizedLive do

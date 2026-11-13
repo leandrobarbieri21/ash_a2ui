@@ -1311,6 +1311,14 @@ defmodule AshA2ui.ResolvedView do
     end
   end
 
+  @doc false
+  # The surface id a resource or UI module's messages carry, without
+  # resolving the whole view (`AshA2ui.LiveRenderer` routes actions by it).
+  @spec surface_id(module | Spark.Dsl.t()) :: String.t()
+  def surface_id(resource_or_ui_module) do
+    surface_id(resource_or_ui_module, AshA2ui.Info.resource!(resource_or_ui_module))
+  end
+
   defp surface_id(resource_or_ui_module, resource) do
     case AshA2ui.Info.a2ui_surface_id(resource_or_ui_module) do
       {:ok, surface_id} -> surface_id
