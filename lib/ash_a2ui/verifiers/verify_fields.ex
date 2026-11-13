@@ -6,9 +6,10 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       name is a public attribute, calculation, or aggregate of the resolved
       resource — a related table's (`resource`) fields of its own resource,
     * `:form` component fields never name a calculation or aggregate (they
-      are not writable — table-only), and
+      are not writable — table-only),
     * `:form` component fields are a subset of the accepts + argument names of
-      the form's create/update action(s).
+      the form's create/update action(s), and
+    * a `steps` field is not also drawn as pairs, a badge or a link.
 
   Fields declared with a `source`, `relationship`, `link` or `links` option
   are exempt from both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
@@ -46,7 +47,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
         with :ok <- verify_components(dsl_state, target, module, known, exempt),
              :ok <- verify_field_overrides(dsl_state, module, overridable, exempt),
              :ok <- verify_badge_tones(dsl_state, module),
-             :ok <- verify_link_urls(dsl_state, module, overridable) do
+             :ok <- verify_link_urls(dsl_state, module, overridable),
+             :ok <- verify_steps(dsl_state, module) do
           verify_hide_empty(dsl_state, module)
         end
     end
@@ -275,6 +277,30 @@ defmodule AshA2ui.Verifiers.VerifyFields do
 
           true ->
             nil
+        end
+
+      _other ->
+        nil
+    end)
+  end
+
+  # A steps field draws its value as a stepper: one presentation, so it does
+  # not also draw as pairs, a badge or a link.
+  defp verify_steps(dsl_state, module) do
+    dsl_state
+    |> Verifier.get_entities([:a2ui])
+    |> Enum.find_value(:ok, fn
+      %AshA2ui.Field{steps: true, name: name} = field ->
+        if field.pairs || AshA2ui.ResolvedView.badge_field?(field) || field.link ||
+             field.links || field.link_url || field.source do
+          {:error,
+           DslError.exception(
+             module: module,
+             path: [:a2ui, :field, name, :steps],
+             message:
+               "steps cannot be combined with pairs, badge_text, badge_tones, badge_help, " <>
+                 "link, links, link_url or source"
+           )}
         end
 
       _other ->

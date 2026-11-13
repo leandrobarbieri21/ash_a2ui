@@ -636,6 +636,7 @@ defmodule AshA2ui.Dynamic.Parser do
     "link_url" => :link_url,
     "download" => :download,
     "pairs" => :pairs,
+    "steps" => :steps,
     "note" => :note,
     "empty_text" => :empty_text,
     "badge_text" => :badge_text,

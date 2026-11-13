@@ -103,20 +103,32 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.17 is additive: step fields" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.17.0"
+    assert Experience.admin_catalog_version() == "1.17.0"
+    assert catalog["x-changelog"]["1.17.0"] =~ "step fields"
+
+    steps = catalog["components"]["fieldDisplay"]["properties"]["steps"]
+    assert steps["type"] == "object"
+    assert steps["required"] == ["path"]
+
+    source = File.read!(@renderer_asset_path)
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.17.0")
+    assert source =~ "steps: DynamicValueSchema.nullable().optional()"
+    assert source =~ ~s(<ol class="field-steps")
+  end
+
   test "catalog 1.16 is additive: card rows" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.16.0"
-    assert Experience.admin_catalog_version() == "1.16.0"
     assert catalog["x-changelog"]["1.16.0"] =~ "card rows"
 
     grid = catalog["components"]["dataGrid"]["properties"]
     assert grid["layout"]["enum"] == ["rows", "cards"]
     assert grid["expandLabel"]["type"] == "string"
     assert grid["columns"]["items"]["properties"]["pairs"]["type"] == "boolean"
-
-    source = File.read!(@renderer_asset_path)
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.16.0")
   end
 
   test "catalog 1.15 is additive: document rows and table footers" do

@@ -528,6 +528,17 @@ defmodule AshA2ui.ResolvedView do
     end
   end
 
+  @doc """
+  The steps data a `:detail` record carries for its `steps` fields:
+  `_steps_<field>`, the normalized steps (`AshA2ui.Steps.normalize/2`).
+  Shared by the initial render and the context refreshes.
+  """
+  @spec detail_steps_data(t(), struct(), [atom]) :: %{String.t() => [map]}
+  def detail_steps_data(%__MODULE__{} = view, record, fields) do
+    steps_fields = for name <- fields, %{steps: true} = field <- [view.fields[name]], do: field
+    AshA2ui.Steps.data(record, steps_fields, view.l10n)
+  end
+
   defp serialized_field(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->

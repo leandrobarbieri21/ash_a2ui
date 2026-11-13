@@ -55,6 +55,7 @@ msgstr ""
 #: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
+#: test/support/visit_progress_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgid "Appointment"
 msgstr ""
@@ -875,6 +876,10 @@ msgstr ""
 msgid "No results"
 msgstr ""
 
+#: test/support/visit_progress_ui.ex:1
+msgid "No steps yet"
+msgstr ""
+
 #: test/support/experience_ui.ex:61
 msgid "No update"
 msgstr ""
@@ -1095,6 +1100,10 @@ msgstr ""
 
 #: test/support/canvas.ex:172
 msgid "Product"
+msgstr ""
+
+#: test/support/visit_progress_ui.ex:1
+msgid "Progress"
 msgstr ""
 
 #: test/support/bulk_tasks_ui.ex:1
@@ -1562,6 +1571,7 @@ msgstr ""
 #: test/support/sort_only_ui.ex:1
 #: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+#: test/support/visit_progress_ui.ex:1
 #: test/support/word_report_ui.ex:82
 msgid "Title"
 msgstr ""

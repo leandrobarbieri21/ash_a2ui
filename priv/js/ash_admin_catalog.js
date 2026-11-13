@@ -184,7 +184,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.16.0";
+export const ADMIN_CATALOG_VERSION = "1.17.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -626,6 +626,8 @@ export function buildSchemas(basicCatalog = null) {
       note: Str.optional(),
       emptyText: Str.optional(),
       hideWhenEmpty: Bool.optional(),
+      // 1.17: a steps field's normalized steps, drawn as a numbered stepper.
+      steps: DynamicValueSchema.nullable().optional(),
       accessibility: Any.optional(),
       weight: Num.optional(),
     }),
@@ -3056,6 +3058,69 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           .field-value-boolean.is-false::before {
             background: var(--am-border-strong);
           }
+          /* 1.17: a steps field, an ordered list drawn as a stepper. Each
+             step's number, label and state are text; the marker colour only
+             repeats the state. */
+          .field-steps {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: var(--am-space-xs);
+          }
+          .field-step {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0 var(--am-space-xs);
+            align-items: baseline;
+          }
+          .field-step-number {
+            display: inline-grid;
+            place-items: center;
+            min-width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            font-size: var(--am-font-size-xs);
+            font-weight: var(--am-font-weight-semibold);
+            border: var(--am-border-width) solid var(--am-border-strong);
+            color: var(--am-text-muted);
+          }
+          .field-step[data-state="complete"] .field-step-number {
+            border-color: var(--am-success);
+            color: var(--am-success);
+          }
+          .field-step[data-state="current"] .field-step-number {
+            border-color: var(--am-primary);
+            color: var(--am-primary);
+          }
+          .field-step[data-state="overdue"] .field-step-number {
+            border-color: var(--am-error);
+            color: var(--am-error);
+          }
+          .field-step-body {
+            display: grid;
+            gap: 0.125rem;
+            min-width: 0;
+          }
+          .field-step-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: baseline;
+            gap: var(--am-space-2xs);
+          }
+          .field-step-label {
+            font-weight: var(--am-font-weight-medium);
+          }
+          .field-step[data-state="current"] .field-step-label {
+            font-weight: var(--am-font-weight-semibold);
+          }
+          .field-step-text {
+            font-size: var(--am-font-size-s);
+          }
+          .field-step-note {
+            font-size: var(--am-font-size-xs);
+            color: var(--am-text-muted);
+          }
           @container (max-width: 29.99rem) {
             .field {
               grid-template-columns: 1fr;
@@ -3080,7 +3145,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         const isBoolean = props.format === "boolean";
         const links = linkEntries(props.link);
-        const empty = props.value == null || props.value === "";
+        // 1.17: a steps field is empty when it has no steps.
+        const steps = props.steps === undefined ? null : stepEntries(props.steps);
+        const empty = steps ? steps.length === 0 : props.value == null || props.value === "";
 
         // 1.12: an empty field the surface hides draws nothing.
         this.hidden = Boolean(props.hideWhenEmpty) && empty;
@@ -3106,6 +3173,15 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 <span class="am-badge" data-tone=${tone} title=${help || nothing}
                   aria-description=${help || nothing}>${badge}</span>
               </dd>
+            </dl>
+          `;
+        }
+
+        if (steps) {
+          return html`
+            <dl class="field">
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
+              <dd class="field-value">${renderSteps(steps)}</dd>
             </dl>
           `;
         }
@@ -3143,6 +3219,53 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
     }
 
     customElements.define(tag, AshAdminFieldDisplay);
+  }
+
+  // 1.17: the steps a steps field binds, each {number, label, text?, note?,
+  // state, stateLabel}; anything that is not a step with a label is skipped.
+  function stepEntries(value) {
+    if (!Array.isArray(value)) return [];
+    return value.filter((step) => step && typeof step === "object" && str(step.label));
+  }
+
+  const STEP_STATES = ["complete", "current", "upcoming", "overdue"];
+  const STEP_TONES = {
+    complete: "success",
+    current: "info",
+    upcoming: "neutral",
+    overdue: "danger",
+  };
+
+  // An ordered list: the number, label and state are text (the state is not
+  // only a colour: its words sit in a badge beside the label), the current
+  // step is aria-current, and text and note follow on their own lines.
+  function renderSteps(steps) {
+    return html`
+      <ol class="field-steps" role="list">
+        ${steps.map((step, index) => {
+          const state = STEP_STATES.includes(step.state) ? step.state : "upcoming";
+          const number = step.number ?? index + 1;
+          const stateLabel = str(step.stateLabel) || state;
+          return html`
+            <li
+              class="field-step"
+              data-state=${state}
+              aria-current=${state === "current" ? "step" : nothing}
+            >
+              <span class="field-step-number">${number}</span>
+              <span class="field-step-body">
+                <span class="field-step-head">
+                  <span class="field-step-label">${str(step.label)}</span>
+                  <span class="am-badge" data-tone=${STEP_TONES[state]}>${stateLabel}</span>
+                </span>
+                ${str(step.text) ? html`<span class="field-step-text">${str(step.text)}</span>` : nothing}
+                ${str(step.note) ? html`<span class="field-step-note">${str(step.note)}</span>` : nothing}
+              </span>
+            </li>
+          `;
+        })}
+      </ol>
+    `;
   }
 
   // --- FormSection: labeled field grouping ----------------------------------

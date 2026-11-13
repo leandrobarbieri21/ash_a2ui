@@ -165,6 +165,9 @@ with `?ctx[<context>]=<id>`), its `:detail` cards and its related tables:
   vocabulary. The detail data carries `_badge_<field>`,
   `_badge_tone_<field>` and `_badge_help_<field>`; the admin `fieldDisplay`
   binds them as `badge`, `badgeTone` and `badgeHelp` (catalog 1.12).
+- A detail value that is a sequence of stages draws as a numbered stepper:
+  declare `steps true` on its `field` (see the layout rules, "Step
+  fields"; admin catalog 1.17).
 - A field's `note` ("Calculated") sits beside its label on detail cards
   (admin catalog), saying how the value came to be.
 - A value the record does not state shows the field's `empty_text`

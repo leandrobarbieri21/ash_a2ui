@@ -52,6 +52,21 @@ Requires Elixir 1.20 or later.
   or `report` click until the server answers; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
+- **Admin catalog 1.17: step fields.** A field's `steps true` marks a value
+  that is a list of steps (`label`, optional `text` and `note`, and a
+  `state`: `complete`, `current`, `upcoming` or `overdue`), drawn on
+  `:detail` cards as a numbered stepper: an order's fulfilment, Placed →
+  Packed → Shipped → Delivered. The detail data carries the normalized steps
+  at `_steps_<field>` (`number`, `label`, `text`, `note`, `state`,
+  `stateLabel` — the state in words, translated — and `line`, the whole
+  step as one line), and the admin `fieldDisplay` binds them as `steps`. The
+  stock renderer draws an ordered list with each step's state written out;
+  the basic catalog draws one Text row per step. A step without a label is
+  left out and the rest are numbered 1..n; a missing or unknown state reads
+  as `upcoming`. Verified: `steps` does not combine with `pairs`, a badge or
+  a link. The `Field` struct gains `steps`; the library catalog gains
+  "Complete", "Current", "Upcoming" and "Overdue".
+
 - **Admin catalog 1.16: card rows.** `display :cards` on a table draws one
   card per row: the `row_layout`'s title and badge head it, its `meta`
   fields are labeled rows and its `expand` fields fold under a disclosure

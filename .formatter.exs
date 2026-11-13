@@ -161,6 +161,7 @@ spark_locals_without_parens = [
   spec_version: 1,
   step: 1,
   step: 2,
+  steps: 1,
   subtitle: 1,
   surface_id: 1,
   swimlane_labels: 1,

@@ -518,6 +518,7 @@ defmodule AshA2ui.Info do
             resolved_view
             |> ResolvedView.record_values(record, fields, opts)
             |> Map.merge(ResolvedView.detail_badge_data(resolved_view, record, fields))
+            |> Map.merge(ResolvedView.detail_steps_data(resolved_view, record, fields))
 
           :not_found ->
             %{}

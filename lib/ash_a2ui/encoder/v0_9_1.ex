@@ -1654,6 +1654,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         |> maybe_put("format", display_format(view, resource, field))
         |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
         |> put_detail_badge(view, field, "/detail/#{detail.context}/")
+        |> put_detail_steps(view, field, "/detail/#{detail.context}/")
         |> put_empty_text(view, field)
         |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
@@ -1685,6 +1686,15 @@ defmodule AshA2ui.Encoder.V0_9_1 do
     if ResolvedView.badge_field?(declared),
       do: put_badge_bindings(display, declared, base),
       else: display
+  end
+
+  # Catalog 1.17: a steps field draws its value as a numbered stepper,
+  # bound to the normalized `_steps_<field>` list (see AshA2ui.Steps).
+  defp put_detail_steps(display, view, field, base) do
+    case view.fields[field] do
+      %{steps: true} -> Map.put(display, "steps", %{"path" => "#{base}_steps_#{field}"})
+      _other -> display
+    end
   end
 
   defp put_badge_bindings(display, %{name: field, badge_tones: tones, badge_help: help}, base) do
@@ -4314,17 +4324,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
 
     field_rows =
       Enum.flat_map(detail.fields, fn field ->
-        {value_id, value_components} =
-          linked_value(
-            detail,
-            field,
-            %{
-              "id" => "#{base}_value_#{field}",
-              "component" => "Text",
-              "text" => %{"path" => detail_value_path(view, detail, field)}
-            },
-            "/detail/#{detail.context}/"
-          )
+        {value_id, value_components} = detail_value(view, detail, base, field)
 
         [
           %{
@@ -4357,6 +4357,50 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       }
       | heading ++ field_rows
     ]
+  end
+
+  # A steps field (catalog 1.17) falls back to one plain Text row per step,
+  # templated over the normalized `_steps_<field>` list: each row is the
+  # step's whole `line` ("1. Placed · Complete · 3 Nov 2026").
+  defp detail_value(view, detail, base, field) do
+    case view.fields[field] do
+      %{steps: true} -> steps_value(detail, base, field)
+      _other -> plain_detail_value(view, detail, base, field)
+    end
+  end
+
+  defp steps_value(detail, base, field) do
+    value_id = "#{base}_value_#{field}"
+
+    {value_id,
+     [
+       %{
+         "id" => value_id,
+         "component" => "Column",
+         "children" => %{
+           "componentId" => "#{base}_step_#{field}",
+           "path" => "/detail/#{detail.context}/_steps_#{field}"
+         }
+       },
+       %{
+         "id" => "#{base}_step_#{field}",
+         "component" => "Text",
+         "text" => %{"path" => "line"}
+       }
+     ]}
+  end
+
+  defp plain_detail_value(view, detail, base, field) do
+    linked_value(
+      detail,
+      field,
+      %{
+        "id" => "#{base}_value_#{field}",
+        "component" => "Text",
+        "text" => %{"path" => detail_value_path(view, detail, field)}
+      },
+      "/detail/#{detail.context}/"
+    )
   end
 
   # A detail card's heading: its label, else its humanized name — none when
