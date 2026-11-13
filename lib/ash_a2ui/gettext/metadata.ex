@@ -122,7 +122,7 @@ defmodule AshA2ui.Gettext.Metadata do
         primary_texts(component.primary_action) ++
         query_texts(table.query) ++
         edited_texts(component) ++
-        footer_texts(component)
+        card_texts(component)
 
     Enum.each(texts, fn
       {context, text} -> Label.translate(l10n, text, context)
@@ -130,9 +130,16 @@ defmodule AshA2ui.Gettext.Metadata do
     end)
   end
 
-  # A footer link shows only under the admin catalog.
-  defp footer_texts(%{footer_link: [_ | _] = link}), do: [link[:label]]
-  defp footer_texts(_component), do: []
+  # The card's header and caption, and a footer link (admin catalog only).
+  defp card_texts(component) do
+    footer =
+      case Map.get(component, :footer_link) do
+        [_ | _] = link -> [link[:label]]
+        _none -> []
+      end
+
+    Enum.filter([component.heading, component.description], &is_binary/1) ++ footer
+  end
 
   # A detail card's badge fields: their texts and help show only once a record
   # selects them, like a row layout's badge.

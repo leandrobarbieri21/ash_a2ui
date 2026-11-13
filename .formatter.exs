@@ -78,6 +78,7 @@ spark_locals_without_parens = [
   group_icon: 1,
   group_labels: 1,
   group_subtitle: 1,
+  heading: 1,
   help: 1,
   help_title: 1,
   hidden: 1,

@@ -1779,6 +1779,28 @@ defmodule AshA2ui do
         metadata domain.
         """
       ],
+      heading: [
+        type: :string,
+        doc: """
+        The header of the table's own card ("Order lines"), drawn above its
+        rows, inside the card. Unlike `label`, which names the table's
+        section, it is drawn only when declared, so several tables under one
+        `section` heading can each carry their own card header. Translated in
+        the metadata domain. The admin dataGrid carries it as `heading`
+        (catalog 1.18); the basic catalog draws it as a Text before the
+        table. Tables only.
+        """
+      ],
+      description: [
+        type: :string,
+        doc: """
+        A one-line caption under the table's card header, above its rows
+        ("Each line on this order, newest first."). Static text, translated
+        in the metadata domain. The admin dataGrid carries it as
+        `description` (catalog 1.18); the basic catalog draws it as a caption
+        Text before the table. Tables only.
+        """
+      ],
       footer_note: [
         type: :atom,
         doc: """
@@ -1818,9 +1840,10 @@ defmodule AshA2ui do
         doc: """
         The heading this component's section is shown under: a table's
         heading on multi-table surfaces, a `:detail` or `:report` card's
-        heading. Defaults to the humanized component name (`:contract_value`
-        reads "Contract value"), which cannot say "Properties & pricing".
-        Translated in the metadata domain like a field's `label`.
+        heading. Defaults to the humanized component name (`:order_total`
+        reads "Order total"), which cannot say "Products & pricing".
+        Translated in the metadata domain like a field's `label`. A table's
+        own card header is `heading`, not this.
         """
       ],
       as: [

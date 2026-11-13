@@ -52,6 +52,20 @@ Requires Elixir 1.20 or later.
   or `report` click until the server answers; a host that runs a report's rows
   on arrival brackets the fetch with the same messages.
 
+- **Admin catalog 1.18: table card headers.** A table's `heading` is the
+  header of its own card ("Order lines") and its `description` a one-line
+  caption under it, above the rows ("Each line on this order, newest
+  first."). Both are static text translated in the metadata domain. The
+  admin dataGrid carries them as `heading` and `description`, present only
+  when declared: `label` still names the table's section and always rides
+  on the grid (it falls back to the resource or component name), so a
+  renderer could not tell a declared card header from that default. Several
+  tables under one `section` heading can each carry their own. The stock
+  renderer draws the grid as one card with the header on top, in every
+  layout and above the empty state; the basic catalog draws them as an `h3`
+  and a caption Text just before the table. Verified: tables only, and not
+  on a board. The `Component` struct gains `heading` and `description`.
+
 - **Admin catalog 1.17: step fields.** A field's `steps true` marks a value
   that is a list of steps (`label`, optional `text` and `note`, and a
   `state`: `complete`, `current`, `upcoming` or `overdue`), drawn on

@@ -184,7 +184,7 @@ import {
 const ADMIN_CATALOG_ID = "https://ash-a2ui.dev/catalogs/admin/v1";
 
 /** The admin catalog contract version (additive within the v1 id). */
-export const ADMIN_CATALOG_VERSION = "1.17.0";
+export const ADMIN_CATALOG_VERSION = "1.18.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -505,6 +505,10 @@ export function buildSchemas(basicCatalog = null) {
       layout: EnumOf(["rows", "cards"]).optional(),
       // 1.16: the words on the disclosure opening the expand columns.
       expandLabel: Str.optional(),
+      // 1.18: the header of the table's own card and the caption under it,
+      // present only when declared (label stays the accessible name).
+      heading: Str.optional(),
+      description: Str.optional(),
       // 1.14: the icon name for a list-rows renderer's group headers.
       groupIcon: Str.optional(),
       // 1.15: the line under the rows (a binding) and the link beside it.
@@ -1510,6 +1514,40 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             gap: var(--am-space-2xs);
             margin-top: var(--am-space-m);
           }
+          /* 1.18: a declared heading frames the grid as one card, the
+           * header on top; the frame inside it drops its own edge. */
+          .grid-card {
+            border: var(--am-border-width) solid var(--am-border);
+            border-radius: var(--am-grid-radius);
+            background: var(--am-surface);
+            box-shadow: var(--am-grid-shadow);
+          }
+          .grid-heading {
+            display: grid;
+            gap: var(--am-space-2xs);
+            padding: var(--am-space-m) var(--am-space-l);
+          }
+          .grid-heading-title {
+            margin: 0;
+            font-size: var(--am-font-size-l);
+            font-weight: var(--am-font-weight-bold);
+            color: var(--am-text);
+          }
+          .grid-heading-description {
+            margin: 0;
+            font-size: var(--am-font-size-s);
+            color: var(--am-text-muted);
+          }
+          .grid-card .grid-frame,
+          .grid-card .grid-empty {
+            border: 0;
+            border-top: var(--am-border-width) solid var(--am-border);
+            border-radius: 0 0 var(--am-grid-radius) var(--am-grid-radius);
+            box-shadow: none;
+          }
+          .grid-card .grid-cards {
+            padding: 0 var(--am-space-l) var(--am-space-l);
+          }
           .grid-empty {
             display: grid;
             place-items: center;
@@ -1648,22 +1686,25 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const label = str(props.label);
         const {empty, pagination, prompts, rest} = this.partitionChildren();
 
+        const body =
+          rows.length === 0
+            ? html`
+                <div class="grid-empty">
+                  ${empty.length > 0
+                    ? empty.map((ref) => html`${this.renderNode(ref)}`)
+                    : html`<p class="no-records">
+                        ${label ? `${label}: no records` : "No records"}
+                      </p>`}
+                </div>
+              `
+            : html`
+                ${this.renderTable(columns, rows, rowActions, label)}
+                ${this.renderCards(columns, rows, rowActions, label)}
+              `;
+
         return html`
           <div class="grid-root">
-            ${rows.length === 0
-              ? html`
-                  <div class="grid-empty">
-                    ${empty.length > 0
-                      ? empty.map((ref) => html`${this.renderNode(ref)}`)
-                      : html`<p class="no-records">
-                          ${label ? `${label}: no records` : "No records"}
-                        </p>`}
-                  </div>
-                `
-              : html`
-                  ${this.renderTable(columns, rows, rowActions, label)}
-                  ${this.renderCards(columns, rows, rowActions, label)}
-                `}
+            ${this.renderCardHeader(props, body)}
             ${pagination.length > 0
               ? html`<div class="grid-pagination">
                   ${pagination.map((ref) => html`${this.renderNode(ref)}`)}
@@ -1676,6 +1717,28 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         // The ConfirmDialog is mounted imperatively in updated() — dynamic
         // tag names cannot appear in Lit templates without unsafeStatic,
         // which is not part of this factory's deps contract.
+      }
+
+      /**
+       * 1.18: a declared heading and caption make the grid one card: the
+       * header on top, then the rows (table or card list) or the empty
+       * state. Without them the body draws as before.
+       */
+      renderCardHeader(props, body) {
+        const heading = str(props.heading);
+        const description = str(props.description);
+        if (!heading && !description) return body;
+        return html`
+          <section class="grid-card" part="card">
+            <header class="grid-heading" part="heading">
+              ${heading ? html`<h3 class="grid-heading-title">${heading}</h3>` : nothing}
+              ${description
+                ? html`<p class="grid-heading-description">${description}</p>`
+                : nothing}
+            </header>
+            ${body}
+          </section>
+        `;
       }
 
       renderTable(columns, rows, rowActions, label) {

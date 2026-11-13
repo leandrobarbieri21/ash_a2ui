@@ -935,6 +935,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "groupIcon",
         table.component.row_layout && table.component.row_layout.group_icon
       )
+      |> put_grid_header(view, table.component)
       |> put_grid_footer(view, table.component)
       |> put_grid_sort(view, table)
       |> drop_inline_duplicate(view, table)
@@ -1079,6 +1080,41 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       %{pairs: true} -> Map.put(column, "pairs", true)
       _other -> column
     end
+  end
+
+  # Catalog 1.18: the table card's own header and the caption under it, above
+  # the rows. Only when declared: `label` names the section and always rides
+  # on the grid, so a renderer could not tell it from the default.
+  defp put_grid_header(grid, view, component) do
+    grid
+    |> maybe_put("heading", card_text(view, Map.get(component, :heading)))
+    |> maybe_put("description", card_text(view, Map.get(component, :description)))
+  end
+
+  defp card_text(view, text) when is_binary(text), do: Label.translate(view.l10n, text)
+  defp card_text(_view, _none), do: nil
+
+  # The basic catalog has no card header: the heading and caption are Texts
+  # drawn just before the table's collection.
+  defp card_header_ids(component, sfx) do
+    child_if(Map.get(component, :heading), "table#{sfx}_card_heading") ++
+      child_if(Map.get(component, :description), "table#{sfx}_card_description")
+  end
+
+  defp card_header_components(view, component, sfx) do
+    [
+      {"table#{sfx}_card_heading", Map.get(component, :heading), "h3"},
+      {"table#{sfx}_card_description", Map.get(component, :description), "caption"}
+    ]
+    |> Enum.filter(fn {_id, text, _variant} -> is_binary(text) end)
+    |> Enum.map(fn {id, text, variant} ->
+      %{
+        "id" => id,
+        "component" => "Text",
+        "text" => Label.translate(view.l10n, text),
+        "variant" => variant
+      }
+    end)
   end
 
   # Catalog 1.15: the line under a table's rows, in its card: the context
@@ -1783,6 +1819,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       create_button_ids(view, table, sfx) ++
       child_if(AshA2ui.Bulk.enabled?(table), AshA2ui.Bulk.toolbar_id(sfx)) ++
       child_if(AshA2ui.Calendar.calendar?(table), "calendar#{sfx}") ++
+      card_header_ids(component, sfx) ++
       [collection_id(table, sfx)] ++
       empty_state_ids(view, table, sfx) ++
       child_if(table.query, "query#{sfx}_pagination") ++
@@ -1909,7 +1946,7 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "text" => heading,
         "variant" => "h2"
       }
-      | collection_components(table, sfx)
+      | card_header_components(view, table.component, sfx) ++ collection_components(table, sfx)
     ] ++ bulk_toolbar_components(view, table, sfx)
   end
 
