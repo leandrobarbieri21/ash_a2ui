@@ -130,6 +130,14 @@ changes is the wire format and the way a host wires the renderer.
    with `AshA2ui.Info.build_surface/2` and `AshA2ui.ActionHandler.handle/3`
    (see Rendering Clients).
 
+### Features
+
+- A report input or column can take a declared label: a `field` override
+  naming a `:report` component's param or row key (`field :from do label
+  "From date" end`) labels the param input, the row cell caption, the export
+  column and the CSV header. Contributed by @suedoh in #80, ported onto the
+  A2UI 1.0 encoder.
+
 ### Bug Fixes:
 
 - **A host passing its own assigns to `surface_container/1` renders.** A

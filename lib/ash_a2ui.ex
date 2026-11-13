@@ -18,11 +18,21 @@ defmodule AshA2ui do
       name: [
         type: :atom,
         required: true,
-        doc: "The name of the resource attribute/calculation/aggregate this field maps to."
+        doc: """
+        The name of the resource attribute/calculation/aggregate this field
+        maps to, or a param or row key of a `:report` component (only `label`
+        applies to a report name).
+        """
       ],
       label: [
         type: :string,
-        doc: "Human-readable label. Defaults to a humanized version of the field name."
+        doc: """
+        Human-readable label. Defaults to a humanized version of the field
+        name. When the field names a `:report` component's param or row key,
+        the label reaches the param input, the row cell caption, the export
+        column and the CSV header; `widget`, `hidden` and `order` apply to
+        tables and forms only.
+        """
       ],
       widget: [
         type: :atom,
@@ -1893,7 +1903,8 @@ defmodule AshA2ui do
         The arguments of a `:report` component's `action` rendered as inputs
         (bound to the reserved `/report/<name>/params/<param>` paths and
         submitted by the Run button). Defaults to all of the action's
-        arguments, in declaration order.
+        arguments, in declaration order. Each input is labelled by a `field`
+        override of the same name, else by the humanized name.
         """
       ],
       param_placeholders: [

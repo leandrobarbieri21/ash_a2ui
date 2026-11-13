@@ -100,6 +100,131 @@ defmodule AshA2ui.VerifierTest do
       assert result =~ ~r/public attribute, calculation, or aggregate/
     end
 
+    @tag ac: "A2UI-NEW/AC-5"
+    test "field override naming a report param compiles cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule ReportParamOverride do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.BucketWord
+
+              component :report do
+                action :length_report
+                params [:min_length]
+                fields [:word, :length]
+              end
+
+              field :min_length do
+                label "Minimum length"
+              end
+            end
+          end
+        end)
+
+      refute result =~ ~r/does not exist/
+      refute result =~ ~r/unknown field/
+    end
+
+    @tag ac: "A2UI-NEW/AC-5"
+    test "field override naming an argument of a report without declared params compiles cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule ReportDefaultParamOverride do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.BucketWord
+
+              component :report do
+                action :length_report
+                fields [:word, :length]
+              end
+
+              field :min_length do
+                label "Minimum length"
+              end
+            end
+          end
+        end)
+
+      refute result =~ ~r/does not exist/
+      refute result =~ ~r/unknown field/
+    end
+
+    @tag ac: "A2UI-NEW/AC-5"
+    test "field override naming a report row key compiles cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule ReportRowKeyOverride do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.BucketWord
+
+              component :report do
+                action :length_report
+                params [:min_length]
+                fields [:word, :length]
+              end
+
+              field :length do
+                label "Letters"
+              end
+            end
+          end
+        end)
+
+      refute result =~ ~r/does not exist/
+      refute result =~ ~r/unknown field/
+    end
+
+    @tag ac: "A2UI-NEW/AC-5"
+    test "field override naming an argument the report does not render does not compile cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule ReportArgumentNotRendered do
+            @moduledoc false
+            use Ash.Resource, domain: nil, extensions: [AshA2ui]
+
+            attributes do
+              uuid_primary_key :id
+              attribute :name, :string, public?: true
+            end
+
+            actions do
+              defaults [:read]
+
+              action :usage_report, {:array, :map} do
+                argument :from, :date
+                argument :to, :date
+
+                run fn _input, _context -> {:ok, []} end
+              end
+            end
+
+            a2ui do
+              component :report do
+                action :usage_report
+                params [:from]
+                fields [:name]
+              end
+
+              field :to do
+                label "To date"
+              end
+            end
+          end
+        end)
+
+      assert result =~ ~r/field :to does not exist/
+      assert result =~ ~r/param or row key of a `:report` component/
+    end
+
     test "form field outside the action's accepts does not compile cleanly" do
       result =
         capture_io(:stderr, fn ->

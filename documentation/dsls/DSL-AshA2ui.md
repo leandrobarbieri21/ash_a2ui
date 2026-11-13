@@ -444,7 +444,7 @@ end
 | [`resource`](#a2ui-component-resource){: #a2ui-component-resource } | `atom` |  | A **related table**: the Ash resource this `:table` reads, when it is not the surface's own (`component :table, :messages do resource MyApp.Message; context_filter thread_id: :thread; require_context [:thread] end`). Its fields, `read_action`, `query`, `context_filter` keys, `source` paths and links are resolved against this resource, read as the surface's actor like every other table. Related tables are read-only: no `row_actions`, `editable` or `sections`, and a `select_context` must name a context over this resource. Defaults to the surface resource. |
 | [`read_action`](#a2ui-component-read_action){: #a2ui-component-read_action } | `atom` |  | The read action used to load records (tables). Defaults to the primary read. |
 | [`action`](#a2ui-component-action){: #a2ui-component-action } | `atom` |  | The generic Ash action a `:report` component runs (actor-scoped, authorized like any other invocation). Must return a list of row maps; the declared `fields` select and order the rendered columns. Required on `:report` components. |
-| [`params`](#a2ui-component-params){: #a2ui-component-params } | `list(atom)` |  | The arguments of a `:report` component's `action` rendered as inputs (bound to the reserved `/report/<name>/params/<param>` paths and submitted by the Run button). Defaults to all of the action's arguments, in declaration order. |
+| [`params`](#a2ui-component-params){: #a2ui-component-params } | `list(atom)` |  | The arguments of a `:report` component's `action` rendered as inputs (bound to the reserved `/report/<name>/params/<param>` paths and submitted by the Run button). Defaults to all of the action's arguments, in declaration order. Each input is labelled by a `field` override of the same name, else by the humanized name. |
 | [`param_placeholders`](#a2ui-component-param_placeholders){: #a2ui-component-param_placeholders } | `keyword` |  | A placeholder per `:report` param, e.g. `param_placeholders search: "Search vendors", status: "Any status"`. Emitted as that param's TextField `"placeholder"` on the admin catalog (the basic TextField takes none); the field keeps its `"label"` as its accessible name. Keys must be among `params`. |
 | [`create_action`](#a2ui-component-create_action){: #a2ui-component-create_action } | `atom` |  | The create action submitted by the form. |
 | [`update_action`](#a2ui-component-update_action){: #a2ui-component-update_action } | `atom` |  | The update action submitted by the form. |
@@ -1025,12 +1025,12 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`name`](#a2ui-field-name){: #a2ui-field-name .spark-required} | `atom` |  | The name of the resource attribute/calculation/aggregate this field maps to. |
+| [`name`](#a2ui-field-name){: #a2ui-field-name .spark-required} | `atom` |  | The name of the resource attribute/calculation/aggregate this field maps to, or a param or row key of a `:report` component (only `label` applies to a report name). |
 ### Options
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`label`](#a2ui-field-label){: #a2ui-field-label } | `String.t` |  | Human-readable label. Defaults to a humanized version of the field name. |
+| [`label`](#a2ui-field-label){: #a2ui-field-label } | `String.t` |  | Human-readable label. Defaults to a humanized version of the field name. When the field names a `:report` component's param or row key, the label reaches the param input, the row cell caption, the export column and the CSV header; `widget`, `hidden` and `order` apply to tables and forms only. |
 | [`widget`](#a2ui-field-widget){: #a2ui-field-widget } | `atom` |  | Widget override (e.g. `:text_field`, `:check_box`, `:choice_picker`, `:date_time_input`). Defaults via `AshA2ui.TypeMapper`. |
 | [`order`](#a2ui-field-order){: #a2ui-field-order } | `non_neg_integer` | `0` | Sort order of the field within components. Lower comes first. |
 | [`hidden`](#a2ui-field-hidden){: #a2ui-field-hidden } | `boolean` | `false` | Hide this field from all components. |

@@ -18,6 +18,7 @@ defmodule AshA2ui.L10n.ReviewFindingsTest do
   alias AshA2ui.Test.Gettext, as: TestGettext
   alias AshA2ui.Test.HubUI
   alias AshA2ui.Test.L10nScenarios
+  alias AshA2ui.Test.LabelledReportUI
   alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Minimal
   alias AshA2ui.Test.MinimalUI
@@ -139,6 +140,23 @@ defmodule AshA2ui.L10n.ReviewFindingsTest do
     pseudo = L10nScenarios.run(L10nScenarios.scenario("hub_build_admin"), @pseudo)
     assert pseudo =~ ~s("hint": "⟪Statuses update nightly.⟫")
     assert {nil, "Statuses update nightly."} in Metadata.surface_messages(HubUI)
+  end
+
+  @tag ac: "A2UI-NEW/AC-7"
+  test "a declared report label is translated once and extracted in place of the humanized name" do
+    json = LabelledReportUI |> Info.build_surface(@pseudo) |> Jason.encode!()
+
+    assert json =~ ~s("label":"⟪Minimum length⟫")
+    assert json =~ ~s("text":"⟪Letters⟫")
+    refute json =~ "⟪⟪"
+    refute json =~ "Min length"
+
+    messages = Metadata.surface_messages(LabelledReportUI)
+
+    assert {nil, "Minimum length"} in messages
+    assert {nil, "Letters"} in messages
+    refute {nil, "Min length"} in messages
+    refute {nil, "Length"} in messages
   end
 
   test "the inline-edit feedback's field name is in the extracted catalog" do

@@ -30,6 +30,11 @@ actions) and `export` blocks (server-generated CSV via a
 - `param_placeholders search: "Search vendors"` gives a param's input a
   placeholder (admin catalog; the label stays as its accessible name). Keys
   must be among `params`.
+- A `field` override may name a report param or row key
+  (`field :from do label "From date" end`): its `label` reaches the param
+  input, the cell caption, the export column and the CSV header. Only
+  `label` applies to a report name, and the override is shared with the
+  surface's tables and form, so one name carries one label.
 - The action runs actor-scoped with the surface's `authorize?` — scope
   inside the action's `run` via `context.actor` where needed.
 - Results land wholesale at `/report/<name>/rows`. The `/ui/feedback`

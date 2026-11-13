@@ -30,6 +30,10 @@ component :report, :usage do
   params [:from, :to]              # defaults to all of the action's arguments
   fields [:user, :visits, :minutes] # required: the column allowlist
 end
+
+field :from do
+  label "From date"                # labels the param input (default: "From")
+end
 ```
 
 ### Rendering
@@ -38,13 +42,22 @@ A report section is a Card (`report_<name>`, a root child) containing:
 
 - a heading (the humanized component name),
 - one TextField per param, bound to the reserved
-  `/report/<name>/params/<param>` path,
+  `/report/<name>/params/<param>` path and labelled by the `field` override
+  of the same name (else the humanized param name),
 - a **Run** button dispatching the `"report"` client action (context:
   `"component"` and the current `"params"` bound from
   `/report/<name>/params`),
 - a List templated over `/report/<name>/rows`, each row a Row of
   caption-labeled cells — one per declared field, bound template-relative
-  to the row map's keys.
+  to the row map's keys (the caption is the `field` label, else the
+  humanized key).
+
+A `field` override may name a report param or row key even though neither
+is a resource field. Only `label` applies to a report name: `hidden`,
+`order` and `widget` are ignored for it. Overrides are shared by every
+component of the surface, so a name used as a report param and as a table
+column or form field on the same surface carries one label; do not reuse a
+form field's name for an unrelated report param.
 
 ### The `"report"` action
 

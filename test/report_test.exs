@@ -15,6 +15,7 @@ defmodule AshA2ui.ReportTest do
   alias AshA2ui.Experience
   alias AshA2ui.ResolvedView
   alias AshA2ui.Test.BucketWord
+  alias AshA2ui.Test.LabelledReportUI
   alias AshA2ui.Test.Messages
   alias AshA2ui.Test.Surface
   alias AshA2ui.Test.WordReportUI
@@ -34,6 +35,20 @@ defmodule AshA2ui.ReportTest do
 
   defp create_word!(word) do
     Ash.create!(BucketWord, %{word: word}, authorize?: false)
+  end
+
+  defp download_csv(messages) do
+    args =
+      Enum.find_value(messages, fn
+        %{"callRendererFunction" => %{"callFunction" => %{"@call" => "downloadFile"} = call}} ->
+          call["args"]
+
+        _ ->
+          nil
+      end)
+
+    ["data:text/csv;base64," <> base64] = [args["dataUrl"]]
+    Base.decode64!(base64)
   end
 
   describe "resolution" do
@@ -277,6 +292,50 @@ defmodule AshA2ui.ReportTest do
                  "functionCallId" => "run_1",
                  "result" => %{"count" => 1}
                })
+    end
+  end
+
+  describe "declared labels" do
+    setup do
+      create_word!("ab")
+      create_word!("abcdef")
+
+      [message] = AshA2ui.Info.build_surface(LabelledReportUI, authorize?: false)
+      assert_valid_agent_message(message)
+
+      %{components: Map.new(message["createSurface"]["components"], &{&1["id"], &1})}
+    end
+
+    @tag ac: "A2UI-NEW/AC-6"
+    test "the param input carries the declared label", %{components: components} do
+      assert components["report_lengths_param_min_length"]["label"] == "Minimum length"
+    end
+
+    @tag ac: "A2UI-NEW/AC-6"
+    test "the row cell caption and the export column carry the declared label", %{
+      components: components
+    } do
+      assert components["report_lengths_cell_length_label"]["text"] == "Letters"
+      assert components["report_lengths_export_column_length"]["label"] == "Letters"
+      # an undeclared name keeps its humanized label
+      assert components["report_lengths_cell_state_label"]["text"] == "State"
+    end
+
+    @tag ac: "A2UI-NEW/AC-6"
+    test "the CSV header carries the declared label" do
+      message =
+        Messages.call(
+          "export",
+          "labelled_report",
+          %{
+            "params" => %{"min_length" => "3"},
+            "columns" => %{"word" => true, "length" => true}
+          },
+          id: "call-1"
+        )
+
+      assert {:ok, messages} = ActionHandler.handle(LabelledReportUI, message, authorize?: false)
+      assert download_csv(messages) == "Word,Letters\r\nabcdef,6\r\n"
     end
   end
 end

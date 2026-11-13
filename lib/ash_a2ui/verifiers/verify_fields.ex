@@ -5,6 +5,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     * every component field (declared or inferred) and every `field` override
       name is a public attribute, calculation, or aggregate of the resolved
       resource — a related table's (`resource`) fields of its own resource,
+      and a `field` override may also name a param or row key of a `:report`
+      component,
     * `:form` component fields never name a calculation or aggregate (they
       are not writable — table-only),
     * `:form` component fields are a subset of the accepts + argument names of
@@ -43,6 +45,7 @@ defmodule AshA2ui.Verifiers.VerifyFields do
           dsl_state
           |> related_resources(target)
           |> Enum.reduce(known, &MapSet.union(&2, known_field_names(&1)))
+          |> MapSet.union(report_field_names(dsl_state, target))
 
         with :ok <- verify_components(dsl_state, target, module, known, exempt),
              :ok <- verify_field_overrides(dsl_state, module, overridable, exempt),
@@ -207,7 +210,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
             message: """
             field #{inspect(field.name)} does not exist on the resource.
 
-            Every field override must name a public attribute, calculation, or aggregate. \
+            Every field override must name a public attribute, calculation, or aggregate, \
+            or a param or row key of a `:report` component. \
             Available fields: #{inspect(MapSet.to_list(known))}
             """
           )}}
@@ -378,6 +382,27 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     dsl_state
     |> Verifier.get_entities([:a2ui])
     |> Enum.filter(&is_struct(&1, AshA2ui.Component))
+  end
+
+  # A report's row keys and the params it renders: the declared `params`,
+  # else every argument of its action (as AshA2ui.ResolvedView defaults
+  # them), else none when the action does not resolve (VerifyReports
+  # reports that).
+  defp report_field_names(dsl_state, target) do
+    for %AshA2ui.Component{name: :report} = component <- components(dsl_state),
+        name <- (component.fields || []) ++ report_params(target, component),
+        into: MapSet.new(),
+        do: name
+  end
+
+  defp report_params(_target, %AshA2ui.Component{params: params}) when is_list(params),
+    do: params
+
+  defp report_params(target, %AshA2ui.Component{action: action}) do
+    case action && Info.action(target, action) do
+      %{arguments: arguments} -> Enum.map(arguments, & &1.name)
+      _unresolved -> []
+    end
   end
 
   defp related_resources(dsl_state, target) do

@@ -743,10 +743,15 @@ msgstr ""
 msgid "Length"
 msgstr ""
 
+#: test/support/labelled_report_ui.ex:1
 #: test/support/word_report_ui.ex:1
 #: test/support/word_report_ui.ex:100
 #: test/support/word_report_ui.ex:23
 msgid "Lengths"
+msgstr ""
+
+#: test/support/labelled_report_ui.ex:1
+msgid "Letters"
 msgstr ""
 
 #: test/support/hub_ui.ex:1
@@ -812,6 +817,10 @@ msgstr ""
 #: test/support/minimal.ex:1
 #: test/support/minimal_ui.ex:1
 msgid "Minimal"
+msgstr ""
+
+#: test/support/labelled_report_ui.ex:1
+msgid "Minimum length"
 msgstr ""
 
 #: test/support/action_handler_fixtures.ex:152
@@ -1381,6 +1390,7 @@ msgstr ""
 msgid "Starts on"
 msgstr ""
 
+#: test/support/labelled_report_ui.ex:1
 #: test/support/review_item.ex:1
 #: test/support/submission.ex:1
 #: test/support/word_report_ui.ex:1
@@ -1712,6 +1722,7 @@ msgstr ""
 #: test/support/bucket_words_ui.ex:60
 #: test/support/editable_words_ui.ex:1
 #: test/support/editable_words_ui.ex:26
+#: test/support/labelled_report_ui.ex:1
 #: test/support/word_report_ui.ex:1
 #: test/support/word_report_ui.ex:100
 #: test/support/word_report_ui.ex:23
