@@ -49,7 +49,7 @@ defmodule AshA2ui.Manifest do
         label: "Referral",                # the grid's accessible name (admin catalog)
         resource: MyApp.Referral,         # the resource the table reads
         read_action: :read,               # the read without a preset
-        display: :list,                   # :list | :board | :calendar | :timeline | :matrix
+        display: :list,                   # :list | :rows | :cards | :board | :calendar | :timeline | :matrix
         sectioned: false,                 # true: one rendered table per section record
         component_id: "data_grid",        # the element carrying the rows (see Selectors)
         records_path: "/records",
@@ -362,7 +362,7 @@ defmodule AshA2ui.Manifest do
   # runtime suffix per section).
   defp component_id(view, table) do
     cond do
-      table.sections || table.component.display not in [:list, :rows] -> nil
+      table.sections || table.component.display not in [:list, :rows, :cards] -> nil
       Experience.admin?(view) -> "data_grid#{table_suffix(view, table)}"
       table.component.row_layout -> "record_row#{table_suffix(view, table)}_body"
       true -> "record_row#{table_suffix(view, table)}_content"

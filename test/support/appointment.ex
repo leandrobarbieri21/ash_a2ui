@@ -37,6 +37,28 @@ defmodule AshA2ui.Test.Appointment do
               expr(if status == :completed, do: nil, else: "/visits/" <> type(id, :string)) do
       public? true
     end
+
+    # A visit's labeled values whose labels vary per record (`pairs`), and a
+    # badge already in words.
+    calculate :details,
+              {:array, :map},
+              fn records, _context ->
+                Enum.map(records, fn visit ->
+                  [%{"term" => "Title", "value" => visit.title}] ++
+                    if(visit.status,
+                      do: [%{"term" => "Status", "value" => to_string(visit.status)}],
+                      else: []
+                    )
+                end)
+              end do
+      public? true
+    end
+
+    calculate :seen_by,
+              :string,
+              expr("Seen by Dr. " <> title) do
+      public? true
+    end
   end
 
   actions do

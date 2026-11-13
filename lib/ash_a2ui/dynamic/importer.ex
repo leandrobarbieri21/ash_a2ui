@@ -226,6 +226,7 @@ defmodule AshA2ui.Dynamic.Importer do
 
   defp put_display(spec, %{display: :board}), do: Map.put(spec, "display", "board")
   defp put_display(spec, %{display: :rows}), do: Map.put(spec, "display", "rows")
+  defp put_display(spec, %{display: :cards}), do: Map.put(spec, "display", "cards")
 
   defp put_display(spec, %{display: :timeline} = component) do
     spec
@@ -297,6 +298,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_list("trailing", layout.trailing)
       |> put_list("expand", layout.expand)
       |> put_opt("leading", layout.leading)
+      |> put_opt("expand_label", layout.expand_label)
       |> put_opt("group_by", layout.group_by)
       |> put_opt("group_subtitle", layout.group_subtitle)
       |> put_opt("group_icon", layout.group_icon)
@@ -470,6 +472,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("link_label", field.link_label)
       |> put_opt("link_url", field.link_url)
       |> put_value("download", field.download)
+      |> put_value("pairs", field.pairs)
       |> put_value("note", field.note)
       |> put_value("empty_text", field.empty_text)
       |> put_keyword("badge_text", field.badge_text, :raw)

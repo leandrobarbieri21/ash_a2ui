@@ -365,7 +365,8 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
          :ok <- verify_layout_fields_distinct(layout, module),
          :ok <- verify_badge_text(layout, module),
          :ok <- verify_badge_help(layout, module),
-         :ok <- verify_group(layout, module) do
+         :ok <- verify_group(layout, module),
+         :ok <- verify_expand_label(layout, module) do
       verify_badge_tones(layout, module)
     end
   end
@@ -384,6 +385,15 @@ defmodule AshA2ui.Verifiers.VerifyLayouts do
   end
 
   defp verify_group(_layout, _module), do: :ok
+
+  defp verify_expand_label(%{expand_label: label, expand: []}, module) when is_binary(label) do
+    {:error,
+     error(module, [:a2ui, :component, :table, :row_layout, :expand_label],
+       message: "row_layout declares expand_label without expand fields"
+     )}
+  end
+
+  defp verify_expand_label(_layout, _module), do: :ok
 
   defp verify_layout_fields_known(%{fields: nil}, _layout, _module), do: :ok
 

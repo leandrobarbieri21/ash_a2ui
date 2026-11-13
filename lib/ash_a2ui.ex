@@ -146,6 +146,16 @@ defmodule AshA2ui do
         Table/detail only.
         """
       ],
+      pairs: [
+        type: :boolean,
+        doc: """
+        The field's value is a list of `%{"term" => _, "value" => _}` maps (a
+        `{:array, :map}` calculation): labeled values whose labels vary per
+        record, such as a record's extracted terms. Its admin dataGrid column
+        carries `"pairs": true` (admin catalog 1.16), and a renderer draws one
+        labeled row per pair; renderers that ignore it show the raw list.
+        """
+      ],
       download: [
         type: :boolean,
         doc: """
@@ -1301,6 +1311,15 @@ defmodule AshA2ui do
         basic card shows them in its metadata grid.
         """
       ],
+      expand_label: [
+        type: :string,
+        doc: """
+        The words on the disclosure that opens the `expand` fields ("Show
+        notes"). The admin dataGrid carries it as `expandLabel` (admin
+        catalog 1.16). Translated in the metadata domain. Only with `expand`
+        fields.
+        """
+      ],
       leading: [
         type: :atom,
         doc: """
@@ -1876,7 +1895,7 @@ defmodule AshA2ui do
         """
       ],
       display: [
-        type: {:one_of, [:list, :rows, :board, :calendar, :timeline, :matrix]},
+        type: {:one_of, [:list, :rows, :cards, :board, :calendar, :timeline, :matrix]},
         default: :list,
         doc: """
         How a `:table` lays out its records. `:list` (default) renders rows
@@ -1885,7 +1904,12 @@ defmodule AshA2ui do
         — and requires a `row_layout`: the admin dataGrid carries
         `"layout": "rows"`, which renderers may draw as list rows (title and
         subtitle, badge, trailing values, an opening detail); renderers that
-        ignore it draw the grid. `:board` renders a
+        ignore it draw the grid. `:cards` draws each record as its own card
+        and also requires a `row_layout`: the layout's title and badge head
+        the card, its `meta` fields are labeled rows, and its `expand` fields
+        fold under a disclosure named by `expand_label`. The admin dataGrid
+        carries `"layout": "cards"`; renderers that ignore it draw the grid.
+        `:board` renders a
         sectioned table's sections side by side as lanes, each with its
         heading and total, card list and pagination; it requires a
         `sections` block and a `row_layout`, and cards move between lanes

@@ -929,7 +929,8 @@ defmodule AshA2ui.Encoder.V0_9_1 do
         "children" => ["empty_state#{sfx}" | pagination_children] ++ prompt_ids
       }
       |> put_row_click(view, table)
-      |> maybe_put("layout", if(table.component.display == :rows, do: "rows"))
+      |> maybe_put("layout", grid_layout(table.component.display))
+      |> maybe_put("expandLabel", expand_label(view, table.component.row_layout))
       |> maybe_put(
         "groupIcon",
         table.component.row_layout && table.component.row_layout.group_icon
@@ -1052,11 +1053,32 @@ defmodule AshA2ui.Encoder.V0_9_1 do
       |> put_column_presentation(view, table.resource, field)
       |> put_column_badge(layout, field)
       |> put_column_placement(layout, field)
+      |> put_column_pairs(view, field)
       |> put_empty_text(view, field)
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
     end)
+  end
+
+  # Catalog 1.12 list rows and 1.16 cards: a layout the admin dataGrid draws
+  # instead of its grid.
+  defp grid_layout(:rows), do: "rows"
+  defp grid_layout(:cards), do: "cards"
+  defp grid_layout(_display), do: nil
+
+  # Catalog 1.16: the words on the disclosure that opens the expand fields.
+  defp expand_label(view, %{expand_label: label}) when is_binary(label),
+    do: Label.translate(view.l10n, label)
+
+  defp expand_label(_view, _layout), do: nil
+
+  # Catalog 1.16: a field whose value is a list of {term, value} pairs.
+  defp put_column_pairs(column, view, field) do
+    case view.fields[field] do
+      %{pairs: true} -> Map.put(column, "pairs", true)
+      _other -> column
+    end
   end
 
   # Catalog 1.15: the line under a table's rows, in its card: the context

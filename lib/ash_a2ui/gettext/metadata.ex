@@ -194,6 +194,7 @@ defmodule AshA2ui.Gettext.Metadata do
 
     Keyword.values(layout.badge_text) ++
       Keyword.values(Map.get(layout, :badge_help, [])) ++
+      List.wrap(Map.get(layout, :expand_label)) ++
       unlabeled
   end
 

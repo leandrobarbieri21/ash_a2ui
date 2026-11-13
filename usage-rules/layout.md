@@ -178,6 +178,44 @@ topics for the full contracts.
   columns carry `"placement": "group" | "groupSubtitle"` and the dataGrid
   `groupIcon`; the basic card shows them in its metadata grid.
 
+## Cards (`display :cards`)
+
+- Records that each read as a small document (an order's notes, a policy's
+  terms) draw one card per row: `display :cards` plus a `row_layout`. The
+  layout's `title` and `badge` head the card, its `meta` fields are
+  labeled rows, and its `expand` fields fold under a disclosure named by
+  `expand_label`:
+
+  ```elixir
+  component :table, :terms do
+    resource MyApp.OrderTerm
+    display :cards
+    fields [:name, :status_text, :details, :original_text]
+    context_filter order_id: :order
+
+    row_layout do
+      title :name
+      badge :status_text          # a string already in words shows as written
+      meta [:details]
+      expand [:original_text]
+      expand_label "Show original text"
+    end
+  end
+
+  field :details, do: pairs(true)
+  ```
+
+- A field's `pairs true` says its value is a list of
+  `%{"term" => _, "value" => _}` maps (an `{:array, :map}` calculation):
+  labeled values whose labels differ per record. The renderer draws one
+  labeled row per pair.
+- `display :cards` without a `row_layout`, and `expand_label` without
+  `expand` fields, do not compile. `expand_label` translates as metadata.
+- Admin catalog 1.16: the dataGrid carries `"layout": "cards"` and
+  `expandLabel`, and the pairs column `"pairs": true`. A renderer that
+  ignores them draws the grid. The basic catalog draws its usual card,
+  with the expand fields in its metadata grid.
+
 ## Table columns
 
 - A `column` entity on a `:table` says how the admin data grid draws one

@@ -309,6 +309,7 @@ msgstr ""
 msgid "Clinic"
 msgstr ""
 
+#: test/support/card_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 msgid "Clinic id"
@@ -475,6 +476,7 @@ msgstr ""
 msgid "Destroy"
 msgstr ""
 
+#: test/support/card_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
 #: test/support/promotion.ex:1
 msgid "Details"
@@ -985,6 +987,7 @@ msgid "Overview"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
+#: test/support/card_visits_ui.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
@@ -1269,6 +1272,10 @@ msgstr ""
 msgid "Seen at"
 msgstr ""
 
+#: test/support/card_visits_ui.ex:1
+msgid "Seen by"
+msgstr ""
+
 #: test/support/appointments_ui.ex:1
 msgctxt "select_context"
 msgid "Select appointment"
@@ -1318,6 +1325,10 @@ msgstr ""
 
 #: test/support/article.ex:1
 msgid "Shout title"
+msgstr ""
+
+#: test/support/card_visits_ui.ex:1
+msgid "Show clinic"
 msgstr ""
 
 #: test/support/table_displays.ex:101
@@ -1527,6 +1538,7 @@ msgstr ""
 #: test/support/calendar_event.ex:218
 #: test/support/calendar_event.ex:80
 #: test/support/captioned_task.ex:1
+#: test/support/card_visits_ui.ex:1
 #: test/support/column_task.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
