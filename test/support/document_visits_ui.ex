@@ -24,11 +24,11 @@ defmodule AshA2ui.Test.DocumentVisitsUI do
       fields [:status, :title, :scheduled_for]
       context_filter owner_id: :owner
       require_context [:owner]
-      footer_note(:name)
-      footer_link(href: "#all", label: "All visits")
+      footer_note :name
+      footer_link href: "#all", label: "All visits"
 
       row_layout do
-        leading(:status)
+        leading :status
         title :title
         trailing [:scheduled_for]
       end
@@ -36,7 +36,7 @@ defmodule AshA2ui.Test.DocumentVisitsUI do
 
     field :title do
       link_url :page_url
-      download(true)
+      download true
     end
   end
 end
