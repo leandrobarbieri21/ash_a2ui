@@ -268,6 +268,46 @@ topics for the full contracts.
   `steps` with `pairs`, a badge (`badge_text`, `badge_tones`,
   `badge_help`), `link`, `links`, `link_url` or `source` does not compile.
 
+## Table card headers (`heading`, `description`)
+
+- A table that sits in a card of its own on a record page takes a card
+  header and a one-line caption above its rows. Several tables can share
+  one page `section` heading and each still name its own card:
+
+  ```elixir
+  component :table, :lines do
+    section "Order"
+    heading "Order lines"
+    description "Each line on this order, newest first."
+    resource MyApp.OrderLine
+    fields [:product_name, :quantity, :price]
+    context_filter order_id: :order
+  end
+
+  component :table, :shipments do
+    section "Order"
+    heading "Shipments"
+    resource MyApp.Shipment
+    fields [:carrier, :shipped_on]
+    context_filter order_id: :order
+  end
+  ```
+
+- `heading` is not `label`. `label` names the table's section (the
+  heading over a table on multi-table surfaces) and the collection's
+  accessible name; `heading` is drawn only where declared, inside the
+  table's card. Use `heading` for the card's own header.
+- Both are static text, translated in the metadata domain. For a line that
+  reads from the record (a count, a date), use a `section_note` or a
+  `footer_note` instead.
+- Admin catalog 1.18: the dataGrid carries `heading` and `description`
+  only when declared. The stock renderer draws the grid as one card, the
+  header on top and the caption muted under it, in every layout (table,
+  rows, cards) and above the empty state when there are no rows. The basic
+  catalog draws an `h3` Text and a caption Text just before the table.
+- Tables only, and not on a board (a lane has no card): elsewhere they do
+  not compile.
+
 ## Table columns
 
 - A `column` entity on a `:table` says how the admin data grid draws one

@@ -188,6 +188,8 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_opt("label", component.label)
       |> put_opt("section", component.section)
       |> put_opt("section_note", component.section_note)
+      |> put_opt("heading", component.heading)
+      |> put_opt("description", component.description)
       |> put_opt("footer_note", component.footer_note)
       |> put_keyword("footer_link", component.footer_link, :raw)
       |> put_list("hide_empty", component.hide_empty)

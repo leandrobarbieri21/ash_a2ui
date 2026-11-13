@@ -1,6 +1,8 @@
 defmodule AshA2ui.Verifiers.VerifyTableDisplays do
   @moduledoc """
-  Verifies at compile time that timelines (`display :timeline`, see
+  Verifies at compile time that a table's card header and caption
+  (`heading`, `description`) stay on tables, that list rows and cards have a
+  row layout, and that timelines (`display :timeline`, see
   `AshA2ui.Timeline`) and matrices (`display :matrix`, see
   `AshA2ui.Matrix`) are sound. The rules are `AshA2ui.Timeline.validate/2`
   and `AshA2ui.Matrix.validate/2`, shared with composed surfaces
@@ -29,6 +31,7 @@ defmodule AshA2ui.Verifiers.VerifyTableDisplays do
       resource = VerifyCalendar.table_resource(component, dsl_state)
 
       with :ok <- validate_rows(component),
+           :ok <- validate_card_header(component),
            :ok <- AshA2ui.Timeline.validate(component, resource),
            :ok <- AshA2ui.Matrix.validate(component, resource) do
         {:cont, :ok}
@@ -44,6 +47,24 @@ defmodule AshA2ui.Verifiers.VerifyTableDisplays do
        do: {:error, :display, "display #{inspect(display)} requires a row_layout"}
 
   defp validate_rows(_component), do: :ok
+
+  # A card header and caption head a table's own card; a board lane has none.
+  defp validate_card_header(%Component{} = component) do
+    problem =
+      cond do
+        component.name != :table -> "is for tables: it heads the table's card"
+        component.display == :board -> "is not drawn on a board lane: it has no card"
+        true -> nil
+      end
+
+    case problem && Enum.find([:heading, :description], &Map.get(component, &1)) do
+      option when option in [:heading, :description] ->
+        {:error, option, "#{option} #{problem}"}
+
+      _none ->
+        :ok
+    end
+  end
 
   defp error(component, module, option, message) do
     key = Component.key(component)

@@ -25,6 +25,8 @@ defmodule AshA2ui.Dynamic.Promoter do
     label: :raw,
     section: :raw,
     section_note: :name,
+    heading: :raw,
+    description: :raw,
     footer_note: :name,
     footer_link: :string_keyword,
     hide_empty: :name_list,

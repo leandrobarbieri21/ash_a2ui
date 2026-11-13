@@ -126,6 +126,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "label" => :label,
     "section" => :section,
     "section_note" => :section_note,
+    "heading" => :heading,
+    "description" => :description,
     "footer_note" => :footer_note,
     "footer_link" => :footer_link,
     "hide_empty" => :hide_empty,

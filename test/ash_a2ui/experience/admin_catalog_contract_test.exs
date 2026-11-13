@@ -103,11 +103,26 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert Map.has_key?(catalog["x-changelog"], "1.3.0")
   end
 
+  test "catalog 1.18 is additive: table card headers" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert catalog["version"] == "1.18.0"
+    assert Experience.admin_catalog_version() == "1.18.0"
+    assert catalog["x-changelog"]["1.18.0"] =~ "table card headers"
+
+    grid = catalog["components"]["dataGrid"]["properties"]
+    assert grid["heading"]["type"] == "string"
+    assert grid["description"]["type"] == "string"
+
+    source = File.read!(@renderer_asset_path)
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.18.0")
+    assert source =~ "heading: Str.optional()"
+    assert source =~ ~s(<header class="grid-heading")
+  end
+
   test "catalog 1.17 is additive: step fields" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
-    assert catalog["version"] == "1.17.0"
-    assert Experience.admin_catalog_version() == "1.17.0"
     assert catalog["x-changelog"]["1.17.0"] =~ "step fields"
 
     steps = catalog["components"]["fieldDisplay"]["properties"]["steps"]
@@ -115,7 +130,6 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert steps["required"] == ["path"]
 
     source = File.read!(@renderer_asset_path)
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "1.17.0")
     assert source =~ "steps: DynamicValueSchema.nullable().optional()"
     assert source =~ ~s(<ol class="field-steps")
   end

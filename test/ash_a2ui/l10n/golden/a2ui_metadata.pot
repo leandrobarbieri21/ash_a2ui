@@ -33,6 +33,7 @@ msgid "All"
 msgstr ""
 
 #: test/support/document_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 msgid "All visits"
 msgstr ""
 
@@ -356,6 +357,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:88
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
@@ -544,6 +546,10 @@ msgstr ""
 
 #: test/support/column_task.ex:1
 msgid "Due {date}"
+msgstr ""
+
+#: test/support/headed_visits_ui.ex:1
+msgid "Each visit for this owner. Details come from the latest."
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
@@ -995,6 +1001,7 @@ msgstr ""
 #: test/support/card_visits_ui.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
@@ -1228,12 +1235,14 @@ msgid "Role"
 msgstr ""
 
 #: test/support/appointment_page_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 msgid "Schedule"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
@@ -1251,6 +1260,7 @@ msgstr ""
 #: test/support/appointments_ui.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 msgid "Scheduled for"
 msgstr ""
@@ -1409,6 +1419,7 @@ msgstr ""
 #: test/support/diagram_flow.ex:114
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/hub_ui.ex:1
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
@@ -1551,6 +1562,7 @@ msgstr ""
 #: test/support/column_task.ex:1
 #: test/support/document_visits_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/linked_filters_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
 #: test/support/links.ex:135
@@ -1649,7 +1661,12 @@ msgstr ""
 msgid "Visit card"
 msgstr ""
 
+#: test/support/headed_visits_ui.ex:1
+msgid "Visit history"
+msgstr ""
+
 #: test/support/grouped_visits_ui.ex:1
+#: test/support/headed_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 msgid "Visits"

@@ -4,8 +4,9 @@
   "title": "AshA2ui Admin Catalog v1",
   "description": "Semantic admin components for AshA2ui surfaces (see notes/2026-09-07-admin-catalog-contract.md). Extends the A2UI basic catalog: basic inputs, buttons and pickers remain available inside admin surfaces; the admin vocabulary adds the page shell, collection, task panel and feedback components. Selected with `config :ash_a2ui, :catalog, :admin_v1`. Property values are literals or data-model path bindings using the same {\"path\": ...} template-ref mechanism the basic encoders emit.",
   "catalogId": "https://ash-a2ui.dev/catalogs/admin/v1",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "x-changelog": {
+    "1.18.0": "Additive: table card headers. dataGrid gains an optional heading (the header of the table's own card, translated, present only when the table declares one; label stays the collection's accessible name and is not a heading) and an optional description (a one-line caption under the heading, above the rows, translated). A renderer draws both inside the table's card in every layout, and above the empty state when there are no rows. Renderers that ignore them leave them out. The catalogId is unchanged.",
     "1.17.0": "Additive: step fields. fieldDisplay gains an optional steps (a binding to a steps field's steps, /detail/<context>/_steps_<field>: a list of {number, label, text?, note?, state, stateLabel, line} objects, state one of complete, current, upcoming or overdue and stateLabel its words, translated), drawn as a numbered stepper. Renderers that ignore it draw the value. The catalogId is unchanged.",
     "1.16.0": "Additive: card rows. dataGrid layout gains cards (one card per row: the title and badge head it, the other columns are labeled rows, and expand columns fold under a disclosure), the dataGrid an optional expandLabel (the words on that disclosure, translated) and columns an optional pairs (true: the value is a list of {term, value} objects, drawn as one labeled row each). Renderers that ignore them draw the grid. The catalogId is unchanged.",
     "1.15.0": "Additive: document rows and table footers. dataGrid columns gain the placement leading (a short code drawn before the row's title, such as a file's type); a plain link object may carry download: true (the address is a file to download, not a page to open); the dataGrid gains an optional footerNote (a binding to a line of text drawn under the rows, inside the table's card) and footerLink ({href, label}: a link beside it). Renderers that ignore them draw the column as any other, follow the link, and leave the footer out. The catalogId is unchanged.",
@@ -186,6 +187,14 @@
           "type": "string",
           "enum": ["rows", "cards"],
           "description": "Optional (1.12): rows asks for list rows instead of a grid: no header, each row its title (and subtitle), badge, trailing columns, and a disclosure opening its expand columns. 1.16: cards asks for one card per row, headed by its title and badge, its other columns as labeled rows and its expand columns under a disclosure. Renderers that ignore it draw the grid."
+        },
+        "heading": {
+          "type": "string",
+          "description": "Optional (1.18): the header of the table's own card (\"Order lines\"), translated; present only when the table declares one. Drawn above the rows (or the empty state), inside the card, in every layout."
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional (1.18): a one-line caption under the card's heading, above the rows (or the empty state), muted; translated."
         },
         "expandLabel": {
           "type": "string",
