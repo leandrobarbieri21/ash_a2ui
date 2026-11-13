@@ -40,6 +40,20 @@ Requires Elixir 1.20 or later.
 
 ### Features:
 
+- **More than one surface on a page.** `AshA2ui.LiveRenderer.surface_container/1`
+  takes optional `id` (default `"ash-a2ui-surface"`), `surface` (rendered as
+  `data-a2ui-surface`) and `primary` (`data-a2ui-primary`) attrs; the
+  defaults render the same markup as before. The JS hook reads them: a
+  container with a `surface` takes only that surface's messages and binds
+  only that surface, a v1.0 `actionResponse` goes to the hook that sent the
+  action, and messages that name no surface (`callFunction`) go to the
+  primary container. Before, every hook on a page took every
+  `"a2ui:messages"` push, so two hooks drew the same surface. A page with
+  no `surface` and no `primary` routes as before. Building and pushing the
+  second surface's messages, and routing its `"a2ui:action"` events by
+  `surfaceId` to `AshA2ui.ActionHandler.handle/3`, stay with the host; see
+  the LiveView usage rules.
+
 - **`param_placeholders` on a `:report` component.** A placeholder per report
   param (`param_placeholders search: "Search vendors"`), emitted as the param
   TextField's `"placeholder"` under the admin catalog, as `search_placeholder`
