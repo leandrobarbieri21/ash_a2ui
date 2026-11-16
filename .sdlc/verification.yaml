@@ -22,8 +22,12 @@ suites:
     mix compile --warnings-as-errors && mix format --check-formatted &&
     mix credo --strict && mix dialyzer
 
-# Where the verdict lands. The commit status is written under CI's identity,
-# never an agent's.
+# Where the verdict lands. `ci.status_context` is a CHECK-RUN name (as shown
+# by `gh api repos/<o>/<r>/commits/<sha>/check-runs`), NOT a commit-status
+# context: the DoR evidence validator (ai-sdlc SDLC-66) matches verdicts by
+# this exact name and must read check-runs, not statuses. The value must name
+# a check that exists on the default branch's head. Verdicts are written by
+# CI's identity, never an agent's.
 ci:
   provider: github-actions
   status_context: "mix test (JUnit report)"
