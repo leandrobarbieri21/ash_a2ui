@@ -225,6 +225,18 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Bug Fixes:
 
+- **The Text skin reaches what the 1.0 renderer draws.** Three rules had
+  been written for the shadow-DOM renderers and stopped selecting anything:
+  the caption tier correction keyed on `.a2ui-text.caption` (the renderer
+  names it `a2ui-text-caption` since `@a2ui/web_core` 0.14), so captions and
+  lane counts came back as grey italics; the section chip tone was only
+  chosen for a Text of variant `h2`/`h3`, but the encoder writes headings as
+  Markdown (`### Booked`, variant `body`), so every chip lost its fill; and
+  a host's Tailwind preflight (`h1..h6 { font-weight: inherit }`) now
+  reaches light-DOM headings, flattening them to body weight. Captions are
+  upright and black again, the chip tone hashes a level-2 or level-3
+  heading's own words, and headings take `--a2ui-heading-font-weight`
+  (default `bold`).
 - **A field the actor's field policies forbid serializes as empty.** A
   rendered value, a refreshed row or a CSV cell holding an `Ash.ForbiddenField`
   came out as its inspected struct (`#Ash.ForbiddenField<...>`); it is now

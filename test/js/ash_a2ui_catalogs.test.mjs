@@ -541,3 +541,83 @@ test("the prompt Modal shows the outcome of a failed invoke", async () => {
   assert.equal(modal.isOpen, true);
   assert.equal(modal.querySelector(".ash-a2ui-prompt-error").textContent, "Not allowed");
 });
+
+// A basic-catalog surface of the given Text components.
+function textSurface(hook, texts) {
+  hook.processMessages([
+    {
+      version: "1.0",
+      createSurface: {
+        surfaceId: "s1",
+        catalogId: mergedCatalog.id,
+        components: [
+          {id: "root", component: "Column", children: texts.map((text) => text.id)},
+          ...texts.map((text) => ({component: "Text", ...text})),
+        ],
+        dataModel: {ui: {feedback: feedback()}},
+      },
+    },
+  ]);
+}
+
+// The rules of the Text element's styles, as [selectors, declarations].
+function textRules() {
+  const css = (styles) =>
+    [styles].flat(Infinity).map((sheet) => (typeof sheet === "string" ? sheet : sheet.cssText ?? ""));
+  const text = css(customElements.get("ash-a2ui-text").styles)
+    .join("\n")
+    .replace(/\/\*[\s\S]*?\*\//g, "");
+  return [...text.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([, selectors, body]) => [
+    selectors.split(",").map((selector) => selector.trim()),
+    body,
+  ]);
+}
+
+// Whether some rule of the Text element's styles that declares `declaration`
+// selects `node`: the skin reaches the DOM the renderer draws, whatever
+// classes the renderer names its variants with.
+function styled(node, declaration) {
+  return textRules().some(
+    ([selectors, body]) =>
+      body.includes(declaration) && selectors.some((selector) => node.matches(selector)),
+  );
+}
+
+test("the Text element's skin selects the DOM the renderer draws", async () => {
+  const hook = mountHook({catalogs: [mergedCatalog]});
+  textSurface(hook, [
+    {id: "stage_booked_heading", text: "### Booked"},
+    {id: "table_heading_orders", text: "## Orders"},
+    {id: "table_heading_card", text: "#### Mochi"},
+    {id: "surface_title", text: "# Board"},
+    {id: "total", text: "8", variant: "caption"},
+  ]);
+  const surface = await render(hook, "s1");
+  const spans = deepAll(surface, ".a2ui-text");
+  assert.equal(spans.length, 5, "five Texts render");
+  const [booked, orders, card, title, total] = spans;
+
+  // captions: black, upright metadata — not the renderer's grey italics
+  assert.ok(total.classList.contains("a2ui-text-caption"), "the renderer's caption class");
+  assert.ok(styled(total, "font-style: normal"), "a caption rule selects the caption");
+
+  // headings keep their weight under a host's preflight (the test has no
+  // Markdown renderer, so the heading element the renderer would draw into
+  // the span is stood in for)
+  for (const [span, tag] of [[booked, "h3"], [orders, "h2"], [card, "h4"], [title, "h1"]]) {
+    const heading = span.appendChild(document.createElement(tag));
+    assert.ok(styled(heading, "font-weight: var(--a2ui-heading-font-weight"), `${tag} keeps its weight`);
+  }
+
+  // section chips: tone follows the heading's own words (level 2 and 3 only)
+  assert.ok(booked.classList.contains("nb-section"));
+  assert.ok(booked.classList.contains("nb-section-tone-cyan"), "### Booked hashes 'Booked'");
+  assert.ok(orders.classList.contains("nb-section"));
+  assert.ok([...orders.classList].some((name) => name.startsWith("nb-section-tone-")));
+  assert.equal(
+    [...card.classList].some((name) => name.startsWith("nb-section-tone-")),
+    false,
+    "a level-4 title takes no chip tone",
+  );
+  assert.ok(title.classList.contains("nb-title"));
+});

@@ -516,6 +516,19 @@ function sectionTone(label) {
   return SECTION_TONES[hash % SECTION_TONES.length];
 }
 
+// The text a section heading's chip tone hashes: a level-2 or level-3
+// heading's own words, else null (a level-1 title, a level-4 card title or
+// body text carries no chip). The 1.0 encoder writes headings as Markdown
+// ("### Booked", variant body); a Text that still names variant h2/h3 hashes
+// its text as it is.
+function sectionHeadingLabel(props) {
+  const text = String(props?.text ?? "");
+  const variant = props?.variant || "body";
+  if (variant === "h2" || variant === "h3") return text;
+  const heading = /^#{2,3}[ \t]+(.+)$/.exec(text.trim());
+  return heading ? heading[1] : null;
+}
+
 function componentIdOf(element) {
   try {
     return element.context?.componentModel?.id ?? "";
@@ -631,12 +644,27 @@ function defineAnatomyElements({lit, basicCatalog}) {
       super.styles,
       lit.css`
         /* The tier correction: captions are small BLACK metadata, not
-         * grey italics — the style has no grey text tier. */
-        .a2ui-text.caption,
-        .a2ui-text.caption em {
+         * grey italics — the style has no grey text tier. The renderer
+         * names the variant class a2ui-text-caption (every basic-catalog
+         * class carries the a2ui- prefix from @a2ui/web_core 0.14). */
+        .a2ui-text.a2ui-text-caption,
+        .a2ui-text.a2ui-text-caption em {
           font-style: normal;
           font-weight: var(--a2ui-label-font-weight, 500);
           color: var(--a2ui-text-caption-color, var(--a2ui-color-on-surface, inherit));
+        }
+
+        /* Headings keep their weight. The renderer draws in the light DOM,
+         * so a host's Tailwind preflight (h1..h6 { font-weight: inherit })
+         * reaches them and flattens every heading to body weight; the
+         * shadow-DOM renderers were out of its reach. */
+        .a2ui-text h1,
+        .a2ui-text h2,
+        .a2ui-text h3,
+        .a2ui-text h4,
+        .a2ui-text h5,
+        .a2ui-text h6 {
+          font-weight: var(--a2ui-heading-font-weight, bold);
         }
 
         /* The badge anatomy (digest §4): 2px black border, shared radius,
@@ -876,11 +904,8 @@ function defineAnatomyElements({lit, basicCatalog}) {
       if (!span) return;
       if (id.startsWith("table_heading") || /^stage_.+_heading$/.test(id)) {
         span.classList.add("nb-section");
-        const variant = this.controller?.props?.variant || "body";
-        if (variant === "h2" || variant === "h3") {
-          const text = String(this.controller?.props?.text ?? "");
-          span.classList.add(`nb-section-tone-${sectionTone(text)}`);
-        }
+        const label = sectionHeadingLabel(this.controller?.props);
+        if (label !== null) span.classList.add(`nb-section-tone-${sectionTone(label)}`);
       } else if (id === "surface_title") {
         span.classList.add("nb-title");
       }
