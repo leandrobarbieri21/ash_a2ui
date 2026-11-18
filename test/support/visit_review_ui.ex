@@ -22,11 +22,11 @@ defmodule AshA2ui.Test.VisitReviewUI do
     end
 
     field :title do
-      review(:title_review)
+      review :title_review
     end
 
     field :status do
-      review(:status_review)
+      review :status_review
     end
   end
 end
