@@ -11,7 +11,9 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       are not writable — table-only),
     * `:form` component fields are a subset of the accepts + argument names of
       the form's create/update action(s), and
-    * a `steps` field is not also drawn as pairs, a badge or a link.
+    * a `steps` field is not also drawn as pairs, a badge or a link, and
+    * a field's `review` names a public attribute, calculation or aggregate
+      of the same resource.
 
   Fields declared with a `source`, `relationship`, `link` or `links` option
   are exempt from both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
@@ -51,7 +53,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
              :ok <- verify_field_overrides(dsl_state, module, overridable, exempt),
              :ok <- verify_badge_tones(dsl_state, module),
              :ok <- verify_link_urls(dsl_state, module, overridable),
-             :ok <- verify_steps(dsl_state, module) do
+             :ok <- verify_steps(dsl_state, module),
+             :ok <- verify_reviews(dsl_state, module, overridable) do
           verify_hide_empty(dsl_state, module)
         end
     end
@@ -304,6 +307,28 @@ defmodule AshA2ui.Verifiers.VerifyFields do
              message:
                "steps cannot be combined with pairs, badge_text, badge_tones, badge_help, " <>
                  "link, links, link_url or source"
+           )}
+        end
+
+      _other ->
+        nil
+    end)
+  end
+
+  # A field's review is read from a field of the same resource.
+  defp verify_reviews(dsl_state, module, known) do
+    dsl_state
+    |> Verifier.get_entities([:a2ui])
+    |> Enum.find_value(:ok, fn
+      %AshA2ui.Field{review: review, name: name} when not is_nil(review) ->
+        if not MapSet.member?(known, review) do
+          {:error,
+           DslError.exception(
+             module: module,
+             path: [:a2ui, :field, name, :review],
+             message:
+               "review names #{inspect(review)}, which is not a public attribute, " <>
+                 "calculation or aggregate"
            )}
         end
 

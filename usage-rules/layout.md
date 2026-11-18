@@ -268,6 +268,48 @@ topics for the full contracts.
   `steps` with `pairs`, a badge (`badge_text`, `badge_tones`,
   `badge_help`), `link`, `links`, `link_url` or `source` does not compile.
 
+## Review fields (`review`)
+
+- A detail value filled in automatically (read from a document by a person
+  or a model, imported, inferred) can say so: `review` names a public
+  attribute or calculation of the same resource holding the field's review.
+
+  ```elixir
+  # on MyApp.Agreement: how the fee was filled in
+  calculate :fee_review, :map, {MyApp.Agreement.FieldReview, field: :fee} do
+    public? true
+  end
+
+  # %{state: :pending, page: 3, href: "/files/9#page=3",
+  #   quote: "Annual fee: $14,400"}
+
+  field :fee do
+    review :fee_review
+  end
+  ```
+
+- A review: `state`, one of `pending` (filled in automatically, nobody has
+  checked it yet), `reviewed` (a person checked it) or `missing` (looked for
+  and not found), and an optional citation: `page` (a positive integer),
+  `href` (an address that opens the source there) and `quote` (the words
+  the value was read from). Keys and the state may be atoms or strings.
+- Bad values never fail the page: `nil`, a value that is not a map, or a
+  map without a known state is no review (the field draws as it would
+  without one); a page that is not a positive integer, and a blank or
+  non-text `href` or `quote`, are left out.
+- The detail data carries the normalized review at `_review_<field>`:
+  `{state, stateLabel, page?, pageLabel?, href?, quote?}`, where
+  `stateLabel` is the state in words ("Not reviewed", "Reviewed", "Not found
+  in the document") and `pageLabel` the page tag ("p. 3"), both library
+  strings, translated. `nil` when the field has none.
+- Admin catalog 3.1: the `fieldDisplay` binds it as `review`; the stock
+  renderer highlights a pending value and writes the state out as a badge
+  beside the page tag, a link when there is an `href`, with the quote as
+  its tooltip. The basic catalog and tables draw the value alone.
+- `review` naming anything but a public attribute, calculation or aggregate
+  of the resource does not compile. Whether a person may mark a value
+  reviewed is the host's action and policy, not this option.
+
 ## Table card headers (`heading`, `description`)
 
 - A table that sits in a card of its own on a record page takes a card

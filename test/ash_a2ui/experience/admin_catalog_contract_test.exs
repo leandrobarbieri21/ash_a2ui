@@ -216,8 +216,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
     basic = "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    assert contract(catalog)["version"] == "3.0.0"
-    assert Experience.admin_catalog_version() == "3.0.0"
+    assert contract(catalog)["version"] == "3.1.0"
+    assert Experience.admin_catalog_version() == "3.1.0"
     assert changelog(catalog)["3.0.0"] =~ "Breaking"
     assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
     assert catalog["$id"] == catalog["catalogId"]
@@ -241,11 +241,23 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     inputs = Regex.scan(~r/"(\w+)"/, list, capture: :all_but_first) |> List.flatten()
     assert Enum.sort(inputs ++ ["Modal"]) == Enum.sort(owned)
     assert source =~ "export const ADMIN_BASIC_KINDS = [...INPUT_OVERRIDE_KINDS, \"Modal\"]"
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.0.0")
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.1.0")
 
     # the functions state who may call them
     for {name, function} <- catalog["functions"],
         do: assert(function["allowedCallers"] == "rendererOnly", name)
+  end
+
+  test "catalog 3.1 adds the fieldDisplay review, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.1.0"] =~ "review fields"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    review = catalog["components"]["fieldDisplay"]["properties"]["review"]
+    assert review["$ref"] == "common_types.json#/$defs/DataBinding"
+    assert review["description"] =~ "pending"
+    refute "review" in catalog["components"]["fieldDisplay"]["required"]
   end
 
   test "catalog 2.0 is the A2UI 1.0 wire: filterPicker, the more tag's words" do

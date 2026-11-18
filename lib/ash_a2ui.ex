@@ -211,6 +211,26 @@ defmodule AshA2ui do
         catalog (`fieldDisplay`'s `note`); translated in the metadata domain.
         """
       ],
+      review: [
+        type: :atom,
+        doc: """
+        A public attribute, calculation or aggregate of the same resource
+        that says how this field's value was filled in, for `:detail`
+        cards: a map with a `state`, one of `"pending"` (filled in
+        automatically, nobody has checked it yet), `"reviewed"` (a person
+        checked it) or `"missing"` (looked for and not found), and an
+        optional citation: `page` (a positive integer, the page of the
+        source document the value came from), `href` (an address that
+        opens the source at that place) and `quote` (the words the value
+        was read from). Keys and the state may be atoms or strings. `nil`,
+        or a value without a known state, means the field has no review.
+        The record carries the normalized review at `_review_<field>` (see
+        `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review`
+        (admin catalog 3.1): the value is highlighted while pending, with
+        its state in words and a page tag linking to the source. The basic
+        catalog and tables show the value alone.
+        """
+      ],
       empty_text: [
         type: :string,
         doc: """
