@@ -384,3 +384,187 @@ test("destroying the hook cancels the in-flight call", async () => {
 
   assert.equal(hook.responses[0].response.error.code, "CANCELLED");
 });
+
+// A row's prompt dialog: the trigger asks for the pre-fill (`prompt`), the
+// fields bind /prompt/values/complete, Confirm invokes with those values.
+function bootstrapPrompt(hook, values = {note: "", hours: null, owner: null}) {
+  hook.processMessages([
+    {
+      version: "1.0",
+      createSurface: {
+        surfaceId: "s1",
+        catalogId: BASIC_CATALOG_ID,
+        components: [
+          {id: "root", component: "Column", children: ["open", "note", "hours", "confirm"]},
+          {
+            id: "open",
+            component: "Button",
+            child: "open_label",
+            action: ashAction("prompt", {action: "complete", recordId: "r1"}),
+          },
+          {id: "open_label", component: "Text", text: "Complete"},
+          {id: "note", component: "TextField", label: "Note", value: {"@path": "/prompt/values/complete/note"}},
+          {id: "hours", component: "TextField", label: "Hours", value: {"@path": "/prompt/values/complete/hours"}},
+          {
+            id: "confirm",
+            component: "Button",
+            child: "confirm_label",
+            action: ashAction("invoke", {
+              action: "complete",
+              recordId: "r1",
+              values: {"@path": "/prompt/values/complete"},
+            }),
+          },
+          {id: "confirm_label", component: "Text", text: "Confirm"},
+        ],
+        dataModel: {
+          prompt: {
+            values: {complete: values},
+            select: {complete: {owner: {search: "", label: ""}}},
+          },
+          ui: {feedback: feedback()},
+        },
+      },
+    },
+  ]);
+}
+
+const prefill = (path, value) => ({
+  version: "1.0",
+  updateDataModel: {surfaceId: "s1", path, value},
+});
+
+const promptValues = (hook) => hook.processor.getSurface("s1").dataModel.get("/prompt/values/complete");
+const typeInto = (hook, path, value) => hook.processor.getSurface("s1").dataModel.set(path, value);
+
+test("a prompt's pre-fill keeps what the person typed before it arrived, and Confirm sends that", async () => {
+  const hook = mountHook({actionTimeoutMs: 0});
+  bootstrapPrompt(hook);
+
+  const opened = click(hook, "s1", "open");
+  await tick();
+  const {functionCallId} = sent(hook)[0].callAgentFunction;
+
+  typeInto(hook, "/prompt/values/complete/note", "Fixed the leak");
+
+  hook.processMessages([
+    prefill("/prompt/values/complete", {note: "", hours: 2, owner: "u7"}),
+    prefill("/prompt/select/complete", {owner: {search: "", label: "Grace"}}),
+    prefill("/errors", {}),
+    agentResponse(functionCallId, {value: {}}),
+  ]);
+  await opened;
+
+  assert.deepEqual(promptValues(hook), {note: "Fixed the leak", hours: 2, owner: "u7"});
+  assert.deepEqual(hook.processor.getSurface("s1").dataModel.get("/prompt/select/complete/owner"), {
+    search: "",
+    label: "Grace",
+  });
+
+  const confirmed = click(hook, "s1", "confirm");
+  await tick();
+  assert.deepEqual(sent(hook)[1].callAgentFunction.callFunction.args.context.values, {
+    note: "Fixed the leak",
+    hours: 2,
+    owner: "u7",
+  });
+  hook.processor.dispose();
+  await confirmed;
+});
+
+test("an option the person picked before the pre-fill keeps its value and its label", async () => {
+  const hook = mountHook({actionTimeoutMs: 0});
+  bootstrapPrompt(hook);
+
+  const opened = click(hook, "s1", "open");
+  await tick();
+  const {functionCallId} = sent(hook)[0].callAgentFunction;
+
+  // option_select's own reply: the picked value and its label.
+  hook.processMessages([
+    prefill("/prompt/values/complete/owner", "u9"),
+    prefill("/prompt/select/complete/owner", {search: "ali", label: "Alan"}),
+  ]);
+
+  hook.processMessages([
+    prefill("/prompt/values/complete", {note: "", hours: 2, owner: "u7"}),
+    prefill("/prompt/select/complete", {owner: {search: "", label: "Grace"}}),
+    agentResponse(functionCallId, {value: {}}),
+  ]);
+  await opened;
+
+  const dataModel = hook.processor.getSurface("s1").dataModel;
+  assert.deepEqual(promptValues(hook), {note: "", hours: 2, owner: "u9"});
+  assert.deepEqual(dataModel.get("/prompt/select/complete/owner"), {search: "ali", label: "Alan"});
+});
+
+test("a pre-fill that lands after the slow notice still keeps the person's typing", async () => {
+  const hook = mountHook({actionTimeoutMs: 10});
+  bootstrapPrompt(hook);
+
+  await click(hook, "s1", "open");
+  const {functionCallId} = sent(hook)[0].callAgentFunction;
+  assert.equal(hook.responses[0].response.error.code, "TIMEOUT");
+
+  typeInto(hook, "/prompt/values/complete/hours", "5");
+  hook.processMessages([
+    prefill("/prompt/values/complete", {note: "Was here", hours: 2, owner: null}),
+    agentResponse(functionCallId, {value: {}}),
+  ]);
+
+  assert.deepEqual(promptValues(hook), {note: "Was here", hours: "5", owner: null});
+});
+
+test("once the pre-fill is in, the agent's later writes of the prompt values apply as sent", async () => {
+  const hook = mountHook({actionTimeoutMs: 0});
+  bootstrapPrompt(hook);
+
+  const opened = click(hook, "s1", "open");
+  await tick();
+  const {functionCallId} = sent(hook)[0].callAgentFunction;
+  hook.processMessages([
+    prefill("/prompt/values/complete", {note: "", hours: 2, owner: null}),
+    agentResponse(functionCallId, {value: {}}),
+  ]);
+  await opened;
+
+  typeInto(hook, "/prompt/values/complete/note", "Done");
+  // A successful Confirm resets the dialog.
+  hook.processMessages([prefill("/prompt/values/complete", {note: "", hours: null, owner: null})]);
+
+  assert.deepEqual(promptValues(hook), {note: "", hours: null, owner: null});
+});
+
+test("a whole-model refresh while the pre-fill is pending resets what counts as typed", async () => {
+  const hook = mountHook({actionTimeoutMs: 0});
+  bootstrapPrompt(hook, {note: "stale", hours: 9, owner: null});
+
+  const opened = click(hook, "s1", "open");
+  await tick();
+  const {functionCallId} = sent(hook)[0].callAgentFunction;
+
+  // A refresh replaces the data model: the dialog now shows blank fields,
+  // which the person did not type.
+  hook.processMessages([
+    {
+      version: "1.0",
+      updateDataModel: {
+        surfaceId: "s1",
+        path: "/",
+        value: {
+          prompt: {values: {complete: {note: "", hours: null, owner: null}}},
+          ui: {feedback: feedback()},
+        },
+      },
+    },
+  ]);
+  typeInto(hook, "/prompt/values/complete/hours", "4");
+
+  hook.processMessages([
+    prefill("/prompt/values/complete", {note: "From the record", hours: 2, owner: null}),
+    agentResponse(functionCallId, {value: {}}),
+  ]);
+  await opened;
+
+  assert.deepEqual(promptValues(hook), {note: "From the record", hours: "4", owner: null});
+});

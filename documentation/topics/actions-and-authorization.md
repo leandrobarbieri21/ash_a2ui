@@ -141,7 +141,10 @@ basic-catalog `Modal` instead of a bare button:
   action (`{"action": "decline", "recordId": {"@path": "id"}, "component":
   "table"}`); the server answers by pre-filling
   `/prompt/values/decline` (each field's current record value when it is a
-  public attribute, `""` otherwise) and clearing `/errors`,
+  public attribute, `""` otherwise) and clearing `/errors`. The dialog is
+  open and editable while that reply is on its way; the shipped hook keeps
+  any field the person edits in the meantime (and its select label) and
+  pre-fills only the others, so Confirm sends what the dialog shows,
 - the Modal `content` is a Column with a title, one input per prompt
   field bound to `/prompt/values/decline/<field>`, a per-field error `Text`
   bound to `/errors/<field>`, and a **Confirm** button,
