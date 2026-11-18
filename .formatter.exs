@@ -140,6 +140,7 @@ spark_locals_without_parens = [
   relationship: 1,
   require_context: 1,
   resource: 1,
+  review: 1,
   review?: 1,
   row_actions: 1,
   row_field: 1,
