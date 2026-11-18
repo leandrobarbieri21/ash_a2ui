@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.0.0";
+export const ADMIN_CATALOG_VERSION = "3.1.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -682,6 +682,8 @@ export function buildSchemas(basicCatalog = null) {
       hideWhenEmpty: Bool.optional(),
       // 1.17: a steps field's normalized steps, drawn as a numbered stepper.
       steps: DynamicValueSchema.nullable().optional(),
+      // 3.1: how a review field's value was filled in: its state and citation.
+      review: DynamicValueSchema.nullable().optional(),
       weight: Num.optional(),
     }),
 
@@ -3215,6 +3217,30 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             font-size: var(--am-font-size-xs);
             color: var(--am-text-muted);
           }
+          /* 3.1: a review field. A pending value is highlighted; the state
+             is written out (not only coloured) beside its page tag. */
+          .field[data-review="pending"] .field-value {
+            background: var(--ash-admin-field-pending-bg, var(--am-warning-subtle));
+            border-radius: var(--am-radius-s);
+            padding-inline: var(--am-space-2xs);
+          }
+          .field-review {
+            grid-column: 2;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--am-space-2xs);
+            font-size: var(--am-font-size-xs);
+          }
+          .field-review-page {
+            color: var(--am-text-muted);
+          }
+          @container (max-width: 29.99rem) {
+            .field-review {
+              grid-column: 1;
+            }
+          }
           @container (max-width: 29.99rem) {
             .field {
               grid-template-columns: 1fr;
@@ -3239,6 +3265,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         const isBoolean = props.format === "boolean";
         const links = linkEntries(props.link);
+        // 3.1: a review field's state and citation, or null.
+        const review = reviewEntry(props.review);
         // 1.17: a steps field is empty when it has no steps.
         const steps = props.steps === undefined ? null : stepEntries(props.steps);
         const empty = steps ? steps.length === 0 : props.value == null || props.value === "";
@@ -3249,9 +3277,10 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         if (empty && props.emptyText) {
           return html`
-            <dl class="field">
+            <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value field-value-empty">${str(props.emptyText)}</dd>
+            ${renderReview(review)}
             </dl>
           `;
         }
@@ -3261,30 +3290,33 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           const tone = props.badgeTone ? badgeTone(props.badgeTone) : "neutral";
           const help = str(props.badgeHelp);
           return html`
-            <dl class="field">
+            <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">
                 <span class="am-badge" data-tone=${tone} title=${help || nothing}
                   aria-description=${help || nothing}>${badge}</span>
               </dd>
+            ${renderReview(review)}
             </dl>
           `;
         }
 
         if (steps) {
           return html`
-            <dl class="field">
+            <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderSteps(steps)}</dd>
+            ${renderReview(review)}
             </dl>
           `;
         }
 
         if (links.length > 0) {
           return html`
-            <dl class="field">
+            <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderLinks(this, links)}</dd>
+            ${renderReview(review)}
             </dl>
           `;
         }
@@ -3292,27 +3324,58 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (isBoolean) {
           const value = formatDisplayValue(props.value, props.format);
           return html`
-            <dl class="field">
+            <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd
                 class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
               >
                 ${value}
               </dd>
+            ${renderReview(review)}
             </dl>
           `;
         }
 
         return html`
-          <dl class="field">
+          <dl class="field" data-review=${review ? review.state : nothing}>
             <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
             <dd class="field-value">${renderValue(props.value, props.format)}</dd>
-          </dl>
+          ${renderReview(review)}
+            </dl>
         `;
       }
     }
 
     customElements.define(tag, AshAdminFieldDisplay);
+  }
+
+  // 3.1: the review a review field binds, {state, stateLabel, page?,
+  // pageLabel?, href?, quote?}; anything without a known state is none.
+  const REVIEW_STATES = ["pending", "reviewed", "missing"];
+  const REVIEW_TONES = { pending: "warning", reviewed: "success", missing: "neutral" };
+
+  function reviewEntry(value) {
+    if (!value || typeof value !== "object" || !REVIEW_STATES.includes(value.state)) return null;
+    return value;
+  }
+
+  // The state in words as a badge, then the page tag: a link to the source
+  // when there is an address, its quote as the tooltip.
+  function renderReview(review) {
+    if (!review) return nothing;
+    const quote = str(review.quote);
+    const page = str(review.pageLabel);
+    const href = str(review.href);
+    return html`
+      <dd class="field-review">
+        <span class="am-badge" data-tone=${REVIEW_TONES[review.state]}>${str(review.stateLabel) || review.state}</span>
+        ${page
+          ? href
+            ? html`<a class="field-review-page" href=${href} title=${quote || nothing}>${page}</a>`
+            : html`<span class="field-review-page" title=${quote || nothing}>${page}</span>`
+          : nothing}
+      </dd>
+    `;
   }
 
   // 1.17: the steps a steps field binds, each {number, label, text?, note?,

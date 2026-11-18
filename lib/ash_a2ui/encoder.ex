@@ -1959,6 +1959,7 @@ defmodule AshA2ui.Encoder do
         |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
         |> put_detail_badge(view, field, "/detail/#{detail.context}/")
         |> put_detail_steps(view, field, "/detail/#{detail.context}/")
+        |> put_detail_review(view, field, "/detail/#{detail.context}/")
         |> put_empty_text(view, field)
         |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
@@ -1998,6 +1999,18 @@ defmodule AshA2ui.Encoder do
     case view.fields[field] do
       %{steps: true} -> Map.put(display, "steps", %{"@path" => "#{base}_steps_#{field}"})
       _other -> display
+    end
+  end
+
+  # Catalog 3.1: a review field binds how its value was filled in (state and
+  # citation), the normalized `_review_<field>` (see AshA2ui.Review).
+  defp put_detail_review(display, view, field, base) do
+    case view.fields[field] do
+      %{review: review} when not is_nil(review) ->
+        Map.put(display, "review", %{"@path" => "#{base}_review_#{field}"})
+
+      _other ->
+        display
     end
   end
 

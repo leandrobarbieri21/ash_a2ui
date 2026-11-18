@@ -165,6 +165,17 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Review fields: how a detail value was filled in** (admin catalog
+  3.1.0). A field's `review` names a public attribute or calculation of the
+  same resource holding a map: `state` (`pending`, `reviewed` or `missing`)
+  and an optional citation (`page`, `href`, `quote`). The detail record
+  carries it normalized at `_review_<field>` (`AshA2ui.Review`), with the
+  state in words and the page tag translated, and the admin `fieldDisplay`
+  binds it as `review`: the stock renderer highlights a pending value and
+  writes its state beside a page tag linking to the source. Additive: the
+  catalogId is unchanged, and renderers that ignore it draw the value. The
+  basic catalog and tables are unchanged. Dynamic specs carry the option.
+
 - **An admin table with an `export` block stays a `dataGrid`** (#114). On
   an admin surface, declaring `export` used to drop the table to the basic
   composition: a `List`, a `## Table` heading and the export Row. The table

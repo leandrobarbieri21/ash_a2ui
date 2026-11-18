@@ -530,6 +530,20 @@ defmodule AshA2ui.ResolvedView do
     AshA2ui.Steps.data(record, steps_fields, view.l10n)
   end
 
+  @doc """
+  The review data a `:detail` record carries for its `review` fields:
+  `_review_<field>`, the normalized review (`AshA2ui.Review.normalize/2`),
+  `nil` when the field has none. Shared by the initial render and the
+  context refreshes.
+  """
+  @spec detail_review_data(t(), struct(), [atom]) :: %{String.t() => map | nil}
+  def detail_review_data(%__MODULE__{} = view, record, fields) do
+    review_fields =
+      for name <- fields, %{review: review} = field <- [view.fields[name]], review, do: field
+
+    AshA2ui.Review.data(record, review_fields, view.l10n)
+  end
+
   defp serialized_field(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->
@@ -1265,7 +1279,16 @@ defmodule AshA2ui.ResolvedView do
 
     calc_loads = Enum.filter(field_names, &calculation_or_aggregate?(resource, &1))
 
-    Enum.uniq(source_loads ++ calc_loads ++ AshA2ui.Links.loads(resource, field_names, fields))
+    review_loads =
+      for name <- field_names,
+          %{review: review} when not is_nil(review) <- [fields[name]],
+          calculation_or_aggregate?(resource, review),
+          do: review
+
+    Enum.uniq(
+      source_loads ++
+        calc_loads ++ review_loads ++ AshA2ui.Links.loads(resource, field_names, fields)
+    )
   end
 
   # A source path loads its relationship prefix — and, when the terminal

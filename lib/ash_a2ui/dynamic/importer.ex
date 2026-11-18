@@ -472,6 +472,7 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_value("download", field.download)
       |> put_value("pairs", field.pairs)
       |> put_value("steps", field.steps)
+      |> put_opt("review", field.review)
       |> put_value("note", field.note)
       |> put_value("empty_text", field.empty_text)
       |> put_keyword("badge_text", field.badge_text, :raw)

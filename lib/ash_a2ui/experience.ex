@@ -183,10 +183,11 @@ defmodule AshA2ui.Experience do
   1.16 added card rows (`layout: "cards"`), the `expandLabel` disclosure
   label and labeled `pairs` columns; 1.17 added the fieldDisplay `steps`
   stepper; 1.18 added a table card's own `heading` and `description`. 2.0
-  includes every 1.x addition, and 3.0 every 2.x one.
+  includes every 1.x addition, and 3.0 every 2.x one. 3.1 added the
+  fieldDisplay `review` (a review field's state and citation).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.0.0"
+  def admin_catalog_version, do: "3.1.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

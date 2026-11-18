@@ -86,6 +86,36 @@ defmodule AshA2ui.Test.Appointment do
       public? true
     end
 
+    # How a visit's title and status were filled in (`review`): the title
+    # read from page 3 of the referral and not checked yet; the status
+    # looked for and not found until the visit is completed.
+    calculate :title_review,
+              :map,
+              fn records, _context ->
+                Enum.map(records, fn _visit ->
+                  %{
+                    state: :pending,
+                    page: 3,
+                    href: "/referrals/1#page=3",
+                    quote: "Reason for visit: checkup"
+                  }
+                end)
+              end do
+      public? true
+    end
+
+    calculate :status_review,
+              :map,
+              fn records, _context ->
+                Enum.map(records, fn visit ->
+                  if visit.status == :completed,
+                    do: %{"state" => "reviewed", "page" => "2"},
+                    else: %{"state" => "missing"}
+                end)
+              end do
+      public? true
+    end
+
     calculate :seen_by,
               :string,
               expr("Seen by Dr. " <> title) do
