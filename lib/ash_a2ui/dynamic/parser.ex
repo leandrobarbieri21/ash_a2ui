@@ -640,6 +640,8 @@ defmodule AshA2ui.Dynamic.Parser do
     "pairs" => :pairs,
     "steps" => :steps,
     "review" => :review,
+    "field_action" => :field_action,
+    "field_action_visible" => :field_action_visible,
     "note" => :note,
     "empty_text" => :empty_text,
     "badge_text" => :badge_text,
@@ -690,12 +692,15 @@ defmodule AshA2ui.Dynamic.Parser do
     "visible_when" => :visible_when
   }
 
-  @action_nested ~w(via)
+  # `icon` is an icon name (text), not a field: it skips the name
+  # conversion other `icon` options take.
+  @action_nested ~w(via icon)
 
   defp parse_action(entry, path) when is_map(entry) do
     with {:ok, opts} <- convert_options(entry, @action_keys, @action_nested, path),
          {:ok, via} <- via_spec(Map.get(entry, "via"), path) do
       opts = if via, do: opts ++ [{:via, via}], else: opts
+      opts = if Map.has_key?(entry, "icon"), do: opts ++ [{:icon, entry["icon"]}], else: opts
       build_entity(:action, entity_def(:action), opts, [], path)
     end
   end
@@ -1036,6 +1041,8 @@ defmodule AshA2ui.Dynamic.Parser do
               :link_label,
               :link_url,
               :review,
+              :field_action,
+              :field_action_visible,
               :group_by,
               :group_subtitle,
               :section_note,

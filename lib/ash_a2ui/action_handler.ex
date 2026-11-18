@@ -137,6 +137,19 @@ defmodule AshA2ui.ActionHandler do
       `/prompt/options/<action>/<field>`. `"invoke"` re-reads every picked
       value through the scope of the row it is invoked on before the write.
 
+    * `"field_action"` — context `%{"component" => detail, "field" => name,
+      "recordId" => id, "contexts" => selections}`. Runs the `field_action`
+      a field of that `:detail` card declares (admin catalog 3.2): the
+      client names the card and the field, never the Ash action, so the
+      field's declaration is the allowlist. The record is re-read through
+      the card's context as the actor (an authorized read, dependency
+      filter included) with the field's `field_action_visible` loaded, and
+      refused unless the record offers the action. The update action then
+      runs on it with the field's name as its `:field` argument. A success
+      re-reads the card's record into `/detail/<context>` (its review and
+      field-action data included) and refreshes the tables the action's
+      `refreshes` names, every table by default.
+
     * `"bulk_invoke"` / `"bulk_select"` — bulk actions over a row selection
       on tables declaring `bulk_actions` (see `AshA2ui.Bulk` and the Bulk
       Actions topic). `bulk_invoke` takes `%{"action" => name, "component"
@@ -328,8 +341,8 @@ defmodule AshA2ui.ActionHandler do
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
-  @writes ~w(submit_form invoke bulk_invoke prompt edit_cell nested_add nested_remove
-             start_create start_edit wizard_next wizard_back)
+  @writes ~w(submit_form invoke field_action bulk_invoke prompt edit_cell nested_add
+             nested_remove start_create start_edit wizard_next wizard_back)
 
   @pinned_refusal msg(
                     "This view shows an earlier moment, so nothing on it can be changed. Return to now to make changes."
@@ -830,6 +843,8 @@ defmodule AshA2ui.ActionHandler do
   end
 
   defp dispatch("invoke", context, env), do: invoke_dispatch(context, env)
+
+  defp dispatch("field_action", context, env), do: field_action(context, env)
 
   defp dispatch("bulk_invoke", context, env), do: bulk_invoke(context, env)
 
@@ -1716,7 +1731,8 @@ defmodule AshA2ui.ActionHandler do
              |> linked_record_values(record, fields, ash_opts)
              |> Map.merge(ResolvedView.detail_badge_data(view, record, fields))
              |> Map.merge(ResolvedView.detail_steps_data(view, record, fields))
-             |> Map.merge(ResolvedView.detail_review_data(view, record, fields))}
+             |> Map.merge(ResolvedView.detail_review_data(view, record, fields))
+             |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))}
 
           # The selection was just validated; a raced-away record renders empty.
           :not_found ->
@@ -1827,6 +1843,126 @@ defmodule AshA2ui.ActionHandler do
       other ->
         other
     end)
+  end
+
+  # --- field_action ----------------------------------------------------------
+
+  # A detail field's action (catalog 3.2): the field's declaration names
+  # the Ash action, the card's context re-reads the record, and
+  # `field_action_visible` gates it on the server as on the screen.
+  defp field_action(context, %{view: view} = env) do
+    with {:ok, detail, field} <- field_action_target(view, context),
+         {:ok, record_id} <- field_action_record_id(view, context),
+         {:ok, record} <- field_action_record(view, detail, field, record_id, env) do
+      action = field.field_action
+
+      env =
+        env
+        |> Map.put(:invoked, action)
+        |> Map.put(:setting, Map.get(view.actions, action))
+        |> Map.put(:shown_fields, [])
+
+      result =
+        update_record(record, action, %{field: Atom.to_string(field.name)}, env.ash_opts)
+
+      with {:ok, messages} <- after_write(result, env, completed_text(view, action)),
+           {:ok, detail_messages} <- field_action_detail(view, detail, record_id, env) do
+        {:ok, detail_messages ++ messages}
+      end
+    end
+  end
+
+  # The card and the field the client named, when that field of that card
+  # declares a field action.
+  defp field_action_target(view, context) do
+    component = Map.get(context, "component")
+    name = Map.get(context, "field")
+
+    target =
+      is_binary(component) and is_binary(name) and
+        Enum.find_value(view.details, fn detail ->
+          to_string(detail.name) == component &&
+            Enum.find_value(detail.fields, &declared_field_action(view, &1, name))
+            |> then(&(&1 && {detail, &1}))
+        end)
+
+    case target do
+      {detail, field} ->
+        {:ok, detail, field}
+
+      _none ->
+        {:error,
+         [
+           status(
+             view,
+             "Field action #{inspect(name)} on #{inspect(component)} is not allowed: no field " <>
+               "of that card declares a field_action."
+           )
+         ]}
+    end
+  end
+
+  defp declared_field_action(view, field, name) do
+    case view.fields[field] do
+      %{field_action: action} = declared when not is_nil(action) ->
+        if to_string(field) == name, do: declared
+
+      _other ->
+        nil
+    end
+  end
+
+  defp field_action_record_id(view, context) do
+    case Map.get(context, "recordId") do
+      id when is_binary(id) and id != "" ->
+        {:ok, id}
+
+      _missing ->
+        {:error, [status(view, ~s(Malformed field_action: context is missing "recordId".))]}
+    end
+  end
+
+  defp field_action_record(view, detail, field, record_id, %{ash_opts: ash_opts} = env) do
+    context = view.contexts[detail.context]
+
+    case ContextRunner.fetch_selected(
+           view,
+           context,
+           record_id,
+           env.selected,
+           ash_opts,
+           detail.loads
+         ) do
+      {:ok, record} ->
+        if ResolvedView.field_action_offered?(field, record),
+          do: {:ok, record},
+          else: {:error, [status(view, unavailable_text(view, field.field_action))]}
+
+      :not_found ->
+        {:error, [status(view, unavailable_text(view, field.field_action))]}
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
+  # The card's record again, as a context change writes it: every detail of
+  # the same context shares the path.
+  defp field_action_detail(view, detail, record_id, %{ash_opts: ash_opts} = env) do
+    details = Enum.filter(view.details, &(&1.context == detail.context))
+
+    selected =
+      Map.update(
+        env.selected,
+        detail.context,
+        %{value: record_id},
+        &Map.put(&1, :value, record_id)
+      )
+
+    case context_detail_value(view, detail.context, details, selected, ash_opts) do
+      {:ok, value} -> {:ok, [update_data_model(view, "/detail/#{detail.context}", value)]}
+      {:error, error} -> {:error, error_messages(view, error)}
+    end
   end
 
   # --- invoke ----------------------------------------------------------------

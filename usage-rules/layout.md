@@ -310,6 +310,60 @@ topics for the full contracts.
   of the resource does not compile. Whether a person may mark a value
   reviewed is the host's action and policy, not this option.
 
+## Field actions (`field_action`)
+
+- A button beside one detail value, running an update action on the
+  card's record for that field (mark this value reviewed, flag it, ask
+  about it). `field_action` names the update action; it must declare a
+  `:field` argument, which receives the field's name as a string.
+  `field_action_visible` names a boolean attribute or calculation saying
+  per record whether the button is offered (omit it to always offer it).
+
+  ```elixir
+  # on MyApp.Agreement
+  update :review_field do
+    argument :field, :atom, allow_nil?: false, constraints: [one_of: [:fee, :term]]
+    change MyApp.Agreement.RecordFieldReview
+  end
+
+  calculate :fee_reviewable, :boolean, MyApp.Agreement.FieldReviewable do
+    public? true
+  end
+
+  # on the surface
+  field :fee do
+    review :fee_review
+    field_action :review_field
+    field_action_visible :fee_reviewable
+  end
+
+  action :review_field do
+    label "Mark as reviewed"
+    icon "check"
+    refreshes []
+  end
+  ```
+
+- The `action` entity of the same name gives the button its `label`, an
+  optional `icon` (a renderer may draw the button as that icon, the label
+  becoming its accessible name and tooltip) and the tables it `refreshes`
+  (every table when omitted; `[]` for none). Its `visible_when` gates row
+  actions only: a field action's gate is `field_action_visible`.
+- Admin catalog 3.2: the `fieldDisplay` carries `action` (`{label, action:
+  "field_action", context, icon?}`, the rowActions entry shape) and
+  `actionVisible` (`/detail/<context>/_action_<field>`). The detail data
+  carries `_action_<field>` (true or false) for every field action. The
+  basic catalog and tables draw no button.
+- The `field_action` ashAction sends the card and the field, never the
+  action: the server finds the action in the field's declaration, re-reads
+  the record through the card's context as the actor, refuses it unless
+  `field_action_visible` holds, runs the update as the actor and re-sends
+  the card's record (`/detail/<context>`). Authorization is the action's
+  own policies.
+- A `field_action` that is not an update action of the card's record, one
+  without a `:field` argument, or a `field_action_visible` that is not a
+  public field of that record does not compile.
+
 ## Table card headers (`heading`, `description`)
 
 - A table that sits in a card of its own on a record page takes a card

@@ -153,6 +153,8 @@ defmodule AshA2ui.Dynamic.Promoter do
     pairs: :raw,
     steps: :raw,
     review: :name,
+    field_action: :name,
+    field_action_visible: :name,
     note: :raw,
     empty_text: :raw,
     badge_text: :string_keyword,
@@ -162,6 +164,7 @@ defmodule AshA2ui.Dynamic.Promoter do
 
   @action_options [
     label: :raw,
+    icon: :raw,
     refreshes: :name_list,
     prompt_fields: :name_list,
     prompt_title: :raw,

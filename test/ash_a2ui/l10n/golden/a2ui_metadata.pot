@@ -39,6 +39,7 @@ msgstr ""
 msgid "All visits"
 msgstr ""
 
+#: test/support/finding_fields_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:230
 #: test/support/links.ex:267
@@ -640,6 +641,10 @@ msgstr ""
 msgid "Export contract"
 msgstr ""
 
+#: test/support/finding_fields_ui.ex:1
+msgid "Facts"
+msgstr ""
+
 #: test/support/table_displays.ex:101
 #: test/support/table_displays.ex:132
 msgctxt "one_of:outcome"
@@ -654,6 +659,10 @@ msgstr ""
 #: test/support/paginated.ex:1
 msgctxt "one_of:category"
 msgid "Feature"
+msgstr ""
+
+#: test/support/finding_fields_ui.ex:1
+msgid "Finding"
 msgstr ""
 
 #: test/support/adoption.ex:243
@@ -946,6 +955,7 @@ msgstr ""
 
 #: test/support/adoption.ex:243
 #: test/support/adoption.ex:356
+#: test/support/finding_fields_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:206
 #: test/support/links.ex:230
@@ -1600,6 +1610,7 @@ msgstr ""
 #: test/support/card_visits_ui.ex:1
 #: test/support/column_task.ex:1
 #: test/support/document_visits_ui.ex:1
+#: test/support/finding_fields_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
 #: test/support/linked_filters_ui.ex:1

@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.1.0";
+export const ADMIN_CATALOG_VERSION = "3.2.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -684,6 +684,10 @@ export function buildSchemas(basicCatalog = null) {
       steps: DynamicValueSchema.nullable().optional(),
       // 3.1: how a review field's value was filled in: its state and citation.
       review: DynamicValueSchema.nullable().optional(),
+      // 3.2: a field action's button (a rowActions-shaped entry) and
+      // whether the record offers it.
+      action: RecordAny.optional(),
+      actionVisible: DynamicValueSchema.nullable().optional(),
       weight: Num.optional(),
     }),
 
@@ -977,6 +981,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
    *   disabled       boolean
    *   pressed        undefined, or the `aria-pressed` state of a toggle
    *   primaryAction  boolean; marks a row's primary action (`data-primary-action`)
+   *   icon           optional icon name (3.2, a field action's): a host may draw
+   *                  the button as that icon, the label becoming its accessible
+   *                  name and tooltip; the stock button draws the label
    *   onClick        (event) => void, called for an enabled button
    */
   function stockActionButton(opts) {
@@ -3236,8 +3243,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           .field-review-page {
             color: var(--am-text-muted);
           }
+          /* 3.2: a field action's button, under the value. */
+          .field-action {
+            grid-column: 2;
+            margin: 0;
+          }
           @container (max-width: 29.99rem) {
-            .field-review {
+            .field-review,
+            .field-action {
               grid-column: 1;
             }
           }
@@ -3252,6 +3265,48 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       createController() {
         return new A2uiController(this, adminApis.fieldDisplay);
+      }
+
+      /**
+       * 3.2: whether the field's action is offered: there is one, and the
+       * record offers it (`actionVisible` true; an unbound one always
+       * offers it). Hiding is a rendering concern only: the server
+       * re-checks every call.
+       */
+      fieldActionOffered(props) {
+        const entry = props?.action;
+        if (!entry || typeof entry !== "object" || typeof entry.action !== "string") return false;
+        const bound = this.context?.componentModel?.properties?.actionVisible !== undefined;
+        return !bound || props.actionVisible === true;
+      }
+
+      /** 3.2: sends the field's action (its rowActions-shaped entry, the
+       * bindings resolved now) and holds the button busy until the outcome. */
+      onFieldAction(entry) {
+        const spec = adminActionSpec(entry);
+        if (!spec || this._amFieldActionBusy || !this.context?.componentModel) return;
+        this._amFieldActionBusy = true;
+        markActionBusy(this);
+        this.requestUpdate();
+        dispatchActionSpec(this.context, spec);
+      }
+
+      onActionSettled() {
+        this._amFieldActionBusy = false;
+      }
+
+      /** 3.2: the field action's button, while the record offers it. */
+      renderFieldAction(props) {
+        if (!this.fieldActionOffered(props)) return nothing;
+        const entry = props.action;
+        return html`<dd class="field-action" data-a2ui-action="field_action">${renderActionButton({
+          label: str(entry.label),
+          icon: typeof entry.icon === "string" && entry.icon !== "" ? entry.icon : undefined,
+          tone: "quiet",
+          size: "sm",
+          busy: Boolean(this._amFieldActionBusy),
+          onClick: () => this.onFieldAction(entry),
+        })}</dd>`;
       }
 
       willUpdate(changedProperties) {
@@ -3280,7 +3335,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value field-value-empty">${str(props.emptyText)}</dd>
-            ${renderReview(review)}
+            ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
           `;
         }
@@ -3296,7 +3351,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 <span class="am-badge" data-tone=${tone} title=${help || nothing}
                   aria-description=${help || nothing}>${badge}</span>
               </dd>
-            ${renderReview(review)}
+            ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
           `;
         }
@@ -3306,7 +3361,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderSteps(steps)}</dd>
-            ${renderReview(review)}
+            ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
           `;
         }
@@ -3316,7 +3371,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             <dl class="field" data-review=${review ? review.state : nothing}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderLinks(this, links)}</dd>
-            ${renderReview(review)}
+            ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
           `;
         }
@@ -3331,7 +3386,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
               >
                 ${value}
               </dd>
-            ${renderReview(review)}
+            ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
           `;
         }
@@ -3340,7 +3395,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           <dl class="field" data-review=${review ? review.state : nothing}>
             <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
             <dd class="field-value">${renderValue(props.value, props.format)}</dd>
-          ${renderReview(review)}
+          ${renderReview(review)}${this.renderFieldAction(props)}
             </dl>
         `;
       }

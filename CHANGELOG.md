@@ -165,6 +165,22 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Field actions: a button beside a detail value** (admin catalog
+  3.2.0). A field's `field_action` names an update action of the record a
+  `:detail` card shows; the action receives the field's name as its
+  `:field` argument. `field_action_visible` names a boolean field gating it
+  per record, and the `action` entity gives it its `label`, a new `icon`
+  and the tables it `refreshes`. The admin `fieldDisplay` carries the
+  button as `action` (a rowActions-shaped entry) and its gate as
+  `actionVisible` (`/detail/<context>/_action_<field>`); the stock renderer
+  draws a quiet button and sends the new `field_action` ashAction. The
+  server finds the Ash action in the field's declaration (the client names
+  only the card and the field), re-reads the record through the card's
+  context as the actor, enforces the gate, runs the update and re-sends
+  the card's record. Additive: the catalogId is unchanged, and renderers
+  that ignore it draw no button. The basic catalog and tables are
+  unchanged. Dynamic specs carry both options and the action's `icon`.
+
 - **Review fields: how a detail value was filled in** (admin catalog
   3.1.0). A field's `review` names a public attribute or calculation of the
   same resource holding a map: `state` (`pending`, `reviewed` or `missing`)

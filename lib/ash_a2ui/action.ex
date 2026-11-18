@@ -16,6 +16,9 @@ defmodule AshA2ui.Action do
     prompt fields (`AshA2ui.PromptOptions`): such a field offers only the
     options a destination read action returns for the row the prompt is
     opened on.
+  * `icon` names an icon a renderer may draw the action's button as, the
+    label becoming its accessible name and tooltip. Field actions (a
+    field's `field_action`) carry it; other buttons draw the label.
   * `via` delegates a row action to a host-provided function instead of
     running the mapped Ash action directly: the row button still emits the
     ordinary `invoke` event, but the handler calls
@@ -28,6 +31,7 @@ defmodule AshA2ui.Action do
   defstruct [
     :name,
     :label,
+    :icon,
     :refreshes,
     :prompt_title,
     :via,
@@ -40,6 +44,7 @@ defmodule AshA2ui.Action do
   @type t :: %__MODULE__{
           name: atom,
           label: String.t() | nil,
+          icon: String.t() | nil,
           refreshes: [atom] | nil,
           prompt_fields: [atom],
           prompt_options: [AshA2ui.PromptOptions.t()],

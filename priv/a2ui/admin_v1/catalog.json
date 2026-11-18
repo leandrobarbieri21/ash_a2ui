@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.1.0",
+        "version": "3.2.0",
         "changelog": {
+          "3.2.0": "Additive: field actions. fieldDisplay gains an optional action (a button beside the value: {label, action, context, icon?}, shaped like a dataGrid rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the card (component) and the field, with recordId and contexts bound to the card's record and the selections; label is the action's name in words, translated, and icon an optional icon name the button may draw as, the label becoming its accessible name and tooltip) and an optional actionVisible (a binding to whether the record offers it, /detail/<context>/_action_<field>, a boolean). A renderer draws the button only while actionVisible is true and dispatches the entry with its bindings resolved; the server re-checks every call. Renderers that ignore them draw no button. The catalogId is unchanged.",
           "3.1.0": "Additive: review fields. fieldDisplay gains an optional review (a binding to a review field's review, /detail/<context>/_review_<field>: an object {state, stateLabel, page?, pageLabel?, href?, quote?}, state one of pending, reviewed or missing and stateLabel its words, translated; page the source page the value came from, pageLabel its tag (\"p. 3\"), href an address opening the source there and quote the words the value was read from; null for no review). A renderer highlights a pending value and writes the state out beside the page tag, linked when there is an href. Renderers that ignore it draw the value. The catalogId is unchanged.",
           "3.0.0": "Breaking: the basic kinds this catalog renders itself move into it. TextField, CheckBox, ChoicePicker, DateTimeInput and Modal are declared here, with the basic catalog's definitions unchanged, and on an admin surface they carry no @catalogId: they resolve from this catalog, so a renderer draws its accessible inputs (a real label, the field's error beside the control) and the prompt Modal. Under 2.0.0 they carried the basic catalog's id and rendered from the basic catalog. Every other basic kind still carries the basic catalog's id. A function call inside a component on an admin surface names the basic catalog when its function is the basic catalog's. A renderer of 2.0.0 does not declare these kinds in the admin catalog and would reject or misplace them, so the catalogId moves to https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3. openSurface states its allowedCallers (rendererOnly, the default). 3.0.0 includes every 2.0.0 component and property unchanged.",
           "2.0.0": "Breaking: the A2UI 1.0 wire (protocolVersion \"1.0\"). Bindings are {\"@path\": ...} and function calls {\"@call\": ...}; an admin surface names this catalog as its catalogId and its basic components carry the basic catalog's id as @catalogId; every envelope (row actions, row click, sort, pagination, calendar window) is sent as the ash_a2ui catalog's ashAction function. The catalogId moves to https://github.com/lukegalea/ash_a2ui/catalogs/admin/v2, and this contract metadata moves under metadata.extensions.ash_a2ui. New: filterPicker, a query filter's picker (the ChoicePicker with hint, counts, dynamicOptions and grouped options). dataGrid columns' more declares textPath, captionPath and labelPath (the server-written tag text, list caption and accessible label). 2.0.0 includes every 1.x addition, up to and including 1.12 (record pages), 1.13 (plain links), 1.14 (grouped list rows), 1.15 (document rows and table footers), 1.16 (card rows), 1.17 (step fields) and 1.18 (table card headers).",
@@ -456,6 +457,22 @@
         "steps": {
           "$ref": "common_types.json#/$defs/DataBinding",
           "description": "Optional (1.17): binding to a steps field's steps (/detail/<context>/_steps_<field>), a list of {number, label, text?, note?, state, stateLabel, line}: number is the step's place (from 1), text the line under the label, note a smaller line, state one of complete, current, upcoming or overdue, stateLabel the state in words (translated) and line the whole step as one line of text. When present the value draws as a numbered stepper with each step's state written out, not only coloured; an empty list is an empty value (emptyText, hideWhenEmpty)."
+        },
+        "action": {
+          "type": "object",
+          "description": "Optional (3.2): the field's action, a button beside the value. Shaped like a dataGrid rowActions entry and dispatched the same way (the ash_a2ui catalog's ashAction, context bindings resolved at click time).",
+          "properties": {
+            "label": {"type": "string", "description": "The action's name in words (translated): the button's text, or its accessible name and tooltip when it draws as an icon."},
+            "action": {"type": "string", "description": "The client action name dispatched: field_action."},
+            "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}, "description": "The action context: component (the detail card), field, recordId (bound to /detail/<context>/id) and contexts (bound to /context on surfaces with contexts)."},
+            "icon": {"type": "string", "description": "Optional: an icon name the button may draw as (\"check\")."}
+          },
+          "required": ["label", "action", "context"],
+          "additionalProperties": false
+        },
+        "actionVisible": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (3.2): binding to whether the record offers the field's action (/detail/<context>/_action_<field>, a boolean). The button shows only while it is true; the server re-checks every call."
         },
         "review": {
           "$ref": "common_types.json#/$defs/DataBinding",
