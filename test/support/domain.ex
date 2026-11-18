@@ -39,6 +39,7 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.HubContract
     resource AshA2ui.Test.HubLine
     resource AshA2ui.Test.HubRole
+    resource AshA2ui.Test.Finding
     resource AshA2ui.Test.ExportContract
     resource AshA2ui.Test.ExportContractLine
   end

@@ -185,8 +185,8 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
   end
 
   # An `action` entity is refresh metadata for a client-reachable action:
-  # a row action of some table, a table's editable update_action (inline
-  # cell editing), or the form's create/update action (including the
+  # a row action of some table, a detail field's field_action, a table's
+  # editable update_action (inline cell editing), or the form's create/update action (including the
   # primary-action defaults a form or editable block falls back to, when
   # the resource is resolvable).
   defp verify_action_references(actions, components, dsl_state, module) do
@@ -204,8 +204,8 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
            message: """
            action #{inspect(action.name)} is not reachable from any component.
 
-           `action` entities attach refresh metadata to a table's row_actions entry or \
-           to the form's create/update action. \
+           `action` entities attach refresh metadata to a table's row_actions entry, \
+           a detail field's field_action or the form's create/update action. \
            Reachable actions: #{inspect(MapSet.to_list(reachable))}
            """
          )}
@@ -224,7 +224,22 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     end)
     |> Enum.concat(form_defaults(form, target))
     |> Enum.concat(editable_actions(components, target))
+    |> Enum.concat(field_actions(Verifier.get_entities(dsl_state, [:a2ui]), components))
     |> MapSet.new()
+  end
+
+  @doc false
+  # The field actions (catalog 3.2) of the fields a `:detail` card shows.
+  def field_actions(entities, components) do
+    shown =
+      for %Component{name: :detail, fields: fields} <- components,
+          field <- fields || [],
+          into: MapSet.new(),
+          do: field
+
+    for %AshA2ui.Field{field_action: action, name: name} <- entities,
+        action && MapSet.member?(shown, name),
+        do: action
   end
 
   # The update actions editable blocks commit through (declared, or the

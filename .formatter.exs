@@ -58,6 +58,8 @@ spark_locals_without_parens = [
   facet_counts: 1,
   field: 1,
   field: 2,
+  field_action: 1,
+  field_action_visible: 1,
   fields: 1,
   filename: 1,
   filter: 1,

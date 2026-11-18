@@ -544,6 +544,32 @@ defmodule AshA2ui.ResolvedView do
     AshA2ui.Review.data(record, review_fields, view.l10n)
   end
 
+  @doc """
+  The field-action data a `:detail` record carries for its fields that
+  declare a `field_action`: `_action_<field>`, whether the action is
+  offered on this record (`field_action_visible`, see
+  `field_action_offered?/2`). Shared by the initial render and the context
+  refreshes.
+  """
+  @spec detail_field_action_data(t(), struct(), [atom]) :: %{String.t() => boolean}
+  def detail_field_action_data(%__MODULE__{} = view, record, fields) do
+    for name <- fields,
+        %{field_action: action} = field <- [view.fields[name]],
+        action,
+        into: %{},
+        do: {"_action_#{name}", field_action_offered?(field, record)}
+  end
+
+  @doc """
+  Whether a field's `field_action` is offered on `record`: always without a
+  `field_action_visible`, else only when that field of the record is `true`.
+  """
+  @spec field_action_offered?(AshA2ui.Field.t(), struct()) :: boolean
+  def field_action_offered?(%AshA2ui.Field{field_action_visible: nil}, _record), do: true
+
+  def field_action_offered?(%AshA2ui.Field{field_action_visible: visible}, record),
+    do: Map.get(record, visible) == true
+
   defp serialized_field(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->
@@ -1285,9 +1311,17 @@ defmodule AshA2ui.ResolvedView do
           calculation_or_aggregate?(resource, review),
           do: review
 
+    # A field action's per-record gate is loaded with the record it gates.
+    action_loads =
+      for name <- field_names,
+          %{field_action_visible: visible} when not is_nil(visible) <- [fields[name]],
+          calculation_or_aggregate?(resource, visible),
+          do: visible
+
     Enum.uniq(
       source_loads ++
-        calc_loads ++ review_loads ++ AshA2ui.Links.loads(resource, field_names, fields)
+        calc_loads ++
+        review_loads ++ action_loads ++ AshA2ui.Links.loads(resource, field_names, fields)
     )
   end
 

@@ -54,6 +54,7 @@ defmodule AshA2ui.Dynamic.Importer do
   end
 
   alias AshA2ui.Component
+  alias AshA2ui.Verifiers.VerifyComponents
   alias Spark.Dsl.Extension
 
   @doc """
@@ -473,6 +474,8 @@ defmodule AshA2ui.Dynamic.Importer do
       |> put_value("pairs", field.pairs)
       |> put_value("steps", field.steps)
       |> put_opt("review", field.review)
+      |> put_opt("field_action", field.field_action)
+      |> put_opt("field_action_visible", field.field_action_visible)
       |> put_value("note", field.note)
       |> put_value("empty_text", field.empty_text)
       |> put_keyword("badge_text", field.badge_text, :raw)
@@ -505,7 +508,11 @@ defmodule AshA2ui.Dynamic.Importer do
     # reachable ONLY through a rejected feature (inline editing commits
     # through its update_action) would make the spec unresolvable — it is
     # rejected visibly alongside the feature that carried it.
-    reachable = MapSet.new(reachable_from_spec(components, resource))
+    reachable =
+      components
+      |> reachable_from_spec(resource)
+      |> Enum.concat(VerifyComponents.field_actions(AshA2ui.Info.fields(module), components))
+      |> MapSet.new()
 
     AshA2ui.Info.action_settings(module)
     |> Enum.with_index()
@@ -516,6 +523,7 @@ defmodule AshA2ui.Dynamic.Importer do
         spec =
           %{"name" => to_string(action.name)}
           |> put_value("label", action.label)
+          |> put_value("icon", action.icon)
           |> put_list("refreshes", action.refreshes)
           |> put_list("prompt_fields", action.prompt_fields)
           |> put_value("prompt_title", action.prompt_title)

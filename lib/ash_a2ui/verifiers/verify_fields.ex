@@ -13,7 +13,11 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       the form's create/update action(s), and
     * a `steps` field is not also drawn as pairs, a badge or a link, and
     * a field's `review` names a public attribute, calculation or aggregate
-      of the same resource.
+      of the same resource, and
+    * a field's `field_action` names an update action of the record each
+      `:detail` card showing the field reads (its context's resource), one
+      declaring a `:field` argument, and its `field_action_visible` a
+      public attribute, calculation or aggregate of that resource.
 
   Fields declared with a `source`, `relationship`, `link` or `links` option
   are exempt from both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
@@ -54,7 +58,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
              :ok <- verify_badge_tones(dsl_state, module),
              :ok <- verify_link_urls(dsl_state, module, overridable),
              :ok <- verify_steps(dsl_state, module),
-             :ok <- verify_reviews(dsl_state, module, overridable) do
+             :ok <- verify_reviews(dsl_state, module, overridable),
+             :ok <- verify_field_actions(dsl_state, module) do
           verify_hide_empty(dsl_state, module)
         end
     end
@@ -335,6 +340,69 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       _other ->
         nil
     end)
+  end
+
+  # A field action runs on the record a detail card shows: its context's
+  # resource holds the update action (with a `:field` argument) and the
+  # per-record gate.
+  defp verify_field_actions(dsl_state, module) do
+    entities = Verifier.get_entities(dsl_state, [:a2ui])
+
+    contexts =
+      for %AshA2ui.Context{} = context <- entities, into: %{}, do: {context.name, context}
+
+    Enum.find_value(entities, :ok, fn
+      %AshA2ui.Field{field_action: action, name: name} = field when not is_nil(action) ->
+        entities
+        |> Enum.filter(
+          &(match?(%AshA2ui.Component{name: :detail}, &1) and name in (&1.fields || []))
+        )
+        |> Enum.map(&(contexts[&1.context] && contexts[&1.context].resource))
+        |> Enum.filter(&((&1 && Code.ensure_loaded?(&1)) and Info.resource?(&1)))
+        |> Enum.uniq()
+        |> Enum.find_value(&field_action_error(&1, field, module))
+
+      _other ->
+        nil
+    end)
+  end
+
+  defp field_action_error(resource, %AshA2ui.Field{name: name} = field, module) do
+    error = fn message ->
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :field, name, :field_action],
+         message: message
+       )}
+    end
+
+    case Info.action(resource, field.field_action) do
+      %{type: :update, arguments: arguments} ->
+        cond do
+          not Enum.any?(arguments, &(&1.name == :field)) ->
+            error.(
+              "field_action #{inspect(field.field_action)} of #{inspect(resource)} declares no " <>
+                ":field argument, which receives the field's name"
+            )
+
+          field.field_action_visible &&
+              not MapSet.member?(known_field_names(resource), field.field_action_visible) ->
+            error.(
+              "field_action_visible names #{inspect(field.field_action_visible)}, which is not " <>
+                "a public attribute, calculation or aggregate of #{inspect(resource)}"
+            )
+
+          true ->
+            nil
+        end
+
+      _other ->
+        error.(
+          "field_action names #{inspect(field.field_action)}, which is not an update action " <>
+            "of #{inspect(resource)}"
+        )
+    end
   end
 
   defp link_url_error(module, name, message),

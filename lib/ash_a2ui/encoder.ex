@@ -1960,6 +1960,7 @@ defmodule AshA2ui.Encoder do
         |> put_detail_badge(view, field, "/detail/#{detail.context}/")
         |> put_detail_steps(view, field, "/detail/#{detail.context}/")
         |> put_detail_review(view, field, "/detail/#{detail.context}/")
+        |> put_field_action(view, detail, field)
         |> put_empty_text(view, field)
         |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
@@ -2008,6 +2009,43 @@ defmodule AshA2ui.Encoder do
     case view.fields[field] do
       %{review: review} when not is_nil(review) ->
         Map.put(display, "review", %{"@path" => "#{base}_review_#{field}"})
+
+      _other ->
+        display
+    end
+  end
+
+  # Catalog 3.2: a field action is a button beside the value, its entry
+  # shaped like a dataGrid rowActions entry (label, action, context) and
+  # sent the same way, as the ash_a2ui catalog's ashAction. The context
+  # names the card and the field, never the Ash action (the server finds it
+  # in the field's declaration); `actionVisible` binds whether the record
+  # offers it.
+  defp put_field_action(display, view, detail, field) do
+    case view.fields[field] do
+      %{field_action: action} when not is_nil(action) ->
+        setting = Map.get(view.actions, action)
+        base = "/detail/#{detail.context}"
+
+        context =
+          %{
+            "component" => to_string(detail.name),
+            "field" => to_string(field),
+            "recordId" => %{"@path" => "#{base}/id"}
+          }
+          |> put_contexts_binding(view)
+
+        entry =
+          %{
+            "label" => ResolvedView.action_label(view, action),
+            "action" => "field_action",
+            "context" => context
+          }
+          |> maybe_put("icon", setting && setting.icon)
+
+        display
+        |> Map.put("action", entry)
+        |> Map.put("actionVisible", %{"@path" => "#{base}/_action_#{field}"})
 
       _other ->
         display

@@ -421,7 +421,10 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       "wizard_back",
       # Basic-catalog reference-link Buttons: the admin catalog's link cells
       # keep pushing "a2ui:open_surface" and never dispatch it
-      "open_surface"
+      "open_surface",
+      # Catalog 3.2: a detail field's action, sent in the rowActions entry
+      # shape (the field's declaration names the Ash action)
+      "field_action"
     ]
 
     @tag ac: "A2UI-101B/AC-11"

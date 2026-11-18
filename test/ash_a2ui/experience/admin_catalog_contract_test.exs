@@ -216,8 +216,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
     basic = "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    assert contract(catalog)["version"] == "3.1.0"
-    assert Experience.admin_catalog_version() == "3.1.0"
+    assert contract(catalog)["version"] == "3.2.0"
+    assert Experience.admin_catalog_version() == "3.2.0"
     assert changelog(catalog)["3.0.0"] =~ "Breaking"
     assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
     assert catalog["$id"] == catalog["catalogId"]
@@ -241,7 +241,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     inputs = Regex.scan(~r/"(\w+)"/, list, capture: :all_but_first) |> List.flatten()
     assert Enum.sort(inputs ++ ["Modal"]) == Enum.sort(owned)
     assert source =~ "export const ADMIN_BASIC_KINDS = [...INPUT_OVERRIDE_KINDS, \"Modal\"]"
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.1.0")
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.2.0")
 
     # the functions state who may call them
     for {name, function} <- catalog["functions"],
@@ -258,6 +258,23 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert review["$ref"] == "common_types.json#/$defs/DataBinding"
     assert review["description"] =~ "pending"
     refute "review" in catalog["components"]["fieldDisplay"]["required"]
+  end
+
+  test "catalog 3.2 adds the fieldDisplay field action, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.2.0"] =~ "field actions"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    field = catalog["components"]["fieldDisplay"]
+    action = field["properties"]["action"]
+    assert action["required"] == ["label", "action", "context"]
+    assert Map.keys(action["properties"]) |> Enum.sort() == ~w(action context icon label)
+
+    visible = field["properties"]["actionVisible"]
+    assert visible["$ref"] == "common_types.json#/$defs/DataBinding"
+    refute "action" in field["required"]
+    refute "actionVisible" in field["required"]
   end
 
   test "catalog 2.0 is the A2UI 1.0 wire: filterPicker, the more tag's words" do

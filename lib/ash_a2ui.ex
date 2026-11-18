@@ -231,6 +231,32 @@ defmodule AshA2ui do
         catalog and tables show the value alone.
         """
       ],
+      field_action: [
+        type: :atom,
+        doc: """
+        An update action of the record a `:detail` card shows, offered as a
+        button beside this field (admin catalog 3.2): choosing it runs the
+        action on that record, as the actor, with the field's name (a
+        string) as its `:field` argument, which the action must declare.
+        The record is re-read through the card's context first (an
+        authorized read), and the card's record is re-read and re-sent
+        afterwards. The `action` entity of the same name gives the button
+        its `label` (default: the humanized action name), its `icon` and
+        the tables it `refreshes`; its `visible_when` gates row actions
+        only. Several fields may share one action. The basic catalog and
+        tables draw no button.
+        """
+      ],
+      field_action_visible: [
+        type: :atom,
+        doc: """
+        A public attribute, calculation or aggregate of the same resource
+        that says, per record, whether this field's `field_action` is
+        offered: `true` offers it, anything else hides it. Enforced on the
+        server too: the action is refused for a record it does not offer
+        it on. Without it the action is offered on every record.
+        """
+      ],
       empty_text: [
         type: :string,
         doc: """
@@ -2262,6 +2288,15 @@ defmodule AshA2ui do
         its prompt heading — and the name in its bulk status line and its
         success status ("<label>: done."). A plain string, so a host can
         pass translated text. Defaults to the humanized action name.
+        """
+      ],
+      icon: [
+        type: :string,
+        doc: """
+        An icon name a renderer may draw this action's button as, its
+        label becoming the button's accessible name and tooltip ("check").
+        Carried by field actions (a field's `field_action`, admin catalog
+        3.2); other buttons draw the label.
         """
       ],
       refreshes: [
