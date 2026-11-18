@@ -329,3 +329,86 @@ export function panelStateOf(message) {
 
   return null;
 }
+
+// --- Prompt pre-fill --------------------------------------------------------
+//
+// A row action with `prompt_fields` opens its dialog at once and asks the
+// agent for the pre-fill (`prompt`), which writes the whole
+// /prompt/values/<action> map (and /prompt/select/<action>, the label state
+// of its searchable and scoped selects) when it lands. A person can type
+// into the dialog before then. The pre-fill must not replace what they
+// typed: Confirm sends /prompt/values/<action>, so an overwritten field
+// would send a value the person never entered (often a blank).
+//
+// The hook keeps the values the dialog showed when the `prompt` call went
+// out. A field whose value differs from that when the pre-fill arrives was
+// edited by the person: the pre-fill write keeps the person's value, and
+// that field's select state, and fills only the fields left untouched.
+
+/** Whether two data-model values (JSON shapes) are equal. */
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
+}
+
+function plainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The fields of a prompt's values map the person changed: those whose
+ * value in `current` differs from `before` (the map when the `prompt` call
+ * went out). Returns the list of field names.
+ */
+export function editedPromptFields(before, current) {
+  const was = plainObject(before) ? before : {};
+  const now = plainObject(current) ? current : {};
+  const fields = new Set([...Object.keys(was), ...Object.keys(now)]);
+  return [...fields].filter((field) => !sameValue(was[field], now[field]));
+}
+
+function overlay(value, kept) {
+  const out = plainObject(value) ? {...value} : {};
+  for (const [field, keptValue] of Object.entries(kept)) {
+    if (keptValue === undefined) delete out[field];
+    else out[field] = keptValue;
+  }
+  return out;
+}
+
+/**
+ * Rewrites the pre-fill writes in `messages` so they keep what the person
+ * typed. `prompts` lists the open prompts awaiting their pre-fill, each
+ * `{surfaceId, action, values, selects}`: `values` maps each edited field
+ * to its current value, `selects` maps each edited field to its current
+ * /prompt/select state (absent when it has none). Only a write of the
+ * whole `/prompt/values/<action>` or `/prompt/select/<action>` map is
+ * rewritten; every other message is passed through. Returns a new array;
+ * the messages themselves are not modified.
+ */
+export function keepPromptEdits(messages, prompts) {
+  const edited = prompts.filter((prompt) => Object.keys(prompt.values).length > 0);
+  if (edited.length === 0) return messages;
+
+  return messages.map((message) => {
+    const update = message && message.updateDataModel;
+    if (!update) return message;
+
+    for (const prompt of edited) {
+      if (update.surfaceId !== prompt.surfaceId) continue;
+      const kept =
+        update.path === `/prompt/values/${prompt.action}`
+          ? prompt.values
+          : update.path === `/prompt/select/${prompt.action}`
+            ? prompt.selects
+            : null;
+      if (kept) return {...message, updateDataModel: {...update, value: overlay(update.value, kept)}};
+    }
+
+    return message;
+  });
+}

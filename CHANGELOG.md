@@ -225,6 +225,15 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Bug Fixes:
 
+- **A prompt keeps what the person typed before its pre-fill arrived.** A
+  row action's prompt dialog opens at once and its `prompt` reply arrives
+  later, so a field typed into before then was overwritten by the pre-fill
+  (often a blank), and Confirm sent that instead of what was typed. The
+  LiveView hook now keeps the values the dialog showed when the `prompt`
+  call went out: a field changed since then keeps the person's value (and
+  its `/prompt/select` label state) and the pre-fill fills only the
+  untouched fields. A whole data-model refresh while the call is pending
+  resets the comparison. No wire or catalog change.
 - **A field the actor's field policies forbid serializes as empty.** A
   rendered value, a refreshed row or a CSV cell holding an `Ash.ForbiddenField`
   came out as its inspected struct (`#Ash.ForbiddenField<...>`); it is now
