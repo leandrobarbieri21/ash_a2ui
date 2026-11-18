@@ -140,7 +140,9 @@ add a proper Ash action and expose it via `row_actions` instead.
   trigger of a prompt Modal (an action with `prompt_fields`). No Ash write:
   the handler validates the allowlist + `visible_when`, pre-fills
   `/prompt/values/<action>` from the record, and clears `/errors`. The
-  actual write is the subsequent `"invoke"` with `"values"`.
+  actual write is the subsequent `"invoke"` with `"values"`. The shipped
+  hook keeps a field the person edited before the pre-fill arrived: the
+  pre-fill fills only the untouched fields.
 - `"query"` — context `%{"query" => <the query state map>}` plus optional
   `"page"`/`"pageDelta"`. Requires the table to declare a `query` entity;
   every search/sort/filter/page value is validated against that allowlist

@@ -44,6 +44,19 @@
  * call is unanswered, so an empty table or report reads as "rows on the
  * way" rather than "no rows".
  *
+ * ## Prompt pre-fill: what the person typed stays
+ *
+ * A `prompt` call (a row action's dialog opening) asks the agent to
+ * pre-fill `/prompt/values/<action>`, and the dialog is open, its fields
+ * editable, while the reply is on its way. The hook keeps the values the
+ * dialog showed when the call went out. When the reply arrives, a field
+ * whose value has changed since then was edited by the person: the
+ * pre-fill keeps the person's value (and that field's
+ * `/prompt/select/<action>` state) and fills only the untouched fields
+ * (`keepPromptEdits` in `ash_a2ui_protocol.js`). Confirm then sends what
+ * the dialog shows. A write of the whole data model while the call is
+ * pending (a refresh) resets what the hook compares against.
+ *
  * ## Renderer functions
  *
  * A `callRendererFunction` runs a catalog function the agent may call
@@ -159,6 +172,8 @@ import {
   PROTOCOL_VERSION,
   ashActionCall,
   createAshFunctionCatalog,
+  editedPromptFields,
+  keepPromptEdits,
   panelStateOf,
   pendingFeedback,
   quietAction,
@@ -166,6 +181,12 @@ import {
   rpcError,
   slowFeedback,
 } from "./ash_a2ui_protocol.js";
+
+// A detached copy of a data-model value (path writes change the model in
+// place, so a kept value must not alias it).
+function copyJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
 
 // The ash_a2ui actions that fetch the data a surface shows: the hook marks
 // the surface loading (AshA2ui.Loading) from the call until the agent
@@ -585,6 +606,9 @@ export const AshA2ui = {
     // The functionCallIds of the ashAction calls this hook sent and has not
     // had answered: their agentFunctionResponse is routed here.
     this.pendingCalls = new Set();
+    // The `prompt` calls not yet answered, by functionCallId: the values
+    // their dialog showed when each went out (see "Prompt pre-fill").
+    this.pendingPrompts = new Map();
 
     const ashCatalog = createAshFunctionCatalog(deps.Catalog, {
       ashAction: (args, context) => this.runAshAction(args, context),
@@ -660,14 +684,19 @@ export const AshA2ui = {
   processMessages(messages) {
     if (!this.processor) return;
 
-    const batch = replaceExistingSurfaces(messages, (id) => this.surfaceExists(id));
+    const batch = keepPromptEdits(
+      replaceExistingSurfaces(messages, (id) => this.surfaceExists(id)),
+      this.promptEdits(),
+    );
     for (const error of this.apply(batch)) this.send(error);
 
     // An answered call no longer routes its (late or repeated) responses here.
     for (const message of batch) {
       const callId = respondedCallId(message);
       if (callId !== undefined && this.pendingCalls) this.pendingCalls.delete(callId);
+      if (callId !== undefined && this.pendingPrompts) this.pendingPrompts.delete(callId);
     }
+    this.rebasePrompts();
 
     // Belt and braces for the skeleton: onSurfaceCreated dismisses it.
     if (this.skeletonEl && batch.some((message) => message && message.createSurface)) {
@@ -714,6 +743,7 @@ export const AshA2ui = {
     }
 
     this.pendingCalls.add(functionCallId);
+    if (args && args.name === "prompt") this.watchPrompt(surfaceId, args.context, functionCallId);
 
     let response;
     try {
@@ -879,6 +909,67 @@ export const AshA2ui = {
         field.focus();
       }
     }
+  },
+
+  /**
+   * Records the values a prompt dialog shows as its `prompt` call goes out
+   * (see "Prompt pre-fill"). The entry lives until the agent answers the
+   * call, also after a timeout: a late pre-fill still keeps the edits.
+   */
+  watchPrompt(surfaceId, context, functionCallId) {
+    const action = context && context.action;
+    const dataModel = this.surfaceDataModel(surfaceId);
+    if (typeof action !== "string" || !dataModel) return;
+    this.pendingPrompts.set(functionCallId, {
+      surfaceId,
+      action,
+      root: dataModel.get("/"),
+      values: copyJson(dataModel.get(`/prompt/values/${action}`)),
+    });
+  },
+
+  /**
+   * The person's edits to each pending prompt, for `keepPromptEdits`: the
+   * current value and select state of every field changed since its call
+   * went out.
+   */
+  promptEdits() {
+    const prompts = [];
+    if (!this.pendingPrompts) return prompts;
+    for (const {surfaceId, action, values: before} of this.pendingPrompts.values()) {
+      const dataModel = this.surfaceDataModel(surfaceId);
+      if (!dataModel) continue;
+      const current = dataModel.get(`/prompt/values/${action}`);
+      const values = {};
+      const selects = {};
+      for (const field of editedPromptFields(before, current)) {
+        values[field] = copyJson(current && current[field]);
+        const state = dataModel.get(`/prompt/select/${action}/${field}`);
+        if (state !== undefined) selects[field] = copyJson(state);
+      }
+      prompts.push({surfaceId, action, values, selects});
+    }
+    return prompts;
+  },
+
+  /**
+   * A write of the whole data model (a refresh, a re-bootstrap) replaced
+   * what the dialog showed: the comparison starts over from it.
+   */
+  rebasePrompts() {
+    if (!this.pendingPrompts) return;
+    for (const prompt of this.pendingPrompts.values()) {
+      const dataModel = this.surfaceDataModel(prompt.surfaceId);
+      if (!dataModel || dataModel.get("/") === prompt.root) continue;
+      prompt.root = dataModel.get("/");
+      prompt.values = copyJson(dataModel.get(`/prompt/values/${prompt.action}`));
+    }
+  },
+
+  /** The data model of a surface the processor holds, else null. */
+  surfaceDataModel(surfaceId) {
+    const surface = this.processor && this.processor.getSurface(surfaceId);
+    return surface ? surface.dataModel : null;
   },
 
   /**

@@ -6,7 +6,9 @@ import {
   ASH_A2UI_CATALOG_ID,
   ashActionCall,
   createAshFunctionCatalog,
+  editedPromptFields,
   feedback,
+  keepPromptEdits,
   panelStateOf,
   pendingFeedback,
   quietAction,
@@ -150,4 +152,44 @@ test("panelStateOf reads a /ui/panel write and a whole-model write", () => {
   assert.equal(panelStateOf(write("/", {ui: {panel: {visible: []}}})), false);
   assert.equal(panelStateOf(write("/name", "Ada")), null);
   assert.equal(panelStateOf(null), null);
+});
+
+test("editedPromptFields names the fields whose value changed, nested values compared by value", () => {
+  assert.deepEqual(
+    editedPromptFields(
+      {note: "", hours: 2, tags: ["a"], owner: null},
+      {note: "typed", hours: 2, tags: ["a"], owner: null, added: "x"},
+    ),
+    ["note", "added"],
+  );
+  assert.deepEqual(editedPromptFields(undefined, {note: ""}), ["note"]);
+  assert.deepEqual(editedPromptFields({note: ""}, {note: ""}), []);
+});
+
+test("keepPromptEdits overlays the edited fields on that prompt's whole-map writes only", () => {
+  const write = (surfaceId, path, value) => ({version: "1.0", updateDataModel: {surfaceId, path, value}});
+  const messages = [
+    write("s1", "/prompt/values/complete", {note: "", hours: 2}),
+    write("s1", "/prompt/select/complete", {owner: {search: "", label: "Grace"}}),
+    write("s1", "/prompt/values/complete/note", ""),
+    write("s1", "/prompt/values/delegate", {note: ""}),
+    write("s2", "/prompt/values/complete", {note: ""}),
+    write("s1", "/errors", {}),
+  ];
+  const prompts = [
+    {
+      surfaceId: "s1",
+      action: "complete",
+      values: {note: "typed", owner: "u9", gone: undefined},
+      selects: {owner: {search: "", label: "Alan"}},
+    },
+  ];
+
+  const out = keepPromptEdits(messages, prompts);
+
+  assert.deepEqual(out[0].updateDataModel.value, {note: "typed", hours: 2, owner: "u9"});
+  assert.deepEqual(out[1].updateDataModel.value, {owner: {search: "", label: "Alan"}});
+  assert.deepEqual(out.slice(2), messages.slice(2), "other writes pass through");
+  assert.deepEqual(messages[0].updateDataModel.value, {note: "", hours: 2}, "input not modified");
+  assert.equal(keepPromptEdits(messages, [{...prompts[0], values: {}}]), messages);
 });
