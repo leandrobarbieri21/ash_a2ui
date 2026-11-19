@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.2.0",
+        "version": "3.3.0",
         "changelog": {
+          "3.3.0": "Additive: review fields in tables. dataGrid columns gain an optional review (row-relative, {path: \"_review_<field>\"}: the row's review of a review field the column draws, the same object fieldDisplay's review binds, {state, stateLabel, page?, pageLabel?, href?, quote?}, or null for none) and the subtitle binding an optional reviewPath (row-relative, the _review_<field> key of the subtitle's field). A renderer highlights a pending value and writes the state out beside the page tag (a link when href is present), in grids, list rows and cards alike. Renderers that ignore them draw the value. The catalogId is unchanged.",
           "3.2.0": "Additive: field actions. fieldDisplay gains an optional action (a button beside the value: {label, action, context, icon?}, shaped like a dataGrid rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the card (component) and the field, with recordId and contexts bound to the card's record and the selections; label is the action's name in words, translated, and icon an optional icon name the button may draw as, the label becoming its accessible name and tooltip) and an optional actionVisible (a binding to whether the record offers it, /detail/<context>/_action_<field>, a boolean). A renderer draws the button only while actionVisible is true and dispatches the entry with its bindings resolved; the server re-checks every call. Renderers that ignore them draw no button. The catalogId is unchanged.",
           "3.1.0": "Additive: review fields. fieldDisplay gains an optional review (a binding to a review field's review, /detail/<context>/_review_<field>: an object {state, stateLabel, page?, pageLabel?, href?, quote?}, state one of pending, reviewed or missing and stateLabel its words, translated; page the source page the value came from, pageLabel its tag (\"p. 3\"), href an address opening the source there and quote the words the value was read from; null for no review). A renderer highlights a pending value and writes the state out beside the page tag, linked when there is an href. Renderers that ignore it draw the value. The catalogId is unchanged.",
           "3.0.0": "Breaking: the basic kinds this catalog renders itself move into it. TextField, CheckBox, ChoicePicker, DateTimeInput and Modal are declared here, with the basic catalog's definitions unchanged, and on an admin surface they carry no @catalogId: they resolve from this catalog, so a renderer draws its accessible inputs (a real label, the field's error beside the control) and the prompt Modal. Under 2.0.0 they carried the basic catalog's id and rendered from the basic catalog. Every other basic kind still carries the basic catalog's id. A function call inside a component on an admin surface names the basic catalog when its function is the basic catalog's. A renderer of 2.0.0 does not declare these kinds in the admin catalog and would reject or misplace them, so the catalogId moves to https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3. openSurface states its allowedCallers (rendererOnly, the default). 3.0.0 includes every 2.0.0 component and property unchanged.",
@@ -97,14 +98,21 @@
                 "required": ["path"],
                 "additionalProperties": false
               },
+              "review": {
+                "type": "object",
+                "description": "Optional (3.3): row-relative binding ({path: \"_review_<field>\"}) to the row's review of the column's field: {state, stateLabel, page?, pageLabel?, href?, quote?} or null, as fieldDisplay's review. state is pending (filled in automatically, not checked yet), reviewed (a person checked it) or missing (looked for, not found), stateLabel the state in words (translated), page the source page the value came from (from 1), pageLabel its tag (translated), href an address opening the source at that place and quote the words the value was read from. When present a pending value is highlighted and the state is written out, not only coloured, beside the page tag (a link when href is present). Null or absent on a row = no review for that row.",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": false
+              },
               "sortable": {
                 "type": "boolean",
                 "description": "Optional (1.7): true when the table's query lets the client sort by this column (the field is in its sortable allowlist). The renderer makes the header a sort control driven by the dataGrid's sort. Absent = not sortable."
               },
               "subtitle": {
                 "type": "object",
-                "description": "Optional (1.8): row-relative binding to a second line drawn under the cell's value (a column's subtitle field). Absent or empty on a row = no second line.",
-                "properties": {"path": {"type": "string"}},
+                "description": "Optional (1.8): row-relative binding to a second line drawn under the cell's value (a column's subtitle field). Absent or empty on a row = no second line. reviewPath (optional, 3.3, row-relative) names the subtitle field's review on the row (the _review_<field> key), shaped as the column's review.",
+                "properties": {"path": {"type": "string"}, "reviewPath": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
               },

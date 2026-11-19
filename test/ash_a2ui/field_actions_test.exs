@@ -114,8 +114,8 @@ defmodule AshA2ui.FieldActionsTest do
       refute Enum.any?(Map.values(components), &Map.has_key?(&1, "actionVisible"))
     end
 
-    test "the admin catalog is 3.2" do
-      assert AshA2ui.Experience.admin_catalog_version() == "3.2.0"
+    test "the admin catalog is 3.2 or later" do
+      assert Version.match?(AshA2ui.Experience.admin_catalog_version(), ">= 3.2.0")
     end
   end
 
