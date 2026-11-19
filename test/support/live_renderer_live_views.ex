@@ -385,6 +385,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       open_surface_url: "/app/r/{surface}/{recordId}"
   end
 
+  defmodule AshA2ui.Test.DocumentPaneLive do
+    @moduledoc false
+
+    # A document pane (catalog 3.4) kept in the address: the URL's
+    # ?document=shown seeds the bootstrap, the pane's switch push_patches
+    # it, and back/forward shows or hides the pane again. The surface build
+    # is stubbed (it reports its opts); the real ActionHandler answers the
+    # pane's actions, which read nothing.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.VisitDocumentUI,
+      deep_link: true,
+      pubsub: [module: AshA2ui.Test.PubSub, topics: ["ash_a2ui_test:documents"]],
+      surface_fn: &Stubs.surface/2,
+      data_model_fn: &Stubs.data_model/2
+  end
+
   defmodule AshA2ui.Test.OpenSurfaceCallbackLive do
     @moduledoc false
 

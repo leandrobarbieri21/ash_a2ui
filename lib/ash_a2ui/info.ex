@@ -521,7 +521,13 @@ defmodule AshA2ui.Info do
 
       %{value: value} ->
         context = resolved_view.contexts[context_name]
-        loads = details |> Enum.flat_map(& &1.loads) |> Enum.uniq()
+
+        loads =
+          details
+          |> Enum.flat_map(& &1.loads)
+          |> Kernel.++(ResolvedView.document_loads(resolved_view, context_name))
+          |> Enum.uniq()
+
         fields = details |> Enum.flat_map(& &1.fields) |> Enum.uniq()
 
         case AshA2ui.ContextRunner.fetch_selected(
@@ -537,8 +543,13 @@ defmodule AshA2ui.Info do
             |> ResolvedView.record_values(record, fields, opts)
             |> Map.merge(ResolvedView.detail_badge_data(resolved_view, record, fields))
             |> Map.merge(ResolvedView.detail_steps_data(resolved_view, record, fields))
-            |> Map.merge(ResolvedView.detail_review_data(resolved_view, record, fields))
+            |> Map.merge(
+              ResolvedView.detail_review_data(resolved_view, record, fields, context_name)
+            )
             |> Map.merge(ResolvedView.detail_field_action_data(resolved_view, record, fields))
+            |> Map.merge(
+              ResolvedView.detail_document_data(resolved_view, context_name, record, fields)
+            )
             |> Map.merge(
               ResolvedView.detail_context_data(
                 resolved_view,

@@ -225,6 +225,22 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     params kept), and browser back/forward re-applies the URL's selections —
     so a detail view is a shareable, back-button-friendly URL.
 
+    ## Document panes
+
+    A surface declaring a `document_pane` (see `AshA2ui.DocumentPane`) keeps
+    the pane open in the address: the connected mount reads
+    `?<url_param>=shown` and builds the surface with the pane open, and when
+    a person shows or hides it (the `"document_pane"` action) the LiveView
+    `push_patch`es the current path with the parameter added or removed
+    (closed is the default, so it leaves no parameter; other params are
+    kept). The patch needs the current URI, which `handle_params/4` records:
+    a LiveView without `deep_link: true` or `time_travel: true` calls
+    `AshA2ui.LiveRenderer.handle_params/4` from its own `handle_params/3`.
+    Browser back/forward to a different parameter shows or hides the pane
+    again. The state is assigned as `:ash_a2ui_document_state`
+    (`%{"<pane>" => true}` while open), so the page around the surface can
+    follow it.
+
     ## Time travel
 
     With `time_travel: true` the surface reads as of the instant in the
@@ -390,7 +406,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       actor = config.actor_fn.(socket)
       tenant = config.tenant_fn.(socket)
       locale = config.locale_fn.(socket)
-      url_state = url_state(params)
+      url_state = config.ui |> url_state(params)
       as_of = url_as_of(config, params)
       page = page_values(config, socket)
 
@@ -407,6 +423,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_context_state: nil,
           ash_a2ui_uri: nil,
           ash_a2ui_url_ctx: url_state.ctx,
+          ash_a2ui_document_state: url_state.documents,
           ash_a2ui_pending_calls: %{},
           ash_a2ui_surfaces: %{},
           ash_a2ui_page: page,
@@ -514,16 +531,18 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
-    # The URL's ctx/q params (anything else — including a LiveView not
-    # mounted at the router — carries no state).
-    defp url_state(params) when is_map(params) do
+    # The URL's ctx/q params and the document panes it holds open (anything
+    # else — including a LiveView not mounted at the router — carries no
+    # state).
+    defp url_state(ui, params) when is_map(params) do
       %{
         ctx: string_map(Map.get(params, "ctx")),
-        query: params |> Map.get("q") |> query_params()
+        query: params |> Map.get("q") |> query_params(),
+        documents: AshA2ui.DocumentPane.url_state(ui, params)
       }
     end
 
-    defp url_state(_not_mounted_at_router), do: %{ctx: %{}, query: nil}
+    defp url_state(_ui, _not_mounted_at_router), do: %{ctx: %{}, query: nil, documents: %{}}
 
     # time_travel: the URL's ?as_of= instant, nil (now) otherwise.
     defp url_as_of(%{time_travel: true}, params), do: AshA2ui.AsOf.from_params(params)
@@ -628,7 +647,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       query = if url_state.query, do: [query_state: url_state.query], else: []
 
-      context ++ query
+      documents =
+        if url_state.documents == %{}, do: [], else: [document_state: url_state.documents]
+
+      context ++ query ++ documents
     end
 
     @doc """
@@ -642,11 +664,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     def handle_params(config, params, uri, socket) do
       first? = is_nil(socket.assigns[:ash_a2ui_uri])
       socket = socket |> assign(:ash_a2ui_uri, uri) |> update_page(config)
-      ctx = url_state(params).ctx
+      %{ctx: ctx, documents: documents} = url_state(config.ui, params)
 
       cond do
         first? or not connected?(socket) ->
-          {:noreply, assign(socket, :ash_a2ui_url_ctx, ctx)}
+          {:noreply, assign(socket, ash_a2ui_url_ctx: ctx, ash_a2ui_document_state: documents)}
 
         # A new instant rebuilds the surface: pinned and live surfaces carry
         # different controls, so a data-model refresh is not enough.
@@ -656,7 +678,36 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         true ->
           socket
           |> restart_changed_surfaces(config, params)
+          |> apply_url_documents(config, documents)
           |> apply_url_context(config, ctx)
+      end
+    end
+
+    # Back/forward to an address that holds a document pane open or closed
+    # differently: the pane follows it. A patch this LiveView made itself
+    # (the switch) already matches.
+    defp apply_url_documents(socket, config, documents) do
+      current = socket.assigns[:ash_a2ui_document_state] || %{}
+
+      if documents == current do
+        socket
+      else
+        surface_id = AshA2ui.ResolvedView.surface_id(config.ui)
+
+        messages =
+          for pane <- AshA2ui.DocumentPane.panes(config.ui),
+              name = Atom.to_string(pane.name),
+              Map.get(documents, name, false) != Map.get(current, name, false) do
+            AshA2ui.Encoder.update_data_model(
+              surface_id,
+              AshA2ui.DocumentPane.ui_path(pane) <> "/shown",
+              Map.get(documents, name, false)
+            )
+          end
+
+        socket
+        |> assign(:ash_a2ui_document_state, documents)
+        |> push_messages(messages)
       end
     end
 
@@ -848,6 +899,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             |> track_context_state(messages)
             |> push_messages(messages)
             |> maybe_patch_context(config, previous_context)
+            |> maybe_patch_document(config, outcome, message)
 
           maybe_open_surface(config, outcome, message, socket)
       end
@@ -928,6 +980,51 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     end
 
     defp maybe_patch_context(socket, _config, _previous), do: socket
+
+    # An accepted "document_pane" (the pane's switch): the address keeps it,
+    # `?<url_param>=shown` while open and no parameter while closed.
+    defp maybe_patch_document(socket, config, :ok, message) do
+      with {"document_pane", %{"pane" => name, "shown" => shown}} when is_boolean(shown) <-
+             action_name(message),
+           %AshA2ui.DocumentPane{} = pane <-
+             Enum.find(
+               AshA2ui.DocumentPane.panes(config.ui),
+               &(Atom.to_string(&1.name) == name)
+             ) do
+        documents =
+          if shown,
+            do: Map.put(socket.assigns.ash_a2ui_document_state, name, true),
+            else: Map.delete(socket.assigns.ash_a2ui_document_state, name)
+
+        socket = assign(socket, :ash_a2ui_document_state, documents)
+
+        case socket.assigns[:ash_a2ui_uri] do
+          uri when is_binary(uri) ->
+            push_patch(socket, to: document_path(uri, pane, shown), replace: false)
+
+          _not_at_the_router ->
+            socket
+        end
+      else
+        _other -> socket
+      end
+    end
+
+    defp maybe_patch_document(socket, _config, _outcome, _message), do: socket
+
+    defp document_path(uri, pane, shown) do
+      %URI{path: path, query: query} = URI.parse(uri)
+
+      params =
+        (query || "")
+        |> Query.decode()
+        |> AshA2ui.DocumentPane.put_param(pane, shown)
+
+      case Query.encode(params) do
+        "" -> path || "/"
+        encoded -> (path || "/") <> "?" <> encoded
+      end
+    end
 
     defp context_ids(context_state) do
       for {name, %{"value" => value}} <- context_state,
@@ -1166,10 +1263,20 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp l10n_opts(config, locale), do: [{:locale, locale} | config.l10n]
 
     defp refresh_opts(socket) do
-      state_opts(call_opts(socket) ++ page_opts(socket.assigns[:ash_a2ui_page]), %{
-        query_state: socket.assigns.ash_a2ui_query_state,
-        context_state: socket.assigns.ash_a2ui_context_state
-      })
+      opts =
+        state_opts(call_opts(socket) ++ page_opts(socket.assigns[:ash_a2ui_page]), %{
+          query_state: socket.assigns.ash_a2ui_query_state,
+          context_state: socket.assigns.ash_a2ui_context_state
+        })
+
+      # A full refresh rewrites /ui: an open document pane stays open.
+      case socket.assigns[:ash_a2ui_document_state] do
+        documents when is_map(documents) and map_size(documents) > 0 ->
+          Keyword.put(opts, :document_state, documents)
+
+        _none ->
+          opts
+      end
     end
 
     defp state_opts(opts, state) do

@@ -108,6 +108,7 @@ defmodule AshA2ui.MixProject do
         "documentation/topics/calendars.md",
         "documentation/topics/timelines-and-matrices.md",
         "documentation/topics/live-diagrams.md",
+        "documentation/topics/document-panes.md",
         "documentation/topics/contexts-and-details.md",
         "documentation/topics/agent-composed-surfaces.md",
         "documentation/topics/relationships.md",
@@ -143,6 +144,7 @@ defmodule AshA2ui.MixProject do
           AshA2ui.Calendar,
           AshA2ui.Diagram,
           AshA2ui.Diagram.Source,
+          AshA2ui.DocumentPane,
           AshA2ui.Editable,
           AshA2ui.Export,
           AshA2ui.Manifest

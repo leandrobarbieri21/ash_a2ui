@@ -393,6 +393,8 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
 
   describe "handler contract" do
     @dispatch_names [
+      "document_pane",
+      "document_region",
       "submit_form",
       "invoke",
       "prompt",
