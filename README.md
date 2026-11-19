@@ -633,8 +633,8 @@ in this repo. POC route cells are filled in when the POC lands.
 
 | Capability | Demo route | Test |
 |---|---|---|
-| Table render (`List` + `Row`/`Column` composition) | `/admin-tools/promotions-providers` (ScribbleVet backend) | `test/encoder_test.exs` |
-| Form create/update | `/admin-tools/promotions-providers` (ScribbleVet backend) | `test/encoder_test.exs`, `test/action_handler_test.exs` |
+| Table render (`List` + `Row`/`Column` composition) | `/admin-tools/promotions-providers` (reference host app) | `test/encoder_test.exs` |
+| Form create/update | `/admin-tools/promotions-providers` (reference host app) | `test/encoder_test.exs`, `test/action_handler_test.exs` |
 | Row actions (`invoke` allowlist) | `/admin-tools/promotions-providers` (`generate_webhook_secret`) | `test/action_handler_test.exs` |
 | Validation-error round trip (`/errors/<field>`) | `/admin-tools/promotions-providers` (duplicate name) | `test/action_handler_test.exs` |
 | Actor-aware authorization | `/admin-tools/promotions-providers` (admin live_session actor) | `test/action_handler_test.exs` |
@@ -644,9 +644,9 @@ in this repo. POC route cells are filled in when the POC lands.
 | LiveView transport (mount, action round trip) | `/admin-tools/promotions-providers` | `test/live_renderer_test.exs` |
 | PubSub live data refresh | `/admin-tools/promotions-providers` (second-session create) | `test/live_renderer_test.exs` |
 | End-to-end: resource → surface → action → updated data model | `/admin-tools/promotions-providers` + `GET /admin-tools/a2ui/promotions-providers` (JSON) | `test/ash_a2ui_test.exs` |
-| Form field groups (`group` N-column sections) | `/admin-tools/promotions-providers` (ScribbleVet backend) | `test/wave6_encoder_test.exs` |
-| Card-style table rows (`row_layout` + `_badge_<field>`) | `/admin-tools/promotions-providers` (ScribbleVet backend) | `test/wave6_encoder_test.exs`, `test/wave6_action_handler_test.exs` |
-| Agent-composed surfaces (spec → validate → serve, tamper cases, DSL parity) | `/admin-tools/agent` (ScribbleVet backend, `design_admin_surface` tool) | `test/dynamic_test.exs` |
+| Form field groups (`group` N-column sections) | `/admin-tools/promotions-providers` (reference host app) | `test/wave6_encoder_test.exs` |
+| Card-style table rows (`row_layout` + `_badge_<field>`) | `/admin-tools/promotions-providers` (reference host app) | `test/wave6_encoder_test.exs`, `test/wave6_action_handler_test.exs` |
+| Agent-composed surfaces (spec → validate → serve, tamper cases, DSL parity) | `/admin-tools/agent` (reference host app, `design_admin_surface` tool) | `test/dynamic_test.exs` |
 
 ## Roadmap
 

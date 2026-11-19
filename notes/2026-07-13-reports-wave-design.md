@@ -1,6 +1,6 @@
 # Reports wave: dynamic table sets, report queries, CSV export, inline cell editing
 
-Design record for the four features closing the ScribbleVet misspellings /
+Design record for the four features closing a host app's misspellings /
 usage_stats NO-GOs (thesis roadmap items 3+4). Contracts below are FROZEN on
 merge; the topic docs are the public statement, this note records rationale.
 
@@ -101,7 +101,7 @@ end
   nothing to infer from). Labels come from shared `field` entities.
 - Reports run on demand only (initial rows `[]`); params persist in the
   data model between runs (accumulation = the action unions across runs'
-  inputs if it wants — ScribbleVet models the three usage_stats loaders as
+  inputs if it wants — the host app models the three usage_stats loaders as
   arguments of one action).
 - Versions: both 0.9.1 and 1.0.
 

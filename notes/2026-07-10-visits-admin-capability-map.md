@@ -1,8 +1,7 @@
 # Visits admin stress test — capability map & design record (2026-07-10)
 
-The ScribbleVet Visits admin screen
-(`backend/lib/scribble_web/controllers/admin/visits_live_controller.ex`,
-~1,300 lines) was chosen as a stress test for AshA2ui. This note records the
+A host app's visits admin screen
+(a ~1,300-line LiveView controller) was chosen as a stress test for AshA2ui. This note records the
 behavior→capability map that drove the `visits-wave` branch, and what the
 screen still needs beyond it.
 

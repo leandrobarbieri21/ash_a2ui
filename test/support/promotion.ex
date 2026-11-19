@@ -2,8 +2,8 @@ defmodule AshA2ui.Test.Promotion do
   @moduledoc """
   Fixture resource for Wave 6 layout features: its surface declares a
   `row_layout` (card-style table rows: title + badge + metadata grid) and
-  form `group` sections (labeled N-column field grids), modeled on the
-  ScribbleVet promotions admin screen.
+  form `group` sections (labeled N-column field grids), modeled on a host
+  app's promotions admin screen.
   """
 
   use Ash.Resource,
