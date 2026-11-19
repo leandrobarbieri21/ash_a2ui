@@ -38,6 +38,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       live("/live-renderer/context-pubsub", AshA2ui.Test.ContextPubsubLive)
       live("/live-renderer/deep-link", AshA2ui.Test.DeepLinkLive)
       live("/live-renderer/people-deep-link", AshA2ui.Test.PeopleDeepLinkLive)
+      live("/live-renderer/document-pane", AshA2ui.Test.DocumentPaneLive)
       live("/live-renderer/open-surface-callback", AshA2ui.Test.OpenSurfaceCallbackLive)
       live("/live-renderer/localized", AshA2ui.Test.LocalizedLive)
       live("/live-renderer/surfaces", AshA2ui.Test.SurfacesLive)

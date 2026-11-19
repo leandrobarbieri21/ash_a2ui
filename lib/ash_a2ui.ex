@@ -221,8 +221,12 @@ defmodule AshA2ui do
         checked it) or `"missing"` (looked for and not found), and an
         optional citation: `page` (a positive integer, the page of the
         source document the value came from), `href` (an address that
-        opens the source at that place) and `quote` (the words the value
-        was read from). Keys and the state may be atoms or strings. `nil`,
+        opens the source at that place), `quote` (the words the value
+        was read from) and `boxes` (where the value sits on the source's
+        pages, `[%{page, x, y, width, height}]` as fractions of the page:
+        the regions of a `document_pane` bound to the card, whose page
+        tag then opens the pane there). Keys and the state may be atoms
+        or strings. `nil`,
         or a value without a known state, means the field has no review.
         The record carries the normalized review at `_review_<field>` (see
         `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review`
@@ -358,6 +362,103 @@ defmodule AshA2ui do
         `apply(module, function, [context | args])`. It returns
         `{:ok, %{source: mermaid, markers: markers}}` or `{:error, reason}`;
         see `AshA2ui.Diagram` for the marker shape.
+        """
+      ]
+    ]
+  }
+
+  @document_pane %Spark.Dsl.Entity{
+    name: :document_pane,
+    describe: """
+    A document pane: the document a context's record was read from, drawn
+    beside the surface's sections, with each value boxed where it sits on its
+    page. It is bound to the `:detail` cards of its `context`: the boxes are
+    the `boxes` of their fields' `review` citations (see `AshA2ui.Review`),
+    in the fields' review states, and each field's page tag opens the pane at
+    its box. The pane has its own show/hide switch, off by default; on is
+    written to the address (`?<url_param>=shown`) by `AshA2ui.LiveRenderer`.
+    The admin catalog draws it (catalog 3.4): the document with pdf.js,
+    loaded only when a document opens, with a text layer, zoom and page
+    navigation. The basic catalog leaves it out. See the Document Panes
+    topic and `AshA2ui.DocumentPane`.
+    """,
+    examples: [
+      """
+      document_pane :document do
+        context :contract
+        source :page_document
+        label "Show document"
+        description "Read-only, for reviewing values"
+      end
+      """,
+      """
+      document_pane :policy do
+        context :policy
+        source :current_version_file
+        regions :signature_fields
+      end
+      """
+    ],
+    target: AshA2ui.DocumentPane,
+    args: [:name],
+    schema: [
+      name: [
+        type: :atom,
+        required: true,
+        doc: """
+        The name of the pane: the `<name>` of its `/ui/documents/<name>`
+        state and of its record key `_document_<name>`. A lowercase
+        identifier, unique across the surface's panes.
+        """
+      ],
+      context: [
+        type: :atom,
+        required: true,
+        doc: """
+        The context whose record holds the document. At least one `:detail`
+        component must render it: the pane is bound to those cards.
+        """
+      ],
+      source: [
+        type: :atom,
+        required: true,
+        doc: """
+        A public attribute, calculation or aggregate of the context's
+        resource holding the document: a map with `url` (the address the
+        browser fetches the PDF from, read as the reader; `href` is accepted
+        too) and `name` (the file name shown above it), keys atoms or
+        strings. `nil`, or a value without a `url`, means the record has no
+        document: the switch is not drawn.
+        """
+      ],
+      regions: [
+        type: :atom,
+        doc: """
+        Optional: a public attribute, calculation or aggregate of the
+        context's resource holding more regions, ones no field's review
+        cites (a signature field, a table value): a list of maps with `id`,
+        `page`, `x`, `y`, `width`, `height` (the box, as fractions of the
+        page), `state` (`pending`, `reviewed`, `selected`,
+        `reviewed_selected`, `linked` or `empty`) and an optional `label`.
+        Bad regions are dropped (see `AshA2ui.DocumentPane.region/1`).
+        """
+      ],
+      label: [
+        type: :string,
+        doc: """
+        The switch's label, translated in the metadata domain. Defaults to
+        "Show document", the library's own string.
+        """
+      ],
+      description: [
+        type: :string,
+        doc: "Optional words beside the switch, translated in the metadata domain."
+      ],
+      url_param: [
+        type: :string,
+        doc: """
+        The address parameter that holds the pane open (`?<url_param>=shown`).
+        Defaults to the pane's name.
         """
       ]
     ]
@@ -2462,6 +2563,7 @@ defmodule AshA2ui do
       @context,
       @query,
       @diagram,
+      @document_pane,
       @component,
       @field,
       @action
@@ -2493,7 +2595,8 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyRelationships,
     AshA2ui.Verifiers.VerifyNestedForms,
     AshA2ui.Verifiers.VerifyBulkActions,
-    AshA2ui.Verifiers.VerifyDiagrams
+    AshA2ui.Verifiers.VerifyDiagrams,
+    AshA2ui.Verifiers.VerifyDocumentPanes
   ]
 
   @moduledoc """

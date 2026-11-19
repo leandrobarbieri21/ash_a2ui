@@ -188,7 +188,7 @@ defmodule AshA2ui.Experience do
   `action` and `actionVisible` (a field action's button).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.2.0"
+  def admin_catalog_version, do: "3.4.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

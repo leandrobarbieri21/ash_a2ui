@@ -165,6 +165,27 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Document panes: the source document beside a record** (admin catalog
+  3.4.0, ADR 0002). A `document_pane` entity is bound to a context's
+  `:detail` cards: its `source` names the record's document (`%{url,
+  name}`), and its regions are the `boxes` of the cards' fields' `review`
+  citations (fractions of the page; reviews now carry `boxes`), in their
+  review states, plus any its `regions` source adds. The admin catalog
+  gains `documentPane` (the surface's sections beside the document, one
+  part to two, stacked when narrow, with a show/hide switch off by
+  default) and `documentViewer` (the PDF drawn with pdf.js, a text layer
+  per page that assistive technology reads, zoom, page navigation, and
+  regions in the states pending, reviewed, selected, reviewed-selected,
+  linked and empty). A review's page tag opens the pane at its region.
+  Activating a region sends the new `document_region` action, the switch
+  `document_pane`; both are quiet. `AshA2ui.LiveRenderer` keeps the pane
+  open in the address (`?<url_param>=shown`). pdf.js is the host's
+  dependency, loaded through `createAshAdminCatalog`'s new `loadPdf` only
+  when a document opens (`priv/js/ash_a2ui_pdf.js` and its worker module);
+  serve `pdfjs-dist/wasm/` as its `wasmUrl` to draw scanned documents.
+  Additive: the catalogId is unchanged. The basic catalog leaves the pane
+  out.
+
 - **Field actions: a button beside a detail value** (admin catalog
   3.2.0). A field's `field_action` names an update action of the record a
   `:detail` card shows; the action receives the field's name as its

@@ -275,9 +275,9 @@ defmodule AshA2ui.Encoder do
 
   # The admin catalog's own components (priv/a2ui/admin_v1/catalog.json).
   # Every other component the encoder emits is a basic-catalog component.
-  @admin_components ~w(actionBar calendarView confirmDialog dataGrid emptyState entityPage
-                       fieldDisplay filterPicker formSection liveDiagram pagination recordPanel
-                       statusBanner)
+  @admin_components ~w(actionBar calendarView confirmDialog dataGrid documentPane documentViewer
+                       emptyState entityPage fieldDisplay filterPicker formSection liveDiagram
+                       pagination recordPanel statusBanner)
 
   @numeric_types [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
 
@@ -608,6 +608,19 @@ defmodule AshA2ui.Encoder do
     |> put_matrix_data(view)
     |> put_wizard_state(view)
     |> put_diagram_state(view, opts)
+    |> put_document_state(view, opts)
+  end
+
+  # Catalog 3.4: each document pane's own state at /ui/documents/<name>,
+  # shown where the `:document_state` option (the address) says so.
+  defp put_document_state(value, %{document_panes: []}, _opts), do: value
+
+  defp put_document_state(value, view, opts) do
+    put_in(
+      value,
+      ["ui", "documents"],
+      AshA2ui.DocumentPane.ui_state(view, Keyword.get(opts, :document_state))
+    )
   end
 
   # The value at "/records": on single-table surfaces the serialized row
@@ -982,6 +995,10 @@ defmodule AshA2ui.Encoder do
 
     {form_sections, form_children} = admin_form_sections(view, form, options)
 
+    # 3.4: a document pane holds the surface's sections beside its document.
+    {body_children, pane_components} =
+      admin_document_pane(view, diagram_children(view) ++ section_children)
+
     root = %{
       "id" => "root",
       "component" => "entityPage",
@@ -993,8 +1010,7 @@ defmodule AshA2ui.Encoder do
         form_children ++
           ["status_banner"] ++
           context_children(view) ++
-          diagram_children(view) ++
-          section_children ++ ["action_result_panel"]
+          body_children ++ ["action_result_panel"]
     }
 
     [
@@ -1002,8 +1018,56 @@ defmodule AshA2ui.Encoder do
       | context_sections ++
           diagram_sections ++
           table_sections ++
-          detail_sections ++ report_sections ++ section_wrappers ++ form_sections
+          detail_sections ++
+          report_sections ++ section_wrappers ++ pane_components ++ form_sections
     ] ++ [admin_status_banner() | action_result_components()]
+  end
+
+  # Catalog 3.4: the surface's document pane. Its `documentPane` holds the
+  # surface's sections (`children`) and its `documentViewer` (`viewer`): the
+  # renderer draws the sections alone while the pane is hidden (the
+  # default) and beside the document while shown. Both bind the pane's
+  # record key (`/detail/<context>/_document_<name>`, nil without a
+  # document: no switch) and its state (`/ui/documents/<name>`). The switch
+  # and a region a person goes to are sent as the bare `document_pane` and
+  # `document_region` events, with `shown` / `regionId` added.
+  defp admin_document_pane(%{document_panes: []}, children), do: {children, []}
+
+  defp admin_document_pane(%{document_panes: [pane | _]} = view, children) do
+    name = Atom.to_string(pane.name)
+    id = "document_pane_#{name}"
+    viewer_id = "document_viewer_#{name}"
+    document = "/detail/#{pane.context}/#{AshA2ui.DocumentPane.data_key(pane)}"
+    ui = AshA2ui.DocumentPane.ui_path(pane)
+
+    components = [
+      %{
+        "id" => id,
+        "component" => "documentPane",
+        "pane" => name,
+        "label" => AshA2ui.DocumentPane.label(pane, view.l10n),
+        "document" => %{"@path" => document},
+        "shown" => %{"@path" => "#{ui}/shown"},
+        "selected" => %{"@path" => "#{ui}/selected"},
+        "regionHref" => AshA2ui.DocumentPane.region_href(pane, ""),
+        "toggleAction" => %{"name" => "document_pane", "context" => %{"pane" => name}},
+        "viewer" => viewer_id,
+        "children" => children
+      }
+      |> maybe_put("description", AshA2ui.DocumentPane.description(pane, view.l10n)),
+      %{
+        "id" => viewer_id,
+        "component" => "documentViewer",
+        "src" => %{"@path" => "#{document}/src"},
+        "fileName" => %{"@path" => "#{document}/fileName"},
+        "regions" => %{"@path" => "#{document}/regions"},
+        "selected" => %{"@path" => "#{ui}/selected"},
+        "regionAction" => %{"name" => "document_region", "context" => %{"pane" => name}},
+        "strings" => AshA2ui.DocumentPane.strings(view.l10n)
+      }
+    ]
+
+    {[id], components}
   end
 
   defp context_children(view) do

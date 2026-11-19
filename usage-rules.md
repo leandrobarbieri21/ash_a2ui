@@ -40,6 +40,10 @@ Sub-rules (addressable as `ash_a2ui:<name>`):
 - `ash_a2ui:diagrams` — `diagram` entities: a host source returning a
   mermaid diagram and markers, server-resolved marker links, lazy-loaded
   mermaid in the admin catalog, and PubSub-driven marker moves.
+- `ash_a2ui:documents` — `document_pane` entities: a record's source
+  document beside the surface's sections, its regions from the `:detail`
+  fields' review citations, the switch kept in the address, and pdf.js
+  loaded lazily by the host (`loadPdf`, `wasmUrl`).
 - `ash_a2ui:shell` — the command palette (ctrl+p), the surface launcher
   (ctrl+k) and `/open <surface> [id | n]`: `AshA2ui.Shell`'s key table and
   slash grammar, the `AshA2ui.Shell.Host` lists in ACP wire shapes, and
