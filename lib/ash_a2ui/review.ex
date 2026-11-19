@@ -7,10 +7,11 @@ defmodule AshA2ui.Review do
   `"pending"` (filled in automatically, nobody has checked it yet),
   `"reviewed"` (a person checked it) or `"missing"` (looked for and not
   found), and an optional citation: `page` (the page of the source document
-  the value came from), `href` (an address that opens the source there) and
-  `quote` (the words the value was read from). Keys and the state may be
-  atoms or strings. `normalize/2` turns it into the wire review a record
-  carries at `_review_<field>`:
+  the value came from), `href` (an address that opens the source there),
+  `quote` (the words the value was read from) and `boxes` (where on its
+  pages the value sits, for a document pane: see `AshA2ui.DocumentPane`).
+  Keys and the state may be atoms or strings. `normalize/2` turns it into
+  the wire review a record carries at `_review_<field>`:
 
       %{
         "state" => "pending",
@@ -18,8 +19,16 @@ defmodule AshA2ui.Review do
         "page" => 3,                         # only when present
         "pageLabel" => "p. 3",               # the page tag, translated
         "href" => "/documents/9#page=3",     # only when present
-        "quote" => "Annual fee: $14,400"     # only when present
+        "quote" => "Annual fee: $14,400",    # only when present
+        "boxes" => [%{"page" => 3, "x" => 0.1, "y" => 0.42,
+                      "width" => 0.3, "height" => 0.02}]   # only when present
       }
+
+  Each box is a rectangle on a page, as fractions of the page from its
+  top-left corner (`x` and `width` of its width, `y` and `height` of its
+  height), the shape `AshA2ui.DocumentPane` draws. On a surface whose
+  `document_pane` is bound to the field's card, a review with boxes links to
+  them: its `href` becomes the pane's (`AshA2ui.DocumentPane.region_href/2`).
 
   Bad values never fail a render:
 
@@ -27,7 +36,10 @@ defmodule AshA2ui.Review do
       review (`nil`): the field draws as it would without one;
     * a `page` that is not a positive integer (or a string of one) is left
       out, and so is its `pageLabel`;
-    * an `href` or `quote` that is not text, or is `""`, is left out.
+    * an `href` or `quote` that is not text, or is `""`, is left out;
+    * a box that is not on a positive page, or whose numbers are not
+      fractions of the page (from 0 to 1, a positive width and height, not
+      past the page's edge), is left out, and so is an empty list.
   """
 
   import AshA2ui.Gettext, only: [msg: 1]
@@ -63,6 +75,7 @@ defmodule AshA2ui.Review do
         |> put_present("pageLabel", page && page_label(l10n, page))
         |> put_present("href", text(get(value, :href)))
         |> put_present("quote", text(get(value, :quote)))
+        |> put_present("boxes", boxes(get(value, :boxes)))
     end
   end
 
@@ -96,6 +109,40 @@ defmodule AshA2ui.Review do
   end
 
   defp page(_page), do: nil
+
+  @doc """
+  A box as the wire carries it (`%{"page", "x", "y", "width", "height"}`),
+  or `nil` when it is not a box on a page: `page` a positive integer, the
+  rest numbers from 0 to 1 with a positive width and height, the box not
+  past the page's right or bottom edge. Keys may be atoms or strings.
+  """
+  @spec box(term) :: %{String.t() => number} | nil
+  def box(value) when is_map(value) and not is_struct(value) do
+    with page when is_integer(page) <- page(get(value, :page)),
+         [x, y, w, h] <- Enum.map([:x, :y, :width, :height], &fraction(get(value, &1))),
+         true <- Enum.all?([x, y, w, h], &is_number/1),
+         true <- w > 0 and h > 0 and x + w <= 1.0001 and y + h <= 1.0001 do
+      %{"page" => page, "x" => x, "y" => y, "width" => w, "height" => h}
+    else
+      _not_a_box -> nil
+    end
+  end
+
+  def box(_value), do: nil
+
+  defp boxes(list) when is_list(list) do
+    case list |> Enum.map(&box/1) |> Enum.reject(&is_nil/1) do
+      [] -> nil
+      boxes -> boxes
+    end
+  end
+
+  defp boxes(_value), do: nil
+
+  defp fraction(n) when is_integer(n) and n in 0..1, do: n * 1.0
+  defp fraction(n) when is_float(n) and n >= 0 and n <= 1, do: n
+  defp fraction(%Decimal{} = n), do: n |> Decimal.to_float() |> fraction()
+  defp fraction(_n), do: nil
 
   defp text(value) when is_binary(value) and value != "", do: value
   defp text(_value), do: nil

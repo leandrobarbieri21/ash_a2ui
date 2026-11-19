@@ -18,7 +18,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
   @kinds ~w(entityPage dataGrid emptyState pagination recordPanel fieldDisplay formSection actionBar statusBanner confirmDialog)
 
   # Kinds added after 1.0, each additive within the catalog id.
-  @additive_kinds ~w(calendarView liveDiagram filterPicker alertBanner)
+  @additive_kinds ~w(calendarView liveDiagram filterPicker documentPane documentViewer alertBanner)
 
   # The pinned property names per kind, straight from the contract.
   @pinned_props %{
@@ -275,6 +275,31 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert visible["$ref"] == "common_types.json#/$defs/DataBinding"
     refute "action" in field["required"]
     refute "actionVisible" in field["required"]
+  end
+
+  test "catalog 3.4 adds the document pane and viewer, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.4.0"] =~ "document panes"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    pane = catalog["components"]["documentPane"]
+    assert pane["allowedParents"] == ["entityPage"]
+
+    assert pane["required"] ==
+             ~w(component pane label document shown viewer children)
+
+    viewer = catalog["components"]["documentViewer"]
+    assert viewer["allowedParents"] == ["documentPane"]
+    assert viewer["required"] == ~w(component src regions)
+    assert viewer["description"] =~ "reviewed-selected, linked or empty"
+
+    for kind <- ~w(documentPane documentViewer) do
+      assert %{"$ref" => "#/components/" <> kind} in catalog["$defs"]["anyComponent"]["oneOf"]
+    end
+
+    assert catalog["components"]["fieldDisplay"]["properties"]["review"]["description"] =~
+             "boxes"
   end
 
   test "catalog 3.3 adds the dataGrid column review and subtitle reviewPath, under the same id" do

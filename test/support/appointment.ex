@@ -116,6 +116,76 @@ defmodule AshA2ui.Test.Appointment do
       public? true
     end
 
+    # The referral a visit's details were read from, for a document pane
+    # (catalog 3.4): a walk-in has none. Its title was read from a box on
+    # page 1, its status from page 2; the clinic's stamp is a region no
+    # field cites.
+    calculate :referral_document,
+              :map,
+              fn records, _context ->
+                Enum.map(records, fn
+                  %{title: "Walk-in"} -> nil
+                  visit -> %{url: "/referrals/#{visit.id}/file", name: "referral.pdf"}
+                end)
+              end do
+      public? true
+    end
+
+    calculate :referral_regions,
+              {:array, :map},
+              fn records, _context ->
+                Enum.map(records, fn _visit ->
+                  [
+                    %{
+                      id: "stamp",
+                      page: 2,
+                      x: 0.7,
+                      y: 0.85,
+                      width: 0.2,
+                      height: 0.08,
+                      state: :empty
+                    },
+                    %{id: "bad", page: 0, x: 0.1, y: 0.1, width: 0.1, height: 0.1}
+                  ]
+                end)
+              end do
+      public? true
+    end
+
+    calculate :title_cited_review,
+              :map,
+              fn records, _context ->
+                Enum.map(records, fn _visit ->
+                  %{
+                    state: :pending,
+                    page: 1,
+                    boxes: [
+                      %{page: 1, x: 0.1, y: 0.2, width: 0.3, height: 0.025},
+                      %{page: 1, x: 2, y: 0.2, width: 0.3, height: 0.025}
+                    ]
+                  }
+                end)
+              end do
+      public? true
+    end
+
+    calculate :status_cited_review,
+              :map,
+              fn records, _context ->
+                Enum.map(records, fn visit ->
+                  %{
+                    state: if(visit.status == :completed, do: :reviewed, else: :pending),
+                    page: 2,
+                    href: "/referrals/1#page=2",
+                    boxes: [
+                      %{"page" => 2, "x" => 0.5, "y" => 0.4, "width" => 0.25, "height" => 0.02}
+                    ]
+                  }
+                end)
+              end do
+      public? true
+    end
+
     calculate :seen_by,
               :string,
               expr("Seen by Dr. " <> title) do

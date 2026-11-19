@@ -56,6 +56,8 @@ defmodule AshA2ui.ResolvedView do
       read per row, never surface-wide
     * `diagrams` lists the surface's `diagram` entities in declaration
       order (see `AshA2ui.Diagram`)
+    * `document_panes` lists the surface's `document_pane` entities in
+      declaration order (see `AshA2ui.DocumentPane`)
 
   FROZEN CONTRACT — the struct fields and `resolve/2` signature are the
   interface every parallel track codes against; do not change outside an
@@ -100,6 +102,7 @@ defmodule AshA2ui.ResolvedView do
     diagrams: [],
     page_header: nil,
     section_nav: nil,
+    document_panes: [],
     l10n: nil
   ]
 
@@ -307,6 +310,7 @@ defmodule AshA2ui.ResolvedView do
           diagrams: [AshA2ui.Diagram.t()],
           page_header: AshA2ui.PageHeader.t() | nil,
           section_nav: AshA2ui.SectionNav.t() | nil,
+          document_panes: [AshA2ui.DocumentPane.t()],
           l10n: AshA2ui.L10n.t()
         }
 
@@ -329,7 +333,8 @@ defmodule AshA2ui.ResolvedView do
     :gettext_backend,
     :metadata_domain,
     :errors_domain,
-    :verbatim
+    :verbatim,
+    :document_state
   ]
 
   @doc """
@@ -420,6 +425,7 @@ defmodule AshA2ui.ResolvedView do
       diagrams: AshA2ui.Info.diagrams(resource_or_ui_module),
       page_header: page_header,
       section_nav: resolve_section_nav(resource_or_ui_module, l10n),
+      document_panes: AshA2ui.DocumentPane.panes(resource_or_ui_module),
       l10n: l10n
     }
   end
@@ -549,12 +555,53 @@ defmodule AshA2ui.ResolvedView do
   `nil` when the field has none. Shared by the initial render and the
   context refreshes.
   """
-  @spec detail_review_data(t(), struct(), [atom]) :: %{String.t() => map | nil}
-  def detail_review_data(%__MODULE__{} = view, record, fields) do
+  #
+  # With the context's name, a review whose citation has boxes links to them
+  # in the context's document pane (`AshA2ui.DocumentPane.region_href/2`).
+  @spec detail_review_data(t(), struct(), [atom], atom | nil) :: %{String.t() => map | nil}
+  def detail_review_data(%__MODULE__{} = view, record, fields, context \\ nil) do
     review_fields =
       for name <- fields, %{review: review} = field <- [view.fields[name]], review, do: field
 
-    AshA2ui.Review.data(record, review_fields, view.l10n)
+    data = AshA2ui.Review.data(record, review_fields, view.l10n)
+
+    case Enum.find(view.document_panes, &(&1.context == context)) do
+      nil -> data
+      pane -> Map.new(data, fn {key, review} -> {key, pane_href(pane, key, review)} end)
+    end
+  end
+
+  defp pane_href(pane, "_review_" <> field, %{"boxes" => [_ | _]} = review),
+    do: Map.put(review, "href", AshA2ui.DocumentPane.region_href(pane, field))
+
+  defp pane_href(_pane, _key, review), do: review
+
+  @doc """
+  The document-pane data a `:detail` record of `context` carries:
+  `_document_<pane>` for each `document_pane` bound to that context (see
+  `AshA2ui.DocumentPane.data/4`). Shared by the initial render and the
+  context refreshes.
+  """
+  @spec detail_document_data(t(), atom, struct(), [atom]) :: %{String.t() => map | nil}
+  def detail_document_data(%__MODULE__{} = view, context, record, fields),
+    do: AshA2ui.DocumentPane.data(view, context, record, fields)
+
+  @doc """
+  What the document panes bound to `context` load on its record: their
+  `source` and `regions` calculations or aggregates.
+  """
+  @spec document_loads(t(), atom) :: [atom]
+  def document_loads(%__MODULE__{} = view, context) do
+    case view.contexts[context] do
+      nil ->
+        []
+
+      %{resource: resource} ->
+        for pane <- view.document_panes,
+            pane.context == context,
+            load <- AshA2ui.DocumentPane.loads(pane, resource),
+            do: load
+    end
   end
 
   @doc """

@@ -56,6 +56,7 @@ for the resource named by `for_resource`).
    * header_action
  * [section_nav](#a2ui-section_nav)
    * nav_item
+ * [document_pane](#a2ui-document_pane)
  * [component](#a2ui-component)
    * nested_form
    * group
@@ -718,6 +719,73 @@ Target: `AshA2ui.SectionNav.Item`
 ### Introspection
 
 Target: `AshA2ui.SectionNav`
+
+### a2ui.document_pane
+```elixir
+document_pane name
+```
+
+
+A document pane: the document a context's record was read from, drawn
+beside the surface's sections, with each value boxed where it sits on its
+page. It is bound to the `:detail` cards of its `context`: the boxes are
+the `boxes` of their fields' `review` citations (see `AshA2ui.Review`),
+in the fields' review states, and each field's page tag opens the pane at
+its box. The pane has its own show/hide switch, off by default; on is
+written to the address (`?<url_param>=shown`) by `AshA2ui.LiveRenderer`.
+The admin catalog draws it (catalog 3.4): the document with pdf.js,
+loaded only when a document opens, with a text layer, zoom and page
+navigation. The basic catalog leaves it out. See the Document Panes
+topic and `AshA2ui.DocumentPane`.
+
+
+
+
+### Examples
+```
+document_pane :document do
+  context :contract
+  source :page_document
+  label "Show document"
+  description "Read-only, for reviewing values"
+end
+
+```
+
+```
+document_pane :policy do
+  context :policy
+  source :current_version_file
+  regions :signature_fields
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#a2ui-document_pane-name){: #a2ui-document_pane-name .spark-required} | `atom` |  | The name of the pane: the `<name>` of its `/ui/documents/<name>` state and of its record key `_document_<name>`. A lowercase identifier, unique across the surface's panes. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`context`](#a2ui-document_pane-context){: #a2ui-document_pane-context .spark-required} | `atom` |  | The context whose record holds the document. At least one `:detail` component must render it: the pane is bound to those cards. |
+| [`source`](#a2ui-document_pane-source){: #a2ui-document_pane-source .spark-required} | `atom` |  | A public attribute, calculation or aggregate of the context's resource holding the document: a map with `url` (the address the browser fetches the PDF from, read as the reader; `href` is accepted too) and `name` (the file name shown above it), keys atoms or strings. `nil`, or a value without a `url`, means the record has no document: the switch is not drawn. |
+| [`regions`](#a2ui-document_pane-regions){: #a2ui-document_pane-regions } | `atom` |  | Optional: a public attribute, calculation or aggregate of the context's resource holding more regions, ones no field's review cites (a signature field, a table value): a list of maps with `id`, `page`, `x`, `y`, `width`, `height` (the box, as fractions of the page), `state` (`pending`, `reviewed`, `selected`, `reviewed_selected`, `linked` or `empty`) and an optional `label`. Bad regions are dropped (see `AshA2ui.DocumentPane.region/1`). |
+| [`label`](#a2ui-document_pane-label){: #a2ui-document_pane-label } | `String.t` |  | The switch's label, translated in the metadata domain. Defaults to "Show document", the library's own string. |
+| [`description`](#a2ui-document_pane-description){: #a2ui-document_pane-description } | `String.t` |  | Optional words beside the switch, translated in the metadata domain. |
+| [`url_param`](#a2ui-document_pane-url_param){: #a2ui-document_pane-url_param } | `String.t` |  | The address parameter that holds the pane open (`?<url_param>=shown`). Defaults to the pane's name. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.DocumentPane`
 
 ### a2ui.component
 ```elixir
@@ -1459,7 +1527,7 @@ end
 | [`download`](#a2ui-field-download){: #a2ui-field-download } | `boolean` |  | With `link_url`: the link downloads its address (a file) instead of opening it. The link entry carries `"download" => true` (admin catalog 1.15); the stock renderer draws an `<a download>`. Only with `link_url`. |
 | [`link_label`](#a2ui-field-link_label){: #a2ui-field-link_label } | `atom` |  | The destination attribute/calculation used as each link's label for `link :relationship` and `links`. Defaults to the cell's own display value for single links (when it is not the bare foreign key), else the first public attribute of `[:name, :title, :label, :username, :email]` on the destination, else its primary key. |
 | [`note`](#a2ui-field-note){: #a2ui-field-note } | `String.t` |  | A few words beside the field's label on `:detail` cards, saying how the value came to be: "Calculated", "From the signed copy". Admin catalog (`fieldDisplay`'s `note`); translated in the metadata domain. |
-| [`review`](#a2ui-field-review){: #a2ui-field-review } | `atom` |  | A public attribute, calculation or aggregate of the same resource that says how this field's value was filled in, for `:detail` cards and table rows: a map with a `state`, one of `"pending"` (filled in automatically, nobody has checked it yet), `"reviewed"` (a person checked it) or `"missing"` (looked for and not found), and an optional citation: `page` (a positive integer, the page of the source document the value came from), `href` (an address that opens the source at that place) and `quote` (the words the value was read from). Keys and the state may be atoms or strings. `nil`, or a value without a known state, means the field has no review. The record carries the normalized review at `_review_<field>` (see `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review` (admin catalog 3.1): the value is highlighted while pending, with its state in words and a page tag linking to the source. A table drawing the field carries each row's review at the same key, bound by the admin `dataGrid` column as `review` and by a column subtitle as `reviewPath` (admin catalog 3.3); every table drawing the field must have the named field too. The basic catalog shows the value alone. |
+| [`review`](#a2ui-field-review){: #a2ui-field-review } | `atom` |  | A public attribute, calculation or aggregate of the same resource that says how this field's value was filled in, for `:detail` cards and table rows: a map with a `state`, one of `"pending"` (filled in automatically, nobody has checked it yet), `"reviewed"` (a person checked it) or `"missing"` (looked for and not found), and an optional citation: `page` (a positive integer, the page of the source document the value came from), `href` (an address that opens the source at that place), `quote` (the words the value was read from) and `boxes` (where the value sits on the source's pages, `[%{page, x, y, width, height}]` as fractions of the page: the regions of a `document_pane` bound to the card, whose page tag then opens the pane there). Keys and the state may be atoms or strings. `nil`, or a value without a known state, means the field has no review. The record carries the normalized review at `_review_<field>` (see `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review` (admin catalog 3.1): the value is highlighted while pending, with its state in words and a page tag linking to the source. A table drawing the field carries each row's review at the same key, bound by the admin `dataGrid` column as `review` and by a column subtitle as `reviewPath` (admin catalog 3.3); every table drawing the field must have the named field too. The basic catalog shows the value alone. |
 | [`field_action`](#a2ui-field-field_action){: #a2ui-field-field_action } | `atom` |  | An update action of the record a `:detail` card shows, offered as a button beside this field (admin catalog 3.2): choosing it runs the action on that record, as the actor, with the field's name (a string) as its `:field` argument, which the action must declare. The record is re-read through the card's context first (an authorized read), and the card's record is re-read and re-sent afterwards. The `action` entity of the same name gives the button its `label` (default: the humanized action name), its `icon` and the tables it `refreshes`; its `visible_when` gates row actions only. Several fields may share one action. The basic catalog and tables draw no button. |
 | [`field_action_visible`](#a2ui-field-field_action_visible){: #a2ui-field-field_action_visible } | `atom` |  | A public attribute, calculation or aggregate of the same resource that says, per record, whether this field's `field_action` is offered: `true` offers it, anything else hides it. Enforced on the server too: the action is refused for a record it does not offer it on. Without it the action is offered on every record. |
 | [`empty_text`](#a2ui-field-empty_text){: #a2ui-field-empty_text } | `String.t` |  | What a `:detail` card shows for this field when the record has no value (`nil` or `""`), instead of a blank: "Not stated", "None". Shown muted by the admin catalog (`fieldDisplay`'s `emptyText`); the basic catalog shows the blank. A table's admin dataGrid column carries it too (catalog 1.14), for list rows ("No scope of work stated"). Translated in the metadata domain. |
