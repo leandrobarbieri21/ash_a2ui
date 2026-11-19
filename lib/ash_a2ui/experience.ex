@@ -185,7 +185,9 @@ defmodule AshA2ui.Experience do
   stepper; 1.18 added a table card's own `heading` and `description`. 2.0
   includes every 1.x addition, and 3.0 every 2.x one. 3.1 added the
   fieldDisplay `review` (a review field's state and citation); 3.2 its
-  `action` and `actionVisible` (a field action's button).
+  `action` and `actionVisible` (a field action's button); 3.3 the dataGrid
+  column `review` and subtitle `reviewPath` (a review field's review per
+  row).
   """
   @spec admin_catalog_version() :: String.t()
   def admin_catalog_version, do: "3.4.0"

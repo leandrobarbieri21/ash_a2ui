@@ -485,6 +485,30 @@ export function createAdminStyles(css) {
       font-size: var(--am-font-size-xs);
       color: var(--am-text-muted);
     }
+    /* 3.3: a review field's review in a cell, as on a detail card: a
+     * pending value is highlighted, the state written out beside the page
+     * tag. */
+    .am-cell-value[data-review="pending"] {
+      background: var(--ash-admin-field-pending-bg, var(--am-warning-subtle));
+      border-radius: var(--am-radius-s);
+      padding-inline: var(--am-space-2xs);
+    }
+    .am-cell-review {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--am-space-2xs);
+      font-size: var(--am-font-size-xs);
+    }
+    .am-cell-review-page {
+      color: var(--am-text-muted);
+    }
+    .am-cell-sub:has(.am-cell-review) {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--am-space-xs);
+    }
     .am-cell-detail {
       display: inline-flex;
       align-items: center;

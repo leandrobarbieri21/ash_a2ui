@@ -185,6 +185,18 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   serve `pdfjs-dist/wasm/` as its `wasmUrl` to draw scanned documents.
   Additive: the catalogId is unchanged. The basic catalog leaves the pane
   out.
+- **Review fields in tables** (admin catalog 3.3.0). A review field a
+  table draws carries each row's review at `_review_<field>` (the same
+  normalized `{state, stateLabel, page?, pageLabel?, href?, quote?}` a
+  detail record carries), on the first render and on every refresh. The
+  admin `dataGrid` column binds it as `review` (`{path: "_review_<field>"}`)
+  and a column's subtitle as `reviewPath`; row layout fields are columns,
+  so list rows and cards carry it too. The stock renderer draws it in the
+  cell as on a detail card: a pending value highlighted, the state in
+  words beside the page tag, a link when there is an `href`. Additive: the
+  catalogId is unchanged and renderers that ignore it draw the value. The
+  basic catalog is unchanged. A review field drawn in a table whose
+  resource lacks the named review field no longer compiles.
 
 - **Field actions: a button beside a detail value** (admin catalog
   3.2.0). A field's `field_action` names an update action of the record a

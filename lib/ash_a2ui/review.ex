@@ -1,7 +1,7 @@
 defmodule AshA2ui.Review do
   @moduledoc """
   The review of a field declared `review :name`: how its value was filled
-  in, drawn on `:detail` cards (admin catalog 3.1).
+  in, drawn on `:detail` cards (admin catalog 3.1) and in table rows (3.3).
 
   The named attribute or calculation holds a map with a `state`, one of
   `"pending"` (filled in automatically, nobody has checked it yet),
@@ -82,8 +82,9 @@ defmodule AshA2ui.Review do
   def normalize(_value, _l10n), do: nil
 
   @doc """
-  The review data a `:detail` record carries for its `review` fields:
-  `%{"_review_<field>" => review}`, `nil` for a field with no review.
+  The review data a `:detail` record or a table row carries for its
+  `review` fields: `%{"_review_<field>" => review}`, `nil` for a field
+  with no review.
   """
   @spec data(struct(), [AshA2ui.Field.t()], L10n.t()) :: %{String.t() => review | nil}
   def data(record, fields, l10n) do

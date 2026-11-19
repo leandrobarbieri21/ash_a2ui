@@ -1375,8 +1375,27 @@ defmodule AshA2ui.Encoder do
       |> put_link_binding(view, field, "_links/#{field}")
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
+      |> put_column_review(view, field, columns[field])
     end)
   end
+
+  # Catalog 3.3: a review field drawn in a table binds each row's review
+  # (the row-relative `_review_<field>`, see review_row_data/3), and so does
+  # a column's subtitle when its field is one (`reviewPath`).
+  defp put_column_review(column, view, field, cells) do
+    column =
+      if review_field?(view, field),
+        do: Map.put(column, "review", %{"path" => "_review_#{field}"}),
+        else: column
+
+    subtitle = cells && cells.subtitle
+
+    if subtitle && review_field?(view, subtitle),
+      do: put_in(column, ["subtitle", "reviewPath"], "_review_#{subtitle}"),
+      else: column
+  end
+
+  defp review_field?(view, field), do: not is_nil(view.fields[field] && view.fields[field].review)
 
   # Catalog 1.12 list rows and 1.16 cards: a layout the admin dataGrid draws
   # instead of its grid.
@@ -5631,6 +5650,19 @@ defmodule AshA2ui.Encoder do
     |> Map.merge(AshA2ui.Calendar.row_data(table, record))
     |> Map.merge(AshA2ui.Timeline.row_data(table, record))
     |> Map.merge(primary_action_data(view, table, record))
+    |> Map.merge(review_row_data(view, field_names, record))
+  end
+
+  # Catalog 3.3: the review of each review field a row draws, at the
+  # `_review_<field>` its column binds (`nil` for a row with none).
+  defp review_row_data(view, field_names, record) do
+    fields =
+      for name <- field_names,
+          %{review: review} = field <- [view.fields[name]],
+          review,
+          do: field
+
+    AshA2ui.Review.data(record, fields, view.l10n)
   end
 
   # The row's fields, plus the values of rewritten choices at `_values`
