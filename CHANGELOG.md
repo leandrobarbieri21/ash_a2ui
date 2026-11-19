@@ -165,6 +165,16 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Review summaries** (admin catalog 3.6.0). An `alert` `:detail` may
+  declare `review_summary`: it counts the surface's `review` fields still
+  waiting on its record (`pending` or `missing`) and links to the first one
+  in declaration order, to its card's section (the `section_nav` anchor
+  when listed, else the section's id), or to `fallback_href` once nothing
+  waits. The record carries it at `_review_summary_<component>` (count,
+  field, href, label), refreshed with every write of `/detail/<context>`
+  (a field action included); the `alertBanner` binds its new `count` and
+  its link to it. Additive over 3.5.0: the catalogId is unchanged.
+
 - **Record pages the surface draws whole** (admin catalog 3.5.0). A
   surface can now declare the page around its sections:
   - `page_header`: a breadcrumb (`crumb`, whose address a host page value

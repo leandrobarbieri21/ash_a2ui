@@ -44,6 +44,7 @@ defmodule AshA2ui.Component do
     :granularity,
     :granularities,
     :alert,
+    :review_summary,
     :visible,
     lead: false,
     context_filter: [],
@@ -107,6 +108,7 @@ defmodule AshA2ui.Component do
           groups: [AshA2ui.Group.t()],
           steps: [AshA2ui.Step.t()],
           alert: AshA2ui.Alert.t() | nil,
+          review_summary: AshA2ui.ReviewSummary.t() | nil,
           lead: boolean,
           visible: atom | nil
         }

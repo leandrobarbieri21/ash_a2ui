@@ -159,6 +159,11 @@ defmodule AshA2ui.Gettext.Metadata do
   defp collect_detail(detail, view) do
     resource = view.contexts[detail.context].resource
 
+    # A review summary's link words are chosen with a record.
+    for summary <- List.wrap(detail.component.review_summary),
+        text <- AshA2ui.ReviewSummary.texts(summary),
+        do: Label.translate(view.l10n, text)
+
     # Only the admin catalog shows the placeholder, so the basic encoder run
     # above never translates it.
     for name <- detail.fields,

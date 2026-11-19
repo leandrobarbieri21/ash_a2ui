@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.5.0";
+export const ADMIN_CATALOG_VERSION = "3.6.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -729,6 +729,8 @@ export function buildSchemas(basicCatalog = null) {
       message: DynamicStringSchema.nullable().optional(),
       linkHref: DynamicStringSchema.nullable().optional(),
       linkLabel: DynamicStringSchema.nullable().optional(),
+      // 3.6: a review summary's count of fields still waiting.
+      count: DynamicValueSchema.nullable().optional(),
       weight: Num.optional(),
     }),
 
@@ -1981,7 +1983,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (title === "" && message === "") return nothing;
         const href = str(props.linkHref);
         const role = props.variant === "danger" || props.variant === "warning" ? "alert" : "status";
-        return html`<div class="alert" role=${role} data-variant=${props.variant || "info"} data-layout=${props.layout || "inline"}>
+        const count = typeof props.count === "number" ? props.count : nothing;
+        return html`<div class="alert" role=${role} data-variant=${props.variant || "info"} data-layout=${props.layout || "inline"} data-count=${count}>
           <div>
             ${title ? html`<p class="alert-title">${title}</p>` : nothing}
             ${message ? html`<p class="alert-message">${message}</p>` : nothing}

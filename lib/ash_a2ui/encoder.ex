@@ -2112,6 +2112,7 @@ defmodule AshA2ui.Encoder do
       |> maybe_put("message", alert.message && %{"@path" => "#{path}/#{alert.message}"})
       |> maybe_put("linkHref", alert.link_href && %{"@path" => "#{path}/#{alert.link_href}"})
       |> maybe_put("linkLabel", alert.link_label && %{"@path" => "#{path}/#{alert.link_label}"})
+      |> put_review_summary(detail, path)
     ]
   end
 
@@ -2149,6 +2150,20 @@ defmodule AshA2ui.Encoder do
       }
       | heading ++ fields
     ]
+  end
+
+  # Catalog 3.6: an alert's review summary: its link and count, computed
+  # with the record (`AshA2ui.ReviewSummary`).
+  defp put_review_summary(banner, %{component: %{review_summary: nil}}, _path), do: banner
+
+  defp put_review_summary(banner, %{component: component}, path) do
+    base = "#{path}/#{AshA2ui.ReviewSummary.key(component)}"
+
+    Map.merge(banner, %{
+      "count" => %{"@path" => "#{base}/count"},
+      "linkHref" => %{"@path" => "#{base}/href"},
+      "linkLabel" => %{"@path" => "#{base}/label"}
+    })
   end
 
   defp table_suffix(view, table) do

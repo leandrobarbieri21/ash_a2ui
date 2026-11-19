@@ -576,20 +576,21 @@ defmodule AshA2ui.ResolvedView do
   @doc """
   The computed data a context's record carries beyond its fields' values:
   the page header's `_header_action_<name>` offers when the header reads
-  that context (`AshA2ui.PageHeader.data/3`). `opts` carries the read's
+  that context (`AshA2ui.PageHeader.data/3`), and each review summary of
+  that context (`AshA2ui.ReviewSummary.data/3`). `opts` carries the read's
   `:actor` and `:tenant`. Shared by the initial render and every refresh of
   `/detail/<context>`.
   """
   @spec detail_context_data(t(), atom, struct(), keyword) :: %{String.t() => term}
-  def detail_context_data(
-        %__MODULE__{page_header: %{context: context} = header},
-        context,
-        record,
-        opts
-      ),
-      do: AshA2ui.PageHeader.data(header, record, opts)
+  def detail_context_data(%__MODULE__{} = view, context, record, opts) do
+    header =
+      case view.page_header do
+        %{context: ^context} = header -> AshA2ui.PageHeader.data(header, record, opts)
+        _other -> %{}
+      end
 
-  def detail_context_data(%__MODULE__{}, _context, _record, _opts), do: %{}
+    Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record))
+  end
 
   @doc """
   Whether a field's `field_action` is offered on `record`: always without a
