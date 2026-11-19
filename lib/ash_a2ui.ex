@@ -216,7 +216,7 @@ defmodule AshA2ui do
         doc: """
         A public attribute, calculation or aggregate of the same resource
         that says how this field's value was filled in, for `:detail`
-        cards: a map with a `state`, one of `"pending"` (filled in
+        cards and table rows: a map with a `state`, one of `"pending"` (filled in
         automatically, nobody has checked it yet), `"reviewed"` (a person
         checked it) or `"missing"` (looked for and not found), and an
         optional citation: `page` (a positive integer, the page of the
@@ -227,8 +227,12 @@ defmodule AshA2ui do
         The record carries the normalized review at `_review_<field>` (see
         `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review`
         (admin catalog 3.1): the value is highlighted while pending, with
-        its state in words and a page tag linking to the source. The basic
-        catalog and tables show the value alone.
+        its state in words and a page tag linking to the source. A table
+        drawing the field carries each row's review at the same key, bound
+        by the admin `dataGrid` column as `review` and by a column subtitle
+        as `reviewPath` (admin catalog 3.3); every table drawing the field
+        must have the named field too. The basic catalog shows the value
+        alone.
         """
       ],
       field_action: [

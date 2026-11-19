@@ -305,10 +305,36 @@ topics for the full contracts.
 - Admin catalog 3.1: the `fieldDisplay` binds it as `review`; the stock
   renderer highlights a pending value and writes the state out as a badge
   beside the page tag, a link when there is an `href`, with the quote as
-  its tooltip. The basic catalog and tables draw the value alone.
+  its tooltip. The basic catalog draws the value alone.
+- Admin catalog 3.3: a table drawing a review field carries each row's
+  review at the same `_review_<field>` key (`nil` for a row with none), and
+  the `dataGrid` column binds it as `review` (`{path: "_review_<field>"}`,
+  row-relative). A field folded into another column as its `subtitle`
+  rides on that column's subtitle as `reviewPath`. Row layout fields
+  (`title`, `trailing`, `expand`, ...) are columns, so they carry it too.
+  The stock renderer draws it in the cell as on a detail card. The review
+  is computed per row, so its `href` can point at that row's source:
+
+  ```elixir
+  # on MyApp.AgreementLine: how this line's price was filled in
+  calculate :price_review, :map, {MyApp.AgreementLine.FieldReview, field: :price} do
+    public? true
+  end
+
+  component :table, :lines do
+    resource MyApp.AgreementLine
+    fields [:service, :period, :price]
+    column :service, do: subtitle(:period)   # the period's review: reviewPath
+  end
+
+  field :price, do: review(:price_review)
+  field :period, do: review(:period_review)
+  ```
+
 - `review` naming anything but a public attribute, calculation or aggregate
-  of the resource does not compile. Whether a person may mark a value
-  reviewed is the host's action and policy, not this option.
+  of the resource does not compile, and neither does a review field drawn
+  in a table whose resource lacks the named field. Whether a person may
+  mark a value reviewed is the host's action and policy, not this option.
 
 ## Field actions (`field_action`)
 

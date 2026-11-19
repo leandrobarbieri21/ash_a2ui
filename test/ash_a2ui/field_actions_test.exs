@@ -115,7 +115,7 @@ defmodule AshA2ui.FieldActionsTest do
     end
 
     test "the admin catalog is 3.2 or later" do
-      assert Version.compare(AshA2ui.Experience.admin_catalog_version(), "3.2.0") in [:eq, :gt]
+      assert Version.match?(AshA2ui.Experience.admin_catalog_version(), ">= 3.2.0")
     end
   end
 

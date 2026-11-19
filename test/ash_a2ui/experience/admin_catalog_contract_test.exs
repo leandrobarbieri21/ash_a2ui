@@ -277,6 +277,24 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     refute "actionVisible" in field["required"]
   end
 
+  test "catalog 3.3 adds the dataGrid column review and subtitle reviewPath, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.3.0"] =~ "review fields in tables"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    column = catalog["components"]["dataGrid"]["properties"]["columns"]["items"]
+    review = column["properties"]["review"]
+    assert review["required"] == ["path"]
+    assert Map.keys(review["properties"]) == ["path"]
+    assert review["description"] =~ "pending"
+    refute "review" in column["required"]
+
+    subtitle = column["properties"]["subtitle"]
+    assert Map.keys(subtitle["properties"]) |> Enum.sort() == ~w(path reviewPath)
+    assert subtitle["required"] == ["path"]
+  end
+
   test "catalog 2.0 is the A2UI 1.0 wire: filterPicker, the more tag's words" do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
 
