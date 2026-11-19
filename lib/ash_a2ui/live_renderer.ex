@@ -82,6 +82,12 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         around the surface already owns its heading: the surface is built
         with `header: false` (see `AshA2ui.Info.build_surface/2`), so it
         does not render a second `<h1>`.
+      * `:page_fn` (optional) — a 1-arity function `socket -> map`: the
+        host page's values (`%{back: "/orders?q=late"}`), written to the
+        main surface's `/page` for its `page_header` to read (see
+        `AshA2ui.Info.build_surface/2`'s `:page`). Called on mount and on
+        every `handle_params/4`; a change once the surface is built is
+        pushed as an `updateDataModel` of `/page`.
       * `:locale_fn` (optional) — a 1-arity function `socket -> locale`
         (`"fr"`), called on mount. The locale is assigned as
         `:ash_a2ui_locale` and passed to every surface, data-model and
@@ -368,6 +374,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         open_surface_url: Keyword.get(opts, :open_surface_url),
         on_function_response: Keyword.get(opts, :on_function_response),
         header: Keyword.get(opts, :header, true),
+        page_fn: Keyword.get(opts, :page_fn),
         surfaces: normalize_surfaces(Keyword.get(opts, :surfaces, [])),
         locale_fn: Keyword.get(opts, :locale_fn) || fn _socket -> nil end,
         l10n:
@@ -385,6 +392,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       locale = config.locale_fn.(socket)
       url_state = url_state(params)
       as_of = url_as_of(config, params)
+      page = page_values(config, socket)
 
       socket =
         assign(socket,
@@ -400,7 +408,9 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_uri: nil,
           ash_a2ui_url_ctx: url_state.ctx,
           ash_a2ui_pending_calls: %{},
-          ash_a2ui_surfaces: %{}
+          ash_a2ui_surfaces: %{},
+          ash_a2ui_page: page,
+          ash_a2ui_page_sent: nil
         )
 
       socket =
@@ -422,7 +432,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
               config.ui,
               opts ++
                 initial_state_opts(config.ui, url_state, opts) ++
-                link_button_opts(config) ++ header_opts(config)
+                link_button_opts(config) ++ header_opts(config) ++ page_opts(page)
             )
           end)
           |> start_surfaces(config, params)
@@ -553,6 +563,54 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       if navigates?(config), do: [link_buttons: true], else: []
     end
 
+    # The host page's values (`:page_fn`), `nil` without one.
+    defp page_values(%{page_fn: nil}, _socket), do: nil
+
+    defp page_values(%{page_fn: page_fn}, socket),
+      do: AshA2ui.Encoder.page_values(page_fn.(socket))
+
+    defp page_opts(nil), do: []
+    defp page_opts(page), do: [page: page]
+
+    # The host page's values a build carried (`nil` for a surface with none).
+    defp built_page(messages) do
+      Enum.find_value(messages, fn
+        %{"createSurface" => %{"dataModel" => %{"page" => page}}} -> page
+        _other -> nil
+      end)
+    end
+
+    # A change of the host page's values: kept, and pushed once the main
+    # surface is built (a build still running carries the values it started
+    # with; its landing pushes the change, see handle_async/4).
+    defp update_page(socket, %{page_fn: nil}), do: socket
+
+    defp update_page(socket, config) do
+      page = page_values(config, socket)
+      socket = assign(socket, :ash_a2ui_page, page)
+      push_page(socket, config)
+    end
+
+    defp push_page(socket, config) do
+      sent = socket.assigns[:ash_a2ui_page_sent]
+      page = socket.assigns[:ash_a2ui_page]
+
+      if sent != nil and page != nil and sent != page do
+        message = %{
+          "version" => "1.0",
+          "updateDataModel" => %{
+            "surfaceId" => AshA2ui.ResolvedView.surface_id(config.ui),
+            "path" => "/page",
+            "value" => page
+          }
+        }
+
+        socket |> assign(:ash_a2ui_page_sent, page) |> push_messages([message])
+      else
+        socket
+      end
+    end
+
     # `header: false` only when configured, so the default build is unchanged.
     defp header_opts(%{header: false}), do: [header: false]
     defp header_opts(_config), do: []
@@ -583,7 +641,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     """
     def handle_params(config, params, uri, socket) do
       first? = is_nil(socket.assigns[:ash_a2ui_uri])
-      socket = assign(socket, :ash_a2ui_uri, uri)
+      socket = socket |> assign(:ash_a2ui_uri, uri) |> update_page(config)
       ctx = url_state(params).ctx
 
       cond do
@@ -900,13 +958,15 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     a failed bootstrap must crash loudly, not strand the client on the
     skeleton.
     """
-    def handle_async(_config, :ash_a2ui_surface, {:ok, messages}, socket) do
+    def handle_async(config, :ash_a2ui_surface, {:ok, messages}, socket) do
       socket =
         socket
         |> track_query_state(messages)
         |> track_context_state(messages)
+        |> push_messages(messages)
+        |> assign(:ash_a2ui_page_sent, built_page(messages))
 
-      {:noreply, push_messages(socket, messages)}
+      {:noreply, push_page(socket, config)}
     end
 
     def handle_async(_config, :ash_a2ui_surface, {:exit, reason}, _socket) do
@@ -1106,7 +1166,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     defp l10n_opts(config, locale), do: [{:locale, locale} | config.l10n]
 
     defp refresh_opts(socket) do
-      state_opts(call_opts(socket), %{
+      state_opts(call_opts(socket) ++ page_opts(socket.assigns[:ash_a2ui_page]), %{
         query_state: socket.assigns.ash_a2ui_query_state,
         context_state: socket.assigns.ash_a2ui_context_state
       })

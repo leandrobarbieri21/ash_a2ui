@@ -43,6 +43,9 @@ defmodule AshA2ui.Component do
     :cell_field,
     :granularity,
     :granularities,
+    :alert,
+    :visible,
+    lead: false,
     context_filter: [],
     require_context: [],
     hide_empty: [],
@@ -102,7 +105,10 @@ defmodule AshA2ui.Component do
           granularities: [:day | :week | :month] | nil,
           nested_forms: [AshA2ui.NestedForm.t()],
           groups: [AshA2ui.Group.t()],
-          steps: [AshA2ui.Step.t()]
+          steps: [AshA2ui.Step.t()],
+          alert: AshA2ui.Alert.t() | nil,
+          lead: boolean,
+          visible: atom | nil
         }
 
   @doc """

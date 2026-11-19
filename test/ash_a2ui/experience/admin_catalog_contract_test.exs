@@ -18,7 +18,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
   @kinds ~w(entityPage dataGrid emptyState pagination recordPanel fieldDisplay formSection actionBar statusBanner confirmDialog)
 
   # Kinds added after 1.0, each additive within the catalog id.
-  @additive_kinds ~w(calendarView liveDiagram filterPicker)
+  @additive_kinds ~w(calendarView liveDiagram filterPicker alertBanner)
 
   # The pinned property names per kind, straight from the contract.
   @pinned_props %{
@@ -216,8 +216,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
     basic = "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    assert contract(catalog)["version"] == "3.2.0"
-    assert Experience.admin_catalog_version() == "3.2.0"
+    assert contract(catalog)["version"] == "3.5.0"
+    assert Experience.admin_catalog_version() == "3.5.0"
     assert changelog(catalog)["3.0.0"] =~ "Breaking"
     assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
     assert catalog["$id"] == catalog["catalogId"]
@@ -241,7 +241,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     inputs = Regex.scan(~r/"(\w+)"/, list, capture: :all_but_first) |> List.flatten()
     assert Enum.sort(inputs ++ ["Modal"]) == Enum.sort(owned)
     assert source =~ "export const ADMIN_BASIC_KINDS = [...INPUT_OVERRIDE_KINDS, \"Modal\"]"
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.2.0")
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.5.0")
 
     # the functions state who may call them
     for {name, function} <- catalog["functions"],

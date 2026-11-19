@@ -185,10 +185,13 @@ defmodule AshA2ui.Experience do
   stepper; 1.18 added a table card's own `heading` and `description`. 2.0
   includes every 1.x addition, and 3.0 every 2.x one. 3.1 added the
   fieldDisplay `review` (a review field's state and citation); 3.2 its
-  `action` and `actionVisible` (a field action's button).
+  `action` and `actionVisible` (a field action's button). 3.5 added the
+  record page a surface draws whole: the entityPage `header`, `lead`,
+  `leadVisible` and `nav`, and the `alertBanner` (3.3 and 3.4 are other
+  additions under review).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.2.0"
+  def admin_catalog_version, do: "3.5.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

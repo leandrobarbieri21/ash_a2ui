@@ -12,7 +12,8 @@ defmodule AshA2ui.Transformers.InferFields do
       matches.
     * `:detail` components get the **context's** resource's public
       attributes (details render the record selected into their `context`,
-      which may be a different resource than the surface's).
+      which may be a different resource than the surface's). One drawn as
+      an `alert` gets none: it reads only the fields its alert names.
 
   In standalone UI modules the target resource is the section's
   `for_resource`. When inference is impossible (no resolvable resource, no
@@ -105,6 +106,10 @@ defmodule AshA2ui.Transformers.InferFields do
   # :report fields are row-map keys, not resource fields — they cannot be
   # inferred (VerifyReports requires them explicitly).
   defp infer_fields(_target, %AshA2ui.Component{name: :report}), do: nil
+
+  # An alert (catalog 3.5) reads the fields its `alert` names, not rows:
+  # it draws no field rows, so none are inferred.
+  defp infer_fields(_target, %AshA2ui.Component{name: :detail, alert: %AshA2ui.Alert{}}), do: []
 
   defp infer_fields(target, %AshA2ui.Component{name: :detail}) do
     infer_fields(target, %AshA2ui.Component{name: :table})

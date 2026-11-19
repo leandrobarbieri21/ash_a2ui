@@ -205,6 +205,10 @@ msgctxt "one_of:status"
 msgid "Booked"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
+msgid "Breadcrumb"
+msgstr ""
+
 #: test/support/editable_words_ui.ex:1
 #: test/support/editable_words_ui.ex:26
 #: test/support/word_report_ui.ex:48
@@ -319,6 +323,10 @@ msgstr ""
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 msgid "Clinic id"
+msgstr ""
+
+#: test/support/dossier_page_ui.ex:1
+msgid "Close"
 msgstr ""
 
 #: test/support/links.ex:135
@@ -531,6 +539,14 @@ msgstr ""
 msgid "Done tasks"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
+msgid "Dossier"
+msgstr ""
+
+#: test/support/dossier_page_ui.ex:1
+msgid "Dossiers"
+msgstr ""
+
 #: test/support/submission.ex:1
 msgctxt "one_of:state"
 msgid "Draft"
@@ -641,6 +657,7 @@ msgstr ""
 msgid "Export contract"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 msgid "Facts"
 msgstr ""
@@ -868,6 +885,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:188
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:87
+#: test/support/dossier_page_ui.ex:1
 #: test/support/enrollment.ex:1
 #: test/support/enrollment.ex:79
 #: test/support/enum_types.ex:15
@@ -974,6 +992,7 @@ msgstr ""
 msgid "Note title"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
 #: test/support/referral.ex:1
 #: test/support/ticket.ex:1
 msgid "Notes"
@@ -1018,8 +1037,16 @@ msgctxt "one_of:status"
 msgid "Open"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
+msgid "Open file"
+msgstr ""
+
 #: test/support/manifest_task.ex:1
 msgid "Open tasks"
+msgstr ""
+
+#: test/support/dossier_page_ui.ex:1
+msgid "Opens the file"
 msgstr ""
 
 #: test/support/table_displays.ex:101
@@ -1043,6 +1070,7 @@ msgstr ""
 #: test/support/appointments_ui.ex:1
 #: test/support/card_visits_ui.ex:1
 #: test/support/document_visits_ui.ex:1
+#: test/support/dossier_page_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
@@ -1330,6 +1358,10 @@ msgstr ""
 msgid "Search contracts or vendors"
 msgstr ""
 
+#: test/support/dossier_page_ui.ex:1
+msgid "Sections"
+msgstr ""
+
 #: test/support/appointment_page_ui.ex:1
 msgid "Seen and signed off"
 msgstr ""
@@ -1533,6 +1565,7 @@ msgid "Submitted"
 msgstr ""
 
 #: test/support/appointment_page_ui.ex:1
+#: test/support/dossier_page_ui.ex:1
 #: test/support/table_displays.ex:78
 msgid "Summary"
 msgstr ""
@@ -1573,6 +1606,10 @@ msgstr ""
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 msgid "Their notes"
+msgstr ""
+
+#: test/support/dossier_page_ui.ex:1
+msgid "This dossier is closed"
 msgstr ""
 
 #: test/support/action_handler_fixtures.ex:152
@@ -1765,6 +1802,10 @@ msgstr ""
 
 #: test/support/enrollment.ex:1
 msgid "Who is enrolling?"
+msgstr ""
+
+#: test/support/dossier_page_ui.ex:1
+msgid "Who looks after it"
 msgstr ""
 
 #: test/support/action_handler_fixtures.ex:194

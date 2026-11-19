@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.2.0";
+export const ADMIN_CATALOG_VERSION = "3.5.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -266,6 +266,7 @@ const TAGS = {
   formSection: "ash-admin-form-section",
   actionBar: "ash-admin-action-bar",
   statusBanner: "ash-admin-status-banner",
+  alertBanner: "ash-admin-alert-banner",
   confirmDialog: "ash-admin-confirm-dialog",
   calendarView: "ash-admin-calendar-view",
   liveDiagram: "ash-admin-live-diagram",
@@ -508,6 +509,13 @@ export function buildSchemas(basicCatalog = null) {
       children: ChildListSchema.optional(),
       // 1.6: false when the host page already owns the heading.
       headerVisible: Bool.optional(),
+      // 3.5: the declared page header, the lead components and their
+      // gates, and the section nav (static: the element reads the paths
+      // they name itself).
+      header: RecordAny.optional(),
+      lead: ChildListSchema.optional(),
+      leadVisible: RecordAny.optional(),
+      nav: RecordAny.optional(),
       weight: Num.optional(),
     }),
 
@@ -707,6 +715,17 @@ export function buildSchemas(basicCatalog = null) {
       // its REF description).
       action: ActionSchema.optional(),
       children: ChildListSchema.optional(),
+      weight: Num.optional(),
+    }),
+
+    // 3.5: a :detail drawn as an alert.
+    alertBanner: EmptyObject.extend({
+      variant: Str.optional(),
+      layout: Str.optional(),
+      title: DynamicStringSchema.nullable().optional(),
+      message: DynamicStringSchema.nullable().optional(),
+      linkHref: DynamicStringSchema.nullable().optional(),
+      linkLabel: DynamicStringSchema.nullable().optional(),
       weight: Num.optional(),
     }),
 
@@ -1211,6 +1230,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   defineFormSection();
   defineActionBar();
   defineStatusBanner();
+  defineAlertBanner();
   defineConfirmDialog();
   defineCalendarView();
   defineLiveDiagram();
@@ -1233,14 +1253,36 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   }
 
   // --- EntityPage: page shell ---------------------------------------------
+  //
+  // 3.5: a record page the surface draws whole. `header` is the page header
+  // the surface declares (breadcrumb, title, tags, meta, buttons), read from
+  // its record at `header.path` by field name; `lead` the components drawn
+  // full width under it (each gated by `leadVisible` when listed there);
+  // `nav` a sticky section nav beside the children. The element subscribes
+  // to the record and to /page itself: they are paths in static props, so
+  // the controller does not.
+  //
+  // A host drawing the page with its own design system subclasses this
+  // element and overrides the drawing only: `renderHeader(model)` (the
+  // resolved `headerModel()`), `renderNav(nav)` and `renderNavItem(item,
+  // index)`; `onHeaderAction(action)` runs a button. The nav's behaviour finds its
+  // entries by `data-a2ui-nav-item` (the entry's index) and marks the
+  // chosen one with the `selected` attribute (and aria-current), so an
+  // override keeps both. `navLine()` is the line a section stops on.
 
   function defineEntityPage() {
     const tag = TAGS.entityPage;
     if (customElements.get(tag)) return;
 
+    // A section's outline, while it is the one just chosen (3s).
+    const OUTLINE_MS = 3000;
+    // Input that ends a held highlight or a pending arrival: the person's own.
+    const PERSON = ["wheel", "touchstart", "keydown", "mousedown"];
+
     class AshAdminEntityPage extends A2uiLitElement {
       static styles = [
         shared,
+        buttons,
         css`
           :host {
             display: block;
@@ -1266,11 +1308,661 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             flex-direction: column;
             gap: var(--am-space-xl);
           }
+          .page-head {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: var(--am-space-m);
+            margin: 0 0 var(--am-space-xl);
+          }
+          .page-crumbs ol {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--am-space-2xs);
+            margin: 0 0 var(--am-space-2xs);
+            padding: 0;
+            list-style: none;
+            font-size: var(--am-font-size-s);
+            color: var(--am-text-muted);
+          }
+          .page-crumbs li + li::before {
+            content: "/";
+            margin-inline-end: var(--am-space-2xs);
+          }
+          .page-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--am-space-xs);
+            margin-top: var(--am-space-xs);
+            font-size: var(--am-font-size-s);
+            color: var(--am-text-muted);
+          }
+          .page-meta [data-tone="warning"] {
+            color: var(--am-warning);
+          }
+          .page-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--am-space-xs);
+          }
+          .page-lead {
+            display: flex;
+            flex-direction: column;
+            gap: var(--am-space-xl);
+            margin: 0 0 var(--am-space-xl);
+          }
+          .page-with-nav {
+            display: grid;
+            gap: var(--am-space-xl);
+            align-items: start;
+          }
+          @media (min-width: 64rem) {
+            .page-with-nav {
+              grid-template-columns: 12.5rem minmax(0, 1fr);
+            }
+            .page-nav {
+              position: sticky;
+              top: var(--ash-admin-nav-top, var(--am-space-xl));
+            }
+          }
+          .page-nav {
+            display: flex;
+            flex-direction: column;
+            gap: var(--am-space-2xs);
+          }
+          .page-nav a {
+            padding: var(--am-space-2xs) var(--am-space-s);
+            border-radius: var(--am-radius-s);
+            color: var(--am-text-muted);
+            text-decoration: none;
+          }
+          .page-nav a[selected] {
+            color: var(--am-text);
+            background: var(--am-hover-tint);
+            font-weight: var(--am-font-weight-medium);
+          }
         `,
       ];
 
       createController() {
         return new A2uiController(this, adminApis.entityPage);
+      }
+
+      get surface() {
+        return this.context?.dataContext?.surface;
+      }
+
+      willUpdate(changedProperties) {
+        super.willUpdate(changedProperties);
+        applyWeight(this, this.controller?.props);
+        this.watchPaths(this.controller?.props);
+      }
+
+      updated(changedProperties) {
+        super.updated?.(changedProperties);
+        if (this.controller?.props?.nav && !this._amNavStarted) this.startNav();
+      }
+
+      disconnectedCallback() {
+        super.disconnectedCallback();
+        this.unwatchPaths();
+        this.stopNav();
+      }
+
+      // --- the record, the host page's values and the lead gates ----------
+
+      /** The data-model paths this page reads by itself, from its props. */
+      watchedPaths(props) {
+        const paths = [];
+        if (props?.header?.path) paths.push(props.header.path);
+        if (props?.header) paths.push("/page");
+        for (const path of Object.values(props?.leadVisible || {})) {
+          if (typeof path === "string") paths.push(path);
+        }
+        return [...new Set(paths)];
+      }
+
+      watchPaths(props) {
+        const dataModel = this.surface?.dataModel;
+        const paths = this.watchedPaths(props);
+        const key = paths.join("|");
+        if (!dataModel || typeof dataModel.subscribe !== "function") return;
+        if (this._amWatched?.key === key && this._amWatched.dataModel === dataModel) return;
+        this.unwatchPaths();
+        this._amWatched = {
+          key,
+          dataModel,
+          subscriptions: paths.map((path) => dataModel.subscribe(path, () => this.requestUpdate())),
+        };
+      }
+
+      unwatchPaths() {
+        for (const subscription of this._amWatched?.subscriptions || []) {
+          try {
+            subscription.unsubscribe();
+          } catch {
+            // The data model may already be gone (surface torn down).
+          }
+        }
+        this._amWatched = null;
+      }
+
+      read(path) {
+        const dataModel = this.surface?.dataModel;
+        return path && dataModel ? dataModel.get(path) : undefined;
+      }
+
+      // --- the header -------------------------------------------------------
+
+      /**
+       * The declared header with its values read from the record: what an
+       * override draws. Items and links without a value are left out, and
+       * buttons not offered.
+       */
+      headerModel() {
+        const header = this.controller?.props?.header;
+        if (!header || typeof header !== "object") return null;
+        const record = this.read(header.path) || {};
+        const page = this.read("/page") || {};
+        const value = (field) => (field ? str(record[field]) : "");
+
+        const item = (entry, kind) => ({
+          kind,
+          field: entry.field,
+          text: value(entry.field),
+          tone: entry.tone ? value(entry.tone) || null : null,
+          icon: entry.iconField ? value(entry.iconField) || null : entry.icon || null,
+          help: entry.helpField ? value(entry.helpField) || null : entry.help || null,
+          helpLabel: entry.helpLabel || null,
+        });
+
+        const pageValue = (path) => {
+          const key = typeof path === "string" ? path.replace(/^\/page\//, "") : "";
+          return key ? str(page[key]) : "";
+        };
+
+        return {
+          breadcrumbLabel: str(header.breadcrumbLabel),
+          breadcrumb: [
+            ...(header.breadcrumb || []).map((crumb) => ({
+              label: str(crumb.label),
+              href: pageValue(crumb.pagePath) || str(crumb.href) || null,
+            })),
+            {label: value(header.title), href: null, current: true},
+          ],
+          title: value(header.title),
+          tags: (header.tags || []).map((entry) => item(entry, "tag")).filter((entry) => entry.text !== ""),
+          meta: (header.meta || []).map((entry) => item(entry, "meta")).filter((entry) => entry.text !== ""),
+          actions: (header.actions || [])
+            .map((action) => ({
+              name: action.name,
+              label: str(action.label),
+              variant: action.variant || "secondary",
+              title: action.title || null,
+              href: action.href ? value(action.href) || null : null,
+              entry: action.action || null,
+              offered: action.visible ? record[action.visible] === true : true,
+              busy: this._amBusyAction === action.name,
+            }))
+            .filter((action) => action.offered && (action.entry || action.href)),
+        };
+      }
+
+      /** Runs a header button's action: its envelope, bindings resolved now. */
+      onHeaderAction(action) {
+        const spec = adminActionSpec(action?.entry);
+        if (!spec || this._amBusyAction || !this.context?.componentModel) return;
+        this._amBusyAction = action.name;
+        markActionBusy(this);
+        this.requestUpdate();
+        dispatchActionSpec(this.context, spec);
+      }
+
+      onActionSettled() {
+        this._amBusyAction = null;
+      }
+
+      /** The stock header: breadcrumb, h1, the line under it, the buttons. */
+      renderHeader(model) {
+        const tone = (entry) => (entry.tone ? entry.tone : nothing);
+        const tooltip = (entry) => entry.help || nothing;
+        return html`<header class="page-head" data-a2ui-page-header>
+          <div>
+            <nav class="page-crumbs" aria-label=${model.breadcrumbLabel || nothing}>
+              <ol>
+                ${model.breadcrumb.map((crumb) =>
+                  crumb.current
+                    ? html`<li aria-current="page">${crumb.label}</li>`
+                    : html`<li>${crumb.href ? html`<a class="am-link" href=${crumb.href}>${crumb.label}</a>` : crumb.label}</li>`,
+                )}
+              </ol>
+            </nav>
+            <h1 class="page-title">${model.title}</h1>
+            ${model.tags.length + model.meta.length > 0
+              ? html`<div class="page-meta">
+                  ${model.tags.map(
+                    (entry) =>
+                      html`<span class="am-badge" data-tone=${tone(entry)} data-field=${entry.field} title=${tooltip(entry)}
+                        >${entry.text}</span
+                      >`,
+                  )}
+                  ${model.meta.map(
+                    (entry) =>
+                      html`<span data-tone=${tone(entry)} data-field=${entry.field} title=${tooltip(entry)}>${entry.text}</span>`,
+                  )}
+                </div>`
+              : nothing}
+          </div>
+          ${model.actions.length > 0
+            ? html`<div class="page-actions">
+                ${model.actions.map((action) =>
+                  action.href
+                    ? html`<a
+                        class=${action.variant === "primary" ? "am-btn am-btn-primary" : "am-btn"}
+                        data-a2ui-action=${action.name}
+                        href=${action.href}
+                        title=${action.title || nothing}
+                        >${action.label}</a
+                      >`
+                    : html`<span data-a2ui-action=${action.name}
+                        >${renderActionButton({
+                          label: action.label,
+                          tone: action.variant === "secondary" ? "default" : action.variant,
+                          busy: action.busy,
+                          onClick: () => this.onHeaderAction(action),
+                        })}</span
+                      >`,
+                )}
+              </div>`
+            : nothing}
+        </header>`;
+      }
+
+      // --- lead and body ----------------------------------------------------
+
+      leadShown(id) {
+        const path = this.controller?.props?.leadVisible?.[id];
+        return typeof path !== "string" || this.read(path) === true;
+      }
+
+      renderLead(props) {
+        const lead = childRefs(props.lead).filter((ref) => this.leadShown(ref.id ?? ref));
+        if (lead.length === 0) return nothing;
+        return html`<div class="page-lead">${lead.map((ref) => html`${this.renderNode(ref)}`)}</div>`;
+      }
+
+      renderBody(props) {
+        return html`<div class="page-body">
+          ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
+        </div>`;
+      }
+
+      // --- the section nav --------------------------------------------------
+
+      /** The stock nav: a link per section. */
+      renderNav(nav) {
+        return html`<nav class="page-nav" id=${nav.id || nothing} aria-label=${str(nav.label) || nothing} data-a2ui-nav>
+          ${(nav.items || []).map((item, index) => this.renderNavItem(item, index))}
+        </nav>`;
+      }
+
+      renderNavItem(item, index) {
+        return html`<a
+          href=${`#${item.anchor}`}
+          id=${item.id || nothing}
+          data-a2ui-nav-item=${index}
+          data-section=${item.target}
+          @click=${(event) => this.onNavClick(event, index)}
+          >${str(item.label)}</a
+        >`;
+      }
+
+      render() {
+        const props = this.controller?.props;
+        if (!props) return nothing;
+
+        const model = this.headerModel();
+        const plain =
+          props.headerVisible === false
+            ? nothing
+            : html`<header class="page-header">
+                <h1 class="page-title">${str(props.title)}</h1>
+                ${props.description
+                  ? html`<p class="page-description">${str(props.description)}</p>`
+                  : nothing}
+              </header>`;
+
+        return html`
+          ${model ? this.renderHeader(model) : plain} ${this.renderLead(props)}
+          ${props.nav
+            ? html`<div class="page-with-nav">${this.renderNav(props.nav)} ${this.renderBody(props)}</div>`
+            : this.renderBody(props)}
+        `;
+      }
+
+      // --- the section nav's behaviour --------------------------------------
+
+      get navEntries() {
+        return [...(this.renderRoot?.querySelectorAll?.("[data-a2ui-nav-item]") || [])];
+      }
+
+      get navElement() {
+        return this.renderRoot?.querySelector?.("[data-a2ui-nav]") || null;
+      }
+
+      navItem(index) {
+        return this.controller?.props?.nav?.items?.[index];
+      }
+
+      startNav() {
+        this._amNavStarted = true;
+        this.reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+        // A link anywhere on the page to a section (inside a surface's
+        // shadow DOM too): the browser's own jump cannot see into it. The
+        // link is found on the click's composed path.
+        this._amOnPageClick = (event) => {
+          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey) return;
+          if (event.composedPath().some((el) => el?.hasAttribute?.("data-a2ui-nav-item"))) return;
+          const link = event.composedPath().find((el) => el instanceof HTMLAnchorElement);
+          const index = link ? this.byHash(link.getAttribute("href")) : -1;
+          if (index < 0 || !this.section(index)) return;
+          event.preventDefault();
+          this.go(index);
+        };
+        // Back and forward between sections, and a same-document jump to a
+        // section's hash: the surface may still be drawing it.
+        this._amOnHash = () => {
+          const index = this.byHash(location.hash);
+          if (index >= 0) this.arrive(index);
+        };
+        this._amOnScroll = () => {
+          if (this._amLocked || this._amFrame) return;
+          this._amFrame = requestAnimationFrame(() => {
+            this._amFrame = null;
+            this.select(this.inView());
+          });
+        };
+        document.addEventListener("click", this._amOnPageClick);
+        window.addEventListener("hashchange", this._amOnHash);
+        document.addEventListener("scroll", this._amOnScroll, {capture: true, passive: true});
+        const hash = this.byHash(location.hash);
+        // The first entry on arrival: the sections may still be drawing, so
+        // the page can look short enough to be "at the bottom" before it is.
+        this.select(hash >= 0 ? hash : 0);
+        if (hash >= 0) this.arrive(hash);
+      }
+
+      stopNav() {
+        if (!this._amNavStarted) return;
+        this._amNavStarted = false;
+        document.removeEventListener("click", this._amOnPageClick);
+        window.removeEventListener("hashchange", this._amOnHash);
+        document.removeEventListener("scroll", this._amOnScroll, {capture: true});
+        cancelAnimationFrame(this._amFrame);
+        this._amFrame = null;
+        this.stopArrival();
+        this.release();
+        clearTimeout(this._amUnoutline);
+      }
+
+      onNavClick(event, index) {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
+        if (!this.section(index)) return;
+        event.preventDefault();
+        this.go(index);
+      }
+
+      // Goes to a section once it is drawn. No deadline: a busy server can
+      // take longer than any fixed wait. The person's own scroll, click or
+      // key ends the wait, so the page never moves under someone reading.
+      arrive(index) {
+        this.stopArrival();
+        this._amArrivalStop = () => this.stopArrival();
+        for (const type of PERSON) {
+          window.addEventListener(type, this._amArrivalStop, {capture: true, once: true});
+        }
+        // An arrival jumps: hold() pins the section from the next frame on,
+        // and an instant scroll issued while a smooth one is running lands a
+        // few pixels past the line in Chromium.
+        const wait = () => {
+          if (!this.section(index)) {
+            this._amWaiting = setTimeout(wait, 100);
+            return;
+          }
+          this.go(index, {instant: true});
+          this.hold(index, Date.now() + OUTLINE_MS);
+        };
+        wait();
+      }
+
+      // The sections above keep drawing after the one arrived at exists,
+      // which pushes it down the page: keep it on the line while it settles.
+      hold(index, until) {
+        const step = () => {
+          const target = this.section(index);
+          if (!target || Date.now() > until) {
+            this.stopArrival();
+            return;
+          }
+          const margin = this.clear(target);
+          if (Math.abs(target.getBoundingClientRect().top - margin) > 1) {
+            target.scrollIntoView({behavior: "auto", block: "start"});
+          }
+          this._amArrival = requestAnimationFrame(step);
+        };
+        this._amArrival = requestAnimationFrame(step);
+      }
+
+      stopArrival() {
+        clearTimeout(this._amWaiting);
+        cancelAnimationFrame(this._amArrival);
+        if (!this._amArrivalStop) return;
+        for (const type of PERSON) {
+          window.removeEventListener(type, this._amArrivalStop, {capture: true});
+        }
+        this._amArrivalStop = null;
+      }
+
+      byHash(hash) {
+        if (!hash || !hash.startsWith("#")) return -1;
+        const items = this.controller?.props?.nav?.items || [];
+        return items.findIndex((item) => `#${item.anchor}` === hash);
+      }
+
+      go(index, {instant = false} = {}) {
+        const item = this.navItem(index);
+        const target = this.section(index);
+        if (!item || !target) return;
+        this.select(index);
+        // Hold the highlight on the chosen entry until the person scrolls,
+        // clicks or types: a section near the end can stop short of the line.
+        this.holdChoice();
+        const items = this.controller?.props?.nav?.items || [];
+        items.forEach((_item, i) => this.outline(this.section(i), false));
+        this.outline(target, true);
+        this.clear(target);
+        const smooth = !instant && !this.reducedMotion?.matches;
+        target.scrollIntoView({behavior: smooth ? "smooth" : "auto", block: "start"});
+        clearTimeout(this._amUnoutline);
+        this._amUnoutline = setTimeout(() => this.outline(target, false), OUTLINE_MS);
+        const hash = `#${item.anchor}`;
+        if (location.hash !== hash) history.replaceState(history.state, "", hash);
+      }
+
+      holdChoice() {
+        this.release();
+        this._amLocked = true;
+        this._amUnlock = () => this.release();
+        for (const type of PERSON) {
+          window.addEventListener(type, this._amUnlock, {capture: true, once: true});
+        }
+      }
+
+      release() {
+        this._amLocked = false;
+        if (!this._amUnlock) return;
+        for (const type of PERSON) {
+          window.removeEventListener(type, this._amUnlock, {capture: true});
+        }
+        this._amUnlock = null;
+      }
+
+      /**
+       * The line a section stops on, in pixels from the top of the window:
+       * where the nav sticks (its own `top`), so the section's heading is
+       * level with the nav. A nav that does not stick (a narrow window)
+       * stops sections at `--ash-admin-nav-line` (0 by default).
+       */
+      navLine() {
+        const nav = this.navElement;
+        const style = nav ? getComputedStyle(nav) : null;
+        if (style && style.position === "sticky") return Math.round(parseFloat(style.top) || 0);
+        return Math.round(parseFloat(getComputedStyle(this).getPropertyValue("--ash-admin-nav-line")) || 0);
+      }
+
+      // A section stops on the line, not behind a sticky bar: its scroll
+      // margin, set on the section itself. Returns the margin.
+      clear(section) {
+        const margin = this.navLine();
+        section.style.scrollMarginTop = `${margin}px`;
+        return margin;
+      }
+
+      /** A section by its entry: its target id, looked up when needed. */
+      section(index) {
+        const item = this.navItem(index);
+        return item ? this.findSection(item.target) : null;
+      }
+
+      /**
+       * The element a nav entry scrolls to, by its target (a section's
+       * component id): an element carrying that DOM id, else the element
+       * drawing that component. A host whose section drawing sets the DOM id
+       * may look it up by id alone.
+       */
+      findSection(target) {
+        return findById(this.renderRoot, target);
+      }
+
+      outline(section, on) {
+        if (!section) return;
+        section.toggleAttribute("data-outlined", on);
+        Object.assign(section.style, {
+          outline: on ? "2px solid var(--ash-admin-nav-outline, var(--am-primary))" : "",
+          outlineOffset: on ? "8px" : "",
+          borderRadius: on ? "var(--am-radius-l)" : "",
+        });
+      }
+
+      // The last section whose top has passed a third of the way down the
+      // window, or the last one once the person has scrolled to the end.
+      inView() {
+        const items = this.controller?.props?.nav?.items || [];
+        const line = window.innerHeight / 3;
+        const page = document.scrollingElement;
+        if (page && page.scrollTop > 0 && page.scrollTop + page.clientHeight >= page.scrollHeight - 1) {
+          return items.length - 1;
+        }
+        let index = 0;
+        items.forEach((_item, i) => {
+          const section = this.section(i);
+          if (section && section.getBoundingClientRect().top <= line) index = i;
+        });
+        return index;
+      }
+
+      select(index) {
+        this.navEntries.forEach((entry) => {
+          const on = Number(entry.getAttribute("data-a2ui-nav-item")) === index;
+          entry.toggleAttribute("selected", on);
+          if (on) entry.setAttribute("aria-current", "location");
+          else entry.removeAttribute("aria-current");
+        });
+      }
+    }
+
+    customElements.define(tag, AshAdminEntityPage);
+  }
+
+  // A section under `root` by its component id, through every shadow root
+  // below it (the surface's sections render inside their elements' own
+  // shadow DOM): an element carrying that DOM id (a host drawing may set
+  // it), else the element drawing that component.
+  function findById(root, id) {
+    if (!root || !id) return null;
+    return findByDomId(root, id) || findByComponent(root, id);
+  }
+
+  function findByDomId(root, id) {
+    const direct = root.getElementById?.(id) || root.querySelector?.(`[id="${id.replace(/"/g, '\\"')}"]`);
+    if (direct) return direct;
+    for (const el of root.querySelectorAll?.("*") || []) {
+      const found = el.shadowRoot && findByDomId(el.shadowRoot, id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function findByComponent(root, id) {
+    for (const el of root.querySelectorAll?.("*") || []) {
+      if (el.context?.componentModel?.id === id) return el;
+      const found = el.shadowRoot && findByComponent(el.shadowRoot, id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  // --- AlertBanner: a :detail drawn as an alert (3.5) -----------------------
+
+  function defineAlertBanner() {
+    const tag = TAGS.alertBanner;
+    if (customElements.get(tag)) return;
+
+    class AshAdminAlertBanner extends A2uiLitElement {
+      static styles = [
+        shared,
+        css`
+          :host {
+            display: block;
+          }
+          .alert {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--am-space-s);
+            padding: var(--am-space-s) var(--am-space-m);
+            border-radius: var(--am-radius-m);
+            border: 1px solid var(--am-border);
+            background: var(--am-hover-tint);
+            font-size: var(--am-font-size-m);
+          }
+          .alert[data-variant="warning"] {
+            background: var(--am-warning-subtle);
+            border-color: color-mix(in srgb, var(--am-warning) 25%, transparent);
+          }
+          .alert[data-variant="danger"] {
+            background: var(--am-error-subtle);
+            border-color: color-mix(in srgb, var(--am-error) 25%, transparent);
+          }
+          .alert[data-variant="success"] {
+            background: var(--am-success-subtle);
+            border-color: color-mix(in srgb, var(--am-success) 25%, transparent);
+          }
+          .alert-title {
+            margin: 0;
+            font-weight: var(--am-font-weight-semibold);
+          }
+          .alert-message {
+            margin: 0;
+          }
+        `,
+      ];
+
+      createController() {
+        return new A2uiController(this, adminApis.alertBanner);
       }
 
       willUpdate(changedProperties) {
@@ -1281,24 +1973,22 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       render() {
         const props = this.controller?.props;
         if (!props) return nothing;
-
-        return html`
-          ${props.headerVisible === false
-            ? nothing
-            : html`<header class="page-header">
-                <h1 class="page-title">${str(props.title)}</h1>
-                ${props.description
-                  ? html`<p class="page-description">${str(props.description)}</p>`
-                  : nothing}
-              </header>`}
-          <div class="page-body">
-            ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
+        const title = str(props.title);
+        const message = str(props.message);
+        if (title === "" && message === "") return nothing;
+        const href = str(props.linkHref);
+        const role = props.variant === "danger" || props.variant === "warning" ? "alert" : "status";
+        return html`<div class="alert" role=${role} data-variant=${props.variant || "info"} data-layout=${props.layout || "inline"}>
+          <div>
+            ${title ? html`<p class="alert-title">${title}</p>` : nothing}
+            ${message ? html`<p class="alert-message">${message}</p>` : nothing}
           </div>
-        `;
+          ${href ? html`<a class="am-link" href=${href}>${str(props.linkLabel) || href}</a>` : nothing}
+        </div>`;
       }
     }
 
-    customElements.define(tag, AshAdminEntityPage);
+    customElements.define(tag, AshAdminAlertBanner);
   }
 
   // --- DataGrid: table / card collection -----------------------------------

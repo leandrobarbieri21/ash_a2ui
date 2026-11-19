@@ -165,6 +165,34 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Record pages the surface draws whole** (admin catalog 3.5.0). A
+  surface can now declare the page around its sections:
+  - `page_header`: a breadcrumb (`crumb`, whose address a host page value
+    at `/page/<key>` may replace), the title, `tag` and `meta` items (text,
+    tone, icon and tooltip read from a context's record) and
+    `header_action` buttons: a link (`href`) or an update action of the
+    record (`run`), offered while its `visible` field holds and
+    `Ash.can?/3` lets the person run it. The new `page_action` ashAction
+    runs it; the header's declaration is the allowlist, and the server
+    re-checks the gate. The entityPage carries it as `header`.
+  - `section_nav`: a sticky nav of the sections beside them, which
+    scrolls a section to its line and outlines it, marks the one in view
+    and goes to an `#anchor` (a link anywhere on the page, or the address
+    on arrival) once the section is drawn, however long that takes. The
+    entityPage carries it as `nav`.
+  - `lead true` on a `:detail` draws it full width under the header, and
+    `visible` gates it per record (entityPage `lead` and `leadVisible`).
+  - `alert` on a `:detail` draws it as the new `alertBanner`: a title, a
+    message and a link read from the record.
+  - `AshA2ui.Info.build_surface/2` takes `:page` (written to `/page`) and
+    `AshA2ui.LiveRenderer` a `:page_fn`, pushing a change once built.
+
+  A field action now re-sends every detail of its card's context (its
+  section notes and the page header included), not only the cards.
+  Additive: the catalogId is unchanged, and renderers that ignore the new
+  props draw the plain heading and the children. 3.3.0 and 3.4.0 are other
+  additions under review; this one is additive over 3.2.0 and over them.
+
 - **Field actions: a button beside a detail value** (admin catalog
   3.2.0). A field's `field_action` names an update action of the record a
   `:detail` card shows; the action receives the field's name as its

@@ -150,6 +150,18 @@ defmodule AshA2ui.ActionHandler do
       field-action data included) and refreshes the tables the action's
       `refreshes` names, every table by default.
 
+    * `"page_action"` — context `%{"action" => name, "recordId" => id,
+      "contexts" => selections}`. Runs a page header button that runs an
+      action (`header_action` with `run`, admin catalog 3.5): the client
+      names the button, never the Ash action, so the header's declaration
+      is the allowlist. The record is re-read through the header's context
+      as the actor, and refused unless the button's `visible` field holds
+      and `Ash.can?/3` lets the actor run the action on it. The update
+      action then runs on it with no input. A success re-reads the header's
+      record into `/detail/<context>` (every detail of that context) and
+      refreshes the tables the action's `refreshes` names, every table by
+      default.
+
     * `"bulk_invoke"` / `"bulk_select"` — bulk actions over a row selection
       on tables declaring `bulk_actions` (see `AshA2ui.Bulk` and the Bulk
       Actions topic). `bulk_invoke` takes `%{"action" => name, "component"
@@ -341,8 +353,8 @@ defmodule AshA2ui.ActionHandler do
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
-  @writes ~w(submit_form invoke field_action bulk_invoke prompt edit_cell nested_add
-             nested_remove start_create start_edit wizard_next wizard_back)
+  @writes ~w(submit_form invoke field_action page_action bulk_invoke prompt edit_cell
+             nested_add nested_remove start_create start_edit wizard_next wizard_back)
 
   @pinned_refusal msg(
                     "This view shows an earlier moment, so nothing on it can be changed. Return to now to make changes."
@@ -845,6 +857,8 @@ defmodule AshA2ui.ActionHandler do
   defp dispatch("invoke", context, env), do: invoke_dispatch(context, env)
 
   defp dispatch("field_action", context, env), do: field_action(context, env)
+
+  defp dispatch("page_action", context, env), do: page_action(context, env)
 
   defp dispatch("bulk_invoke", context, env), do: bulk_invoke(context, env)
 
@@ -1732,7 +1746,8 @@ defmodule AshA2ui.ActionHandler do
              |> Map.merge(ResolvedView.detail_badge_data(view, record, fields))
              |> Map.merge(ResolvedView.detail_steps_data(view, record, fields))
              |> Map.merge(ResolvedView.detail_review_data(view, record, fields))
-             |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))}
+             |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))
+             |> Map.merge(ResolvedView.detail_context_data(view, context_name, record, ash_opts))}
 
           # The selection was just validated; a raced-away record renders empty.
           :not_found ->
@@ -1949,7 +1964,8 @@ defmodule AshA2ui.ActionHandler do
   # The card's record again, as a context change writes it: every detail of
   # the same context shares the path.
   defp field_action_detail(view, detail, record_id, %{ash_opts: ash_opts} = env) do
-    details = Enum.filter(view.details, &(&1.context == detail.context))
+    details =
+      view |> ResolvedView.detail_sources() |> Enum.filter(&(&1.context == detail.context))
 
     selected =
       Map.update(
@@ -1961,6 +1977,104 @@ defmodule AshA2ui.ActionHandler do
 
     case context_detail_value(view, detail.context, details, selected, ash_opts) do
       {:ok, value} -> {:ok, [update_data_model(view, "/detail/#{detail.context}", value)]}
+      {:error, error} -> {:error, error_messages(view, error)}
+    end
+  end
+
+  # --- page_action -----------------------------------------------------------
+
+  # A page header's button that runs an action (catalog 3.5): the header's
+  # declaration names the Ash action, its context re-reads the record, and
+  # the button's `visible` field and `Ash.can?/3` gate it on the server as
+  # on the screen.
+  defp page_action(context, %{view: view} = env) do
+    header = view.page_header
+
+    with {:ok, action} <- page_action_target(view, header, context),
+         {:ok, record_id} <- page_action_record_id(view, context),
+         {:ok, record} <- page_action_record(view, header, action, record_id, env) do
+      env =
+        env
+        |> Map.put(:invoked, action.run)
+        |> Map.put(:setting, Map.get(view.actions, action.run))
+        |> Map.put(:shown_fields, [])
+
+      result = update_record(record, action.run, %{}, env.ash_opts)
+
+      with {:ok, messages} <- after_write(result, env, page_action_done(view, action)),
+           {:ok, detail_messages} <- page_action_detail(view, header, record_id, env) do
+        {:ok, detail_messages ++ messages}
+      end
+    end
+  end
+
+  defp page_action_target(view, header, context) do
+    name = Map.get(context, "action")
+
+    case AshA2ui.PageHeader.runnable(header, name) do
+      nil ->
+        {:error,
+         [
+           status(
+             view,
+             "Page action #{inspect(name)} is not allowed: the page header declares no " <>
+               "header_action of that name that runs an action."
+           )
+         ]}
+
+      action ->
+        {:ok, action}
+    end
+  end
+
+  defp page_action_record_id(view, context) do
+    case Map.get(context, "recordId") do
+      id when is_binary(id) and id != "" ->
+        {:ok, id}
+
+      _missing ->
+        {:error, [status(view, ~s(Malformed page_action: context is missing "recordId".))]}
+    end
+  end
+
+  defp page_action_record(view, header, action, record_id, %{ash_opts: ash_opts} = env) do
+    context = view.contexts[header.context]
+    loads = if action.visible, do: [action.visible], else: []
+    loads = Enum.filter(loads, &ResolvedView.calculation_or_aggregate?(context.resource, &1))
+
+    case ContextRunner.fetch_selected(view, context, record_id, env.selected, ash_opts, loads) do
+      {:ok, record} ->
+        if AshA2ui.PageHeader.offered?(action, record, ash_opts),
+          do: {:ok, record},
+          else: {:error, [status(view, unavailable_text(view, action.run))]}
+
+      :not_found ->
+        {:error, [status(view, unavailable_text(view, action.run))]}
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
+  # "<button>: done.", in the header button's own words.
+  defp page_action_done(view, action),
+    do: t(view, msg("%{action}: done."), action: action.label)
+
+  # The header's record again, with every detail of its context.
+  defp page_action_detail(view, header, record_id, %{ash_opts: ash_opts} = env) do
+    details =
+      view |> ResolvedView.detail_sources() |> Enum.filter(&(&1.context == header.context))
+
+    selected =
+      Map.update(
+        env.selected,
+        header.context,
+        %{value: record_id},
+        &Map.put(&1, :value, record_id)
+      )
+
+    case context_detail_value(view, header.context, details, selected, ash_opts) do
+      {:ok, value} -> {:ok, [update_data_model(view, "/detail/#{header.context}", value)]}
       {:error, error} -> {:error, error_messages(view, error)}
     end
   end

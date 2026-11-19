@@ -123,6 +123,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Fixtures.surface_messages()
     end
 
+    # A surface carrying the host page's values it was built with, at /page.
+    def page_surface(ui, opts) do
+      Fixtures.notify({:surface_fn, ui, opts})
+      [create] = Fixtures.surface_messages()
+      [put_in(create, ["createSurface", "dataModel", "page"], opts[:page])]
+    end
+
+    # The host page's values: the address the page is at.
+    def page_values(socket), do: %{at: socket.assigns[:ash_a2ui_uri] || "mount"}
+
     def data_model(ui, opts) do
       Fixtures.notify({:data_model_fn, ui, opts})
       Fixtures.update_data_model()
@@ -419,6 +429,19 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       locale_fn: &Stubs.pseudo_locale/1,
       gettext_fn: {AshA2ui.Test.PseudoLocale, :translate},
       surface_fn: &Stubs.surface/2,
+      action_fn: &Stubs.action/3
+  end
+
+  defmodule AshA2ui.Test.PageValuesLive do
+    @moduledoc false
+
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer,
+      ui: AshA2ui.Test.MinimalUI,
+      deep_link: true,
+      page_fn: &Stubs.page_values/1,
+      surface_fn: &Stubs.page_surface/2,
       action_fn: &Stubs.action/3
   end
 end

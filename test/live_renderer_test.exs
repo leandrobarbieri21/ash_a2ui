@@ -109,6 +109,33 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "the host page's values (page_fn)" do
+      test "reach the build, and a change once built is pushed to /page", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/page-values")
+
+        assert_receive {:surface_fn, MinimalUI, opts}, 1_000
+        assert opts[:page] == %{"at" => "mount"}
+
+        assert_push_event(view, "a2ui:messages", %{messages: [%{"createSurface" => _} | _]})
+
+        # The values changed while the build ran (handle_params saw the
+        # address): its landing pushes them.
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [%{"updateDataModel" => %{"path" => "/page", "value" => first}}]
+        })
+
+        assert first == %{"at" => "http://www.example.com/live-renderer/page-values"}
+
+        render_patch(view, "/live-renderer/page-values?q=late")
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [%{"updateDataModel" => %{"path" => "/page", "value" => value}}]
+        })
+
+        assert value == %{"at" => "http://www.example.com/live-renderer/page-values?q=late"}
+      end
+    end
+
     describe "a2ui:message round-trip" do
       test "routes the envelope through action_fn and pushes the ok messages", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/stubbed")

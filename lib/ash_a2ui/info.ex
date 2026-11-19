@@ -75,6 +75,22 @@ defmodule AshA2ui.Info do
     |> Enum.filter(&is_struct(&1, AshA2ui.Action))
   end
 
+  @doc "The `page_header` entity declared in the `a2ui` section, if any."
+  @spec page_header(module | Spark.Dsl.t()) :: AshA2ui.PageHeader.t() | nil
+  def page_header(resource_or_ui_module) do
+    resource_or_ui_module
+    |> Extension.get_entities([:a2ui])
+    |> Enum.find(&is_struct(&1, AshA2ui.PageHeader))
+  end
+
+  @doc "The `section_nav` entity declared in the `a2ui` section, if any."
+  @spec section_nav(module | Spark.Dsl.t()) :: AshA2ui.SectionNav.t() | nil
+  def section_nav(resource_or_ui_module) do
+    resource_or_ui_module
+    |> Extension.get_entities([:a2ui])
+    |> Enum.find(&is_struct(&1, AshA2ui.SectionNav))
+  end
+
   @doc """
   Resolves the Ash resource behind `resource_or_ui_module`: the module's
   `for_resource` option if set (standalone UI modules), otherwise the module
@@ -151,6 +167,11 @@ defmodule AshA2ui.Info do
       emitted. Admin catalog: the `entityPage` carries
       `headerVisible: false` (catalog 1.6) and the renderer skips its
       header. Defaults to `true` (the output is unchanged).
+    * `:page` — the host page's values, a map (`%{back: "/orders?q=late"}`),
+      written to `/page` as text for a `page_header`'s breadcrumb (`crumb
+      ... page: :back`) to read. A transport passes the same map to
+      `build_data_model/2` so refreshes keep it. Omitted, a surface with a
+      page header carries an empty `/page`.
     * `:locale` — the locale to translate the library's own strings and
       the host's labels into (`"fr"`). Always explicit: ash_a2ui never reads the ambient Gettext
       locale. Needed with `:gettext_backend`; passed to `:gettext_fn` as a
@@ -269,7 +290,19 @@ defmodule AshA2ui.Info do
   def view_only(%ResolvedView{} = view) do
     tables = Enum.map(view.tables, &Map.merge(&1, %{row_actions: [], bulk_actions: []}))
 
-    %{view | tables: tables, row_actions: [], bulk_actions: [], actions: %{}, refreshes: %{}}
+    header =
+      view.page_header &&
+        %{view.page_header | actions: Enum.reject(view.page_header.actions, & &1.run)}
+
+    %{
+      view
+      | tables: tables,
+        row_actions: [],
+        bulk_actions: [],
+        actions: %{},
+        refreshes: %{},
+        page_header: header
+    }
   end
 
   defp view_only_when_pinned(view, opts) do
@@ -506,6 +539,14 @@ defmodule AshA2ui.Info do
             |> Map.merge(ResolvedView.detail_steps_data(resolved_view, record, fields))
             |> Map.merge(ResolvedView.detail_review_data(resolved_view, record, fields))
             |> Map.merge(ResolvedView.detail_field_action_data(resolved_view, record, fields))
+            |> Map.merge(
+              ResolvedView.detail_context_data(
+                resolved_view,
+                context_name,
+                record,
+                read_opts(resolved_view, opts)
+              )
+            )
 
           :not_found ->
             %{}
