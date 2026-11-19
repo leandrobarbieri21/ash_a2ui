@@ -51,6 +51,8 @@ export const QUIET_ACTIONS = Object.freeze([
   "wizard_next",
   "wizard_back",
   "open_surface",
+  "document_pane",
+  "document_region",
 ]);
 
 /** Whether `ashAction` args name a quiet action (see `QUIET_ACTIONS`). */

@@ -59,6 +59,7 @@ msgstr ""
 #: test/support/appointment_page_ui.ex:1
 #: test/support/appointments_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
+#: test/support/visit_document_ui.ex:1
 #: test/support/visit_progress_ui.ex:1
 #: test/support/visit_review_ui.ex:1
 #: test/support/word_report_ui.ex:78
@@ -1213,6 +1214,10 @@ msgstr ""
 msgid "Read only"
 msgstr ""
 
+#: test/support/visit_document_ui.ex:1
+msgid "Read-only"
+msgstr ""
+
 #: test/support/prompt_scope.ex:161
 msgid "Reassign"
 msgstr ""
@@ -1311,6 +1316,7 @@ msgstr ""
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
+#: test/support/visit_document_ui.ex:1
 #: test/support/visit_review_table_ui.ex:1
 #: test/support/visit_review_ui.ex:1
 msgid "Scheduled for"
@@ -1402,6 +1408,10 @@ msgstr ""
 msgid "Show clinic"
 msgstr ""
 
+#: test/support/visit_document_ui.ex:1
+msgid "Show referral"
+msgstr ""
+
 #: test/support/table_displays.ex:101
 #: test/support/table_displays.ex:132
 msgctxt "one_of:outcome"
@@ -1491,6 +1501,7 @@ msgstr ""
 #: test/support/referral.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+#: test/support/visit_document_ui.ex:1
 #: test/support/visit_review_table_ui.ex:1
 #: test/support/visit_review_ui.ex:1
 #: test/support/word_report_ui.ex:78
@@ -1638,6 +1649,7 @@ msgstr ""
 #: test/support/sort_only_ui.ex:1
 #: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
+#: test/support/visit_document_ui.ex:1
 #: test/support/visit_progress_ui.ex:1
 #: test/support/visit_review_table_ui.ex:1
 #: test/support/visit_review_ui.ex:1
@@ -1715,6 +1727,7 @@ msgstr ""
 #: test/support/diagram_flow.ex:114
 #: test/support/linked_visits_ui.ex:1
 #: test/support/table_displays.ex:78
+#: test/support/visit_document_ui.ex:1
 msgid "Visit"
 msgstr ""
 

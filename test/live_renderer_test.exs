@@ -579,6 +579,93 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert params["tab"] == "notes"
       end
 
+      test "document panes: ?document=shown opens the pane on the bootstrap", %{conn: conn} do
+        {:ok, _view, _html} = live(conn, "/live-renderer/document-pane?document=shown&tab=x")
+
+        assert_receive {:surface_fn, AshA2ui.Test.VisitDocumentUI, opts}, 1_000
+        assert opts[:document_state] == %{"referral" => true}
+      end
+
+      test "document panes: any other value, or none, is the default", %{conn: conn} do
+        for path <- ["/live-renderer/document-pane", "/live-renderer/document-pane?document=1"] do
+          {:ok, _view, _html} = live(conn, path)
+          assert_receive {:surface_fn, AshA2ui.Test.VisitDocumentUI, opts}, 1_000
+          refute Keyword.has_key?(opts, :document_state), path
+        end
+      end
+
+      test "document panes: the switch keeps the address, other params kept", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane?tab=notes")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_hook(
+          view,
+          "a2ui:message",
+          Messages.call("document_pane", "visit_document", %{
+            "pane" => "referral",
+            "shown" => true
+          })
+        )
+
+        assert_push_event(view, "a2ui:messages", %{messages: shown})
+
+        assert Enum.any?(
+                 shown,
+                 &match?(
+                   %{
+                     "updateDataModel" => %{
+                       "path" => "/ui/documents/referral/shown",
+                       "value" => true
+                     }
+                   },
+                   &1
+                 )
+               )
+
+        assert assert_patch(view) == "/live-renderer/document-pane?document=shown&tab=notes"
+
+        render_hook(
+          view,
+          "a2ui:message",
+          Messages.call("document_pane", "visit_document", %{
+            "pane" => "referral",
+            "shown" => false
+          })
+        )
+
+        assert assert_patch(view) == "/live-renderer/document-pane?tab=notes"
+      end
+
+      test "document panes: back/forward shows or hides the pane again", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        render_patch(view, "/live-renderer/document-pane?document=shown")
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [
+            %{"updateDataModel" => %{"path" => "/ui/documents/referral/shown", "value" => true}}
+          ]
+        })
+
+        render_patch(view, "/live-renderer/document-pane")
+
+        assert_push_event(view, "a2ui:messages", %{
+          messages: [
+            %{"updateDataModel" => %{"path" => "/ui/documents/referral/shown", "value" => false}}
+          ]
+        })
+      end
+
+      test "document panes: a refresh keeps an open pane open", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane?document=shown")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+
+        send(view.pid, :anything_changed)
+        assert_receive {:data_model_fn, AshA2ui.Test.VisitDocumentUI, opts}, 1_000
+        assert opts[:document_state] == %{"referral" => true}
+      end
+
       test "deep_link: back/forward to other ctx params re-applies them", %{
         conn: conn,
         ada: ada

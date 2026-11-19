@@ -150,6 +150,16 @@ defmodule AshA2ui.ActionHandler do
       field-action data included) and refreshes the tables the action's
       `refreshes` names, every table by default.
 
+    * `"document_pane"` / `"document_region"` — a `document_pane` (admin
+      catalog 3.4, see `AshA2ui.DocumentPane`) shown or hidden, and a region
+      of it a person went to. Context `%{"pane" => name, "shown" =>
+      boolean}` and `%{"pane" => name, "regionId" => id}`. The pane must be
+      one the surface declares; the renderer has already drawn the change,
+      and the handler writes it to `/ui/documents/<name>/shown` and
+      `/ui/documents/<name>/selected`, so a host sees it like any other
+      action (`AshA2ui.LiveRenderer` writes `shown` to the address). Both
+      are quiet and read nothing.
+
     * `"bulk_invoke"` / `"bulk_select"` — bulk actions over a row selection
       on tables declaring `bulk_actions` (see `AshA2ui.Bulk` and the Bulk
       Actions topic). `bulk_invoke` takes `%{"action" => name, "component"
@@ -314,6 +324,7 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.Conditions
   alias AshA2ui.ContextRunner
   alias AshA2ui.Csv
+  alias AshA2ui.DocumentPane
   alias AshA2ui.Encoder
   alias AshA2ui.Experience
   alias AshA2ui.L10n
@@ -337,7 +348,8 @@ defmodule AshA2ui.ActionHandler do
   # panel steps. The renderer shows no pending state for them and the
   # handler leaves /ui/feedback as it was (see quiet_actions/0).
   @quiet_actions ~w(query option_search context_search option_select nested_add nested_remove
-                    bulk_select prompt wizard_next wizard_back open_surface)
+                    bulk_select prompt wizard_next wizard_back open_surface document_pane
+                    document_region)
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
@@ -352,7 +364,8 @@ defmodule AshA2ui.ActionHandler do
   The action names that report no outcome of their own: reads, searches,
   pickers and panel steps (`query`, `option_search`, `context_search`,
   `option_select`, `nested_add`, `nested_remove`, `bulk_select`, `prompt`,
-  `wizard_next`, `wizard_back`, `open_surface`).
+  `wizard_next`, `wizard_back`, `open_surface`, `document_pane`,
+  `document_region`).
 
   A renderer writes no pending feedback for an `ashAction` call to one of
   them, and the handler leaves `/ui/feedback` as it was unless the action
@@ -1044,8 +1057,53 @@ defmodule AshA2ui.ActionHandler do
 
   defp dispatch("open_surface", context, env), do: open_surface(context, env)
 
+  defp dispatch("document_pane", context, env), do: document_pane(context, env)
+  defp dispatch("document_region", context, env), do: document_region(context, env)
+
   defp dispatch(name, _context, %{view: view}) do
     unknown_action(view, name)
+  end
+
+  # --- document panes ----------------------------------------------------------
+
+  # A pane shown or hidden: the renderer drew it already; the data model
+  # keeps it (and the LiveRenderer the address).
+  defp document_pane(context, %{view: view}) do
+    with {:ok, pane} <- document_pane_named(view, context),
+         shown when is_boolean(shown) <- Map.get(context, "shown") do
+      {:ok, [update_data_model(view, DocumentPane.ui_path(pane) <> "/shown", shown)]}
+    else
+      {:error, messages} ->
+        {:error, messages}
+
+      _not_boolean ->
+        {:error,
+         [status(view, ~s(Malformed document_pane action: "shown" must be true or false.))]}
+    end
+  end
+
+  # A region a person went to. Any id is accepted: it is only ever written
+  # back to the pane's own state, never read.
+  defp document_region(context, %{view: view}) do
+    with {:ok, pane} <- document_pane_named(view, context),
+         id when is_binary(id) and id != "" <- Map.get(context, "regionId") do
+      {:ok, [update_data_model(view, DocumentPane.ui_path(pane) <> "/selected", id)]}
+    else
+      {:error, messages} ->
+        {:error, messages}
+
+      _not_an_id ->
+        {:error, [status(view, ~s(Malformed document_region action: "regionId" must be text.))]}
+    end
+  end
+
+  defp document_pane_named(view, context) do
+    name = Map.get(context, "pane")
+
+    case Enum.find(view.document_panes, &(is_binary(name) and Atom.to_string(&1.name) == name)) do
+      nil -> {:error, [status(view, "This surface has no such document pane.")]}
+      pane -> {:ok, pane}
+    end
   end
 
   # Opens the create task: the panel in create mode over a fresh /form,
@@ -1721,7 +1779,13 @@ defmodule AshA2ui.ActionHandler do
 
       %{value: value} ->
         context = view.contexts[context_name]
-        loads = details |> Enum.flat_map(& &1.loads) |> Enum.uniq()
+
+        loads =
+          details
+          |> Enum.flat_map(& &1.loads)
+          |> Kernel.++(ResolvedView.document_loads(view, context_name))
+          |> Enum.uniq()
+
         fields = details |> Enum.flat_map(& &1.fields) |> Enum.uniq()
 
         case ContextRunner.fetch_selected(view, context, value, selected, ash_opts, loads) do
@@ -1731,8 +1795,9 @@ defmodule AshA2ui.ActionHandler do
              |> linked_record_values(record, fields, ash_opts)
              |> Map.merge(ResolvedView.detail_badge_data(view, record, fields))
              |> Map.merge(ResolvedView.detail_steps_data(view, record, fields))
-             |> Map.merge(ResolvedView.detail_review_data(view, record, fields))
-             |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))}
+             |> Map.merge(ResolvedView.detail_review_data(view, record, fields, context_name))
+             |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))
+             |> Map.merge(ResolvedView.detail_document_data(view, context_name, record, fields))}
 
           # The selection was just validated; a raced-away record renders empty.
           :not_found ->

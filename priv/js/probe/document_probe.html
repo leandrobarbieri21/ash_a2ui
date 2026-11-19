@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+  Document-pane probe page — the client half; drive with
+  priv/js/probe/document_probe.mjs. Replays recorded (synthetic) wire
+  payloads (priv/js/probe/record_document.exs):
+
+    ?payload=document_admin   VisitDocumentUI under admin_v1, the pane hidden
+    ?payload=document_shown   the same, the pane open (?document=shown)
+    &src=<url>                the viewer opens this PDF instead (the
+                              pre-build checks' corpus files)
+    &wasm=1                   configure the engine's wasmUrl (pdfjs-dist/wasm/)
+    &boot=empty               load the catalogs but feed nothing
+
+  Exposes __feedFixture(name) / __dispatched / __pdfLoads / __surface /
+  __csp (the CSP violations the page saw).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>document probe</title>
+    <link rel="stylesheet" href="./catalog/ash_a2ui_theme.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "./nm/lit/index.js",
+          "lit/": "./nm/lit/",
+          "lit-html": "./nm/lit-html/lit-html.js",
+          "lit-html/": "./nm/lit-html/",
+          "@lit/reactive-element": "./nm/@lit/reactive-element/reactive-element.js",
+          "@lit/reactive-element/": "./nm/@lit/reactive-element/",
+          "@lit/context": "./nm/@lit/context/index.js",
+          "@lit/context/": "./nm/@lit/context/",
+          "lit-element": "./nm/lit-element/index.js",
+          "lit-element/": "./nm/lit-element/",
+          "@a2ui/web_core/": "./nm/@a2ui/web_core/src/",
+          "@a2ui/lit/": "./nm/@a2ui/lit/src/",
+          "zod": "./nm/zod/index.js",
+          "zod/v3": "./nm/zod/v3/index.js",
+          "zod/v4": "./nm/zod/v4/index.js",
+          "zod/v4-mini": "./nm/zod/v4-mini/index.js",
+          "zod/mini": "./nm/zod/mini/index.js",
+          "zod/": "./nm/zod/",
+          "@preact/signals-core": "./nm/@preact/signals-core/dist/signals-core.mjs",
+          "signal-utils": "./nm/signal-utils/dist/index.ts.js",
+          "signal-polyfill": "./nm/signal-polyfill/dist/index.js",
+          "signal-utils/": "./nm/signal-utils/dist/",
+          "@lit-labs/signals": "./nm/@lit-labs/signals/index.js",
+          "zod-to-json-schema": "./nm/zod-to-json-schema/dist/esm/index.js",
+          "date-fns": "./nm/date-fns/index.js",
+          "pdfjs-dist/build/pdf.mjs": "./nm/pdfjs-dist/build/pdf.mjs",
+          "@a2ui/web_core": "./nm/@a2ui/web_core/src/index.js",
+          "@a2ui/web_core/catalog": "./nm/@a2ui/web_core/src/catalog/index.js",
+          "@a2ui/web_core/state": "./nm/@a2ui/web_core/src/state/index.js",
+          "@a2ui/web_core/processing": "./nm/@a2ui/web_core/src/processing/index.js",
+          "@a2ui/web_core/resolution": "./nm/@a2ui/web_core/src/resolution/index.js",
+          "@a2ui/web_core/rendering": "./nm/@a2ui/web_core/src/resolution/index.js",
+          "@a2ui/web_core/validation": "./nm/@a2ui/web_core/src/validation/index.js",
+          "@a2ui/web_core/validating": "./nm/@a2ui/web_core/src/validation/integrity-checker.js",
+          "@a2ui/web_core/reactivity": "./nm/@a2ui/web_core/src/reactivity/index.js",
+          "@a2ui/web_core/expressions": "./nm/@a2ui/web_core/src/expressions/index.js",
+          "@a2ui/web_core/adapters": "./nm/@a2ui/web_core/src/processing/adapters/index.js",
+          "@a2ui/web_core/rpc": "./nm/@a2ui/web_core/src/rpc/index.js",
+          "@a2ui/web_core/errors": "./nm/@a2ui/web_core/src/errors.js",
+          "@a2ui/web_core/events": "./nm/@a2ui/web_core/src/common/events.js",
+          "@a2ui/web_core/semver": "./nm/@a2ui/web_core/src/common/semver.js",
+          "@a2ui/web_core/v0_8": "./nm/@a2ui/web_core/src/v0_8/index.js",
+          "@a2ui/web_core/v0_8/basic_catalog": "./nm/@a2ui/web_core/src/v0_8/basic_catalog/index.js",
+          "@a2ui/web_core/v1_0": "./nm/@a2ui/web_core/src/v1_0/index.js",
+          "@a2ui/web_core/v1_0/basic_catalog": "./nm/@a2ui/web_core/src/v1_0/basic_catalog/index.js",
+          "@a2ui/lit": "./nm/@a2ui/lit/src/index.js",
+          "@a2ui/lit/0.8": "./nm/@a2ui/lit/src/0.8/core.js",
+          "@a2ui/lit/v0_8": "./nm/@a2ui/lit/src/0.8/core.js",
+          "@a2ui/lit/ui": "./nm/@a2ui/lit/src/0.8/ui/ui.js",
+          "@a2ui/web_core/catalogs/basic/v1": "./nm/@a2ui/web_core/src/catalogs/basic/v1/index.js",
+          "@a2ui/web_core/universal": "./nm/@a2ui/web_core/src/universal/index.js",
+          "validate-color": "./catalog/probe/shims/validate_color.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import {html, css, nothing} from "lit";
+      import "@a2ui/lit";
+      import {A2uiLitElement, A2uiController} from "@a2ui/lit";
+      import {MessageProcessor, Catalog} from "@a2ui/web_core";
+      import {createAshFunctionCatalog} from "./catalog/ash_a2ui_protocol.js";
+      import {basicCatalog, ChoicePickerApi, ColumnApi} from "@a2ui/web_core/catalogs/basic/v1";
+      import {createAshA2uiCatalog} from "./catalog/ash_a2ui_catalog.js";
+      import {createAshAdminCatalog} from "./catalog/ash_admin_catalog.js";
+
+      window.__csp = [];
+      document.addEventListener("securitypolicyviolation", (event) =>
+        window.__csp.push(`${event.violatedDirective} ${event.blockedURI}`),
+      );
+
+      const params = new URLSearchParams(location.search);
+      const lit = {html, css, nothing};
+      const ashCatalog = createAshA2uiCatalog({basicCatalog, ChoicePickerApi, ColumnApi, A2uiLitElement, A2uiController, lit});
+
+      // The engine, as a host loads it: ash_a2ui_pdf.js, imported the first
+      // time a viewer opens a document. Its worker is pdf.js's own module
+      // (import maps do not reach workers, so the bundled sibling a host
+      // serves is replaced by the unbundled file here).
+      window.__pdfLoads = 0;
+      const loadPdf = () => {
+        window.__pdfLoads += 1;
+        return import("./catalog/ash_a2ui_pdf.js").then((module) => {
+          module.useWorker(new URL("./nm/pdfjs-dist/build/pdf.worker.mjs", location.href));
+          // &wasm=1: pdf.js's decoders (JBIG2, JPX, ICC), as a host serves pdfjs-dist/wasm/.
+          if (params.get("wasm")) module.configure({wasmUrl: new URL("./nm/pdfjs-dist/wasm/", location.href).href});
+          return module;
+        });
+      };
+      const adminCatalog = createAshAdminCatalog({basicCatalog: ashCatalog, A2uiLitElement, A2uiController, lit, loadPdf});
+
+      window.__boot = {stage: "imports-done"};
+      window.__dispatched = [];
+
+      const surfaceEl = document.createElement("a2ui-surface");
+      document.getElementById("host").appendChild(surfaceEl);
+
+      const ashFunctions = createAshFunctionCatalog(Catalog, {
+        ashAction: (args) => {
+          window.__dispatched.push({name: args.name, context: args.context});
+        },
+        downloadFile: () => undefined,
+      });
+      const processor = new MessageProcessor([ashCatalog, adminCatalog, ashFunctions]);
+      processor.onSurfaceCreated((surface) => {
+        window.__surface = surface;
+        surfaceEl.surface = surface;
+      });
+      window.__feedFixture = async (name) => {
+        const payload = await (await fetch(`./fixtures/${name}_payload.json`)).json();
+        const src = params.get("src");
+        if (src) payload.messages[0].createSurface.dataModel.detail.appointment._document_referral.src = src;
+        processor.processMessages(payload.messages);
+      };
+
+      try {
+        if (params.get("boot") !== "empty") await window.__feedFixture(params.get("payload") || "document_admin");
+        window.__boot.stage = "booted";
+      } catch (error) {
+        window.__boot.stage = "error";
+        window.__boot.error = String(error);
+      }
+    </script>
+  </head>
+  <body>
+    <div id="host" style="max-width: 80rem; margin: 1rem auto"></div>
+  </body>
+</html>

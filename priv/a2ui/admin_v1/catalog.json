@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.3.0",
+        "version": "3.4.0",
         "changelog": {
+          "3.4.0": "Additive: document panes. New documentPane (a record's source document beside the surface's sections, with its own show/hide switch: document, shown and selected bind /detail/<context>/_document_<name> and /ui/documents/<name>; toggleAction is the document_pane event, sent with shown; a link in the children whose href starts with regionHref opens the pane at that region) and documentViewer (the PDF at src drawn with pdf.js, loaded only when a document opens, a text layer per page, zoom and page navigation, and regions {id, page, x, y, width, height, state, label?} as fractions of the page in the states pending, reviewed, selected, reviewed-selected, linked and empty; activating a region sends regionAction, the document_region event, with regionId). A review field's review may carry boxes ([{page, x, y, width, height}]), the regions its citation has. Renderers that do not know the new kinds report them as unknown; the catalogId is unchanged.",
           "3.3.0": "Additive: review fields in tables. dataGrid columns gain an optional review (row-relative, {path: \"_review_<field>\"}: the row's review of a review field the column draws, the same object fieldDisplay's review binds, {state, stateLabel, page?, pageLabel?, href?, quote?}, or null for none) and the subtitle binding an optional reviewPath (row-relative, the _review_<field> key of the subtitle's field). A renderer highlights a pending value and writes the state out beside the page tag (a link when href is present), in grids, list rows and cards alike. Renderers that ignore them draw the value. The catalogId is unchanged.",
           "3.2.0": "Additive: field actions. fieldDisplay gains an optional action (a button beside the value: {label, action, context, icon?}, shaped like a dataGrid rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the card (component) and the field, with recordId and contexts bound to the card's record and the selections; label is the action's name in words, translated, and icon an optional icon name the button may draw as, the label becoming its accessible name and tooltip) and an optional actionVisible (a binding to whether the record offers it, /detail/<context>/_action_<field>, a boolean). A renderer draws the button only while actionVisible is true and dispatches the entry with its bindings resolved; the server re-checks every call. Renderers that ignore them draw no button. The catalogId is unchanged.",
           "3.1.0": "Additive: review fields. fieldDisplay gains an optional review (a binding to a review field's review, /detail/<context>/_review_<field>: an object {state, stateLabel, page?, pageLabel?, href?, quote?}, state one of pending, reviewed or missing and stateLabel its words, translated; page the source page the value came from, pageLabel its tag (\"p. 3\"), href an address opening the source there and quote the words the value was read from; null for no review). A renderer highlights a pending value and writes the state out beside the page tag, linked when there is an href. Renderers that ignore it draw the value. The catalogId is unchanged.",
@@ -484,7 +485,7 @@
         },
         "review": {
           "$ref": "common_types.json#/$defs/DataBinding",
-          "description": "Optional (3.1): binding to a review field's review (/detail/<context>/_review_<field>), an object {state, stateLabel, page?, pageLabel?, href?, quote?} or null: state is pending (filled in automatically, not checked yet), reviewed (a person checked it) or missing (looked for, not found), stateLabel the state in words (translated), page the source page the value came from (from 1), pageLabel its tag (translated), href an address opening the source at that place and quote the words the value was read from. When present a pending value is highlighted and the state is written out, not only coloured, beside the page tag (a link when href is present)."
+          "description": "Optional (3.1): binding to a review field's review (/detail/<context>/_review_<field>), an object {state, stateLabel, page?, pageLabel?, href?, quote?} or null: state is pending (filled in automatically, not checked yet), reviewed (a person checked it) or missing (looked for, not found), stateLabel the state in words (translated), page the source page the value came from (from 1), pageLabel its tag (translated), href an address opening the source at that place and quote the words the value was read from. When present a pending value is highlighted and the state is written out, not only coloured, beside the page tag (a link when href is present). From 3.4 it may carry boxes ([{page, x, y, width, height}], fractions of the page): where the value sits in a documentPane's document; its href then opens the pane there."
         }
       },
       "required": ["component", "label", "value"]
@@ -620,6 +621,55 @@
         "weight": {"type": "number"}
       },
       "required": ["component", "source", "markers"]
+    },
+    "documentPane": {
+      "type": "object",
+      "allowedParents": ["entityPage"],
+      "description": "A document pane (3.4): a record's source document beside the surface's sections. The renderer draws the children alone while the pane is hidden (shown false, the default) and, while shown, the children beside the viewer component (roughly one part to two), stacked where there is no room for both. A switch labelled label (description beside it) shows and hides it: the renderer writes shown at once and sends toggleAction with shown added. The switch is drawn only while document is not null. A link inside the children whose href starts with regionHref (\"#document=\") opens the pane at the region it names (the rest of the href, URL-encoded): the renderer shows the pane if it is hidden (sending toggleAction), writes selected and sends the viewer's regionAction. A review field's page tag links this way when the field's citation has boxes.",
+      "properties": {
+        "component": {"const": "documentPane"},
+        "pane": {"type": "string", "description": "The pane's name (the document_pane entity), sent in its actions."},
+        "label": {"type": "string", "description": "The switch's label, translated."},
+        "description": {"type": "string", "description": "Optional words beside the switch, translated."},
+        "document": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Binding to the record's document (/detail/<context>/_document_<name>): {src, fileName, regions} or null when the record has none."
+        },
+        "shown": {
+          "$ref": "common_types.json#/$defs/DynamicBoolean",
+          "description": "Binding to whether the pane is shown (/ui/documents/<name>/shown)."
+        },
+        "selected": {
+          "$ref": "common_types.json#/$defs/DynamicString",
+          "description": "Binding to the region a person went to (/ui/documents/<name>/selected), or null."
+        },
+        "regionHref": {"type": "string", "description": "The href prefix of a link to one of the pane's regions (\"#<url_param>=\")."},
+        "toggleAction": {"$ref": "#/$defs/actionEvent", "description": "The document_pane event ({name, context: {pane}}), sent with shown added."},
+        "viewer": {"$ref": "common_types.json#/$defs/ComponentId", "description": "The documentViewer drawn beside the children."},
+        "children": {"$ref": "common_types.json#/$defs/ChildList", "description": "The surface's sections."},
+        "weight": {"type": "number"}
+      },
+      "required": ["component", "pane", "label", "document", "shown", "viewer", "children"]
+    },
+    "documentViewer": {
+      "type": "object",
+      "allowedParents": ["documentPane"],
+      "description": "A document viewer (3.4): the pages of the PDF at src, drawn by the renderer (pdf.js, loaded only when a viewer has a document to open), each with a text layer assistive technology reads, with zoom and page navigation, and regions outlined on the pages. A region is {id, page, x, y, width, height, state, label?}: its box as fractions of its page from the top-left corner, state one of pending, reviewed, selected, reviewed-selected, linked or empty, and label what it holds (translated). Regions sharing an id are one region drawn in several places. The region whose id is selected is drawn selected (pending) or reviewed-selected (reviewed) and scrolled into view. Activating a region (click, Enter or Space) writes selected and sends regionAction with regionId added. No editing and no signing happen in the viewer.",
+      "properties": {
+        "component": {"const": "documentViewer"},
+        "src": {"$ref": "common_types.json#/$defs/DynamicString", "description": "The address of the PDF, fetched by the browser as the reader."},
+        "fileName": {"$ref": "common_types.json#/$defs/DynamicString", "description": "The file name shown above the pages."},
+        "regions": {"$ref": "common_types.json#/$defs/DataBinding", "description": "Binding to the regions ([{id, page, x, y, width, height, state, label?}])."},
+        "selected": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Binding to the selected region's id, or null."},
+        "regionAction": {"$ref": "#/$defs/actionEvent", "description": "The document_region event ({name, context: {pane}}), sent with regionId added."},
+        "strings": {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "The viewer's own words, translated: loading, failed, pageOf and pageLabel (with %{page} and %{count} for the renderer to fill), previousPage, nextPage, zoomIn, zoomOut, and the state words pending, reviewed and empty."
+        },
+        "weight": {"type": "number"}
+      },
+      "required": ["component", "src", "regions"]
     },
     "filterPicker": {
       "type": "object",
@@ -810,7 +860,7 @@
       "description": "The relative weight of this component within a Row or Column. This is similar to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct descendant of a Row or Column."
     },
     "anyComponent": {
-      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
+      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/documentPane"}, {"$ref": "#/components/documentViewer"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
     },
     "anyFunction": {
       "oneOf": [{"$ref": "#/functions/openSurface"}]

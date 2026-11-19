@@ -26,7 +26,7 @@
  *
  *   entityPage, dataGrid, emptyState, pagination, recordPanel, fieldDisplay,
  *   formSection, actionBar, statusBanner, confirmDialog, calendarView,
- *   liveDiagram, filterPicker
+ *   liveDiagram, filterPicker, documentPane, documentViewer
  *
  * and the basic kinds it renders itself (ADMIN_BASIC_KINDS): TextField,
  * CheckBox, ChoicePicker and DateTimeInput (the a11y-hardened inputs below)
@@ -156,6 +156,9 @@ import {defineNbComponents} from "./nb_components.js";
 // and of the nodes (pure geometry, unit-tested without a browser).
 import {placeMarkerGroups, separate} from "./ash_a2ui_diagram_layout.js";
 
+// 3.4: the document pane and viewer (pdf.js loaded through deps.loadPdf).
+import {defineDocumentElements} from "./ash_admin_document.js";
+
 // Schema builders from web_core's OWN zod (3.x), the instance the
 // GenericBinder introspects. Importing the module directly (rather than
 // receiving builders through `deps`) guarantees instance identity: the
@@ -178,7 +181,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.3.0";
+export const ADMIN_CATALOG_VERSION = "3.4.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -270,6 +273,8 @@ const TAGS = {
   calendarView: "ash-admin-calendar-view",
   liveDiagram: "ash-admin-live-diagram",
   filterPicker: "ash-admin-filter-picker",
+  documentPane: "ash-admin-document-pane",
+  documentViewer: "ash-admin-document-viewer",
 };
 
 /** Basic input kinds this catalog replaces with a11y-hardened elements. */
@@ -329,7 +334,9 @@ void GRID_TABLE_MIN;
  * `{basicCatalog, A2uiLitElement, A2uiController, lit: {html, css,
  * nothing}}`, plus the optional `loadMermaid` (a function
  * returning a promise of the mermaid engine, called the first time a
- * `liveDiagram` draws; see priv/js/ash_a2ui_mermaid.js) and
+ * `liveDiagram` draws; see priv/js/ash_a2ui_mermaid.js), `loadPdf` (a
+ * function returning a promise of the pdf.js engine, called the first time
+ * a `documentViewer` opens a document; see priv/js/ash_a2ui_pdf.js) and
  * `openSurface`, and `renderActionButton(opts)`: every button the catalog
  * draws for an action (row actions, the form's primary button, dialog
  * Cancel/Confirm, pager, calendar tools) is passed to it, and a host that
@@ -743,6 +750,36 @@ export function buildSchemas(basicCatalog = null) {
       markers: DynamicValueSchema.optional(),
       nodes: DynamicValueSchema.optional(),
       error: DynamicStringSchema.nullable().optional(),
+      weight: Num.optional(),
+    }),
+
+    // 3.4: a document pane: the surface's sections beside its document.
+    // `document` and `shown` bind the record's document and the pane's
+    // state; `toggleAction` is the bare document_pane event, sent with
+    // `shown` added.
+    documentPane: EmptyObject.extend({
+      pane: Str.optional(),
+      label: Str.optional(),
+      description: Str.optional(),
+      document: DynamicValueSchema.nullable().optional(),
+      shown: DynamicBooleanSchema.nullable().optional(),
+      selected: DynamicStringSchema.nullable().optional(),
+      regionHref: Str.optional(),
+      toggleAction: bareEvent().optional(),
+      viewer: Str.optional(),
+      children: ChildListSchema.optional(),
+      weight: Num.optional(),
+    }),
+
+    // 3.4: a PDF drawn with pdf.js, its regions on the pages. `regionAction`
+    // is the bare document_region event, sent with `regionId` added.
+    documentViewer: EmptyObject.extend({
+      src: DynamicStringSchema.nullable().optional(),
+      fileName: DynamicStringSchema.nullable().optional(),
+      regions: DynamicValueSchema.nullable().optional(),
+      selected: DynamicStringSchema.nullable().optional(),
+      regionAction: bareEvent().optional(),
+      strings: RecordAny.optional(),
       weight: Num.optional(),
     }),
 
@@ -1217,6 +1254,21 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   defineConfirmDialog();
   defineCalendarView();
   defineLiveDiagram();
+  defineDocumentElements({
+    A2uiLitElement,
+    A2uiController,
+    lit,
+    apis: adminApis,
+    tags: TAGS,
+    styles: {shared, buttons},
+    renderActionButton,
+    dispatchActionSpec,
+    bindingPath,
+    applyWeight,
+    childRefs,
+    catalogId: ASH_A2UI_CATALOG_ID,
+    loadPdf: deps.loadPdf,
+  });
   defineTextField();
   defineCheckBox();
   defineChoicePicker();

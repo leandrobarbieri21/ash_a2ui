@@ -26,4 +26,15 @@ const deps = {
 
 export const basicCatalog = basic.basicCatalog;
 export const mergedCatalog = ashCatalog.createAshA2uiCatalog(deps);
-export const admin = adminCatalog.createAshAdminCatalog({...deps, basicCatalog: mergedCatalog});
+// pdf.js stands in as the engine a test puts on `globalThis.__testPdfEngine`
+// (the document viewer loads it only when a viewer opens a document).
+export const pdfLoads = {count: 0};
+const loadPdf = async () => {
+  pdfLoads.count += 1;
+  return globalThis.__testPdfEngine;
+};
+export const admin = adminCatalog.createAshAdminCatalog({
+  ...deps,
+  basicCatalog: mergedCatalog,
+  loadPdf,
+});

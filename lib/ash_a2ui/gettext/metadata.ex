@@ -91,6 +91,7 @@ defmodule AshA2ui.Gettext.Metadata do
       Enum.each(view.tables, &collect_export(&1, view))
       Enum.each(view.reports, &collect_report(&1, view.l10n))
       Enum.each(view.details, &collect_detail(&1, view))
+      Enum.each(view.document_panes, &collect_document_pane(&1, view.l10n))
     end
 
     drain([]) |> Enum.reverse() |> Enum.uniq()
@@ -152,6 +153,13 @@ defmodule AshA2ui.Gettext.Metadata do
       end
 
     Enum.filter([component.heading, component.description], &is_binary/1) ++ footer
+  end
+
+  # A document pane's switch and the words beside it: only the admin catalog
+  # draws them, so the basic encoder run above never translates them.
+  defp collect_document_pane(pane, l10n) do
+    AshA2ui.DocumentPane.label(pane, l10n)
+    AshA2ui.DocumentPane.description(pane, l10n)
   end
 
   # A detail card's badge fields: their texts and help show only once a record
