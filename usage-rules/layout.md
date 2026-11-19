@@ -390,6 +390,84 @@ topics for the full contracts.
   without a `:field` argument, or a `field_action_visible` that is not a
   public field of that record does not compile.
 
+## Record pages (`page_header`, `section_nav`, `lead`, `alert`)
+
+- A surface that is a whole record page declares the page around its
+  sections too, so the host writes no header, banner or nav of its own
+  (admin catalog 3.5). Everything reads the record selected into a
+  context, by field name:
+
+  ```elixir
+  page_header do
+    context :order
+    title :name
+    crumb "Orders", href: "/orders", page: :back   # /page/back replaces href
+
+    tag :status_text do
+      tone :status_tone          # info success warning danger neutral pending accent gray
+      help_field :status_help
+    end
+
+    meta :summary
+
+    header_action :approve do
+      run :approve               # an update action of the record, run with no input
+      visible :awaiting_approval?
+      variant :primary
+    end
+
+    header_action :invoice do
+      label "Open invoice"
+      href :invoice_url          # no address, no button
+    end
+  end
+
+  section_nav do
+    nav_item :details, label: "Overview", anchor: "overview"
+    nav_item :lines, label: "Items", anchor: "items"
+  end
+
+  component :detail, :on_hold do
+    context :order
+    lead true                    # full width under the header, beside no nav
+    visible :on_hold?
+
+    alert do
+      variant :warning
+      title "This order is on hold"
+      message :hold_note
+      link_href :hold_href       # "#items" goes to a section
+      link_label :hold_link
+    end
+  end
+  ```
+
+- Header items and buttons are words the host computes (a calculation per
+  value, translated by the host); the tag's `tone` is a field holding one
+  of the tone names. An empty value hides its item.
+- A `header_action` with `run` is offered while its `visible` field is
+  `true` and `Ash.can?/3` lets the person run it (`maybe_is: false`); the
+  record carries the result at `_header_action_<name>`. Choosing it sends
+  the `page_action` ashAction, which re-reads the record through the
+  context, re-checks both and runs the action as the person, then re-sends
+  `/detail/<context>`. A host that reloads its page afterwards catches that
+  message in its own `handle_event("a2ui:message", ...)`. A pinned (`as_of`)
+  surface offers none.
+- `/page` holds the host page's values: `build_surface(..., page: %{back:
+  url})`, or `page_fn: fn socket -> %{back: ...} end` on
+  `AshA2ui.LiveRenderer`, which pushes a change once the surface is built.
+- `nav_item` names the first component of a `section`; its section wrapper
+  (`section_<component>`) is the target. The nav scrolls a section to the
+  nav's line, outlines it for three seconds, marks the section in view, and
+  goes to `#<anchor>` from any link on the page or the address on arrival,
+  waiting for the section however long the surface takes.
+- `lead` is for `:detail` components outside any `section`; `visible` gates
+  lead components only. `alert` draws a `:detail` as an `alertBanner`; the
+  basic catalog draws it as a card with its title and message.
+- A header field, a nav entry that does not start a section, a `run` that is
+  not an update action, a button with both or neither of `run` and `href`,
+  or a lead component with a `section` does not compile.
+
 ## Table card headers (`heading`, `description`)
 
 - A table that sits in a card of its own on a record page takes a card

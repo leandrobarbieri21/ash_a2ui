@@ -49,6 +49,13 @@ for the resource named by `for_resource`).
  * [query](#a2ui-query)
    * preset
  * [diagram](#a2ui-diagram)
+ * [page_header](#a2ui-page_header)
+   * crumb
+   * tag
+   * meta
+   * header_action
+ * [section_nav](#a2ui-section_nav)
+   * nav_item
  * [document_pane](#a2ui-document_pane)
  * [component](#a2ui-component)
    * nested_form
@@ -60,6 +67,7 @@ for the resource named by `for_resource`).
    * editable
    * export
    * primary_action
+   * alert
  * [field](#a2ui-field)
  * [action](#a2ui-action)
    * prompt_options
@@ -375,6 +383,343 @@ end
 
 Target: `AshA2ui.Diagram`
 
+### a2ui.page_header
+
+
+The page's header, drawn by the surface (admin catalog 3.5): a
+breadcrumb, the title, a line of tags and notes, and buttons, all read
+from the record selected into `context`. For a record page whose surface
+is the whole page. The host leaves its own header out (`header: false`
+is then unnecessary: the declared header replaces the surface's plain
+heading).
+
+
+### Nested DSLs
+ * [crumb](#a2ui-page_header-crumb)
+ * [tag](#a2ui-page_header-tag)
+ * [meta](#a2ui-page_header-meta)
+ * [header_action](#a2ui-page_header-header_action)
+
+
+### Examples
+```
+page_header do
+  context :order
+  title :name
+  crumb "Orders", href: "/orders", page: :back
+
+  tag :status_text do
+    tone :status_tone
+  end
+
+  meta :customer_summary
+
+  header_action :approve do
+    run :approve
+    variant :primary
+  end
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`context`](#a2ui-page_header-context){: #a2ui-page_header-context .spark-required} | `atom` |  | The declared context whose selected record the header reads. |
+| [`title`](#a2ui-page_header-title){: #a2ui-page_header-title .spark-required} | `atom` |  | A field of the record holding the page's title. |
+| [`breadcrumb_label`](#a2ui-page_header-breadcrumb_label){: #a2ui-page_header-breadcrumb_label } | `String.t` | `"Breadcrumb"` | The breadcrumb's accessible name, translated in the metadata domain. |
+
+
+### a2ui.page_header.crumb
+```elixir
+crumb label
+```
+
+
+One step of the page header's breadcrumb, before the page's own title
+(which ends the breadcrumb). `page` names a value the host page writes
+at `/page/<key>`: when set, it replaces `href` (a list's address with the
+filters the person left it with).
+
+
+
+
+### Examples
+```
+crumb "Orders", href: "/orders", page: :back
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label`](#a2ui-page_header-crumb-label){: #a2ui-page_header-crumb-label .spark-required} | `String.t` |  | The step's words, translated in the metadata domain. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`href`](#a2ui-page_header-crumb-href){: #a2ui-page_header-crumb-href } | `String.t` |  | The step's address. |
+| [`page`](#a2ui-page_header-crumb-page){: #a2ui-page_header-crumb-page } | `atom` |  | A key of the host page's values (`/page/<key>`, see `AshA2ui.Info.build_surface/2`'s `:page`): its value, when present, is the step's address instead of `href`. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PageHeader.Crumb`
+
+### a2ui.page_header.tag
+```elixir
+tag field
+```
+
+
+A tag in the page header's line under the title: the record's state in a
+word or two, coloured by `tone`, explained by its `help`. Tags come
+before the `meta` items.
+
+
+
+
+### Examples
+```
+tag :status_text do
+  tone :status_tone
+  help_field :status_help
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`field`](#a2ui-page_header-tag-field){: #a2ui-page_header-tag-field .spark-required} | `atom` |  | A public attribute, calculation or aggregate of the header's context record holding the item's text. An empty value hides the item. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`tone`](#a2ui-page_header-tag-tone){: #a2ui-page_header-tag-tone } | `atom` |  | A field of the record holding the item's tone: `info`, `success`, `warning`, `danger`, `neutral`, `pending`, `accent` or `gray`. |
+| [`icon`](#a2ui-page_header-tag-icon){: #a2ui-page_header-tag-icon } | `String.t` |  | An icon drawn before the item's text. |
+| [`icon_field`](#a2ui-page_header-tag-icon_field){: #a2ui-page_header-tag-icon_field } | `atom` |  | A field of the record holding the icon's name, instead of `icon`. |
+| [`help`](#a2ui-page_header-tag-help){: #a2ui-page_header-tag-help } | `String.t` |  | A tooltip explaining the item, translated in the metadata domain. |
+| [`help_field`](#a2ui-page_header-tag-help_field){: #a2ui-page_header-tag-help_field } | `atom` |  | A field of the record holding the tooltip, instead of `help`. |
+| [`help_label`](#a2ui-page_header-tag-help_label){: #a2ui-page_header-tag-help_label } | `String.t` |  | The accessible name of the tooltip's trigger, when the tooltip hangs off an info mark after the text rather than off the item itself. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PageHeader.Item`
+
+### a2ui.page_header.meta
+```elixir
+meta field
+```
+
+
+A line of text in the page header's line under the title, after its
+tags: a date, a note, a summary. `tone` colours it.
+
+
+
+
+### Examples
+```
+meta :renewal_note do
+  icon_field :renewal_icon
+  help_field :renewal_help
+  help_label "About this renewal"
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`field`](#a2ui-page_header-meta-field){: #a2ui-page_header-meta-field .spark-required} | `atom` |  | A public attribute, calculation or aggregate of the header's context record holding the item's text. An empty value hides the item. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`tone`](#a2ui-page_header-meta-tone){: #a2ui-page_header-meta-tone } | `atom` |  | A field of the record holding the item's tone: `info`, `success`, `warning`, `danger`, `neutral`, `pending`, `accent` or `gray`. |
+| [`icon`](#a2ui-page_header-meta-icon){: #a2ui-page_header-meta-icon } | `String.t` |  | An icon drawn before the item's text. |
+| [`icon_field`](#a2ui-page_header-meta-icon_field){: #a2ui-page_header-meta-icon_field } | `atom` |  | A field of the record holding the icon's name, instead of `icon`. |
+| [`help`](#a2ui-page_header-meta-help){: #a2ui-page_header-meta-help } | `String.t` |  | A tooltip explaining the item, translated in the metadata domain. |
+| [`help_field`](#a2ui-page_header-meta-help_field){: #a2ui-page_header-meta-help_field } | `atom` |  | A field of the record holding the tooltip, instead of `help`. |
+| [`help_label`](#a2ui-page_header-meta-help_label){: #a2ui-page_header-meta-help_label } | `String.t` |  | The accessible name of the tooltip's trigger, when the tooltip hangs off an info mark after the text rather than off the item itself. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PageHeader.Item`
+
+### a2ui.page_header.header_action
+```elixir
+header_action name
+```
+
+
+A button in the page header. With `href` it is a link to the address a
+field of the record holds (no address, no button). With `run` it runs
+an update action of the record as the person: offered only while
+`visible` holds and `Ash.can?/3` says the person may run it, re-checked
+on the server when chosen (the `page_action` handler action).
+
+
+
+
+### Examples
+```
+header_action :approve do
+  run :approve
+  visible :awaiting_approval?
+  variant :primary
+end
+
+```
+
+```
+header_action :invoice do
+  label "Open invoice"
+  href :invoice_url
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#a2ui-page_header-header_action-name){: #a2ui-page_header-header_action-name .spark-required} | `atom` |  | The button's name, unique in the header. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label`](#a2ui-page_header-header_action-label){: #a2ui-page_header-header_action-label } | `String.t` |  | The button's words, translated in the metadata domain. Defaults to the `run` action's label (its `action` entity's, else its humanized name), else the humanized name. |
+| [`run`](#a2ui-page_header-header_action-run){: #a2ui-page_header-header_action-run } | `atom` |  | An update action of the header's context record, run with no input. |
+| [`href`](#a2ui-page_header-header_action-href){: #a2ui-page_header-header_action-href } | `atom` |  | A field of the record holding the link's address. |
+| [`visible`](#a2ui-page_header-header_action-visible){: #a2ui-page_header-header_action-visible } | `atom` |  | A boolean field of the record: the button is offered only while it is `true`. Without it, a link shows while it has an address and an action while the person may run it. |
+| [`variant`](#a2ui-page_header-header_action-variant){: #a2ui-page_header-header_action-variant } | `:primary \| :secondary \| :quiet` | `:secondary` | The button's emphasis. |
+| [`title`](#a2ui-page_header-header_action-title){: #a2ui-page_header-header_action-title } | `String.t` |  | A tooltip on the button, translated in the metadata domain. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PageHeader.Action`
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.PageHeader`
+
+### a2ui.section_nav
+
+
+A sticky list of the surface's sections drawn beside them (admin catalog
+3.5), for a long record page. Choosing an entry scrolls its section to
+the line the nav starts on and outlines it for three seconds; the entry
+of the section in view is marked as you read; arriving with `#<anchor>`
+in the address goes there once the section is drawn, however long that
+takes. The nav starts after the page header and any `lead` components.
+
+
+### Nested DSLs
+ * [nav_item](#a2ui-section_nav-nav_item)
+
+
+### Examples
+```
+section_nav do
+  nav_item :details, label: "Overview", anchor: "overview"
+  nav_item :order_lines, label: "Items", anchor: "items"
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label`](#a2ui-section_nav-label){: #a2ui-section_nav-label } | `String.t` | `"Sections"` | The nav's accessible name, translated in the metadata domain. |
+| [`id`](#a2ui-section_nav-id){: #a2ui-section_nav-id } | `String.t` |  | A DOM id for the nav. |
+
+
+### a2ui.section_nav.nav_item
+```elixir
+nav_item component
+```
+
+
+One entry of the section nav: the section a component heads, its words
+and the `#anchor` that reaches it (a link anywhere on the page to
+`#<anchor>` goes there too).
+
+
+
+
+### Examples
+```
+nav_item :order_lines, label: "Items", anchor: "items"
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`component`](#a2ui-section_nav-nav_item-component){: #a2ui-section_nav-nav_item-component .spark-required} | `atom` |  | The component whose section the entry reaches: the first component of a `section`, or a component without one. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`label`](#a2ui-section_nav-nav_item-label){: #a2ui-section_nav-nav_item-label .spark-required} | `String.t` |  | The entry's words. |
+| [`anchor`](#a2ui-section_nav-nav_item-anchor){: #a2ui-section_nav-nav_item-anchor .spark-required} | `String.t` |  | The entry's `#anchor`, without the `#`, unique in the nav. |
+| [`id`](#a2ui-section_nav-nav_item-id){: #a2ui-section_nav-nav_item-id } | `String.t` |  | A DOM id for the entry (for tests and links). |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.SectionNav.Item`
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.SectionNav`
+
 ### a2ui.document_pane
 ```elixir
 document_pane name
@@ -468,6 +813,7 @@ distinguishing name via the optional second argument, e.g.
  * [editable](#a2ui-component-editable)
  * [export](#a2ui-component-export)
  * [primary_action](#a2ui-component-primary_action)
+ * [alert](#a2ui-component-alert)
 
 
 ### Examples
@@ -533,6 +879,8 @@ end
 | [`select_context`](#a2ui-component-select_context){: #a2ui-component-select_context } | `atom` |  | A declared context (over the same resource as this table) the table's per-row "Select <context>" button selects into — the master/detail pattern: the button sends `"context_select"` with the row's record id, and the detail panels and related tables bound to the context follow. On a board (`display :board`) every card carries the button; other sectioned tables do not take `select_context`. |
 | [`hide_empty`](#a2ui-component-hide_empty){: #a2ui-component-hide_empty } | `list(atom)` | `[]` | `:detail` components only: fields whose row is left out of the card while the record has no value for them (`nil` or `""`), instead of showing a blank or the field's `empty_text` — "Cancelled by" on an order that was never cancelled. Admin catalog (`fieldDisplay`'s `hideWhenEmpty`); the basic catalog shows the row. |
 | [`context`](#a2ui-component-context){: #a2ui-component-context } | `atom` |  | The declared context a `:detail` component renders: its selected record's fields are written to `/detail/<context>` and displayed as a read-only label/value grid. Required on `:detail` components. |
+| [`lead`](#a2ui-component-lead){: #a2ui-component-lead } | `boolean` | `false` | `:detail` components only: draw it full width right under the page header, before the surface's other sections and beside none of them (admin catalog 3.5, the entityPage's `lead`). Lead components keep their declaration order. The basic catalog draws them in place. |
+| [`visible`](#a2ui-component-visible){: #a2ui-component-visible } | `atom` |  | Lead `:detail` components only: a boolean field of the context's record; the component is drawn only while it is `true` (a notice about some records, a card some records have nothing for). |
 
 
 ### a2ui.component.nested_form
@@ -1067,6 +1415,59 @@ end
 ### Introspection
 
 Target: `AshA2ui.PrimaryAction`
+
+### a2ui.component.alert
+
+
+Draws a `:detail` component as an alert instead of a card (admin catalog
+3.5): a title, a message read from the context's record and an optional
+link, toned by `variant`. For a notice about the record the page shows
+("This order is on hold"), usually declared `lead true` so it sits under
+the page header. Give the component a `visible` field to show it only
+on some records.
+
+
+
+
+### Examples
+```
+component :detail, :on_hold do
+  context :order
+  lead true
+  visible :on_hold?
+
+  alert do
+    variant :warning
+    title "This order is on hold"
+    message :hold_note
+    link_href :hold_href
+    link_label :hold_link
+  end
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`variant`](#a2ui-component-alert-variant){: #a2ui-component-alert-variant } | `:info \| :success \| :warning \| :danger \| :neutral` | `:info` | The alert's tone. |
+| [`layout`](#a2ui-component-alert-layout){: #a2ui-component-alert-layout } | `:inline \| :section` | `:inline` | `:inline` sits with the content around it; `:section` spans the page with its link at the end, for a notice that is about the whole page. |
+| [`title`](#a2ui-component-alert-title){: #a2ui-component-alert-title } | `String.t` |  | The alert's title, translated in the metadata domain. |
+| [`message`](#a2ui-component-alert-message){: #a2ui-component-alert-message } | `atom` |  | A public attribute, calculation or aggregate of the context's record holding the alert's text. Read with the record at `/detail/<context>/<field>`. |
+| [`link_href`](#a2ui-component-alert-link_href){: #a2ui-component-alert-link_href } | `atom` |  | A field of the context's record holding the address of the alert's link (a page, or `#<anchor>` for a place on this page). No value, no link. |
+| [`link_label`](#a2ui-component-alert-link_label){: #a2ui-component-alert-link_label } | `atom` |  | A field of the context's record holding the link's words. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.Alert`
 
 
 

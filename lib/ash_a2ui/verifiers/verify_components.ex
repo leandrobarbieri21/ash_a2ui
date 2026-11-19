@@ -205,7 +205,8 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
            action #{inspect(action.name)} is not reachable from any component.
 
            `action` entities attach refresh metadata to a table's row_actions entry, \
-           a detail field's field_action or the form's create/update action. \
+           a detail field's field_action, a page header's header_action or the form's \
+           create/update action. \
            Reachable actions: #{inspect(MapSet.to_list(reachable))}
            """
          )}
@@ -225,7 +226,16 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     |> Enum.concat(form_defaults(form, target))
     |> Enum.concat(editable_actions(components, target))
     |> Enum.concat(field_actions(Verifier.get_entities(dsl_state, [:a2ui]), components))
+    |> Enum.concat(header_actions(Verifier.get_entities(dsl_state, [:a2ui])))
     |> MapSet.new()
+  end
+
+  # The actions a page header's buttons run (catalog 3.5).
+  defp header_actions(entities) do
+    for %AshA2ui.PageHeader{actions: actions} <- entities,
+        %{run: run} <- actions,
+        run,
+        do: run
   end
 
   @doc false

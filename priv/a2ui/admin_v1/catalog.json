@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.4.0",
+        "version": "3.5.0",
         "changelog": {
+          "3.5.0": "Additive: record pages a surface draws whole. entityPage gains an optional header (the page header the surface declares: breadcrumb, title, tags, meta and buttons, read from a context's record by field name; a button runs an action as the page_action ashAction, offered while the record's _header_action_<name> is true), lead (ids drawn full width under the header), leadVisible (per lead id, the path of a boolean gating it) and nav (a sticky section nav beside the children: a choice scrolls its section to the nav's line and outlines it, the section in view is marked, and an #anchor in a link or the address goes there once drawn). A host page's values are read at /page. New: alertBanner, a :detail drawn as an alert (variant, layout, title, message, link). It is additive over 3.4.0 (the document pane). Renderers that ignore the new props draw the plain heading and the children. The catalogId is unchanged.",
           "3.4.0": "Additive: document panes. New documentPane (a record's source document beside the surface's sections, with its own show/hide switch: document, shown and selected bind /detail/<context>/_document_<name> and /ui/documents/<name>; toggleAction is the document_pane event, sent with shown; a link in the children whose href starts with regionHref opens the pane at that region) and documentViewer (the PDF at src drawn with pdf.js, loaded only when a document opens, a text layer per page, zoom and page navigation, and regions {id, page, x, y, width, height, state, label?} as fractions of the page in the states pending, reviewed, selected, reviewed-selected, linked and empty; activating a region sends regionAction, the document_region event, with regionId). A review field's review may carry boxes ([{page, x, y, width, height}]), the regions its citation has. Renderers that do not know the new kinds report them as unknown; the catalogId is unchanged.",
           "3.3.0": "Additive: review fields in tables. dataGrid columns gain an optional review (row-relative, {path: \"_review_<field>\"}: the row's review of a review field the column draws, the same object fieldDisplay's review binds, {state, stateLabel, page?, pageLabel?, href?, quote?}, or null for none) and the subtitle binding an optional reviewPath (row-relative, the _review_<field> key of the subtitle's field). A renderer highlights a pending value and writes the state out beside the page tag (a link when href is present), in grids, list rows and cards alike. Renderers that ignore them draw the value. The catalogId is unchanged.",
           "3.2.0": "Additive: field actions. fieldDisplay gains an optional action (a button beside the value: {label, action, context, icon?}, shaped like a dataGrid rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the card (component) and the field, with recordId and contexts bound to the card's record and the selections; label is the action's name in words, translated, and icon an optional icon name the button may draw as, the label becoming its accessible name and tooltip) and an optional actionVisible (a binding to whether the record offers it, /detail/<context>/_action_<field>, a boolean). A renderer draws the button only while actionVisible is true and dispatches the entry with its bindings resolved; the server re-checks every call. Renderers that ignore them draw no button. The catalogId is unchanged.",
@@ -61,6 +62,85 @@
         "headerVisible": {
           "type": "boolean",
           "description": "Optional (1.6). false leaves the page header (title and description) out, for a host page that already owns the heading; omitted means true."
+        },
+        "header": {
+          "type": "object",
+          "description": "Optional (3.5): the page header the surface declares, drawn in place of the plain heading (headerVisible does not hide it). Its words are translated; every other value is read from the header's record at path, by field name, when the record is written.",
+          "properties": {
+            "context": {"type": "string", "description": "The context whose record the header reads."},
+            "path": {"type": "string", "description": "The record's data-model path, /detail/<context>."},
+            "title": {"type": "string", "description": "The field holding the page's title, the breadcrumb's last step."},
+            "breadcrumbLabel": {"type": "string", "description": "The breadcrumb's accessible name."},
+            "breadcrumb": {
+              "type": "array",
+              "description": "The steps before the title: {label, href?, pagePath?}. pagePath (/page/<key>) names a host page value that, when present, is the step's address instead of href.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {"type": "string"},
+                  "href": {"type": "string"},
+                  "pagePath": {"type": "string"}
+                },
+                "required": ["label"],
+                "additionalProperties": false
+              }
+            },
+            "tags": {"type": "array", "description": "Tags in the line under the title, before meta: {field, tone?, icon?, iconField?, help?, helpField?, helpLabel?}. field holds the text (empty hides the item), tone a field holding the tone (info, success, warning, danger, neutral, pending, accent or gray), icon or iconField an icon name, help or helpField a tooltip, helpLabel the accessible name of an info mark the tooltip hangs from.", "items": {"$ref": "#/$defs/headerItem"}},
+            "meta": {"type": "array", "description": "Lines of text in the line under the title, after the tags; the same shape as tags.", "items": {"$ref": "#/$defs/headerItem"}},
+            "actions": {
+              "type": "array",
+              "description": "The header's buttons: {name, label, variant, href?, visible?, title?, action?}. variant is primary, secondary or quiet. A link's href names the field holding its address (no address, no button); visible names a boolean field (the button shows while it is true). A button that runs an action carries action, an envelope {label, action: page_action, context: {action, recordId, contexts?}} dispatched as the ash_a2ui catalog's ashAction with its bindings resolved, and visible is _header_action_<name>; the server re-checks every call.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "label": {"type": "string"},
+                  "variant": {"type": "string", "enum": ["primary", "secondary", "quiet"]},
+                  "href": {"type": "string"},
+                  "visible": {"type": "string"},
+                  "title": {"type": "string"},
+                  "action": {"type": "object"}
+                },
+                "required": ["name", "label", "variant"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["context", "path", "title", "breadcrumb", "tags", "meta", "actions"],
+          "additionalProperties": false
+        },
+        "lead": {
+          "$ref": "common_types.json#/$defs/ChildList",
+          "description": "Optional (3.5): ids drawn full width under the page header, before the children and beside no section nav. They are not among the children."
+        },
+        "leadVisible": {
+          "type": "object",
+          "additionalProperties": {"type": "string"},
+          "description": "Optional (3.5): per lead id, the data-model path of a boolean; that lead component is drawn only while it is true."
+        },
+        "nav": {
+          "type": "object",
+          "description": "Optional (3.5): a sticky section nav beside the children: {label, id?, items: [{label, anchor, target, id?}]}. target is the id of the section a choice scrolls to the line the nav starts on (outlined for three seconds); anchor its #anchor, which a link anywhere on the page or the address on arrival also goes to, once the section is drawn. The entry of the section in view is marked selected.",
+          "properties": {
+            "label": {"type": "string"},
+            "id": {"type": "string"},
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {"type": "string"},
+                  "anchor": {"type": "string"},
+                  "target": {"type": "string"},
+                  "id": {"type": "string"}
+                },
+                "required": ["label", "anchor", "target"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["label", "items"],
+          "additionalProperties": false
         }
       },
       "required": ["component", "title", "children"]
@@ -540,6 +620,20 @@
       },
       "required": ["component", "primaryLabel", "busy", "action", "children"]
     },
+    "alertBanner": {
+      "type": "object",
+      "description": "Additive (3.5): a :detail component drawn as an alert about the record: a title, a message and an optional link, toned by variant. Draws nothing while it has neither a title nor a message.",
+      "properties": {
+        "component": {"const": "alertBanner"},
+        "variant": {"type": "string", "enum": ["info", "success", "warning", "danger", "neutral"], "description": "The alert's tone."},
+        "layout": {"type": "string", "enum": ["inline", "section"], "description": "inline sits with the content around it; section spans the page, its link at the end."},
+        "title": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Optional: the alert's title (translated)."},
+        "message": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Optional: binding to the text, a field of the record (/detail/<context>/<field>)."},
+        "linkHref": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Optional: binding to the link's address (#<anchor> for a place on the page). No address, no link."},
+        "linkLabel": {"$ref": "common_types.json#/$defs/DynamicString", "description": "Optional: binding to the link's words."}
+      },
+      "required": ["component", "variant", "layout"]
+    },
     "statusBanner": {
       "type": "object",
       "description": "Typed feedback banner. Renders nothing while the bound kind is null (renderer concern; success and warning → role=status, error → role=alert).",
@@ -845,6 +939,21 @@
     }
   },
   "$defs": {
+    "headerItem": {
+      "type": "object",
+      "description": "One item of a page header's line under the title (3.5): field holds its text, read from the header's record; the rest are optional.",
+      "properties": {
+        "field": {"type": "string"},
+        "tone": {"type": "string"},
+        "icon": {"type": "string"},
+        "iconField": {"type": "string"},
+        "help": {"type": "string"},
+        "helpField": {"type": "string"},
+        "helpLabel": {"type": "string"}
+      },
+      "required": ["field"],
+      "additionalProperties": false
+    },
     "actionEvent": {
       "type": "object",
       "description": "An ash_a2ui action the renderer sends as ashAction: its name and its context, whose bindings resolve against the data model (row-relative inside a dataGrid row).",
@@ -860,7 +969,7 @@
       "description": "The relative weight of this component within a Row or Column. This is similar to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct descendant of a Row or Column."
     },
     "anyComponent": {
-      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/documentPane"}, {"$ref": "#/components/documentViewer"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
+      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/alertBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/documentPane"}, {"$ref": "#/components/documentViewer"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
     },
     "anyFunction": {
       "oneOf": [{"$ref": "#/functions/openSurface"}]

@@ -426,7 +426,10 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       "open_surface",
       # Catalog 3.2: a detail field's action, sent in the rowActions entry
       # shape (the field's declaration names the Ash action)
-      "field_action"
+      "field_action",
+      # Catalog 3.5: a page header button that runs an action (the header's
+      # declaration names the Ash action)
+      "page_action"
     ]
 
     @tag ac: "A2UI-101B/AC-11"

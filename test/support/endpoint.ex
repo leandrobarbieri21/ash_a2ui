@@ -41,6 +41,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       live("/live-renderer/document-pane", AshA2ui.Test.DocumentPaneLive)
       live("/live-renderer/open-surface-callback", AshA2ui.Test.OpenSurfaceCallbackLive)
       live("/live-renderer/localized", AshA2ui.Test.LocalizedLive)
+      live("/live-renderer/page-values", AshA2ui.Test.PageValuesLive)
       live("/live-renderer/surfaces", AshA2ui.Test.SurfacesLive)
       live("/live-renderer/time-travel", AshA2ui.Test.TimeTravelLive)
 

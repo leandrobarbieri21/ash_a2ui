@@ -275,9 +275,9 @@ defmodule AshA2ui.Encoder do
 
   # The admin catalog's own components (priv/a2ui/admin_v1/catalog.json).
   # Every other component the encoder emits is a basic-catalog component.
-  @admin_components ~w(actionBar calendarView confirmDialog dataGrid documentPane documentViewer
-                       emptyState entityPage fieldDisplay filterPicker formSection liveDiagram
-                       pagination recordPanel statusBanner)
+  @admin_components ~w(actionBar alertBanner calendarView confirmDialog dataGrid documentPane
+                       documentViewer emptyState entityPage fieldDisplay filterPicker formSection
+                       liveDiagram pagination recordPanel statusBanner)
 
   @numeric_types [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
 
@@ -609,6 +609,7 @@ defmodule AshA2ui.Encoder do
     |> put_wizard_state(view)
     |> put_diagram_state(view, opts)
     |> put_document_state(view, opts)
+    |> put_page_values(view, opts)
   end
 
   # Catalog 3.4: each document pane's own state at /ui/documents/<name>,
@@ -621,6 +622,26 @@ defmodule AshA2ui.Encoder do
       ["ui", "documents"],
       AshA2ui.DocumentPane.ui_state(view, Keyword.get(opts, :document_state))
     )
+  end
+
+  # Catalog 3.5: the host page's values (`:page`, string keys and values) at
+  # `/page`, which a page header's breadcrumb reads. A surface with a page
+  # header always carries the key, empty when the host passes nothing.
+  defp put_page_values(model, view, opts) do
+    case {opts[:page], view.page_header} do
+      {nil, nil} -> model
+      {page, _header} -> Map.put(model, "page", page_values(page))
+    end
+  end
+
+  @doc false
+  # The host page's values as the wire carries them: string keys, and
+  # values as text (`nil` left out).
+  @spec page_values(map | keyword | nil) :: %{String.t() => String.t()}
+  def page_values(nil), do: %{}
+
+  def page_values(page) do
+    for {key, value} <- page, not is_nil(value), into: %{}, do: {to_string(key), to_string(value)}
   end
 
   # The value at "/records": on single-table surfaces the serialized row
@@ -995,23 +1016,30 @@ defmodule AshA2ui.Encoder do
 
     {form_sections, form_children} = admin_form_sections(view, form, options)
 
-    # 3.4: a document pane holds the surface's sections beside its document.
-    {body_children, pane_components} =
-      admin_document_pane(view, diagram_children(view) ++ section_children)
+    lead = lead_children(view)
 
-    root = %{
-      "id" => "root",
-      "component" => "entityPage",
-      "title" => Experience.surface_title(view),
-      # Record-task panel first (zero jank: an open task is
-      # front-and-center), the typed-feedback banner right below it (the
-      # near-action outcome home), then context pickers, tables, details.
-      "children" =>
-        form_children ++
-          ["status_banner"] ++
-          context_children(view) ++
-          body_children ++ ["action_result_panel"]
-    }
+    # 3.4: a document pane holds the surface's sections beside its document;
+    # 3.5: the lead components sit above them, out of the pane.
+    {body_children, pane_components} =
+      admin_document_pane(view, diagram_children(view) ++ (section_children -- lead))
+
+    root =
+      %{
+        "id" => "root",
+        "component" => "entityPage",
+        "title" => Experience.surface_title(view),
+        # Record-task panel first (zero jank: an open task is
+        # front-and-center), the typed-feedback banner right below it (the
+        # near-action outcome home), then context pickers, tables, details.
+        "children" =>
+          form_children ++
+            ["status_banner"] ++
+            context_children(view) ++
+            body_children ++ ["action_result_panel"]
+      }
+      |> put_page_header(view)
+      |> put_lead(view, lead)
+      |> put_section_nav(view)
 
     [
       root
@@ -1072,6 +1100,114 @@ defmodule AshA2ui.Encoder do
 
   defp context_children(view) do
     for name <- view.context_order, view.contexts[name].picker, do: "context_#{name}"
+  end
+
+  # Catalog 3.5: the page header the surface declares (`page_header`). Each
+  # item and button names the fields it reads from the header's record, at
+  # `path`; a breadcrumb step may read its address from the host page's
+  # values (`pagePath`, `/page/<key>`). A button that runs an action carries
+  # its envelope (the `page_action` ashAction) and is offered while the
+  # record's `_header_action_<name>` is true.
+  defp put_page_header(root, %{page_header: nil}), do: root
+
+  defp put_page_header(root, %{page_header: header} = view) do
+    path = "/detail/#{header.context}"
+
+    wire =
+      %{
+        "context" => to_string(header.context),
+        "path" => path,
+        "title" => to_string(header.title),
+        "breadcrumbLabel" => header.breadcrumb_label,
+        "breadcrumb" =>
+          Enum.map(header.crumbs, fn crumb ->
+            %{"label" => crumb.label}
+            |> maybe_put("href", crumb.href)
+            |> maybe_put("pagePath", crumb.page && "/page/#{crumb.page}")
+          end),
+        "tags" => Enum.map(header.tags, &header_item/1),
+        "meta" => Enum.map(header.meta, &header_item/1),
+        "actions" => Enum.map(header.actions, &header_action(&1, path, view))
+      }
+
+    Map.put(root, "header", wire)
+  end
+
+  defp header_item(item) do
+    %{"field" => to_string(item.field)}
+    |> maybe_put("tone", item.tone && to_string(item.tone))
+    |> maybe_put("icon", item.icon)
+    |> maybe_put("iconField", item.icon_field && to_string(item.icon_field))
+    |> maybe_put("help", item.help)
+    |> maybe_put("helpField", item.help_field && to_string(item.help_field))
+    |> maybe_put("helpLabel", item.help_label)
+  end
+
+  defp header_action(%{run: nil} = action, _path, _view) do
+    %{
+      "name" => to_string(action.name),
+      "label" => action.label,
+      "variant" => to_string(action.variant)
+    }
+    |> maybe_put("href", action.href && to_string(action.href))
+    |> maybe_put("visible", action.visible && to_string(action.visible))
+    |> maybe_put("title", action.title)
+  end
+
+  defp header_action(action, path, view) do
+    context =
+      %{"action" => to_string(action.name), "recordId" => %{"@path" => "#{path}/id"}}
+      |> put_contexts_binding(view)
+
+    %{
+      "name" => to_string(action.name),
+      "label" => action.label,
+      "variant" => to_string(action.variant),
+      "visible" => "_header_action_#{action.name}",
+      "action" => %{"label" => action.label, "action" => "page_action", "context" => context}
+    }
+    |> maybe_put("title", action.title)
+  end
+
+  # Catalog 3.5: the `lead true` components, drawn full width under the
+  # page header, out of the sections (and beside no section nav).
+  defp lead_children(view) do
+    for %{lead: true} = component <- view.components,
+        id <- card_children(component),
+        do: id
+  end
+
+  defp put_lead(root, _view, []), do: root
+
+  defp put_lead(root, view, lead) do
+    visible =
+      for %{lead: true, visible: field} = component <- view.components,
+          not is_nil(field),
+          id <- card_children(component),
+          into: %{},
+          do: {id, "/detail/#{component.context}/#{field}"}
+
+    root
+    |> Map.put("lead", lead)
+    |> maybe_put("leadVisible", if(visible == %{}, do: nil, else: visible))
+  end
+
+  # Catalog 3.5: the section nav (`section_nav`), each entry naming the
+  # section wrapper it reaches (`section_<component>`) and its #anchor.
+  defp put_section_nav(root, %{section_nav: nil}), do: root
+
+  defp put_section_nav(root, %{section_nav: nav}) do
+    items =
+      Enum.map(nav.items, fn item ->
+        %{
+          "label" => item.label,
+          "anchor" => item.anchor,
+          "target" => "section_#{item.component}"
+        }
+        |> maybe_put("id", item.id)
+      end)
+
+    Map.put(root, "nav", %{"label" => nav.label, "items" => items} |> maybe_put("id", nav.id))
   end
 
   # The root children of the surface's sections. `component_order :kind` (the
@@ -2026,6 +2162,24 @@ defmodule AshA2ui.Encoder do
   # composition, with each field a FieldDisplay — typed formatting,
   # link-aware (`link` binds `/detail/<context>/_links/<field>`), and
   # list-aware (multi-line / bulleted text renders as a list).
+  # Catalog 3.5: a `:detail` declaring an `alert` is drawn as one.
+  defp admin_detail_components(view, %{component: %{alert: %AshA2ui.Alert{} = alert}} = detail) do
+    path = "/detail/#{detail.context}"
+
+    [
+      %{
+        "id" => "detail_#{detail.name}",
+        "component" => "alertBanner",
+        "variant" => to_string(alert.variant),
+        "layout" => to_string(alert.layout)
+      }
+      |> maybe_put("title", alert.title && Label.translate(view.l10n, alert.title))
+      |> maybe_put("message", alert.message && %{"@path" => "#{path}/#{alert.message}"})
+      |> maybe_put("linkHref", alert.link_href && %{"@path" => "#{path}/#{alert.link_href}"})
+      |> maybe_put("linkLabel", alert.link_label && %{"@path" => "#{path}/#{alert.link_label}"})
+    ]
+  end
+
   defp admin_detail_components(view, detail) do
     base = "detail_#{detail.name}"
     resource = view.contexts[detail.context].resource
@@ -4751,6 +4905,44 @@ defmodule AshA2ui.Encoder do
   # and one label/value Row per field, each value Text bound to the
   # absolute /detail/<context>/<field> path (an unselected context renders
   # empty values — the server writes %{}).
+  # An alert (catalog 3.5) in the basic catalog: its title and message in a
+  # Card, the link left out.
+  defp detail_components(view, %{component: %{alert: %AshA2ui.Alert{} = alert}} = detail) do
+    base = "detail_#{detail.name}"
+
+    title =
+      if alert.title,
+        do: [
+          %{
+            "id" => "#{base}_title",
+            "component" => "Text",
+            "text" => heading(4, Label.translate(view.l10n, alert.title))
+          }
+        ],
+        else: []
+
+    message =
+      if alert.message,
+        do: [
+          %{
+            "id" => "#{base}_message",
+            "component" => "Text",
+            "text" => %{"@path" => "/detail/#{detail.context}/#{alert.message}"}
+          }
+        ],
+        else: []
+
+    [
+      %{"id" => base, "component" => "Card", "child" => "#{base}_body"},
+      %{
+        "id" => "#{base}_body",
+        "component" => "Column",
+        "children" => Enum.map(title ++ message, & &1["id"])
+      }
+      | title ++ message
+    ]
+  end
+
   defp detail_components(view, detail) do
     base = "detail_#{detail.name}"
 

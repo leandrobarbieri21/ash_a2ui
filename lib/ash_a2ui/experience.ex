@@ -187,10 +187,12 @@ defmodule AshA2ui.Experience do
   fieldDisplay `review` (a review field's state and citation); 3.2 its
   `action` and `actionVisible` (a field action's button); 3.3 the dataGrid
   column `review` and subtitle `reviewPath` (a review field's review per
-  row).
+  row). 3.5 added the record page a surface draws whole: the entityPage
+  `header`, `lead`, `leadVisible` and `nav`, and the `alertBanner` (3.4 is
+  the document pane, merged before it).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.4.0"
+  def admin_catalog_version, do: "3.5.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

@@ -1890,6 +1890,367 @@ defmodule AshA2ui do
     ]
   }
 
+  @alert %Spark.Dsl.Entity{
+    name: :alert,
+    describe: """
+    Draws a `:detail` component as an alert instead of a card (admin catalog
+    3.5): a title, a message read from the context's record and an optional
+    link, toned by `variant`. For a notice about the record the page shows
+    ("This order is on hold"), usually declared `lead true` so it sits under
+    the page header. Give the component a `visible` field to show it only
+    on some records.
+    """,
+    examples: [
+      """
+      component :detail, :on_hold do
+        context :order
+        lead true
+        visible :on_hold?
+
+        alert do
+          variant :warning
+          title "This order is on hold"
+          message :hold_note
+          link_href :hold_href
+          link_label :hold_link
+        end
+      end
+      """
+    ],
+    target: AshA2ui.Alert,
+    schema: [
+      variant: [
+        type: {:one_of, [:info, :success, :warning, :danger, :neutral]},
+        default: :info,
+        doc: "The alert's tone."
+      ],
+      layout: [
+        type: {:one_of, [:inline, :section]},
+        default: :inline,
+        doc: """
+        `:inline` sits with the content around it; `:section` spans the page
+        with its link at the end, for a notice that is about the whole page.
+        """
+      ],
+      title: [
+        type: :string,
+        doc: "The alert's title, translated in the metadata domain."
+      ],
+      message: [
+        type: :atom,
+        doc: """
+        A public attribute, calculation or aggregate of the context's record
+        holding the alert's text. Read with the record at
+        `/detail/<context>/<field>`.
+        """
+      ],
+      link_href: [
+        type: :atom,
+        doc: """
+        A field of the context's record holding the address of the alert's
+        link (a page, or `#<anchor>` for a place on this page). No value, no
+        link.
+        """
+      ],
+      link_label: [
+        type: :atom,
+        doc: "A field of the context's record holding the link's words."
+      ]
+    ]
+  }
+
+  @header_crumb %Spark.Dsl.Entity{
+    name: :crumb,
+    describe: """
+    One step of the page header's breadcrumb, before the page's own title
+    (which ends the breadcrumb). `page` names a value the host page writes
+    at `/page/<key>`: when set, it replaces `href` (a list's address with the
+    filters the person left it with).
+    """,
+    examples: [
+      ~s(crumb "Orders", href: "/orders", page: :back)
+    ],
+    target: AshA2ui.PageHeader.Crumb,
+    args: [:label],
+    schema: [
+      label: [
+        type: :string,
+        required: true,
+        doc: "The step's words, translated in the metadata domain."
+      ],
+      href: [type: :string, doc: "The step's address."],
+      page: [
+        type: :atom,
+        doc: """
+        A key of the host page's values (`/page/<key>`, see
+        `AshA2ui.Info.build_surface/2`'s `:page`): its value, when present,
+        is the step's address instead of `href`.
+        """
+      ]
+    ]
+  }
+
+  @header_item_schema [
+    field: [
+      type: :atom,
+      required: true,
+      doc: """
+      A public attribute, calculation or aggregate of the header's context
+      record holding the item's text. An empty value hides the item.
+      """
+    ],
+    tone: [
+      type: :atom,
+      doc: """
+      A field of the record holding the item's tone: `info`, `success`,
+      `warning`, `danger`, `neutral`, `pending`, `accent` or `gray`.
+      """
+    ],
+    icon: [type: :string, doc: "An icon drawn before the item's text."],
+    icon_field: [
+      type: :atom,
+      doc: "A field of the record holding the icon's name, instead of `icon`."
+    ],
+    help: [
+      type: :string,
+      doc: "A tooltip explaining the item, translated in the metadata domain."
+    ],
+    help_field: [
+      type: :atom,
+      doc: "A field of the record holding the tooltip, instead of `help`."
+    ],
+    help_label: [
+      type: :string,
+      doc: """
+      The accessible name of the tooltip's trigger, when the tooltip hangs
+      off an info mark after the text rather than off the item itself.
+      """
+    ]
+  ]
+
+  @header_tag %Spark.Dsl.Entity{
+    name: :tag,
+    describe: """
+    A tag in the page header's line under the title: the record's state in a
+    word or two, coloured by `tone`, explained by its `help`. Tags come
+    before the `meta` items.
+    """,
+    examples: [
+      """
+      tag :status_text do
+        tone :status_tone
+        help_field :status_help
+      end
+      """
+    ],
+    target: AshA2ui.PageHeader.Item,
+    args: [:field],
+    auto_set_fields: [kind: :tag],
+    schema: @header_item_schema
+  }
+
+  @header_meta %Spark.Dsl.Entity{
+    name: :meta,
+    describe: """
+    A line of text in the page header's line under the title, after its
+    tags: a date, a note, a summary. `tone` colours it.
+    """,
+    examples: [
+      """
+      meta :renewal_note do
+        icon_field :renewal_icon
+        help_field :renewal_help
+        help_label "About this renewal"
+      end
+      """
+    ],
+    target: AshA2ui.PageHeader.Item,
+    args: [:field],
+    auto_set_fields: [kind: :meta],
+    schema: @header_item_schema
+  }
+
+  @header_action %Spark.Dsl.Entity{
+    name: :header_action,
+    describe: """
+    A button in the page header. With `href` it is a link to the address a
+    field of the record holds (no address, no button). With `run` it runs
+    an update action of the record as the person: offered only while
+    `visible` holds and `Ash.can?/3` says the person may run it, re-checked
+    on the server when chosen (the `page_action` handler action).
+    """,
+    examples: [
+      """
+      header_action :approve do
+        run :approve
+        visible :awaiting_approval?
+        variant :primary
+      end
+      """,
+      """
+      header_action :invoice do
+        label "Open invoice"
+        href :invoice_url
+      end
+      """
+    ],
+    target: AshA2ui.PageHeader.Action,
+    args: [:name],
+    schema: [
+      name: [type: :atom, required: true, doc: "The button's name, unique in the header."],
+      label: [
+        type: :string,
+        doc: """
+        The button's words, translated in the metadata domain. Defaults to
+        the `run` action's label (its `action` entity's, else its humanized
+        name), else the humanized name.
+        """
+      ],
+      run: [
+        type: :atom,
+        doc: "An update action of the header's context record, run with no input."
+      ],
+      href: [
+        type: :atom,
+        doc: "A field of the record holding the link's address."
+      ],
+      visible: [
+        type: :atom,
+        doc: """
+        A boolean field of the record: the button is offered only while it
+        is `true`. Without it, a link shows while it has an address and an
+        action while the person may run it.
+        """
+      ],
+      variant: [
+        type: {:one_of, [:primary, :secondary, :quiet]},
+        default: :secondary,
+        doc: "The button's emphasis."
+      ],
+      title: [
+        type: :string,
+        doc: "A tooltip on the button, translated in the metadata domain."
+      ]
+    ]
+  }
+
+  @page_header %Spark.Dsl.Entity{
+    name: :page_header,
+    describe: """
+    The page's header, drawn by the surface (admin catalog 3.5): a
+    breadcrumb, the title, a line of tags and notes, and buttons, all read
+    from the record selected into `context`. For a record page whose surface
+    is the whole page. The host leaves its own header out (`header: false`
+    is then unnecessary: the declared header replaces the surface's plain
+    heading).
+    """,
+    examples: [
+      """
+      page_header do
+        context :order
+        title :name
+        crumb "Orders", href: "/orders", page: :back
+
+        tag :status_text do
+          tone :status_tone
+        end
+
+        meta :customer_summary
+
+        header_action :approve do
+          run :approve
+          variant :primary
+        end
+      end
+      """
+    ],
+    target: AshA2ui.PageHeader,
+    entities: [
+      crumbs: [@header_crumb],
+      tags: [@header_tag],
+      meta: [@header_meta],
+      actions: [@header_action]
+    ],
+    schema: [
+      context: [
+        type: :atom,
+        required: true,
+        doc: "The declared context whose selected record the header reads."
+      ],
+      title: [
+        type: :atom,
+        required: true,
+        doc: "A field of the record holding the page's title."
+      ],
+      breadcrumb_label: [
+        type: :string,
+        default: "Breadcrumb",
+        doc: "The breadcrumb's accessible name, translated in the metadata domain."
+      ]
+    ]
+  }
+
+  @nav_item %Spark.Dsl.Entity{
+    name: :nav_item,
+    describe: """
+    One entry of the section nav: the section a component heads, its words
+    and the `#anchor` that reaches it (a link anywhere on the page to
+    `#<anchor>` goes there too).
+    """,
+    examples: [
+      ~s(nav_item :order_lines, label: "Items", anchor: "items")
+    ],
+    target: AshA2ui.SectionNav.Item,
+    args: [:component],
+    schema: [
+      component: [
+        type: :atom,
+        required: true,
+        doc: """
+        The component whose section the entry reaches: the first component
+        of a `section`, or a component without one.
+        """
+      ],
+      label: [type: :string, required: true, doc: "The entry's words."],
+      anchor: [
+        type: :string,
+        required: true,
+        doc: "The entry's `#anchor`, without the `#`, unique in the nav."
+      ],
+      id: [type: :string, doc: "A DOM id for the entry (for tests and links)."]
+    ]
+  }
+
+  @section_nav %Spark.Dsl.Entity{
+    name: :section_nav,
+    describe: """
+    A sticky list of the surface's sections drawn beside them (admin catalog
+    3.5), for a long record page. Choosing an entry scrolls its section to
+    the line the nav starts on and outlines it for three seconds; the entry
+    of the section in view is marked as you read; arriving with `#<anchor>`
+    in the address goes there once the section is drawn, however long that
+    takes. The nav starts after the page header and any `lead` components.
+    """,
+    examples: [
+      """
+      section_nav do
+        nav_item :details, label: "Overview", anchor: "overview"
+        nav_item :order_lines, label: "Items", anchor: "items"
+      end
+      """
+    ],
+    target: AshA2ui.SectionNav,
+    entities: [items: [@nav_item]],
+    schema: [
+      label: [
+        type: :string,
+        default: "Sections",
+        doc: "The nav's accessible name, translated in the metadata domain."
+      ],
+      id: [type: :string, doc: "A DOM id for the nav."]
+    ]
+  }
+
   @component %Spark.Dsl.Entity{
     name: :component,
     describe: """
@@ -1929,9 +2290,10 @@ defmodule AshA2ui do
       sections: [@table_sections],
       editable: [@editable],
       export: [@export],
-      primary_action: [@primary_action]
+      primary_action: [@primary_action],
+      alert: [@alert]
     ],
-    singleton_entity_keys: [:row_layout, :sections, :editable, :export, :primary_action],
+    singleton_entity_keys: [:row_layout, :sections, :editable, :export, :primary_action, :alert],
     schema: [
       name: [
         type: {:one_of, [:table, :form, :detail, :report]},
@@ -2267,6 +2629,24 @@ defmodule AshA2ui do
         record's fields are written to `/detail/<context>` and displayed as a
         read-only label/value grid. Required on `:detail` components.
         """
+      ],
+      lead: [
+        type: :boolean,
+        default: false,
+        doc: """
+        `:detail` components only: draw it full width right under the page
+        header, before the surface's other sections and beside none of them
+        (admin catalog 3.5, the entityPage's `lead`). Lead components keep
+        their declaration order. The basic catalog draws them in place.
+        """
+      ],
+      visible: [
+        type: :atom,
+        doc: """
+        Lead `:detail` components only: a boolean field of the context's
+        record; the component is drawn only while it is `true` (a notice
+        about some records, a card some records have nothing for).
+        """
       ]
     ]
   }
@@ -2567,6 +2947,8 @@ defmodule AshA2ui do
       @context,
       @query,
       @diagram,
+      @page_header,
+      @section_nav,
       @document_pane,
       @component,
       @field,
@@ -2600,6 +2982,7 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyNestedForms,
     AshA2ui.Verifiers.VerifyBulkActions,
     AshA2ui.Verifiers.VerifyDiagrams,
+    AshA2ui.Verifiers.VerifyPageLayout,
     AshA2ui.Verifiers.VerifyDocumentPanes
   ]
 

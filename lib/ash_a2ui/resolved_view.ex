@@ -67,6 +67,9 @@ defmodule AshA2ui.ResolvedView do
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshA2ui.Label
 
+  # One key per resolved aspect of the surface; the struct is the frozen
+  # interface every track codes against.
+  # credo:disable-for-next-line Credo.Check.Warning.StructFieldAmount
   defstruct [
     :resource,
     :surface_id,
@@ -97,6 +100,8 @@ defmodule AshA2ui.ResolvedView do
     prompts: %{},
     prompt_selects: %{},
     diagrams: [],
+    page_header: nil,
+    section_nav: nil,
     document_panes: [],
     l10n: nil
   ]
@@ -303,6 +308,8 @@ defmodule AshA2ui.ResolvedView do
           prompts: %{atom => [prompt_field]},
           prompt_selects: %{atom => select},
           diagrams: [AshA2ui.Diagram.t()],
+          page_header: AshA2ui.PageHeader.t() | nil,
+          section_nav: AshA2ui.SectionNav.t() | nil,
           document_panes: [AshA2ui.DocumentPane.t()],
           l10n: AshA2ui.L10n.t()
         }
@@ -320,6 +327,7 @@ defmodule AshA2ui.ResolvedView do
     :link_buttons,
     :as_of,
     :header,
+    :page,
     :locale,
     :gettext_fn,
     :gettext_backend,
@@ -381,6 +389,7 @@ defmodule AshA2ui.ResolvedView do
     contexts = resolve_contexts(resource_or_ui_module, l10n)
     declared = Map.new(declared_fields, &{&1.name, &1})
     prompt_selects = resolve_prompt_selects(resource, actions, declared)
+    page_header = resolve_page_header(resource_or_ui_module, actions, l10n)
 
     %__MODULE__{
       resource: resource,
@@ -407,11 +416,15 @@ defmodule AshA2ui.ResolvedView do
       contexts: Map.new(contexts, &{&1.name, &1}),
       context_order: Enum.map(contexts, & &1.name),
       details: resolve_details(components, contexts, fields),
-      notes: resolve_notes(components, contexts, fields),
+      notes:
+        resolve_notes(components, contexts, fields) ++
+          resolve_page_reads(page_header, components, contexts, fields),
       reports: resolve_reports(resource, components),
       prompts: resolve_prompts(resource, actions, declared, prompt_selects, l10n),
       prompt_selects: prompt_selects,
       diagrams: AshA2ui.Info.diagrams(resource_or_ui_module),
+      page_header: page_header,
+      section_nav: resolve_section_nav(resource_or_ui_module, l10n),
       document_panes: AshA2ui.DocumentPane.panes(resource_or_ui_module),
       l10n: l10n
     }
@@ -606,6 +619,24 @@ defmodule AshA2ui.ResolvedView do
         into: %{},
         do: {"_action_#{name}", field_action_offered?(field, record)}
   end
+
+  @doc """
+  The computed data a context's record carries beyond its fields' values:
+  the page header's `_header_action_<name>` offers when the header reads
+  that context (`AshA2ui.PageHeader.data/3`). `opts` carries the read's
+  `:actor` and `:tenant`. Shared by the initial render and every refresh of
+  `/detail/<context>`.
+  """
+  @spec detail_context_data(t(), atom, struct(), keyword) :: %{String.t() => term}
+  def detail_context_data(
+        %__MODULE__{page_header: %{context: context} = header},
+        context,
+        record,
+        opts
+      ),
+      do: AshA2ui.PageHeader.data(header, record, opts)
+
+  def detail_context_data(%__MODULE__{}, _context, _record, _opts), do: %{}
 
   @doc """
   Whether a field's `field_action` is offered on `record`: always without a
@@ -1141,6 +1172,103 @@ defmodule AshA2ui.ResolvedView do
     end
   end
 
+  # The page header's fields, an alert's fields and a lead card's `visible`
+  # field are read with their context's record like a note: loaded and
+  # written to /detail/<context>, never drawn as a card's rows.
+  defp resolve_page_reads(page_header, components, contexts, fields) do
+    by_name = Map.new(contexts, &{&1.name, &1})
+
+    header =
+      case page_header do
+        %AshA2ui.PageHeader{context: name} = header when is_map_key(by_name, name) ->
+          [{:page_header, nil, name, AshA2ui.PageHeader.fields(header)}]
+
+        _none ->
+          []
+      end
+
+    extras =
+      for %{name: :detail} = component <- components,
+          extra =
+            AshA2ui.Alert.fields(component.alert) ++ List.wrap(component.visible),
+          extra != [],
+          is_map_key(by_name, component.context) do
+        {AshA2ui.Component.key(component), component, component.context, extra}
+      end
+
+    for {name, component, context, read} <- header ++ extras do
+      resource = by_name[context].resource
+
+      %{
+        name: name,
+        component: component,
+        context: context,
+        fields: read,
+        loads: field_loads(resource, read, fields),
+        detail_path: "/detail/#{context}"
+      }
+    end
+  end
+
+  # The page header with its words translated once, here: a run action's
+  # button defaults to the action's own label.
+  defp resolve_page_header(resource_or_ui_module, actions, l10n) do
+    case AshA2ui.Info.page_header(resource_or_ui_module) do
+      nil ->
+        nil
+
+      header ->
+        %{
+          header
+          | breadcrumb_label: Label.translate(l10n, header.breadcrumb_label),
+            crumbs: Enum.map(header.crumbs, &%{&1 | label: Label.translate(l10n, &1.label)}),
+            tags: Enum.map(header.tags, &translate_header_item(&1, l10n)),
+            meta: Enum.map(header.meta, &translate_header_item(&1, l10n)),
+            actions: Enum.map(header.actions, &translate_header_action(&1, actions, l10n))
+        }
+    end
+  end
+
+  defp translate_header_item(item, l10n) do
+    %{
+      item
+      | help: item.help && Label.translate(l10n, item.help),
+        help_label: item.help_label && Label.translate(l10n, item.help_label)
+    }
+  end
+
+  defp translate_header_action(action, actions, l10n) do
+    %{
+      action
+      | label: header_action_label(action, actions, l10n),
+        title: action.title && Label.translate(l10n, action.title)
+    }
+  end
+
+  defp header_action_label(%{label: label}, _actions, l10n) when is_binary(label),
+    do: Label.translate(l10n, label)
+
+  defp header_action_label(%{run: run, name: name}, actions, l10n) do
+    case run && Map.get(actions, run) do
+      %{label: label} when is_binary(label) -> Label.translate(l10n, label)
+      _none -> Label.resolve(l10n, nil, run || name)
+    end
+  end
+
+  defp resolve_section_nav(resource_or_ui_module, l10n) do
+    case AshA2ui.Info.section_nav(resource_or_ui_module) do
+      nil ->
+        nil
+
+      nav ->
+        %{
+          nav
+          | label: Label.translate(l10n, nav.label),
+            items: Enum.map(nav.items, &%{&1 | label: Label.translate(l10n, &1.label)})
+        }
+    end
+  end
+
   # Calculations referenced by visible_when conditions of this table's row
   # actions must be loaded with the records so per-row visibility can be
   # evaluated (deduplicated against the rendered-field loads).
@@ -1391,7 +1519,11 @@ defmodule AshA2ui.ResolvedView do
       else: relationships
   end
 
-  defp calculation_or_aggregate?(resource, name) do
+  @doc false
+  # Whether `name` is a calculation or aggregate of `resource` (one a read
+  # must load).
+  @spec calculation_or_aggregate?(module, atom) :: boolean
+  def calculation_or_aggregate?(resource, name) do
     not is_nil(ResourceInfo.calculation(resource, name)) or
       not is_nil(ResourceInfo.aggregate(resource, name))
   end

@@ -12,7 +12,8 @@ defmodule AshA2ui.Transformers.InferFields do
       matches.
     * `:detail` components get the **context's** resource's public
       attributes (details render the record selected into their `context`,
-      which may be a different resource than the surface's).
+      which may be a different resource than the surface's). One drawn as
+      an `alert` gets none: it reads only the fields its alert names.
 
   In standalone UI modules the target resource is the section's
   `for_resource`. When inference is impossible (no resolvable resource, no
@@ -99,6 +100,11 @@ defmodule AshA2ui.Transformers.InferFields do
   defp ash_resource_dsl?(dsl_state) do
     Ash.Resource.Dsl in Transformer.get_persisted(dsl_state, :extensions, [])
   end
+
+  # An alert (catalog 3.5) reads the fields its `alert` names, not rows:
+  # it draws no field rows, so none are inferred, whether or not its
+  # resource has resolved yet.
+  defp infer_fields(_target, %AshA2ui.Component{name: :detail, alert: %AshA2ui.Alert{}}), do: []
 
   defp infer_fields(nil, _component), do: nil
 
