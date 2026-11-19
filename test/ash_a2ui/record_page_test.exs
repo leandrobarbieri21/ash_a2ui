@@ -210,7 +210,14 @@ defmodule AshA2ui.RecordPageTest do
       {components, _model} = surface(:admin_v1, dossier)
 
       refute Enum.any?(Map.keys(components), &String.starts_with?(&1, "detail_closed_field_"))
-      assert [] == Enum.find(AshA2ui.Info.components(DossierPageUI), &(&1.as == :closed)).fields
+      # Not inferred (`fields` stays unset, or empty): the resolved card has no rows.
+      assert Enum.find(AshA2ui.Info.components(DossierPageUI), &(&1.as == :closed)).fields in [
+               nil,
+               []
+             ]
+
+      view = AshA2ui.ResolvedView.resolve(DossierPageUI)
+      assert Enum.find(view.details, &(&1.name == :closed)).fields == []
     end
 
     test "the basic catalog draws an alert as a card with its title and message",

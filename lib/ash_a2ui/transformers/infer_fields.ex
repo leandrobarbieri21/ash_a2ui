@@ -101,15 +101,16 @@ defmodule AshA2ui.Transformers.InferFields do
     Ash.Resource.Dsl in Transformer.get_persisted(dsl_state, :extensions, [])
   end
 
+  # An alert (catalog 3.5) reads the fields its `alert` names, not rows:
+  # it draws no field rows, so none are inferred, whether or not its
+  # resource has resolved yet.
+  defp infer_fields(_target, %AshA2ui.Component{name: :detail, alert: %AshA2ui.Alert{}}), do: []
+
   defp infer_fields(nil, _component), do: nil
 
   # :report fields are row-map keys, not resource fields — they cannot be
   # inferred (VerifyReports requires them explicitly).
   defp infer_fields(_target, %AshA2ui.Component{name: :report}), do: nil
-
-  # An alert (catalog 3.5) reads the fields its `alert` names, not rows:
-  # it draws no field rows, so none are inferred.
-  defp infer_fields(_target, %AshA2ui.Component{name: :detail, alert: %AshA2ui.Alert{}}), do: []
 
   defp infer_fields(target, %AshA2ui.Component{name: :detail}) do
     infer_fields(target, %AshA2ui.Component{name: :table})
