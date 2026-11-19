@@ -14,7 +14,9 @@ defmodule AshA2ui.Verifiers.VerifyPageLayout do
       `visible` only on lead ones, naming a public field of the context's
       resource;
     * an `alert` is only on a `:detail` component, its `message`,
-      `link_href` and `link_label` public fields of the context's resource.
+      `link_href` and `link_label` public fields of the context's resource;
+    * a `review_summary` is only on an `alert`, which then declares no link
+      of its own.
   """
 
   use Spark.Dsl.Verifier
@@ -221,6 +223,15 @@ defmodule AshA2ui.Verifiers.VerifyPageLayout do
 
   defp placement_error(%{alert: alert, name: name}) when not is_nil(alert) and name != :detail,
     do: {:alert, "only :detail components can be drawn as an alert"}
+
+  defp placement_error(%{review_summary: summary, alert: nil}) when not is_nil(summary),
+    do: {:review_summary, "a review summary is an alert's: declare `alert` on the component"}
+
+  defp placement_error(%{review_summary: summary, alert: alert})
+       when not is_nil(summary) and (not is_nil(alert.link_href) or not is_nil(alert.link_label)),
+       do:
+         {:review_summary,
+          "a review summary draws the alert's link: drop the alert's `link_href` and `link_label`"}
 
   defp placement_error(_component), do: nil
 

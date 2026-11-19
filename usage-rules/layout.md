@@ -464,6 +464,33 @@ topics for the full contracts.
 - `lead` is for `:detail` components outside any `section`; `visible` gates
   lead components only. `alert` draws a `:detail` as an `alertBanner`; the
   basic catalog draws it as a card with its title and message.
+- A review banner sums up a record's `review` fields with `review_summary`
+  on an alert (catalog 3.6): the count still waiting (`pending` or
+  `missing`) and a link to the first in declaration order, to its card's
+  section (the nav's anchor, else `#section_<component>`), or to
+  `fallback_href` once none waits. The alert's `message` stays the host's
+  words; the alert declares no link of its own.
+
+  ```elixir
+  component :detail, :to_review do
+    context :order
+    lead true
+    visible :to_review?
+
+    alert do
+      variant :warning
+      title "Check what was read"
+      message :review_note
+    end
+
+    review_summary do
+      link_label "Go to the first field to check"
+      fallback_href "#notes"
+      fallback_label "Go to notes"
+    end
+  end
+  ```
+
 - A header field, a nav entry that does not start a section, a `run` that is
   not an update action, a button with both or neither of `run` and `href`,
   or a lead component with a `section` does not compile.

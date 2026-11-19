@@ -29,6 +29,10 @@ defmodule AshA2ui.Test.Dossier do
     attribute :file_url, :string, public?: true
     attribute :summary, :string, public?: true
     attribute :notes, :string, public?: true
+    # How each field was filled in (AshA2ui.Review's shape), for review summaries.
+    attribute :name_review, :map, public?: true
+    attribute :owner_review, :map, public?: true
+    attribute :notes_review, :map, public?: true
   end
 
   actions do

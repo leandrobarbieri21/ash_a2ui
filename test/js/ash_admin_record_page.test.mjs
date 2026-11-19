@@ -272,3 +272,41 @@ test("an arrival waits for a section that is not drawn yet", async () => {
   pageEl.stopNav();
   history.replaceState(null, "", "#");
 });
+
+test("an alert with a review summary carries its count", async () => {
+  const hook = mountHook({catalogs: [mergedCatalog, admin]});
+  hook.processMessages([
+    {
+      version: "1.0",
+      createSurface: {
+        surfaceId: "s2",
+        catalogId: admin.id,
+        components: [
+          {id: "root", component: "Column", children: ["review"]},
+          {
+            id: "review",
+            component: "alertBanner",
+            variant: "warning",
+            layout: "section",
+            title: "Check what was read",
+            message: {"@path": "/detail/d/notes"},
+            count: {"@path": "/detail/d/_review_summary_review/count"},
+            linkHref: {"@path": "/detail/d/_review_summary_review/href"},
+            linkLabel: {"@path": "/detail/d/_review_summary_review/label"},
+          },
+        ],
+        dataModel: {
+          detail: {d: {notes: "Two wait.", _review_summary_review: {count: 2, href: "#facts", label: "Go"}}},
+          ui: {feedback: feedback()},
+        },
+      },
+    },
+  ]);
+  const element = document.createElement("a2ui-surface");
+  document.body.replaceChildren(element);
+  element.surface = hook.processor.getSurface("s2");
+  await settle();
+  const alert = deep(element, "[data-count]");
+  assert.equal(alert.getAttribute("data-count"), "2");
+  assert.equal(deep(element, "a.am-link").getAttribute("href"), "#facts");
+});

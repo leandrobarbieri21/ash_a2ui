@@ -1959,6 +1959,58 @@ defmodule AshA2ui do
     ]
   }
 
+  @review_summary %Spark.Dsl.Entity{
+    name: :review_summary,
+    describe: """
+    Sums up, on an `alert` `:detail`, the review of the record its context
+    selects (admin catalog 3.6): how many of the surface's `review` fields
+    still wait for a person (`pending` or `missing`), and a link to the
+    first of them in declaration order, to the section of the card holding
+    it (its `section_nav` anchor, else the section's id). With nothing
+    waiting the link is `fallback_href`. The alert's `message` stays the
+    host's words; the count rides beside it. See `AshA2ui.ReviewSummary`.
+    """,
+    examples: [
+      """
+      component :detail, :to_review do
+        context :order
+        lead true
+        visible :to_review?
+
+        alert do
+          variant :warning
+          title "Check what was read from the document"
+          message :review_note
+        end
+
+        review_summary do
+          link_label "Go to the first field to check"
+          fallback_href "#notes"
+          fallback_label "Go to notes"
+        end
+      end
+      """
+    ],
+    target: AshA2ui.ReviewSummary,
+    schema: [
+      link_label: [
+        type: :string,
+        doc: """
+        The link's words while a field waits, translated in the metadata
+        domain. Defaults to "Go to the first field to review".
+        """
+      ],
+      fallback_href: [
+        type: :string,
+        doc: "Where the link goes once nothing waits (`#notes`). No link without it."
+      ],
+      fallback_label: [
+        type: :string,
+        doc: "The link's words once nothing waits, translated in the metadata domain."
+      ]
+    ]
+  }
+
   @header_crumb %Spark.Dsl.Entity{
     name: :crumb,
     describe: """
@@ -2291,9 +2343,18 @@ defmodule AshA2ui do
       editable: [@editable],
       export: [@export],
       primary_action: [@primary_action],
-      alert: [@alert]
+      alert: [@alert],
+      review_summary: [@review_summary]
     ],
-    singleton_entity_keys: [:row_layout, :sections, :editable, :export, :primary_action, :alert],
+    singleton_entity_keys: [
+      :row_layout,
+      :sections,
+      :editable,
+      :export,
+      :primary_action,
+      :alert,
+      :review_summary
+    ],
     schema: [
       name: [
         type: {:one_of, [:table, :form, :detail, :report]},

@@ -68,6 +68,7 @@ for the resource named by `for_resource`).
    * export
    * primary_action
    * alert
+   * review_summary
  * [field](#a2ui-field)
  * [action](#a2ui-action)
    * prompt_options
@@ -814,6 +815,7 @@ distinguishing name via the optional second argument, e.g.
  * [export](#a2ui-component-export)
  * [primary_action](#a2ui-component-primary_action)
  * [alert](#a2ui-component-alert)
+ * [review_summary](#a2ui-component-review_summary)
 
 
 ### Examples
@@ -1468,6 +1470,61 @@ end
 ### Introspection
 
 Target: `AshA2ui.Alert`
+
+### a2ui.component.review_summary
+
+
+Sums up, on an `alert` `:detail`, the review of the record its context
+selects (admin catalog 3.6): how many of the surface's `review` fields
+still wait for a person (`pending` or `missing`), and a link to the
+first of them in declaration order, to the section of the card holding
+it (its `section_nav` anchor, else the section's id). With nothing
+waiting the link is `fallback_href`. The alert's `message` stays the
+host's words; the count rides beside it. See `AshA2ui.ReviewSummary`.
+
+
+
+
+### Examples
+```
+component :detail, :to_review do
+  context :order
+  lead true
+  visible :to_review?
+
+  alert do
+    variant :warning
+    title "Check what was read from the document"
+    message :review_note
+  end
+
+  review_summary do
+    link_label "Go to the first field to check"
+    fallback_href "#notes"
+    fallback_label "Go to notes"
+  end
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`link_label`](#a2ui-component-review_summary-link_label){: #a2ui-component-review_summary-link_label } | `String.t` |  | The link's words while a field waits, translated in the metadata domain. Defaults to "Go to the first field to review". |
+| [`fallback_href`](#a2ui-component-review_summary-fallback_href){: #a2ui-component-review_summary-fallback_href } | `String.t` |  | Where the link goes once nothing waits (`#notes`). No link without it. |
+| [`fallback_label`](#a2ui-component-review_summary-fallback_label){: #a2ui-component-review_summary-fallback_label } | `String.t` |  | The link's words once nothing waits, translated in the metadata domain. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.ReviewSummary`
 
 
 
