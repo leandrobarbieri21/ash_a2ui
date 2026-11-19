@@ -13,7 +13,8 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       the form's create/update action(s), and
     * a `steps` field is not also drawn as pairs, a badge or a link, and
     * a field's `review` names a public attribute, calculation or aggregate
-      of the same resource, and
+      of the same resource, and of the resource of every table drawing the
+      field, and
     * a field's `field_action` names an update action of the record each
       `:detail` card showing the field reads (its context's resource), one
       declaring a `:field` argument, and its `field_action_visible` a
@@ -58,7 +59,7 @@ defmodule AshA2ui.Verifiers.VerifyFields do
              :ok <- verify_badge_tones(dsl_state, module),
              :ok <- verify_link_urls(dsl_state, module, overridable),
              :ok <- verify_steps(dsl_state, module),
-             :ok <- verify_reviews(dsl_state, module, overridable),
+             :ok <- verify_reviews(dsl_state, module, target, overridable),
              :ok <- verify_field_actions(dsl_state, module) do
           verify_hide_empty(dsl_state, module)
         end
@@ -320,27 +321,65 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     end)
   end
 
-  # A field's review is read from a field of the same resource.
-  defp verify_reviews(dsl_state, module, known) do
-    dsl_state
-    |> Verifier.get_entities([:a2ui])
-    |> Enum.find_value(:ok, fn
-      %AshA2ui.Field{review: review, name: name} when not is_nil(review) ->
-        if not MapSet.member?(known, review) do
-          {:error,
-           DslError.exception(
-             module: module,
-             path: [:a2ui, :field, name, :review],
-             message:
-               "review names #{inspect(review)}, which is not a public attribute, " <>
-                 "calculation or aggregate"
-           )}
-        end
+  # A field's review is read from a field of the same resource: of the
+  # surface or a related table's resource, and (catalog 3.3) of every table
+  # that draws the field, since its rows carry the review.
+  defp verify_reviews(dsl_state, module, target, known) do
+    reviews =
+      for %AshA2ui.Field{review: review} = field <- Verifier.get_entities(dsl_state, [:a2ui]),
+          not is_nil(review),
+          do: {field.name, review}
 
-      _other ->
-        nil
+    with :ok <- verify_review_names(reviews, module, known) do
+      verify_table_reviews(dsl_state, Map.new(reviews), module, target)
+    end
+  end
+
+  defp verify_review_names(reviews, module, known) do
+    Enum.find_value(reviews, :ok, fn {name, review} ->
+      if not MapSet.member?(known, review) do
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :field, name, :review],
+           message:
+             "review names #{inspect(review)}, which is not a public attribute, " <>
+               "calculation or aggregate"
+         )}
+      end
     end)
   end
+
+  defp verify_table_reviews(_dsl_state, reviews, _module, _target) when reviews == %{}, do: :ok
+
+  defp verify_table_reviews(dsl_state, reviews, module, target) do
+    unreadable =
+      for %AshA2ui.Component{name: :table} = component <- components(dsl_state),
+          resource = component.resource || target,
+          resource == target or (Code.ensure_loaded?(resource) and Info.resource?(resource)),
+          name <- component.fields || [],
+          review = reviews[name],
+          not MapSet.member?(known_field_names(resource), review),
+          do: {name, review, resource}
+
+    case unreadable do
+      [] ->
+        :ok
+
+      [{name, review, resource} | _rest] ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :field, name, :review],
+           message:
+             "review names #{inspect(review)}, which is not a public attribute, calculation " <>
+               "or aggregate of #{resource_name(resource)}, whose table draws #{inspect(name)}"
+         )}
+    end
+  end
+
+  defp resource_name(resource) when is_atom(resource), do: inspect(resource)
+  defp resource_name(_dsl_state), do: "the resource"
 
   # A field action runs on the record a detail card shows: its context's
   # resource holds the update action (with a `:field` argument) and the

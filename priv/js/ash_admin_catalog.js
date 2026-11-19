@@ -178,7 +178,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.2.0";
+export const ADMIN_CATALOG_VERSION = "3.3.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -533,6 +533,9 @@ export function buildSchemas(basicCatalog = null) {
           subtitle: RecordAny.optional(),
           icon: RecordAny.optional(),
           more: RecordAny.optional(),
+          // 3.3: the row's review of the column's field ({path}); the
+          // subtitle's own review rides on subtitle.reviewPath.
+          review: RecordAny.optional(),
           detail: RecordAny.optional(),
           // 1.10: header help ({title, body}) and the field a header
           // sorts by when it is not the column's own path.
@@ -1997,10 +2000,24 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
        */
       renderCell(row, column) {
         const value = this.renderCellValue(row, column);
-        if (!column.subtitle && !column.icon && !column.more && !column.detail && !column.caption) return value;
+        if (
+          !column.subtitle &&
+          !column.icon &&
+          !column.more &&
+          !column.detail &&
+          !column.caption &&
+          !column.review
+        )
+          return value;
 
         const at = (binding) =>
           binding && typeof binding.path === "string" ? getByPath(row, binding.path) : undefined;
+        // 3.3: the row's review of the column's field, and of its subtitle's.
+        const review = reviewEntry(at(column.review));
+        const subtitleReview =
+          typeof column.subtitle?.reviewPath === "string"
+            ? reviewEntry(getByPath(row, column.subtitle.reviewPath))
+            : null;
         const icon = cellIcon(at(column.icon));
         const label = column.icon ? str(getByPath(row, column.icon.labelPath)) : "";
         const tone = column.icon?.tonePath ? badgeTone(getByPath(row, column.icon.tonePath)) : "neutral";
@@ -2065,7 +2082,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                   <path d=${icon.join(" ")}></path>
                 </svg>`
               : nothing}
-            <span>${value}</span>
+            <span class="am-cell-value" data-review=${review ? review.state : nothing}>${value}</span>
+            ${renderCellReview(review)}
             ${more > 0
               ? html`<span
                   class="am-badge"
@@ -2078,7 +2096,12 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           </span>
           ${subtitle === null || subtitle === undefined || subtitle === ""
             ? nothing
-            : html`<span class="am-cell-sub">${str(subtitle)}</span>`}
+            : subtitleReview
+              ? html`<span class="am-cell-sub"
+                  ><span class="am-cell-value" data-review=${subtitleReview.state}>${str(subtitle)}</span
+                  >${renderCellReview(subtitleReview)}</span
+                >`
+              : html`<span class="am-cell-sub">${str(subtitle)}</span>`}
           ${caption ? html`<span class="am-cell-caption">${caption}</span>` : nothing}
           ${detail
             ? html`<span class="am-cell-detail">${detailIcon
@@ -3418,18 +3441,27 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   // when there is an address, its quote as the tooltip.
   function renderReview(review) {
     if (!review) return nothing;
+    return html`<dd class="field-review">${reviewParts(review, "field-review-page")}</dd>`;
+  }
+
+  // 3.3: a table cell's review (a dataGrid column's review or its
+  // subtitle's reviewPath), drawn as the detail one on the value's line.
+  function renderCellReview(review) {
+    if (!review) return nothing;
+    return html`<span class="am-cell-review">${reviewParts(review, "am-cell-review-page")}</span>`;
+  }
+
+  function reviewParts(review, pageClass) {
     const quote = str(review.quote);
     const page = str(review.pageLabel);
     const href = str(review.href);
     return html`
-      <dd class="field-review">
-        <span class="am-badge" data-tone=${REVIEW_TONES[review.state]}>${str(review.stateLabel) || review.state}</span>
-        ${page
-          ? href
-            ? html`<a class="field-review-page" href=${href} title=${quote || nothing}>${page}</a>`
-            : html`<span class="field-review-page" title=${quote || nothing}>${page}</span>`
-          : nothing}
-      </dd>
+      <span class="am-badge" data-tone=${REVIEW_TONES[review.state]}>${str(review.stateLabel) || review.state}</span>
+      ${page
+        ? href
+          ? html`<a class=${pageClass} href=${href} title=${quote || nothing}>${page}</a>`
+          : html`<span class=${pageClass} title=${quote || nothing}>${page}</span>`
+        : nothing}
     `;
   }
 
