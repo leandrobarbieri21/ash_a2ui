@@ -19,7 +19,8 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     * a table's `context_filter` references declared contexts and public
       attributes of the table's resource; `require_context` entries appear
       among the `context_filter` contexts (requiring a context that doesn't
-      scope the table would be meaningless),
+      scope the table would be meaningless), and so do `context_record`
+      entries (only the record a table is scoped to is handed to its reads),
     * a table's `select_context` names a declared context whose resource is
       the table's resource (the selected row becomes the context's record),
     * every `:detail` component names a declared `context` and renders
@@ -31,8 +32,8 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
       (`AshA2ui.Component.note_context/1`) whose resource has it as a
       public attribute, calculation or aggregate,
     * context options stay on the components they belong to:
-      `context_filter` / `require_context` / `select_context` are
-      table-only, `context` is detail-only.
+      `context_filter` / `require_context` / `context_record` /
+      `select_context` are table-only, `context` is detail-only.
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure.
@@ -301,7 +302,8 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
     key = AshA2ui.Component.key(component)
 
     with :ok <- verify_context_filter(component, key, by_name, target, module),
-         :ok <- verify_require_context(component, key, module) do
+         :ok <- verify_require_context(component, key, module),
+         :ok <- verify_context_record(component, key, module) do
       verify_select_context(component, key, by_name, target, module)
     end
   end
@@ -310,7 +312,7 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
 
   defp verify_component_context_options(component, _by_name, _target, module) do
     case Enum.find(
-           [:context_filter, :require_context, :select_context, :context],
+           [:context_filter, :require_context, :context_record, :select_context, :context],
            &(Map.get(component, &1) not in [nil, []])
          ) do
       nil ->
@@ -323,7 +325,8 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
            path: [:a2ui, :component, component.name, option],
            message:
              "#{option} is not supported on #{inspect(component.name)} components: " <>
-               "context_filter/require_context/select_context are table-only, " <>
+               "context_filter/require_context/context_record/select_context are " <>
+               "table-only, " <>
                "context is detail-only"
          )}
     end
@@ -383,6 +386,28 @@ defmodule AshA2ui.Verifiers.VerifyContexts do
              "require_context entry #{inspect(name)} on table #{inspect(key)} does not " <>
                "appear in the table's context_filter — requiring a context that doesn't " <>
                "scope the table would be meaningless"
+         )}
+    end
+  end
+
+  defp verify_context_record(component, key, module) do
+    scoped = MapSet.new(component.context_filter, fn {_attribute, name} -> name end)
+
+    case Enum.find(component.context_record, fn {name, _loads} ->
+           not MapSet.member?(scoped, name)
+         end) do
+      nil ->
+        :ok
+
+      {name, _loads} ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :component, key, :context_record],
+           message:
+             "context_record entry #{inspect(name)} on table #{inspect(key)} does not " <>
+               "appear in the table's context_filter — only the record a table is scoped " <>
+               "to is handed to its reads"
          )}
     end
   end

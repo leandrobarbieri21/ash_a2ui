@@ -51,9 +51,10 @@ end
 - `depends_on_path` steps are public relationships of the context's own
   resource, ending in a public attribute compared against the parent's
   selected value (to-many paths match when any related record matches).
-- `require_context` entries must appear in the same table's
-  `context_filter`; `select_context` must name a context over the table's
-  own resource; `context_filter`/`require_context`/`select_context` are
+- `require_context` and `context_record` entries must appear in the same
+  table's `context_filter`; `select_context` must name a context over the
+  table's own resource;
+  `context_filter`/`require_context`/`context_record`/`select_context` are
   table-only and `context` is detail-only; on sectioned tables
   `select_context` is boards-only (`display :board`: one select control per
   card). All compile-time verified
@@ -78,6 +79,15 @@ end
   cascade logic in transports.
 - `require_context` means *no read executes* while unmet — use it for
   tables that are meaningless (or expensive) unscoped.
+- `context_record <context>: [loads]` hands a table's read the selected
+  record (fetched once per surface build, with those loads beside the
+  details') in its query context, so a row calculation reuses what is
+  already loaded instead of reading it again. Read it in the calculation
+  with `AshA2ui.ContextRunner.context_record(context, :name)`, compare
+  its primary key with the row's, and keep a path that reads for itself:
+  only `build_surface/2`/`build_data_model/2` hand it, not a page, sort or
+  search the action handler runs alone. It is a read optimization, never
+  authorization: the record was read as the surface's actor.
 - Wire contract (frozen): actions `"context_search"` / `"context_select"`
   / `"context_clear"`; paths `/context/<name>` (`{"search","value","label"}`,
   the whole `/context` map rewritten per change), `/options/<context>`

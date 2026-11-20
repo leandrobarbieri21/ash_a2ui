@@ -32,6 +32,7 @@ spark_locals_without_parens = [
   context: 1,
   context: 2,
   context_filter: 1,
+  context_record: 1,
   controls_card: 1,
   create_action: 1,
   crumb: 1,
