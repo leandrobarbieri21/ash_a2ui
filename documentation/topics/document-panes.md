@@ -97,6 +97,16 @@ states.
   and page navigation.
 - Each region over its box: a button named by its label and state. Choosing
   it selects it and sends the `document_region` action with its id.
+- A value and its region, linked both ways (admin catalog 3.8). While the
+  document sits beside the sections, pointing at a value that cites a
+  region, or focusing anything inside it (its page tag), shows the region
+  linked and scrolls the document, never the page, if the region is out of
+  view. Focus stays where it is and nothing is sent; leaving or blurring
+  clears it. A table row links every region its cells cite. Choosing a
+  region also scrolls the page to the value citing it and flashes it for
+  three seconds; from the keyboard (Enter or Space), focus moves to the
+  value. Stacked on a narrow page, or with the pane hidden, pointing and
+  focusing link nothing.
 
 ## The address and the actions
 
@@ -151,3 +161,22 @@ section 6) and override their seams: `renderToggle` on the pane;
 viewer. The engine, the geometry and the events stay the package's.
 `--ash-admin-document-pane-top` sets where the shown document sticks under
 a sticky header.
+
+The links between values and regions (3.8) need three things from a swap:
+
+- A swap that draws its own field or table row puts `data-a2ui-region`
+  (`REGION_ATTRIBUTE`, exported by `ash_admin_catalog.js`) on the element
+  it draws for the value, its value `regionAddresses(review)` for a field
+  or `regionAddresses(rowReviews(row, columns))` for a row. The stock
+  `fieldDisplay` and `dataGrid` do this; a swap that leaves it out keeps
+  only the page tag's link.
+- `renderRegion`'s `activate(event)` reads a call with no event, a key
+  event, or a click with `detail` 0 as the keyboard (focus then moves to
+  the value), so a key handler calls `activate()`. Its `current` says
+  whether the region is the one a person went to: use it for
+  `aria-current`, since a linked region may be drawn selected.
+- The viewer's `linkedState(region)` is the state a linked region is drawn
+  in, `linked` by default; return `selectedState(region.state)` to draw
+  it selected. The pane's `flashSource(element, on)` draws the flash (the
+  section nav's outline by default), and `sideBySide()` says whether the
+  document is beside the sections.

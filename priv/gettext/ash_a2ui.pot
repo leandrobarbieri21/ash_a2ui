@@ -86,7 +86,7 @@ msgstr ""
 msgid "%{first}; %{rest}"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:529
+#: lib/ash_a2ui/experience.ex:530
 msgid "%{first}–%{last} of %{total}"
 msgstr ""
 
@@ -169,7 +169,7 @@ msgstr ""
 msgid "Confirm"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:269
+#: lib/ash_a2ui/experience.ex:270
 msgid "Create %{resource}"
 msgstr ""
 
@@ -194,7 +194,7 @@ msgstr ""
 msgid "Edit"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:289
+#: lib/ash_a2ui/experience.ex:290
 msgid "Edit %{resource}"
 msgstr ""
 
@@ -250,7 +250,7 @@ msgstr ""
 msgid "Next page"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:332
+#: lib/ash_a2ui/experience.ex:333
 msgid "No %{resource} records yet."
 msgstr ""
 
@@ -324,7 +324,7 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:276
+#: lib/ash_a2ui/experience.ex:277
 msgid "Save changes"
 msgstr ""
 
@@ -362,7 +362,7 @@ msgstr[1] ""
 msgid "Show document"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:532
+#: lib/ash_a2ui/experience.ex:533
 msgid "Showing %{first}–%{last}"
 msgstr ""
 
@@ -387,7 +387,7 @@ msgstr ""
 msgid "This document can't be shown here."
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:243
+#: lib/ash_a2ui/experience.ex:244
 msgid "This is taking longer than usual. Still working…"
 msgstr ""
 
@@ -437,7 +437,7 @@ msgstr ""
 msgid "View"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:286
+#: lib/ash_a2ui/experience.ex:287
 msgid "View %{resource}"
 msgstr ""
 
@@ -449,7 +449,7 @@ msgstr ""
 msgid "Week"
 msgstr ""
 
-#: lib/ash_a2ui/experience.ex:241
+#: lib/ash_a2ui/experience.ex:242
 msgid "Working…"
 msgstr ""
 

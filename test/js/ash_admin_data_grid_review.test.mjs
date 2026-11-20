@@ -127,3 +127,33 @@ test("card rows draw the same review", async () => {
   assert.deepEqual(links, ["#citation=lines.0.price"]);
   assert.equal(card.querySelectorAll(".am-cell-review").length, 2);
 });
+
+// 3.8: a row whose values cite regions carries their addresses, so a
+// document pane links the row with its regions both ways.
+test("a row and its card carry the regions their reviews cite; a row without one carries none", async () => {
+  const grid = await mountGrid();
+  assert.equal(tableRow(grid, "r1").getAttribute("data-a2ui-region"), "#citation=lines.0.price");
+  assert.equal(tableRow(grid, "r2").hasAttribute("data-a2ui-region"), false);
+  const card = grid.renderRoot.querySelector('.grid-cards [data-a2ui-row-id="r1"]');
+  assert.equal(card.getAttribute("data-a2ui-region"), "#citation=lines.0.price");
+});
+
+test("regionAddresses: a row's reviews' hrefs, in column order, each once", async () => {
+  const {regionAddresses, rowReviews, REGION_ATTRIBUTE} = await import("../../priv/js/ash_admin_catalog.js");
+  assert.equal(REGION_ATTRIBUTE, "data-a2ui-region");
+  const columns = [
+    {label: "Service", path: "service", subtitle: {path: "period", reviewPath: "_review_period"}},
+    {label: "Price", path: "price", review: {path: "_review_price"}},
+    {label: "Total", path: "total", review: {path: "_review_total"}},
+  ];
+  const row = {
+    _review_period: {...reviewed, href: "#document=lines.0.period_start"},
+    _review_price: pending,
+    _review_total: {...pending, state: "bogus"},
+  };
+  assert.equal(regionAddresses(rowReviews(row, columns)), "#document=lines.0.period_start #citation=lines.0.price");
+  assert.equal(regionAddresses([pending, pending]), "#citation=lines.0.price");
+  assert.equal(regionAddresses(reviewed), "");
+  assert.equal(regionAddresses(null), "");
+  assert.deepEqual(rowReviews(row, null), []);
+});
