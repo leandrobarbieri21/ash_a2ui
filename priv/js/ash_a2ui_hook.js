@@ -77,6 +77,22 @@
  * want to handle it client-side pass
  * `configureAshA2ui({openSurface: (args, {surfaceId, href}) => ...})`.
  *
+ * ## Live links
+ *
+ * A link the surface declared live (admin catalog 3.7: a breadcrumb step's
+ * `live`) is drawn as a normal link carrying `data-a2ui-live` (its value
+ * `navigate` or `patch`). The hook listens for clicks on its container and,
+ * for a plain primary click on such a link to an address on this origin,
+ * navigates inside the LiveView with `this.js().navigate(href)` or
+ * `this.js().patch(href)` instead of letting the page load (`liveLinkOf` in
+ * `ash_a2ui_protocol.js`). It finds the link through the click's
+ * `composedPath()`, so a link inside a shadow root works; LiveView's own
+ * `data-phx-link` handler reads the click's target, which a shadow root
+ * retargets to its host, and so never sees one there. A modified or middle
+ * click, another origin, and a LiveView without `js()` keep the browser's
+ * own behaviour. A host element drawing such a link itself (a catalog swap)
+ * puts the attribute on the element whose `href` holds the address.
+ *
  * ## Contract with the host bundle
  *
  * This file ships without dependencies: importing `@a2ui/lit` /
@@ -174,6 +190,7 @@ import {
   createAshFunctionCatalog,
   editedPromptFields,
   keepPromptEdits,
+  liveLinkOf,
   panelStateOf,
   pendingFeedback,
   quietAction,
@@ -555,6 +572,10 @@ export const AshA2ui = {
     };
     window.addEventListener(OPEN_SURFACE_EVENT, this.onOpenSurface);
 
+    // Live links: a click anywhere in the surface, shadow roots included.
+    this.onLiveLinkClick = (event) => this.followLiveLink(event);
+    this.el.addEventListener("click", this.onLiveLinkClick);
+
     this.start(deps);
 
     mountedHooks.add(this);
@@ -566,6 +587,7 @@ export const AshA2ui = {
   destroyed() {
     mountedHooks.delete(this);
     if (this.onOpenSurface) window.removeEventListener(OPEN_SURFACE_EVENT, this.onOpenSurface);
+    if (this.onLiveLinkClick) this.el.removeEventListener("click", this.onLiveLinkClick);
 
     if (this.surfaceSubscription && typeof this.surfaceSubscription.unsubscribe === "function") {
       this.surfaceSubscription.unsubscribe();
@@ -1001,6 +1023,23 @@ export const AshA2ui = {
       return;
     }
     this.pushEvent("a2ui:open_surface", args);
+  },
+
+  /**
+   * Follows a live link inside the LiveView (see "Live links"): when the
+   * click is a plain one on a `data-a2ui-live` link in this surface to an
+   * address on this origin, stops the browser's navigation and runs the
+   * LiveView's `navigate` or `patch` JS command. Otherwise does nothing, and
+   * the browser follows the link.
+   */
+  followLiveLink(event) {
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    const link = liveLinkOf(event, path, {container: this.el, location: globalThis.location});
+    if (!link) return;
+    const js = typeof this.js === "function" ? this.js() : null;
+    if (!js || typeof js[link.kind] !== "function") return;
+    event.preventDefault();
+    js[link.kind](link.href);
   },
 };
 

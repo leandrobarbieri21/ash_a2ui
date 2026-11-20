@@ -444,7 +444,9 @@ crumb label
 One step of the page header's breadcrumb, before the page's own title
 (which ends the breadcrumb). `page` names a value the host page writes
 at `/page/<key>`: when set, it replaces `href` (a list's address with the
-filters the person left it with).
+filters the person left it with). `live` makes the step a live link: on
+a LiveView transport a plain click navigates inside the LiveView instead
+of loading the page.
 
 
 
@@ -452,6 +454,10 @@ filters the person left it with).
 ### Examples
 ```
 crumb "Orders", href: "/orders", page: :back
+```
+
+```
+crumb "Orders", href: "/orders", page: :back, live: :navigate
 ```
 
 
@@ -467,6 +473,7 @@ crumb "Orders", href: "/orders", page: :back
 |------|------|---------|------|
 | [`href`](#a2ui-page_header-crumb-href){: #a2ui-page_header-crumb-href } | `String.t` |  | The step's address. |
 | [`page`](#a2ui-page_header-crumb-page){: #a2ui-page_header-crumb-page } | `atom` |  | A key of the host page's values (`/page/<key>`, see `AshA2ui.Info.build_surface/2`'s `:page`): its value, when present, is the step's address instead of `href`. |
+| [`live`](#a2ui-page_header-crumb-live){: #a2ui-page_header-crumb-live } | `:navigate \| :patch` |  | Follow the step inside the LiveView: `:navigate` as `push_navigate` (another LiveView; LiveView loads the page when it cannot), `:patch` as `push_patch` (this LiveView's own address). The `AshA2ui` hook does it on a plain primary click of a same-origin address; a modified click, a renderer that does not know the key and a page without the hook follow `href` as a normal link. |
 
 
 

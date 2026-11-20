@@ -401,7 +401,7 @@ topics for the full contracts.
   page_header do
     context :order
     title :name
-    crumb "Orders", href: "/orders", page: :back   # /page/back replaces href
+    crumb "Orders", href: "/orders", page: :back, live: :navigate   # /page/back replaces href
 
     tag :status_text do
       tone :status_tone          # info success warning danger neutral pending accent gray
@@ -453,6 +453,13 @@ topics for the full contracts.
   `/detail/<context>`. A host that reloads its page afterwards catches that
   message in its own `handle_event("a2ui:message", ...)`. A pinned (`as_of`)
   surface offers none.
+- `live: :navigate` (or `:patch`) on a `crumb` makes it a live link
+  (catalog 3.7): the `AshA2ui` hook follows a plain click inside the
+  LiveView (`push_navigate` / `push_patch` semantics), which a link drawn
+  in the surface's shadow DOM cannot get from `data-phx-link`. A modified
+  click and a page without the hook follow `href` normally. A host
+  `renderHeader` override puts `data-a2ui-live={crumb.live}` on the
+  element whose `href` holds the address.
 - `/page` holds the host page's values: `build_surface(..., page: %{back:
   url})`, or `page_fn: fn socket -> %{back: ...} end` on
   `AshA2ui.LiveRenderer`, which pushes a change once the surface is built.

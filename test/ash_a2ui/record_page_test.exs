@@ -85,7 +85,12 @@ defmodule AshA2ui.RecordPageTest do
                "title" => "name",
                "breadcrumbLabel" => "Breadcrumb",
                "breadcrumb" => [
-                 %{"label" => "Dossiers", "href" => "/dossiers", "pagePath" => "/page/back"}
+                 %{
+                   "label" => "Dossiers",
+                   "href" => "/dossiers",
+                   "pagePath" => "/page/back",
+                   "live" => "navigate"
+                 }
                ],
                "tags" => [
                  %{"field" => "state_text", "tone" => "state_tone", "helpField" => "state_help"}

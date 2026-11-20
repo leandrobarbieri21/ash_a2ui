@@ -9,6 +9,8 @@ import {
   editedPromptFields,
   feedback,
   keepPromptEdits,
+  LIVE_LINK_ATTRIBUTE,
+  liveLinkOf,
   panelStateOf,
   pendingFeedback,
   quietAction,
@@ -193,3 +195,61 @@ test("keepPromptEdits overlays the edited fields on that prompt's whole-map writ
   assert.deepEqual(messages[0].updateDataModel.value, {note: "", hours: 2}, "input not modified");
   assert.equal(keepPromptEdits(messages, [{...prompts[0], values: {}}]), messages);
 });
+
+// A node of a click's composed path: attributes, and an href property when
+// it has one (an anchor's is absolute).
+function node(attributes = {}, href) {
+  return {
+    href,
+    getAttribute: (name) => (name in attributes ? attributes[name] : null),
+  };
+}
+
+test("liveLinkOf finds the live link in the composed path, through elements without one", () => {
+  const location = {origin: "https://app.test", href: "https://app.test/orders/7"};
+  const container = node();
+  const inner = node({href: "/orders"}, "https://app.test/orders");
+  const item = node({[LIVE_LINK_ATTRIBUTE]: "navigate", href: "/orders?q=late"});
+  const path = [node(), inner, item, container];
+
+  // An element's own href property wins (a custom element resolving it), else the attribute.
+  assert.deepEqual(liveLinkOf({button: 0}, path, {container, location}), {
+    kind: "navigate",
+    href: "https://app.test/orders?q=late",
+  });
+  const patch = node({[LIVE_LINK_ATTRIBUTE]: "patch"}, "https://app.test/orders/7?tab=notes");
+  assert.deepEqual(liveLinkOf({button: 0}, [patch, container], {container, location}), {
+    kind: "patch",
+    href: "https://app.test/orders/7?tab=notes",
+  });
+});
+
+test("liveLinkOf leaves the link to the browser unless it is a plain click on this origin", () => {
+  const location = {origin: "https://app.test", href: "https://app.test/orders/7"};
+  const container = node();
+  const live = (attributes = {}) => [node({[LIVE_LINK_ATTRIBUTE]: "navigate", href: "/orders", ...attributes}), container];
+  const at = (click, path = live()) => liveLinkOf(click, path, {container, location});
+
+  assert.ok(at({button: 0}));
+  for (const click of [
+    {button: 1},
+    {button: 0, metaKey: true},
+    {button: 0, ctrlKey: true},
+    {button: 0, shiftKey: true},
+    {button: 0, altKey: true},
+    {button: 0, defaultPrevented: true},
+  ]) {
+    assert.equal(at(click), null, JSON.stringify(click));
+  }
+  assert.equal(at({button: 0}, live({target: "_blank"})), null);
+  assert.ok(at({button: 0}, live({target: "_self"})));
+  assert.equal(at({button: 0}, live({download: ""})), null);
+  assert.equal(at({button: 0}, live({href: "https://elsewhere.test/orders"})), null);
+  assert.equal(at({button: 0}, live({href: null})), null);
+  assert.equal(at({button: 0}, live({[LIVE_LINK_ATTRIBUTE]: "reload"})), null);
+  // Not live, or live only outside the surface: LiveView's own handling.
+  assert.equal(at({button: 0}, [node({href: "/orders"}), container]), null);
+  assert.equal(at({button: 0}, [node(), container, node({[LIVE_LINK_ATTRIBUTE]: "navigate", href: "/x"})]), null);
+  assert.equal(liveLinkOf({button: 0}, live(), {container}), null);
+});
+
