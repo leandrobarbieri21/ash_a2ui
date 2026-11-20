@@ -1105,7 +1105,7 @@ defmodule AshA2ui.Encoder do
   # Catalog 3.5: the page header the surface declares (`page_header`). Each
   # item and button names the fields it reads from the header's record, at
   # `path`; a breadcrumb step may read its address from the host page's
-  # values (`pagePath`, `/page/<key>`). A button that runs an action carries
+  # values (`pagePath`, `/page/<key>`) and be a live link (`live`, 3.7). A button that runs an action carries
   # its envelope (the `page_action` ashAction) and is offered while the
   # record's `_header_action_<name>` is true.
   defp put_page_header(root, %{page_header: nil}), do: root
@@ -1124,6 +1124,7 @@ defmodule AshA2ui.Encoder do
             %{"label" => crumb.label}
             |> maybe_put("href", crumb.href)
             |> maybe_put("pagePath", crumb.page && "/page/#{crumb.page}")
+            |> maybe_put("live", crumb.live && Atom.to_string(crumb.live))
           end),
         "tags" => Enum.map(header.tags, &header_item/1),
         "meta" => Enum.map(header.meta, &header_item/1),

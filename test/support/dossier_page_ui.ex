@@ -23,7 +23,7 @@ defmodule AshA2ui.Test.DossierPageUI do
     page_header do
       context :dossier
       title :name
-      crumb "Dossiers", href: "/dossiers", page: :back
+      crumb "Dossiers", href: "/dossiers", page: :back, live: :navigate
 
       tag :state_text do
         tone :state_tone

@@ -68,6 +68,11 @@ a debounced (150 ms) `AshA2ui.Info.build_data_model/2` refresh.
   builds with `link_buttons: true` only when it has one of those two, so
   a LiveView that cannot navigate shows plain link text.
 
+- Live links send nothing: a link the surface declared live (a `crumb`'s
+  `live`, catalog 3.7) carries `data-a2ui-live="navigate"|"patch"`, and
+  the hook follows a plain click on it with `this.js().navigate/patch`
+  from inside any shadow root (`data-phx-link` cannot reach there).
+
 Don't rename these events or bypass the handler in a custom
 `handle_event/3`.
 

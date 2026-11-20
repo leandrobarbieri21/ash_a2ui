@@ -165,6 +165,19 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Live links** (admin catalog 3.7.0). A page header `crumb` may declare
+  `live: :navigate` (or `:patch`): on a LiveView, a plain click on it
+  navigates inside the LiveView (`push_navigate` / `push_patch` semantics)
+  instead of loading the page. The step carries `live` on the wire, the
+  renderer puts `data-a2ui-live` on the link it draws, and the `AshA2ui`
+  hook follows it through the click's composed path, so a link inside the
+  surface's shadow DOM works where LiveView's `data-phx-link` cannot see
+  it. A modified or middle click, another origin, a renderer that ignores
+  `live` and a page without the hook follow `href` as before. A host
+  `renderHeader` override reads `crumb.live` from the header model and
+  puts the attribute (`LIVE_LINK_ATTRIBUTE`) on its link. Additive over
+  3.6.0: the catalogId is unchanged.
+
 - **Review summaries** (admin catalog 3.6.0). An `alert` `:detail` may
   declare `review_summary`: it counts the surface's `review` fields still
   waiting on its record (`pending` or `missing`) and links to the first one

@@ -12,7 +12,8 @@
  *   - `replaceExistingSurfaces`, which lets a re-joined LiveView bootstrap a
  *     surface the processor still holds;
  *   - `panelStateOf`, which reads the record-task panel's visibility from a
- *     message.
+ *     message;
+ *   - `liveLinkOf`, which says where a click on a live link goes.
  */
 
 /** The protocol version on every message, in both directions. */
@@ -413,4 +414,66 @@ export function keepPromptEdits(messages, prompts) {
 
     return message;
   });
+}
+
+/**
+ * The attribute a renderer puts on a link the surface declared live (admin
+ * catalog 3.7: a breadcrumb step's `live`). Its value is the kind:
+ * `"navigate"` (`push_navigate`, another LiveView) or `"patch"`
+ * (`push_patch`, this LiveView's own address). The AshA2ui hook follows a
+ * plain click on it inside the LiveView, from inside any shadow root of its
+ * surface; LiveView's own `data-phx-link` handler cannot see that far, as it
+ * reads the click's target, which a shadow root retargets to its host.
+ * Without the hook the link is a normal link.
+ */
+export const LIVE_LINK_ATTRIBUTE = "data-a2ui-live";
+
+/** The kinds a live link may name (`LIVE_LINK_ATTRIBUTE`'s values). */
+export const LIVE_LINK_KINDS = Object.freeze(["navigate", "patch"]);
+
+/**
+ * Where a click on a live link goes inside the LiveView: `{kind, href}`
+ * (`href` absolute), or null when the browser should follow the link
+ * itself.
+ *
+ * `click` is the click event (or its `button`, modifier keys and
+ * `defaultPrevented`), `path` its `composedPath()`, innermost first, and
+ * `container` the hook's element: the search for the nearest element
+ * carrying `LIVE_LINK_ATTRIBUTE` stops there. `location` is the page's
+ * (`origin` and `href`). The link's address is its `href` property when it
+ * has a string one (an anchor's, or a custom element's that resolves it),
+ * else its `href` attribute.
+ *
+ * Null for a modified, middle or already handled click; for a link with a
+ * `target` other than `_self` or a `download`; for an unknown kind, no
+ * address, or an address on another origin.
+ */
+export function liveLinkOf(click, path, {container, location} = {}) {
+  if (!click || click.defaultPrevented) return null;
+  if (click.button > 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) {
+    return null;
+  }
+  if (!location || typeof location.origin !== "string") return null;
+
+  for (const node of path || []) {
+    if (node === container) return null;
+    if (!node || typeof node.getAttribute !== "function") continue;
+    const kind = node.getAttribute(LIVE_LINK_ATTRIBUTE);
+    if (kind === null || kind === undefined) continue;
+    if (!LIVE_LINK_KINDS.includes(kind)) return null;
+
+    const target = node.getAttribute("target");
+    if ((target && target !== "_self") || node.getAttribute("download") !== null) return null;
+
+    const href = typeof node.href === "string" && node.href !== "" ? node.href : node.getAttribute("href");
+    if (!href) return null;
+    let url;
+    try {
+      url = new URL(href, location.href || location.origin);
+    } catch {
+      return null;
+    }
+    return url.origin === location.origin ? {kind, href: url.href} : null;
+  }
+  return null;
 }

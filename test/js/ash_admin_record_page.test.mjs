@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 
 import {admin, mergedCatalog} from "./catalogs.mjs";
 import {mountHook, sent} from "./harness.mjs";
-import {feedback} from "../../priv/js/ash_a2ui_protocol.js";
+import {LIVE_LINK_ATTRIBUTE, feedback} from "../../priv/js/ash_a2ui_protocol.js";
 
 async function settle() {
   for (let i = 0; i < 5; i++) await new Promise((resolve) => setTimeout(resolve, 0));
@@ -32,7 +32,7 @@ const header = {
   path: "/detail/dossier",
   title: "name",
   breadcrumbLabel: "Breadcrumb",
-  breadcrumb: [{label: "Dossiers", href: "/dossiers", pagePath: "/page/back"}],
+  breadcrumb: [{label: "Dossiers", href: "/dossiers", pagePath: "/page/back", live: "navigate"}],
   tags: [{field: "state_text", tone: "state_tone", helpField: "state_help"}],
   meta: [{field: "owner", help: "Who looks after it"}, {field: "empty_note"}],
   actions: [
@@ -156,6 +156,52 @@ test("the header reads its record: breadcrumb, title, tags, meta and links", asy
 test("without a page value the breadcrumb keeps its declared address", async () => {
   const {pageEl} = await mountPage({page: {}});
   assert.equal(root(pageEl).querySelector("[data-a2ui-page-header] nav a").getAttribute("href"), "/dossiers");
+});
+
+test("a live breadcrumb step is followed inside the LiveView by the hook", async () => {
+  const {hook, element, pageEl} = await mountPage({page: {}});
+  const link = root(pageEl).querySelector("[data-a2ui-page-header] nav a");
+  assert.equal(link.getAttribute(LIVE_LINK_ATTRIBUTE), "navigate");
+
+  // The hook's container, as mounted() wires it, and the LiveView's JS
+  // commands; a listener on the document records whether the browser would
+  // still have followed the link (and stops it, as the test has no pages).
+  const container = document.createElement("div");
+  document.body.replaceChildren(container);
+  container.append(element);
+  hook.el = container;
+  const followed = [];
+  hook.js = () => ({
+    navigate: (href) => followed.push(["navigate", href]),
+    patch: (href) => followed.push(["patch", href]),
+  });
+  container.addEventListener("click", (event) => hook.followLiveLink(event));
+  const loads = [];
+  const onDocumentClick = (event) => {
+    loads.push(!event.defaultPrevented);
+    event.preventDefault();
+  };
+  document.addEventListener("click", onDocumentClick);
+
+  try {
+    // A plain click, from inside the page's shadow root: the hook navigates.
+    link.dispatchEvent(new MouseEvent("click", {bubbles: true, composed: true, cancelable: true}));
+    assert.deepEqual(followed, [["navigate", new URL("/dossiers", location.href).href]]);
+    assert.deepEqual(loads, [false]);
+
+    // A modified click keeps the browser's own behaviour (a new tab).
+    link.dispatchEvent(new MouseEvent("click", {bubbles: true, composed: true, cancelable: true, metaKey: true}));
+    assert.equal(followed.length, 1);
+    assert.deepEqual(loads, [false, true]);
+
+    // A step that is not live stays a normal link.
+    link.removeAttribute(LIVE_LINK_ATTRIBUTE);
+    link.dispatchEvent(new MouseEvent("click", {bubbles: true, composed: true, cancelable: true}));
+    assert.equal(followed.length, 1);
+    assert.deepEqual(loads, [false, true, true]);
+  } finally {
+    document.removeEventListener("click", onDocumentClick);
+  }
 });
 
 test("a button that runs an action shows while offered and sends page_action", async () => {

@@ -146,7 +146,16 @@ import {
 } from "./ash_a2ui_catalog.js";
 
 // The ash_a2ui catalog's id: the admin envelopes are sent as its ashAction.
-import {ASH_A2UI_CATALOG_ID} from "./ash_a2ui_protocol.js";
+import {ASH_A2UI_CATALOG_ID, LIVE_LINK_ATTRIBUTE, LIVE_LINK_KINDS} from "./ash_a2ui_protocol.js";
+
+/**
+ * The attribute a drawn link carries when the surface declared it live
+ * (3.7: a breadcrumb step's `live`), its value `navigate` or `patch`. A
+ * host's `renderHeader` override puts it on the element whose `href` holds
+ * the address (`crumb.live` in the header model); the AshA2ui hook follows
+ * a plain click on it inside the LiveView.
+ */
+export {LIVE_LINK_ATTRIBUTE};
 
 // The NB layer's calendar grid (`nb-calendar`), used by calendarView. The
 // file has no imports of its own and defines its elements only when asked.
@@ -181,7 +190,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.6.0";
+export const ADMIN_CATALOG_VERSION = "3.7.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -1325,7 +1334,11 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   // index)`; `onHeaderAction(action)` runs a button. The nav's behaviour finds its
   // entries by `data-a2ui-nav-item` (the entry's index) and marks the
   // chosen one with the `selected` attribute (and aria-current), so an
-  // override keeps both. `navLine()` is the line a section stops on.
+  // override keeps both. `navLine()` is the line a section stops on. A
+  // breadcrumb step the surface declared live (3.7) has `crumb.live`
+  // (navigate or patch) in the model: an override puts it on its link as
+  // the `data-a2ui-live` attribute (LIVE_LINK_ATTRIBUTE), on the element
+  // whose `href` holds the address, and the AshA2ui hook follows it.
 
   function defineEntityPage() {
     const tag = TAGS.entityPage;
@@ -1546,6 +1559,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             ...(header.breadcrumb || []).map((crumb) => ({
               label: str(crumb.label),
               href: pageValue(crumb.pagePath) || str(crumb.href) || null,
+              live: LIVE_LINK_KINDS.includes(crumb.live) ? crumb.live : null,
             })),
             {label: value(header.title), href: null, current: true},
           ],
@@ -1581,6 +1595,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._amBusyAction = null;
       }
 
+      /**
+       * A breadcrumb step's link; a live step (3.7) carries data-a2ui-live,
+       * which the AshA2ui hook follows inside the LiveView.
+       */
+      renderCrumbLink(crumb) {
+        return html`<a class="am-link" href=${crumb.href} data-a2ui-live=${crumb.live || nothing}>${crumb.label}</a>`;
+      }
+
       /** The stock header: breadcrumb, h1, the line under it, the buttons. */
       renderHeader(model) {
         const tone = (entry) => (entry.tone ? entry.tone : nothing);
@@ -1592,7 +1614,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 ${model.breadcrumb.map((crumb) =>
                   crumb.current
                     ? html`<li aria-current="page">${crumb.label}</li>`
-                    : html`<li>${crumb.href ? html`<a class="am-link" href=${crumb.href}>${crumb.label}</a>` : crumb.label}</li>`,
+                    : html`<li>${crumb.href ? this.renderCrumbLink(crumb) : crumb.label}</li>`,
                 )}
               </ol>
             </nav>
