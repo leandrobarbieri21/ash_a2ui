@@ -120,7 +120,7 @@ defmodule AshA2ui.Verifiers.VerifyReports do
   defp verify_no_foreign_options(component, key, module) do
     declared_lists =
       Enum.filter(
-        [:row_actions, :context_filter, :require_context],
+        [:row_actions, :context_filter, :require_context, :context_record],
         &(Map.get(component, &1) != [])
       )
 

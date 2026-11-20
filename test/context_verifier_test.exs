@@ -259,6 +259,59 @@ defmodule AshA2ui.ContextVerifierTest do
       assert result =~ ~r/does not appear in the table's context_filter/
     end
 
+    test "context_record outside the context_filter does not compile cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule RecordOutsideFilter do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.Appointment
+              surface_id "x"
+
+              context :owner do
+                resource AshA2ui.Test.Owner
+              end
+
+              component :table do
+                fields [:title]
+                context_record(owner: [:name])
+              end
+            end
+          end
+        end)
+
+      assert result =~
+               ~r/context_record entry :owner on table .* does not appear in the table's context_filter/
+    end
+
+    test "context_record on a non-table component does not compile cleanly" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule RecordOnForm do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.Appointment
+              surface_id "x"
+
+              context :owner do
+                resource AshA2ui.Test.Owner
+              end
+
+              component :form do
+                fields [:title]
+                context_record(owner: [:name])
+              end
+            end
+          end
+        end)
+
+      assert result =~ ~r/context_record is not supported on :form components/
+    end
+
     test "select_context over a foreign resource does not compile cleanly" do
       result =
         capture_io(:stderr, fn ->

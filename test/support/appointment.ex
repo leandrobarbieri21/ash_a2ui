@@ -31,6 +31,27 @@ defmodule AshA2ui.Test.Appointment do
   end
 
   calculations do
+    # The owner's greeting as the surface handed it to the read
+    # (`context_record`), or "not handed" when the read carried no owner.
+    calculate :owner_greeting,
+              :string,
+              fn records, context ->
+                owner = AshA2ui.ContextRunner.context_record(context, :owner)
+
+                Enum.map(records, fn visit ->
+                  case owner do
+                    %{id: id, greeting: greeting}
+                    when id == visit.owner_id and is_binary(greeting) ->
+                      greeting
+
+                    _not_handed ->
+                      "not handed"
+                  end
+                end)
+              end do
+      public? true
+    end
+
     # A page of the visit's own, for plain links (`link_url`): none once completed.
     calculate :page_url,
               :string,

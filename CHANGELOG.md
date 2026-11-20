@@ -357,6 +357,21 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Performance
 
+- **A table can reuse what its context's record already loaded
+  (`context_record`).** A table scoped by a context gave its read only the
+  selected id, so a row calculation that needed something already loaded
+  on the selected record (the record behind a `:detail` or the page
+  header) had to read it again. `context_record order: [:totals]` on a
+  table names contexts from its `context_filter` and the loads it needs;
+  `build_surface/2` and `build_data_model/2` now fetch each selected
+  record once, with those loads added to the details', before the tables
+  read, and hand it to the table's read in its query context. A
+  calculation reads it with `AshA2ui.ContextRunner.context_record/2`
+  (from its `Ash.Resource.Calculation.Context`, an `Ash.Query` or a
+  context map) and must still work without it: a read the action handler
+  runs alone (a page, a sort, a search) hands nothing. Additive: nothing
+  on the wire changes, and a surface without `context_record` reads what
+  it read before, details before tables.
 - **A facet over a field writes the field into SQL once.** `facet_counts`
   counted every faceted filter with one filtered `count` per option, so a
   filter over a calculation repeated the calculation's expression once per

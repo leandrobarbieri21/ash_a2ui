@@ -2667,6 +2667,25 @@ defmodule AshA2ui do
         otherwise it renders no records (and no read is executed).
         """
       ],
+      context_record: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Hands the table's reads the record a context selected, so a row
+        calculation can use what is already loaded on it instead of reading
+        it again. Keys are context names from this table's `context_filter`,
+        values the loads the record must carry
+        (`context_record order: [:totals]`). The surface fetches each
+        selected record once, with these loads added to those of the
+        context's `:detail` components and page header, before the table
+        reads, and puts it in the read's query context; a calculation reads
+        it with `AshA2ui.ContextRunner.context_record/2`. A context with
+        nothing selected hands nothing. `AshA2ui.Info.build_surface/2` and
+        `build_data_model/2` hand it; a read the action handler runs alone
+        (a page, a sort, a search) does not, so the calculation must still
+        work without it.
+        """
+      ],
       column_order: [
         type: {:one_of, [:layout, :fields]},
         default: :layout,

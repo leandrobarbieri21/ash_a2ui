@@ -147,6 +147,49 @@ defmodule AshA2ui.ContextRunner do
   end
 
   @doc """
+  The query context a table's reads carry (the `context:` read option): the
+  selected records its `context_record` names, from `records` (`%{context
+  name => record}`, the records the surface fetched). `%{}` when the table
+  names none or none of them was fetched.
+  """
+  @spec read_context(ResolvedView.table() | map, %{atom => Ash.Resource.record()}) :: map
+  def read_context(table, records) do
+    shared =
+      for {name, _loads} <- Map.get(table, :context_record) || [],
+          record = Map.get(records, name),
+          not is_nil(record),
+          into: %{},
+          do: {name, record}
+
+    if shared == %{}, do: %{}, else: %{ash_a2ui: %{context_records: shared}}
+  end
+
+  @doc """
+  The record a context selected, as the surface handed it to a table's read
+  (the table's `context_record`), or `nil`. `source` is what a calculation
+  or preparation holds: an `Ash.Resource.Calculation.Context` (its
+  `source_context`), an `Ash.Query`, or a query context map.
+
+      def calculate(lines, _opts, context) do
+        case AshA2ui.ContextRunner.context_record(context, :order) do
+          %{totals: totals} -> ...      # the order the surface loaded
+          nil -> ...                    # read it
+        end
+      end
+
+  It is the record as the surface loaded it: compare its primary key with
+  the row's before using it.
+  """
+  @spec context_record(term, atom) :: Ash.Resource.record() | nil
+  def context_record(%Ash.Query{context: context}, name), do: context_record(context, name)
+  def context_record(%{source_context: context}, name), do: context_record(context, name)
+
+  def context_record(%{ash_a2ui: %{context_records: %{} = records}}, name) when is_atom(name),
+    do: Map.get(records, name)
+
+  def context_record(_source, _name), do: nil
+
+  @doc """
   ANDs scope filters (from `table_scope/3`) onto an `Ash.Query`.
   """
   @spec apply_scope(Ash.Query.t(), [{atom, term}]) :: Ash.Query.t()
