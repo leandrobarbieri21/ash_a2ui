@@ -127,8 +127,12 @@ defmodule AshA2ui.ReviewSummary do
     end
   end
 
-  # A table's rows, once each, while one of its review fields waits.
+  # A table's rows, once each, while one of its review fields waits. A
+  # table naming the context in `context_record` reads them with `record`
+  # handed, as it reads its own rows.
   defp rows_waiting(view, context, record, table, opts) do
+    opts = with_read_context(opts, table, %{context => record})
+
     with [_ | _] = fields <- review_fields(view, table),
          {:ok, scope} <- scope(view, context, record, table),
          {:ok, rows} <- read_rows(table, fields, scope, opts) do
@@ -137,6 +141,13 @@ defmodule AshA2ui.ReviewSummary do
           do: {{table.name, Map.get(row, :id)}, field, table.component}
     else
       _none -> []
+    end
+  end
+
+  defp with_read_context(opts, table, records) do
+    case ContextRunner.read_context(table, records) do
+      context when context == %{} -> opts
+      context -> Keyword.put(opts, :context, context)
     end
   end
 

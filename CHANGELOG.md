@@ -372,6 +372,12 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   runs alone (a page, a sort, a search) hands nothing. Additive: nothing
   on the wire changes, and a surface without `context_record` reads what
   it read before, details before tables.
+- **A review summary reads a table's rows with the record handed too.**
+  A `review_summary` counting the rows of a table that names its context
+  in `context_record` read those rows without the record, so a row review
+  calculation built on it read the record's values again on every build.
+  The summary's read now carries the record it summarizes, as the table's
+  own read does.
 - **A facet over a field writes the field into SQL once.** `facet_counts`
   counted every faceted filter with one filtered `count` per option, so a
   filter over a calculation repeated the calculation's expression once per

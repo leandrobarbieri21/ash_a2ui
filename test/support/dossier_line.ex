@@ -53,6 +53,23 @@ defmodule AshA2ui.Test.DossierLine do
   end
 
   calculations do
+    # A line's review that tells the test process whether its read was
+    # handed the dossier (`context_record`, AshA2ui.Test.DossierHandedLinesUI).
+    calculate :label_review,
+              :map,
+              fn lines, context ->
+                handed = AshA2ui.ContextRunner.context_record(context, :dossier)
+
+                send(
+                  self(),
+                  {:dossier_handed, match?(%{name: name} when is_binary(name), handed)}
+                )
+
+                Enum.map(lines, fn _line -> %{state: :pending, page: 1} end)
+              end do
+      public? true
+    end
+
     calculate :review_open,
               :boolean,
               fn lines, _context ->

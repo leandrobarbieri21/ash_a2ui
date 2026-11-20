@@ -12,7 +12,16 @@ defmodule AshA2ui.ContextRecordTest do
 
   alias Ash.DataLayer.Ets
   alias AshA2ui.{ContextRunner, Info}
-  alias AshA2ui.Test.{Appointment, Clinic, Owner, SharedOwnerVisitsUI}
+
+  alias AshA2ui.Test.{
+    Appointment,
+    Clinic,
+    Dossier,
+    DossierHandedLinesUI,
+    DossierLine,
+    Owner,
+    SharedOwnerVisitsUI
+  }
 
   setup do
     on_exit(fn ->
@@ -86,6 +95,41 @@ defmodule AshA2ui.ContextRecordTest do
 
     assert model["records"]["visits"] == []
     assert model["detail"]["owner"] == %{}
+  end
+
+  test "a review summary counting the table's rows reads them with the record handed too" do
+    on_exit(fn ->
+      Ets.stop(Dossier)
+      Ets.stop(DossierLine)
+    end)
+
+    dossier = Ash.create!(Dossier, %{name: "Harbour lease"}, authorize?: false)
+
+    for position <- [1, 2] do
+      Ash.create!(
+        DossierLine,
+        %{dossier_id: dossier.id, label: "Line #{position}", position: position},
+        authorize?: false
+      )
+    end
+
+    [%{"createSurface" => %{"dataModel" => model}}] =
+      Info.build_surface(DossierHandedLinesUI,
+        authorize?: false,
+        context_state: %{"dossier" => %{"value" => dossier.id, "label" => dossier.name}}
+      )
+
+    # The table's read, then the summary's: both were handed the dossier.
+    assert handed_reports() == [true, true]
+    assert model["detail"]["dossier"]["_review_summary_to_review"]["count"] == 2
+  end
+
+  defp handed_reports(acc \\ []) do
+    receive do
+      {:dossier_handed, handed?} -> handed_reports([handed? | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
   end
 
   describe "context_record/2" do
