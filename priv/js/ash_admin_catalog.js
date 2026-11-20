@@ -236,7 +236,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.8.0";
+export const ADMIN_CATALOG_VERSION = "3.9.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -606,6 +606,10 @@ export function buildSchemas(basicCatalog = null) {
           // 3.3: the row's review of the column's field ({path}); the
           // subtitle's own review rides on subtitle.reviewPath.
           review: RecordAny.optional(),
+          // 3.9: the column's field action (a rowActions-shaped entry) and
+          // the row's offer of it ({path}, row-relative).
+          action: RecordAny.optional(),
+          actionVisible: RecordAny.optional(),
           detail: RecordAny.optional(),
           // 1.10: header help ({title, body}) and the field a header
           // sorts by when it is not the column's own path.
@@ -2809,6 +2813,57 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       /**
+       * 3.9: whether a column's field action is offered on `row`: the
+       * column has one, and the row offers it (its `actionVisible` path is
+       * true; an unbound one always offers it). Hiding is a rendering
+       * concern only: the server re-checks every call.
+       */
+      cellActionOffered(row, column) {
+        const entry = column?.action;
+        if (!entry || typeof entry !== "object" || typeof entry.action !== "string") return false;
+        const path = column.actionVisible?.path;
+        return typeof path !== "string" || getByPath(row, path) === true;
+      }
+
+      /**
+       * 3.9: a column's field action, a quiet button on the value's line
+       * after its review, sent like a row action (the entry's bindings
+       * resolved against the row) and busy until the outcome. A click never
+       * reaches the row's own click.
+       */
+      renderCellAction(row, column) {
+        if (!this.cellActionOffered(row, column)) return nothing;
+        const entry = column.action;
+        const rows = this.controller?.props?.rows || [];
+        const index = rows.indexOf(row);
+        const rowIdentity = this.rowIdentity(row, index);
+        const label = str(entry.label);
+        const busy =
+          this._amBusyRowAction !== null &&
+          this._amBusyRowAction.row === rowIdentity &&
+          this._amBusyRowAction.label === label;
+        return html`<span class="am-cell-action" data-a2ui-action="field_action">${renderActionButton({
+          label,
+          icon: typeof entry.icon === "string" && entry.icon !== "" ? entry.icon : undefined,
+          tone: "quiet",
+          size: "sm",
+          busy,
+          onClick: (event) => {
+            event?.stopPropagation?.();
+            this.onCellAction(entry, index);
+          },
+        })}</span>`;
+      }
+
+      /** 3.9: sends a row's field action, the row's bindings resolved now. */
+      onCellAction(entry, index) {
+        const spec = adminActionSpec(entry);
+        if (!spec || index < 0 || this._amBusyRowAction) return;
+        this.markRowActionBusy(entry, index);
+        this.dispatchRowAction(spec, this.rowBasePath(index));
+      }
+
+      /**
        * One cell: its value (below), framed by the column's 1.8 hints when
        * it declares any — a leading icon and a "+N more" tag on the value's
        * line, a second line and a detail line under it.
@@ -2821,7 +2876,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           !column.more &&
           !column.detail &&
           !column.caption &&
-          !column.review
+          !column.review &&
+          !column.action
         )
           return value;
 
@@ -2898,7 +2954,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 </svg>`
               : nothing}
             <span class="am-cell-value" data-review=${review ? review.state : nothing}>${value}</span>
-            ${renderCellReview(review)}
+            ${renderCellReview(review)} ${this.renderCellAction(row, column)}
             ${more > 0
               ? html`<span
                   class="am-badge"

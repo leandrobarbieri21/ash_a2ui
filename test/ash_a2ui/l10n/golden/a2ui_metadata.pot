@@ -39,6 +39,7 @@ msgstr ""
 msgid "All visits"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:230
@@ -274,6 +275,7 @@ msgstr ""
 msgid "Check in"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Check what was read"
 msgstr ""
@@ -545,6 +547,7 @@ msgstr ""
 msgid "Done tasks"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Dossier"
@@ -664,6 +667,7 @@ msgstr ""
 msgid "Export contract"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
@@ -720,10 +724,12 @@ msgstr ""
 msgid "Generate secret"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to history"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to the first field to check"
 msgstr ""
@@ -798,6 +804,10 @@ msgstr ""
 msgid "Kitchen sink"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Label"
+msgstr ""
+
 #: test/support/word_report_ui.ex:1
 #: test/support/word_report_ui.ex:100
 #: test/support/word_report_ui.ex:23
@@ -818,6 +828,10 @@ msgstr ""
 #: test/support/export_contract.ex:103
 #: test/support/hub_ui.ex:1
 msgid "Line count"
+msgstr ""
+
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Lines"
 msgstr ""
 
 #: test/support/manifest_task.ex:1
@@ -901,6 +915,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:188
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:87
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/enrollment.ex:1
@@ -1136,6 +1151,10 @@ msgstr ""
 #: test/support/referral.ex:1
 msgctxt "one_of:status"
 msgid "Pending"
+msgstr ""
+
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Period"
 msgstr ""
 
 #: test/support/links.ex:135
@@ -1385,6 +1404,7 @@ msgstr ""
 msgid "Search contracts or vendors"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Sections"

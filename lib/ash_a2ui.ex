@@ -243,16 +243,20 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         An update action of the record a `:detail` card shows, offered as a
-        button beside this field (admin catalog 3.2): choosing it runs the
-        action on that record, as the actor, with the field's name (a
-        string) as its `:field` argument, which the action must declare.
-        The record is re-read through the card's context first (an
-        authorized read), and the card's record is re-read and re-sent
-        afterwards. The `action` entity of the same name gives the button
-        its `label` (default: the humanized action name), its `icon` and
-        the tables it `refreshes`; its `visible_when` gates row actions
-        only. Several fields may share one action. The basic catalog and
-        tables draw no button.
+        button beside this field (admin catalog 3.2), or of the row a table
+        draws it in, offered in each row (3.9): choosing it runs the action
+        on that record, as the actor, with the field's name (a string) as
+        its `:field` argument when the action declares one (an action that
+        marks the whole record needs none). The record is re-read first, as
+        an authorized read: through the card's context, or through the
+        table's own read and its context filters. Afterwards the card's
+        record is re-read and re-sent; for a row, the records of the
+        contexts its table is filtered by are (a review summary counting
+        the table's rows reads them). The `action` entity of the same name
+        gives the button its `label` (default: the humanized action name),
+        its `icon` and the tables it `refreshes`; its `visible_when` gates
+        row actions only. Several fields may share one action. The basic
+        catalog draws no button.
         """
       ],
       field_action_visible: [

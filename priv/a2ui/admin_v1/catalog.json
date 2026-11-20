@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.8.0",
+        "version": "3.9.0",
         "changelog": {
+          "3.9.0": "Additive: row field actions. A dataGrid column gains an optional action (the field action of the column's field, a button in each row beside the value: {label, action, context, icon?}, shaped like fieldDisplay's action and a rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the table (component) and the field, with recordId bound row-relatively to the row's id and query and contexts to the surface's) and an optional actionVisible (a row-relative binding, {path: \"_action_<field>\"}, to whether the row offers it, a boolean). A renderer draws the button only while the row offers it, dispatches the entry with its bindings resolved against the row, and holds it busy until the outcome; the server re-checks every call. A review summary's count also counts each row of a table filtered by its context alone that has a review field still waiting, once. Renderers that ignore them draw no button. The catalogId is unchanged.",
           "3.8.0": "Additive: a value and its document region linked both ways. A renderer marks the element it draws for a value that cites regions (a fieldDisplay with a review href, a dataGrid row with review cells) with data-a2ui-region, its value the reviews' hrefs separated by spaces. While a documentPane is shown with its document beside the sections, pointing at or focusing inside a marked element (or a link whose href starts with regionHref) shows its regions linked in the viewer, scrolling only the viewer's own canvas when the first is out of view; nothing is written, sent or focused, and leaving or blurring clears it. Activating a region (click, Enter or Space) also scrolls the page to the marked element citing it, flashes it for 3 seconds and, from the keyboard, moves focus to it. The state a linked region is drawn in is the renderer's (linked by default). Renderers that ignore the attribute draw as before. Nothing on the wire changes; the catalogId is unchanged.",
           "3.7.0": "Additive: live links. A page header breadcrumb step gains an optional live, navigate or patch: on a LiveView transport a plain primary click on the step follows its address inside the LiveView (navigate as push_navigate, patch as push_patch) instead of loading the page. The renderer marks the drawn link with the data-a2ui-live attribute (its value the kind) and the AshA2ui hook follows it, across shadow roots; a modified or middle click, a cross-origin address, a renderer that ignores live and a page without the hook follow href as a normal link. It is additive over 3.6.0. The catalogId is unchanged.",
           "3.6.0": "Additive: review summaries. alertBanner gains an optional count (a binding to how many of the surface's review fields still wait, pending or missing, on the record its context selects: /detail/<context>/_review_summary_<component>/count); with it, linkHref and linkLabel bind to the same summary's href (the section of the card holding the first waiting field in declaration order, its section nav #anchor when listed, or the declared fallback) and label. Renderers that ignore count draw the alert and its link. The catalogId is unchanged.",
@@ -186,6 +187,25 @@
               "review": {
                 "type": "object",
                 "description": "Optional (3.3): row-relative binding ({path: \"_review_<field>\"}) to the row's review of the column's field: {state, stateLabel, page?, pageLabel?, href?, quote?} or null, as fieldDisplay's review. state is pending (filled in automatically, not checked yet), reviewed (a person checked it) or missing (looked for, not found), stateLabel the state in words (translated), page the source page the value came from (from 1), pageLabel its tag (translated), href an address opening the source at that place and quote the words the value was read from. When present a pending value is highlighted and the state is written out, not only coloured, beside the page tag (a link when href is present). Null or absent on a row = no review for that row.",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": false
+              },
+              "action": {
+                "type": "object",
+                "description": "Optional (3.9): the field action of the column's field, a button in each row beside the value. Shaped like fieldDisplay's action and a rowActions entry, dispatched the same way (the ash_a2ui catalog's ashAction, context bindings resolved against the row at click time).",
+                "properties": {
+                  "label": {"type": "string", "description": "The action's name in words (translated): the button's text, or its accessible name and tooltip when it draws as an icon."},
+                  "action": {"type": "string", "description": "The client action name dispatched: field_action."},
+                  "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}, "description": "The action context: component (the table), field, recordId (bound row-relatively to the row's id), and query and contexts (bound to /query and /context on surfaces that have them)."},
+                  "icon": {"type": "string", "description": "Optional: an icon name the button may draw as (\"check\")."}
+                },
+                "required": ["label", "action", "context"],
+                "additionalProperties": false
+              },
+              "actionVisible": {
+                "type": "object",
+                "description": "Optional (3.9): row-relative binding ({path: \"_action_<field>\"}) to whether the row offers the column's action, a boolean. The button shows only while it is true; the server re-checks every call.",
                 "properties": {"path": {"type": "string"}},
                 "required": ["path"],
                 "additionalProperties": false
