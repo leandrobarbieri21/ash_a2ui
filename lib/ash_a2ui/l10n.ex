@@ -329,6 +329,23 @@ defmodule AshA2ui.L10n do
   end
 
   @doc """
+  Translates the host display text `msgid` with `l10n` in the metadata
+  domain, as `metadata/3` does, for a text whose `%{count}` the client
+  fills in (a save bar's count of fields still waiting, admin catalog
+  3.9): the count is bound to the placeholder itself, so the translation
+  keeps `%{count}` and a translator sees a normal gettext placeholder.
+  """
+  @spec counted(t() | nil, String.t()) :: String.t()
+  def counted(nil, msgid) when is_binary(msgid), do: msgid
+
+  def counted(%__MODULE__{metadata_domain: domain, verbatim: verbatim} = l10n, msgid)
+      when is_binary(msgid) do
+    if verbatim && MapSet.member?(verbatim, msgid),
+      do: msgid,
+      else: translate(l10n, domain, nil, msgid, [count: "%{count}"], nil)
+  end
+
+  @doc """
   Translates the message template `msgid` of an Ash (Splode) error with
   `l10n`, in the errors domain, filling `bindings` (the error's `vars`).
   Without a translator, or without a translation, the interpolated `msgid`

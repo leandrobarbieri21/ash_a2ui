@@ -104,6 +104,17 @@ defmodule AshA2ui.L10n.TranslatorTest do
                )
     end
 
+    test "a counted text keeps its %{count} for the client: the count is bound to it" do
+      l10n = L10n.new(gettext_fn: {DomainAware, :translate}, locale: "fr")
+
+      assert L10n.counted(l10n, "%{count} to check") ==
+               inspect(
+                 {"%{count} to check", [count: "%{count}"], "fr", [domain: "a2ui_metadata"]}
+               )
+
+      assert L10n.counted(nil, "%{count} to check") == "%{count} to check"
+    end
+
     test "passes a nil locale and the configured metadata domain" do
       l10n = L10n.new(gettext_fn: {DomainAware, :translate}, metadata_domain: "labels")
 

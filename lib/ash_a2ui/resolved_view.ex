@@ -1371,8 +1371,8 @@ defmodule AshA2ui.ResolvedView do
           bar
           | message: translate(l10n, bar.message),
             message_waiting: translate(l10n, bar.message_waiting),
-            status: translate(l10n, bar.status),
-            status_one: translate(l10n, bar.status_one),
+            status: counted(l10n, bar.status),
+            status_one: counted(l10n, bar.status_one),
             save_label:
               translate(l10n, bar.save_label) || AshA2ui.Experience.save_changes_label(l10n),
             discard_label:
@@ -1389,10 +1389,10 @@ defmodule AshA2ui.ResolvedView do
   defp resolve_confirm(confirm, l10n) do
     %{
       confirm
-      | title: translate(l10n, confirm.title),
-        title_one: translate(l10n, confirm.title_one),
-        message: translate(l10n, confirm.message),
-        message_one: translate(l10n, confirm.message_one),
+      | title: counted(l10n, confirm.title),
+        title_one: counted(l10n, confirm.title_one),
+        message: counted(l10n, confirm.message),
+        message_one: counted(l10n, confirm.message_one),
         cancel_label: translate(l10n, confirm.cancel_label) || L10n.t(l10n, msg("Cancel")),
         save_label: translate(l10n, confirm.save_label) || L10n.t(l10n, msg("Save")),
         then_label: translate(l10n, confirm.then_label),
@@ -1402,6 +1402,9 @@ defmodule AshA2ui.ResolvedView do
 
   defp translate(_l10n, nil), do: nil
   defp translate(l10n, text), do: Label.translate(l10n, text)
+
+  defp counted(_l10n, nil), do: nil
+  defp counted(l10n, text), do: L10n.counted(l10n, text)
 
   defp resolve_section_nav(resource_or_ui_module, l10n) do
     case AshA2ui.Info.section_nav(resource_or_ui_module) do
