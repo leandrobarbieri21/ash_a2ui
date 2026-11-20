@@ -91,6 +91,14 @@ defmodule AshA2ui.Info do
     |> Enum.find(&is_struct(&1, AshA2ui.SectionNav))
   end
 
+  @doc "The `save_bar` entity declared in the `a2ui` section, if any (admin catalog 3.9)."
+  @spec save_bar(module | Spark.Dsl.t()) :: AshA2ui.SaveBar.t() | nil
+  def save_bar(resource_or_ui_module) do
+    resource_or_ui_module
+    |> Extension.get_entities([:a2ui])
+    |> Enum.find(&is_struct(&1, AshA2ui.SaveBar))
+  end
+
   @doc """
   Resolves the Ash resource behind `resource_or_ui_module`: the module's
   `for_resource` option if set (standalone UI modules), otherwise the module
@@ -547,6 +555,7 @@ defmodule AshA2ui.Info do
               ResolvedView.detail_review_data(resolved_view, record, fields, context_name)
             )
             |> Map.merge(ResolvedView.detail_field_action_data(resolved_view, record, fields))
+            |> Map.merge(ResolvedView.detail_edit_data(resolved_view, details, record))
             |> Map.merge(
               ResolvedView.detail_document_data(resolved_view, context_name, record, fields)
             )

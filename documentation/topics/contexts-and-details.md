@@ -167,6 +167,49 @@ public attributes and may include public calculations/aggregates (loads are
 computed against the context's resource). Multiple details may render the
 same context; they share the `/detail/<context>` value.
 
+### Editing a record in place
+
+A `:detail` card may let a person correct the values they read (admin
+catalog 3.9). `editable` lists the fields, the update action that saves them
+and the per-record gate; a field shown as a display calculation names the
+attribute it edits with `edit`:
+
+```elixir
+component :detail, :facts do
+  context :statement
+  fields [:title, :amount_text]
+
+  editable do
+    fields [:title, :amount_text]
+    update_action :correct
+    visible :correctable
+  end
+end
+
+field :amount_text do
+  edit :amount
+end
+
+save_bar do
+  context :statement
+  message "You have unsaved changes"
+end
+```
+
+The record carries, under `/detail/<context>`, `_edit_<field>` (the edited
+attribute's value, which the input starts from) and `_editable_<card>`
+(whether the record offers editing). Changes wait on the client at
+`/ui/edits/<card>` (`{recordId, values}`) until the surface's `save_bar`
+saves them all through `"save_changes"`: each card's update action on its
+record with only its changed fields, in one transaction, then the bar's
+`confirm` `then_action` when the person chose it. A success clears
+`/ui/edits` and re-reads each saved card's record; a refusal keeps the
+changes and writes each edited field's error to
+`/ui/edit_errors/<card>/<field>`. The bar counts the context's `review`
+fields still pending or missing, and its `confirm` asks before a save while
+any wait. See the `save_bar` entity docs and the admin catalog's 3.9
+changelog entry for the wire.
+
 ## Refreshes and transports
 
 Every action context on a context-enabled surface carries the current

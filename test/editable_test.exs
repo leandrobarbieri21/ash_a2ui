@@ -288,7 +288,7 @@ defmodule AshA2ui.EditableVerifierTest do
 
   import ExUnit.CaptureIO
 
-  test "editable on a non-table component does not compile cleanly" do
+  test "editable on a component that is neither a table nor a detail does not compile cleanly" do
     result =
       capture_io(:stderr, fn ->
         defmodule FormEditable do
@@ -309,7 +309,7 @@ defmodule AshA2ui.EditableVerifierTest do
         end
       end)
 
-    assert result =~ ~r/only supported on :table components/
+    assert result =~ ~r/only supported on :table and :detail components/
   end
 
   test "editable combined with row_layout does not compile cleanly" do
@@ -361,7 +361,7 @@ defmodule AshA2ui.EditableVerifierTest do
         end
       end)
 
-    assert result =~ ~r/editable field :replacement is not one of table/
+    assert result =~ ~r/editable field :replacement is not one of table :table/
   end
 
   test "editable fields not accepted by the update action do not compile cleanly" do

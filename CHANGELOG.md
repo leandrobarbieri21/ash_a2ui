@@ -165,6 +165,27 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Editing a record in place, saved by a save bar** (admin catalog 3.9.0,
+  ADR 0003). `editable` now goes on a `:detail` card too, with `visible`
+  gating it per record; a field's new `edit` option names the attribute
+  behind a display calculation. Choosing or focusing an editable value opens
+  its input (text, number, date or a choice, from the attribute's type);
+  Enter or leaving it keeps a change, Escape drops it. Changes wait on the
+  client at `/ui/edits` (kept across a refresh of the whole data model)
+  until the new `save_bar` entity's Save sends `save_changes`: each card's
+  update action runs on its record, re-read as the actor, with only its
+  changed fields, all in one transaction. A refusal saves nothing, keeps the
+  changes and writes each field's message to `/ui/edit_errors`. The bar
+  counts the context's `review` fields still waiting; its `confirm` asks
+  before a save while any wait, and its second choice runs a declared
+  `then_action` on the bar's record in the same transaction. The catalog
+  adds `edit`, `editValue`, `editVisible`, `editDraft` and `editError` to
+  `fieldDisplay` and a `saveBar` component; the JS module exports the draft
+  and count helpers (`writeDraft`, `discardEdits`, `editCount`,
+  `waitingReviews`, `confirmTexts`, `saveDecision`) for host swaps.
+  Additive: the catalogId is unchanged, and a renderer that ignores `edit`
+  draws the card read-only.
+
 - **A value and its document region, linked both ways** (admin catalog
   3.8.0). While a `document_pane` is shown beside the sections, pointing
   at a value that cites a region, or focusing inside it, shows the region

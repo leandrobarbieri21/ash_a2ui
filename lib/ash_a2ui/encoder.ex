@@ -277,7 +277,7 @@ defmodule AshA2ui.Encoder do
   # Every other component the encoder emits is a basic-catalog component.
   @admin_components ~w(actionBar alertBanner calendarView confirmDialog dataGrid documentPane
                        documentViewer emptyState entityPage fieldDisplay filterPicker formSection
-                       liveDiagram pagination recordPanel statusBanner)
+                       liveDiagram pagination recordPanel saveBar statusBanner)
 
   @numeric_types [Ash.Type.Integer, Ash.Type.Decimal, Ash.Type.Float]
 
@@ -1035,7 +1035,7 @@ defmodule AshA2ui.Encoder do
           form_children ++
             ["status_banner"] ++
             context_children(view) ++
-            body_children ++ ["action_result_panel"]
+            body_children ++ ["action_result_panel"] ++ save_bar_children(view)
       }
       |> put_page_header(view)
       |> put_lead(view, lead)
@@ -1048,7 +1048,7 @@ defmodule AshA2ui.Encoder do
           table_sections ++
           detail_sections ++
           report_sections ++ section_wrappers ++ pane_components ++ form_sections
-    ] ++ [admin_status_banner() | action_result_components()]
+    ] ++ [admin_status_banner() | action_result_components()] ++ save_bar_components(view)
   end
 
   # Catalog 3.4: the surface's document pane. Its `documentPane` holds the
@@ -2200,6 +2200,7 @@ defmodule AshA2ui.Encoder do
         |> put_detail_steps(view, field, "/detail/#{detail.context}/")
         |> put_detail_review(view, field, "/detail/#{detail.context}/")
         |> put_field_action(view, detail, field)
+        |> put_edit(view, detail, field)
         |> put_empty_text(view, field)
         |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
@@ -2303,6 +2304,130 @@ defmodule AshA2ui.Encoder do
       _other ->
         display
     end
+  end
+
+  # Catalog 3.9: a field of an editable card opens as an input in place.
+  # `edit` names the card, the field and the input (its kind, and a choice's
+  # options); `editValue` binds the stored value the input starts from,
+  # `editVisible` whether the record offers editing, `editDraft` the
+  # person's unsaved change (`/ui/edits/<card>/values/<field>`, absent
+  # while there is none) and `editError` a refused save's message for it.
+  defp put_edit(display, view, %{editable: %{} = editable} = detail, field) do
+    if field in editable.fields do
+      base = "/detail/#{detail.context}"
+      resource = view.contexts[detail.context].resource
+
+      edit =
+        %{
+          "component" => to_string(detail.name),
+          "field" => to_string(field),
+          "recordId" => %{"@path" => "#{base}/id"}
+        }
+        |> Map.merge(edit_input(view, resource, editable.edits[field]))
+
+      display
+      |> Map.put("edit", edit)
+      |> Map.put("editValue", %{"@path" => "#{base}/_edit_#{field}"})
+      |> Map.put("editVisible", %{"@path" => "#{base}/_editable_#{detail.name}"})
+      |> Map.put("editDraft", %{"@path" => "/ui/edits/#{detail.name}/values/#{field}"})
+      |> Map.put("editError", %{"@path" => "/ui/edit_errors/#{detail.name}/#{field}"})
+    else
+      display
+    end
+  end
+
+  defp put_edit(display, _view, _detail, _field), do: display
+
+  # The input an edited attribute takes, from its type: a choice of an
+  # enum's or `one_of`'s values, a number, a date, else text.
+  defp edit_input(view, resource, attr) do
+    case AshA2ui.TypeMapper.choices(resource, attr, view.l10n) do
+      [_ | _] = choices ->
+        %{
+          "input" => "choice",
+          "options" =>
+            Enum.map(choices, fn {value, label} ->
+              %{"value" => to_string(value), "label" => label}
+            end)
+        }
+
+      [] ->
+        %{"input" => edit_kind(resource, attr)}
+    end
+  end
+
+  defp edit_kind(resource, attr) do
+    case ResourceInfo.attribute(resource, attr) do
+      %{type: type} -> type |> Ash.Type.get_type() |> edit_type_kind()
+      nil -> "text"
+    end
+  end
+
+  defp edit_type_kind(type) when type in [Ash.Type.Integer], do: "integer"
+  defp edit_type_kind(type) when type in [Ash.Type.Decimal, Ash.Type.Float], do: "number"
+  defp edit_type_kind(Ash.Type.Date), do: "date"
+  defp edit_type_kind(_type), do: "text"
+
+  # Catalog 3.9: the save bar, last in the page.
+  defp save_bar_children(%{save_bar: nil}), do: []
+  defp save_bar_children(_view), do: ["save_bar"]
+
+  defp save_bar_components(%{save_bar: nil}), do: []
+
+  defp save_bar_components(%{save_bar: bar} = view) do
+    base = "/detail/#{bar.context}"
+
+    context =
+      %{"edits" => %{"@path" => "/ui/edits"}, "recordId" => %{"@path" => "#{base}/id"}}
+      |> put_contexts_binding(view)
+
+    [
+      %{
+        "id" => "save_bar",
+        "component" => "saveBar",
+        "saveLabel" => bar.save_label,
+        "discardLabel" => bar.discard_label,
+        "edits" => %{"@path" => "/ui/edits"},
+        "record" => %{"@path" => base},
+        "reviews" => save_bar_reviews(view, bar.context),
+        "editReviews" => bar.edit_reviews,
+        "action" => %{"action" => "save_changes", "context" => context}
+      }
+      |> maybe_put("message", bar.message)
+      |> maybe_put("messageWaiting", bar.message_waiting)
+      |> maybe_put("status", bar.status)
+      |> maybe_put("statusOne", bar.status_one)
+      |> maybe_put("domId", bar.id)
+      |> maybe_put("confirm", save_bar_confirm(bar.confirm))
+    ]
+  end
+
+  # The fields under review the bar counts: every `review` field of a
+  # detail of its context, with the card showing it.
+  defp save_bar_reviews(view, context) do
+    for detail <- view.details,
+        detail.context == context,
+        field <- detail.fields,
+        match?(%{review: review} when not is_nil(review), view.fields[field]),
+        uniq: true,
+        do: %{"component" => to_string(detail.name), "field" => to_string(field)}
+  end
+
+  defp save_bar_confirm(nil), do: nil
+
+  defp save_bar_confirm(confirm) do
+    %{
+      "title" => confirm.title,
+      "cancelLabel" => confirm.cancel_label,
+      "saveLabel" => confirm.save_label,
+      "thenWhenClear" => confirm.then_when_clear
+    }
+    |> maybe_put("titleOne", confirm.title_one)
+    |> maybe_put("message", confirm.message)
+    |> maybe_put("messageOne", confirm.message_one)
+    |> maybe_put("thenLabel", confirm.then_action && confirm.then_label)
+    |> maybe_put("then", if(confirm.then_action, do: true))
+    |> maybe_put("thenVisible", confirm.then_visible && to_string(confirm.then_visible))
   end
 
   defp put_badge_bindings(display, %{name: field, badge_tones: tones, badge_help: help}, base) do

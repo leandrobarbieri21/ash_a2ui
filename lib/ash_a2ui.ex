@@ -265,6 +265,19 @@ defmodule AshA2ui do
         it on. Without it the action is offered on every record.
         """
       ],
+      edit: [
+        type: :atom,
+        doc: """
+        The attribute a person edits for this field on an editable `:detail`
+        card (admin catalog 3.9), when the field shown is not the stored
+        value itself: a display calculation (`:total_text`, a formatted
+        amount) is edited as the attribute behind it (`:total`). The input
+        starts from the attribute's value and its type picks the input (text,
+        number, date, or a choice of an atom's `one_of` values). Defaults to
+        the field itself. The card's `editable` `update_action` must accept
+        it.
+        """
+      ],
       empty_text: [
         type: :string,
         doc: """
@@ -1720,21 +1733,45 @@ defmodule AshA2ui do
   @editable %Spark.Dsl.Entity{
     name: :editable,
     describe: """
-    Inline cell editing for a `:table` component: the listed fields render as
-    in-row inputs with a per-cell Save button dispatching the `"edit_cell"`
-    client action — the server runs `update_action` on the identified record
-    with just that field's value (cast against the action like any client
-    input). The Save's outcome is the surface's `/ui/feedback`, like any
-    other write; validation errors are mirrored into
-    the failing row's reserved `_error_<field>` key (rendered next to the
-    cell) alongside the standard `/errors/<field>` write. Not supported
-    together with a `row_layout` (card rows render read-only meta values).
+    Editing in place, on a `:table` or a `:detail` card.
+
+    On a `:table`, the listed fields render as in-row inputs with a per-cell
+    Save button dispatching the `"edit_cell"` client action — the server
+    runs `update_action` on the identified record with just that field's
+    value (cast against the action like any client input). The Save's
+    outcome is the surface's `/ui/feedback`, like any other write;
+    validation errors are mirrored into the failing row's reserved
+    `_error_<field>` key (rendered next to the cell) alongside the standard
+    `/errors/<field>` write. Not supported together with a `row_layout`
+    (card rows render read-only meta values).
+
+    On a `:detail` card (admin catalog 3.9), choosing or focusing a listed
+    field's value opens it as an input in place; Enter or leaving it keeps a
+    change, Escape drops it. Nothing is written yet: the change waits, with
+    every other unsaved change on the surface, until the surface's
+    `save_bar` saves them (the `"save_changes"` client action runs each
+    card's `update_action` on its record with its changed fields, all in one
+    transaction). A field's `edit` names the attribute it edits when the
+    field shown is a display calculation. `visible` gates editing per
+    record, on the server too. The basic catalog draws the card read-only.
     """,
     examples: [
       """
       editable do
         fields [:replacement]
         update_action :update_replacement
+      end
+      """,
+      """
+      component :detail, :facts do
+        context :order
+        fields [:title, :total_text]
+
+        editable do
+          fields [:title, :total_text]
+          update_action :correct
+          visible :correctable
+        end
       end
       """
     ],
@@ -1744,17 +1781,182 @@ defmodule AshA2ui do
         type: {:list, :atom},
         required: true,
         doc: """
-        The table fields rendered as editable cells. Each must be one of the
-        table's fields and accepted by the resolved `update_action`.
+        The fields a person edits. Each must be one of the component's
+        fields, and its attribute (a detail field's `edit`, else the field)
+        accepted by the resolved `update_action`.
         """
       ],
       update_action: [
         type: :atom,
         doc: """
-        The update action a cell commit runs (with only the edited field's
-        value). Defaults to the resource's primary update.
+        The update action the edits run (with only the changed fields'
+        values). Defaults to the primary update of the record's resource: the
+        table's, or the detail card's context's.
+        """
+      ],
+      visible: [
+        type: :atom,
+        doc: """
+        `:detail` only: a public attribute, calculation or aggregate of the
+        card's record saying whether a person may edit it: `true` offers
+        editing, anything else draws the card read-only. Enforced on the
+        server too: a save naming a record that does not offer it is
+        refused. Without it every record offers editing.
         """
       ]
+    ]
+  }
+
+  @save_bar_confirm %Spark.Dsl.Entity{
+    name: :confirm,
+    describe: """
+    The dialog a save opens while fields under review still wait (admin
+    catalog 3.9): Cancel (with Escape, the close button and the backdrop)
+    closes it with nothing saved; the save choice saves the changes; the
+    `then` choice saves them and then runs `then_action` on the bar's
+    record, in the same transaction. Nothing waiting, a save saves at once,
+    without the dialog.
+
+    `title` and `message` may hold `%{count}`, the number of fields still
+    waiting; `title_one` and `message_one` are the forms for one.
+    """,
+    examples: [
+      """
+      confirm do
+        title "Save with %{count} fields not reviewed?"
+        title_one "Save with 1 field not reviewed?"
+        message "You can come back to them later."
+        save_label "Save progress"
+        then_label "Save and mark reviewed"
+        then_action :review
+        then_visible :review_open
+      end
+      """
+    ],
+    target: AshA2ui.SaveBar.Confirm,
+    schema: [
+      title: [type: :string, required: true, doc: "The dialog's title. Translated."],
+      title_one: [type: :string, doc: "The title when one field waits. Translated."],
+      message: [type: :string, doc: "The dialog's text. Translated."],
+      message_one: [type: :string, doc: "The text when one field waits. Translated."],
+      cancel_label: [
+        type: :string,
+        doc: "The cancel button. Translated. Defaults to the library's \"Cancel\"."
+      ],
+      save_label: [
+        type: :string,
+        doc:
+          "The choice that saves the changes only. Translated. Defaults to the library's \"Save\"."
+      ],
+      then_action: [
+        type: :atom,
+        doc: """
+        An update action of the bar's record run after the changes are
+        saved, in the same transaction, with no input (marking the record
+        reviewed). Without it the dialog offers no second choice.
+        """
+      ],
+      then_label: [
+        type: :string,
+        doc: "The choice that saves and runs `then_action`. Translated."
+      ],
+      then_visible: [
+        type: :atom,
+        doc: """
+        A public attribute, calculation or aggregate of the bar's record
+        saying whether `then_action` is offered on it: `true` offers it.
+        Enforced on the server too. Without it it is always offered.
+        """
+      ],
+      then_saved_message: [
+        type: :string,
+        doc: "The outcome's message after the `then` choice. Translated. Defaults to the bar's."
+      ],
+      then_when_clear: [
+        type: :boolean,
+        default: false,
+        doc: """
+        Whether a save with nothing waiting runs `then_action` too, without
+        the dialog, while the record offers it: the last fields reviewed,
+        saving finishes the review.
+        """
+      ]
+    ]
+  }
+
+  @save_bar %Spark.Dsl.Entity{
+    name: :save_bar,
+    describe: """
+    The bar pinned to the bottom of the page while a person has unsaved
+    changes to the surface's editable `:detail` cards (admin catalog 3.9):
+    its message, how many fields under review still wait, Discard (drops
+    every change) and Save (saves them all through the `"save_changes"`
+    client action, each card's `update_action` on its record, in one
+    transaction). A refused save keeps the changes and says why: each
+    field's error at its input, the rest as the outcome. A `confirm` asks
+    first while fields still wait. Unsaved changes survive a refresh of the
+    surface's data.
+    """,
+    examples: [
+      """
+      save_bar do
+        context :order
+        message "You have unsaved changes"
+        status "%{count} to check"
+        saved_message "Changes saved."
+      end
+      """
+    ],
+    target: AshA2ui.SaveBar,
+    entities: [confirm: [@save_bar_confirm]],
+    singleton_entity_keys: [:confirm],
+    schema: [
+      context: [
+        type: :atom,
+        required: true,
+        doc: """
+        The context whose record the bar reads: its fields under review (a
+        `review` field on any `:detail` of the context) are the ones it
+        counts, and its `confirm`'s `then_action` runs on it.
+        """
+      ],
+      message: [
+        type: :string,
+        doc: "The bar's message. Translated."
+      ],
+      message_waiting: [
+        type: :string,
+        doc: "The bar's message while fields under review still wait. Translated."
+      ],
+      status: [
+        type: :string,
+        doc:
+          "A tag counting the fields still waiting, with `%{count}`, shown while any wait. Translated."
+      ],
+      status_one: [type: :string, doc: "The tag when one field waits. Translated."],
+      save_label: [
+        type: :string,
+        doc: "The Save button. Translated. Defaults to the library's \"Save changes\"."
+      ],
+      discard_label: [
+        type: :string,
+        doc: "The Discard button. Translated. Defaults to the library's \"Discard changes\"."
+      ],
+      saved_message: [
+        type: :string,
+        doc:
+          "The outcome's message after a save. Translated. Defaults to the library's \"Changes saved.\""
+      ],
+      edit_reviews: [
+        type: :boolean,
+        default: false,
+        doc: """
+        Whether saving an edited field reviews it (the host's update action
+        records the review), so the count of fields still waiting leaves out
+        the ones being edited.
+        """
+      ],
+      id: [type: :string, doc: "A DOM id for the bar."]
     ]
   }
 
@@ -3025,6 +3227,7 @@ defmodule AshA2ui do
       @page_header,
       @section_nav,
       @document_pane,
+      @save_bar,
       @component,
       @field,
       @action
@@ -3051,6 +3254,7 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyCalendar,
     AshA2ui.Verifiers.VerifyTableDisplays,
     AshA2ui.Verifiers.VerifyEditable,
+    AshA2ui.Verifiers.VerifySaveBar,
     AshA2ui.Verifiers.VerifyReports,
     AshA2ui.Verifiers.VerifyExport,
     AshA2ui.Verifiers.VerifyRelationships,

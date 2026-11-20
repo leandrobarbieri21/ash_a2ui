@@ -57,6 +57,8 @@ for the resource named by `for_resource`).
  * [section_nav](#a2ui-section_nav)
    * nav_item
  * [document_pane](#a2ui-document_pane)
+ * [save_bar](#a2ui-save_bar)
+   * confirm
  * [component](#a2ui-component)
    * nested_form
    * group
@@ -795,6 +797,118 @@ end
 
 Target: `AshA2ui.DocumentPane`
 
+### a2ui.save_bar
+
+
+The bar pinned to the bottom of the page while a person has unsaved
+changes to the surface's editable `:detail` cards (admin catalog 3.9):
+its message, how many fields under review still wait, Discard (drops
+every change) and Save (saves them all through the `"save_changes"`
+client action, each card's `update_action` on its record, in one
+transaction). A refused save keeps the changes and says why: each
+field's error at its input, the rest as the outcome. A `confirm` asks
+first while fields still wait. Unsaved changes survive a refresh of the
+surface's data.
+
+
+### Nested DSLs
+ * [confirm](#a2ui-save_bar-confirm)
+
+
+### Examples
+```
+save_bar do
+  context :order
+  message "You have unsaved changes"
+  status "%{count} to check"
+  saved_message "Changes saved."
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`context`](#a2ui-save_bar-context){: #a2ui-save_bar-context .spark-required} | `atom` |  | The context whose record the bar reads: its fields under review (a `review` field on any `:detail` of the context) are the ones it counts, and its `confirm`'s `then_action` runs on it. |
+| [`message`](#a2ui-save_bar-message){: #a2ui-save_bar-message } | `String.t` |  | The bar's message. Translated. |
+| [`message_waiting`](#a2ui-save_bar-message_waiting){: #a2ui-save_bar-message_waiting } | `String.t` |  | The bar's message while fields under review still wait. Translated. |
+| [`status`](#a2ui-save_bar-status){: #a2ui-save_bar-status } | `String.t` |  | A tag counting the fields still waiting, with `%{count}`, shown while any wait. Translated. |
+| [`status_one`](#a2ui-save_bar-status_one){: #a2ui-save_bar-status_one } | `String.t` |  | The tag when one field waits. Translated. |
+| [`save_label`](#a2ui-save_bar-save_label){: #a2ui-save_bar-save_label } | `String.t` |  | The Save button. Translated. Defaults to the library's "Save changes". |
+| [`discard_label`](#a2ui-save_bar-discard_label){: #a2ui-save_bar-discard_label } | `String.t` |  | The Discard button. Translated. Defaults to the library's "Discard changes". |
+| [`saved_message`](#a2ui-save_bar-saved_message){: #a2ui-save_bar-saved_message } | `String.t` |  | The outcome's message after a save. Translated. Defaults to the library's "Changes saved." |
+| [`edit_reviews`](#a2ui-save_bar-edit_reviews){: #a2ui-save_bar-edit_reviews } | `boolean` | `false` | Whether saving an edited field reviews it (the host's update action records the review), so the count of fields still waiting leaves out the ones being edited. |
+| [`id`](#a2ui-save_bar-id){: #a2ui-save_bar-id } | `String.t` |  | A DOM id for the bar. |
+
+
+### a2ui.save_bar.confirm
+
+
+The dialog a save opens while fields under review still wait (admin
+catalog 3.9): Cancel (with Escape, the close button and the backdrop)
+closes it with nothing saved; the save choice saves the changes; the
+`then` choice saves them and then runs `then_action` on the bar's
+record, in the same transaction. Nothing waiting, a save saves at once,
+without the dialog.
+
+`title` and `message` may hold `%{count}`, the number of fields still
+waiting; `title_one` and `message_one` are the forms for one.
+
+
+
+
+### Examples
+```
+confirm do
+  title "Save with %{count} fields not reviewed?"
+  title_one "Save with 1 field not reviewed?"
+  message "You can come back to them later."
+  save_label "Save progress"
+  then_label "Save and mark reviewed"
+  then_action :review
+  then_visible :review_open
+end
+
+```
+
+
+
+
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`title`](#a2ui-save_bar-confirm-title){: #a2ui-save_bar-confirm-title .spark-required} | `String.t` |  | The dialog's title. Translated. |
+| [`title_one`](#a2ui-save_bar-confirm-title_one){: #a2ui-save_bar-confirm-title_one } | `String.t` |  | The title when one field waits. Translated. |
+| [`message`](#a2ui-save_bar-confirm-message){: #a2ui-save_bar-confirm-message } | `String.t` |  | The dialog's text. Translated. |
+| [`message_one`](#a2ui-save_bar-confirm-message_one){: #a2ui-save_bar-confirm-message_one } | `String.t` |  | The text when one field waits. Translated. |
+| [`cancel_label`](#a2ui-save_bar-confirm-cancel_label){: #a2ui-save_bar-confirm-cancel_label } | `String.t` |  | The cancel button. Translated. Defaults to the library's "Cancel". |
+| [`save_label`](#a2ui-save_bar-confirm-save_label){: #a2ui-save_bar-confirm-save_label } | `String.t` |  | The choice that saves the changes only. Translated. Defaults to the library's "Save". |
+| [`then_action`](#a2ui-save_bar-confirm-then_action){: #a2ui-save_bar-confirm-then_action } | `atom` |  | An update action of the bar's record run after the changes are saved, in the same transaction, with no input (marking the record reviewed). Without it the dialog offers no second choice. |
+| [`then_label`](#a2ui-save_bar-confirm-then_label){: #a2ui-save_bar-confirm-then_label } | `String.t` |  | The choice that saves and runs `then_action`. Translated. |
+| [`then_visible`](#a2ui-save_bar-confirm-then_visible){: #a2ui-save_bar-confirm-then_visible } | `atom` |  | A public attribute, calculation or aggregate of the bar's record saying whether `then_action` is offered on it: `true` offers it. Enforced on the server too. Without it it is always offered. |
+| [`then_saved_message`](#a2ui-save_bar-confirm-then_saved_message){: #a2ui-save_bar-confirm-then_saved_message } | `String.t` |  | The outcome's message after the `then` choice. Translated. Defaults to the bar's. |
+| [`then_when_clear`](#a2ui-save_bar-confirm-then_when_clear){: #a2ui-save_bar-confirm-then_when_clear } | `boolean` | `false` | Whether a save with nothing waiting runs `then_action` too, without the dialog, while the record offers it: the last fields reviewed, saving finishes the review. |
+
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.SaveBar.Confirm`
+
+
+
+
+### Introspection
+
+Target: `AshA2ui.SaveBar`
+
 ### a2ui.component
 ```elixir
 component name, as \\ nil
@@ -1285,15 +1399,27 @@ Target: `AshA2ui.Sections`
 ### a2ui.component.editable
 
 
-Inline cell editing for a `:table` component: the listed fields render as
-in-row inputs with a per-cell Save button dispatching the `"edit_cell"`
-client action — the server runs `update_action` on the identified record
-with just that field's value (cast against the action like any client
-input). The Save's outcome is the surface's `/ui/feedback`, like any
-other write; validation errors are mirrored into
-the failing row's reserved `_error_<field>` key (rendered next to the
-cell) alongside the standard `/errors/<field>` write. Not supported
-together with a `row_layout` (card rows render read-only meta values).
+Editing in place, on a `:table` or a `:detail` card.
+
+On a `:table`, the listed fields render as in-row inputs with a per-cell
+Save button dispatching the `"edit_cell"` client action — the server
+runs `update_action` on the identified record with just that field's
+value (cast against the action like any client input). The Save's
+outcome is the surface's `/ui/feedback`, like any other write;
+validation errors are mirrored into the failing row's reserved
+`_error_<field>` key (rendered next to the cell) alongside the standard
+`/errors/<field>` write. Not supported together with a `row_layout`
+(card rows render read-only meta values).
+
+On a `:detail` card (admin catalog 3.9), choosing or focusing a listed
+field's value opens it as an input in place; Enter or leaving it keeps a
+change, Escape drops it. Nothing is written yet: the change waits, with
+every other unsaved change on the surface, until the surface's
+`save_bar` saves them (the `"save_changes"` client action runs each
+card's `update_action` on its record with its changed fields, all in one
+transaction). A field's `edit` names the attribute it edits when the
+field shown is a display calculation. `visible` gates editing per
+record, on the server too. The basic catalog draws the card read-only.
 
 
 
@@ -1307,6 +1433,20 @@ end
 
 ```
 
+```
+component :detail, :facts do
+  context :order
+  fields [:title, :total_text]
+
+  editable do
+    fields [:title, :total_text]
+    update_action :correct
+    visible :correctable
+  end
+end
+
+```
+
 
 
 
@@ -1314,8 +1454,9 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`fields`](#a2ui-component-editable-fields){: #a2ui-component-editable-fields .spark-required} | `list(atom)` |  | The table fields rendered as editable cells. Each must be one of the table's fields and accepted by the resolved `update_action`. |
-| [`update_action`](#a2ui-component-editable-update_action){: #a2ui-component-editable-update_action } | `atom` |  | The update action a cell commit runs (with only the edited field's value). Defaults to the resource's primary update. |
+| [`fields`](#a2ui-component-editable-fields){: #a2ui-component-editable-fields .spark-required} | `list(atom)` |  | The fields a person edits. Each must be one of the component's fields, and its attribute (a detail field's `edit`, else the field) accepted by the resolved `update_action`. |
+| [`update_action`](#a2ui-component-editable-update_action){: #a2ui-component-editable-update_action } | `atom` |  | The update action the edits run (with only the changed fields' values). Defaults to the primary update of the record's resource: the table's, or the detail card's context's. |
+| [`visible`](#a2ui-component-editable-visible){: #a2ui-component-editable-visible } | `atom` |  | `:detail` only: a public attribute, calculation or aggregate of the card's record saying whether a person may edit it: `true` offers editing, anything else draws the card read-only. Enforced on the server too: a save naming a record that does not offer it is refused. Without it every record offers editing. |
 
 
 
@@ -1594,6 +1735,7 @@ end
 | [`review`](#a2ui-field-review){: #a2ui-field-review } | `atom` |  | A public attribute, calculation or aggregate of the same resource that says how this field's value was filled in, for `:detail` cards and table rows: a map with a `state`, one of `"pending"` (filled in automatically, nobody has checked it yet), `"reviewed"` (a person checked it) or `"missing"` (looked for and not found), and an optional citation: `page` (a positive integer, the page of the source document the value came from), `href` (an address that opens the source at that place), `quote` (the words the value was read from) and `boxes` (where the value sits on the source's pages, `[%{page, x, y, width, height}]` as fractions of the page: the regions of a `document_pane` bound to the card, whose page tag then opens the pane there). Keys and the state may be atoms or strings. `nil`, or a value without a known state, means the field has no review. The record carries the normalized review at `_review_<field>` (see `AshA2ui.Review`), and the admin `fieldDisplay` binds it as `review` (admin catalog 3.1): the value is highlighted while pending, with its state in words and a page tag linking to the source. A table drawing the field carries each row's review at the same key, bound by the admin `dataGrid` column as `review` and by a column subtitle as `reviewPath` (admin catalog 3.3); every table drawing the field must have the named field too. The basic catalog shows the value alone. |
 | [`field_action`](#a2ui-field-field_action){: #a2ui-field-field_action } | `atom` |  | An update action of the record a `:detail` card shows, offered as a button beside this field (admin catalog 3.2): choosing it runs the action on that record, as the actor, with the field's name (a string) as its `:field` argument, which the action must declare. The record is re-read through the card's context first (an authorized read), and the card's record is re-read and re-sent afterwards. The `action` entity of the same name gives the button its `label` (default: the humanized action name), its `icon` and the tables it `refreshes`; its `visible_when` gates row actions only. Several fields may share one action. The basic catalog and tables draw no button. |
 | [`field_action_visible`](#a2ui-field-field_action_visible){: #a2ui-field-field_action_visible } | `atom` |  | A public attribute, calculation or aggregate of the same resource that says, per record, whether this field's `field_action` is offered: `true` offers it, anything else hides it. Enforced on the server too: the action is refused for a record it does not offer it on. Without it the action is offered on every record. |
+| [`edit`](#a2ui-field-edit){: #a2ui-field-edit } | `atom` |  | The attribute a person edits for this field on an editable `:detail` card (admin catalog 3.9), when the field shown is not the stored value itself: a display calculation (`:total_text`, a formatted amount) is edited as the attribute behind it (`:total`). The input starts from the attribute's value and its type picks the input (text, number, date, or a choice of an atom's `one_of` values). Defaults to the field itself. The card's `editable` `update_action` must accept it. |
 | [`empty_text`](#a2ui-field-empty_text){: #a2ui-field-empty_text } | `String.t` |  | What a `:detail` card shows for this field when the record has no value (`nil` or `""`), instead of a blank: "Not stated", "None". Shown muted by the admin catalog (`fieldDisplay`'s `emptyText`); the basic catalog shows the blank. A table's admin dataGrid column carries it too (catalog 1.14), for list rows ("No scope of work stated"). Translated in the metadata domain. |
 | [`badge_text`](#a2ui-field-badge_text){: #a2ui-field-badge_text } | `keyword` | `[]` | Draws this field as a badge on `:detail` cards, with the display text per value, matched like a `row_layout`'s `badge_text` (atom and boolean values). Unmatched values show their humanized value, an enumerated value its choice label. Declaring any of `badge_text`, `badge_tones` or `badge_help` makes the field a badge; its text, tone and help are served at `/detail/<context>/_badge_<field>`, `_badge_tone_<field>` and `_badge_help_<field>`, the same keys a row layout's badge uses. |
 | [`badge_tones`](#a2ui-field-badge_tones){: #a2ui-field-badge_tones } | `keyword` | `[]` | The tone per value of a `:detail` badge (see `badge_text`), from the row layout badge tones (`AshA2ui.RowLayout.tones/0`). Unmatched values are `:neutral`. |

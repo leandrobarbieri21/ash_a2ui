@@ -270,7 +270,7 @@ defmodule AshA2ui.Test.SchemaHelper do
       nil ->
         {:error, ["#: the catalog it resolves in does not declare #{inspect(kind)}"]}
 
-      index ->
+      _definition ->
         uri = Resolver.base() <> Resolver.catalog_uri(files, index)
 
         %{

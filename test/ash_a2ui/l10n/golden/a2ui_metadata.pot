@@ -11,6 +11,18 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: a2ui_metadata\n"
 
+#: test/support/statement_edit_ui.ex:1
+msgid "%{count} to check"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "%{count} values still wait."
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "1 to check"
+msgstr ""
+
 #: test/support/kitchen_sink.ex:1
 #: test/support/kitchen_sink_v1_ui.ex:1
 #: test/support/promotion.ex:1
@@ -44,6 +56,7 @@ msgstr ""
 #: test/support/links.ex:230
 #: test/support/links.ex:267
 #: test/support/links.ex:333
+#: test/support/statement_edit_ui.ex:1
 msgid "Amount"
 msgstr ""
 
@@ -667,6 +680,7 @@ msgstr ""
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
+#: test/support/statement_edit_ui.ex:1
 msgid "Facts"
 msgstr ""
 
@@ -791,6 +805,10 @@ msgstr ""
 
 #: test/support/adoption_ui.ex:77
 msgid "Job card"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Kind"
 msgstr ""
 
 #: test/support/kitchen_sink.ex:1
@@ -997,6 +1015,7 @@ msgstr ""
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 #: test/support/manifest_task.ex:1
+#: test/support/statement_edit_ui.ex:1
 msgid "Note"
 msgstr ""
 
@@ -1327,9 +1346,33 @@ msgstr ""
 msgid "Review item"
 msgstr ""
 
+#: test/support/statement_edit_ui.ex:1
+msgid "Reviewing the statement"
+msgstr ""
+
 #: test/support/enrollment.ex:1
 #: test/support/enrollment.ex:79
 msgid "Role"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Save and finish"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Save progress"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Save with %{count} values unchecked?"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Save with 1 value unchecked?"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Saved and finished."
 msgstr ""
 
 #: test/support/appointment_page_ui.ex:1
@@ -1507,6 +1550,10 @@ msgstr ""
 #: test/support/word_report_ui.ex:100
 #: test/support/word_report_ui.ex:23
 msgid "State"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "Statement"
 msgstr ""
 
 #: test/support/action_handler_fixtures.ex:152
@@ -1703,6 +1750,7 @@ msgstr ""
 #: test/support/prompt_scope.ex:190
 #: test/support/record_page_ui.ex:1
 #: test/support/sort_only_ui.ex:1
+#: test/support/statement_edit_ui.ex:1
 #: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
 #: test/support/visit_document_ui.ex:1
@@ -1861,6 +1909,10 @@ msgstr ""
 #: test/support/word_report_ui.ex:23
 #: test/support/word_report_ui.ex:48
 msgid "Word"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "You have unsaved changes"
 msgstr ""
 
 #: test/support/experience_ui.ex:190

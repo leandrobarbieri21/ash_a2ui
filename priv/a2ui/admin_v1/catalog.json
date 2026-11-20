@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.8.0",
+        "version": "3.9.0",
         "changelog": {
+          "3.9.0": "Additive: editing a record in place, saved by a save bar. A fieldDisplay may carry edit ({component, field, recordId, input, options?}: the card and field it edits, input one of text, integer, number, date or choice, options the choices) with editValue (the stored value the input starts from), editVisible (whether the record offers editing), editDraft (the person's unsaved change, /ui/edits/<card>/values/<field>) and editError (a refused save's message for it, /ui/edit_errors/<card>/<field>). While editVisible is true, choosing or focusing the value opens it as an input; Enter or leaving it writes a changed value to editDraft (and the card's recordId to /ui/edits/<card>/recordId), Escape drops the edit; a field with a draft shows the draft. Nothing is sent. The new saveBar component, last in an entityPage's children, shows while /ui/edits holds a change: its message (messageWaiting while fields under review still wait), a status tag counting them (status/statusOne, %{count} replaced), Discard (clears /ui/edits and /ui/edit_errors) and Save, which sends its action (save_changes, the ash_a2ui catalog's ashAction) with choice save. With a confirm and fields still waiting, Save first opens a dialog: Cancel sends nothing, saveLabel sends choice save, thenLabel (when then is true and the bar's record's thenVisible field is true) sends choice then; with nothing waiting and thenWhenClear, Save sends choice then. A field counts as waiting while its review state is pending or missing, unless editReviews is true and it has a draft. A whole-model refresh keeps /ui/edits. Renderers that ignore edit draw the value read-only. The catalogId is unchanged.",
           "3.8.0": "Additive: a value and its document region linked both ways. A renderer marks the element it draws for a value that cites regions (a fieldDisplay with a review href, a dataGrid row with review cells) with data-a2ui-region, its value the reviews' hrefs separated by spaces. While a documentPane is shown with its document beside the sections, pointing at or focusing inside a marked element (or a link whose href starts with regionHref) shows its regions linked in the viewer, scrolling only the viewer's own canvas when the first is out of view; nothing is written, sent or focused, and leaving or blurring clears it. Activating a region (click, Enter or Space) also scrolls the page to the marked element citing it, flashes it for 3 seconds and, from the keyboard, moves focus to it. The state a linked region is drawn in is the renderer's (linked by default). Renderers that ignore the attribute draw as before. Nothing on the wire changes; the catalogId is unchanged.",
           "3.7.0": "Additive: live links. A page header breadcrumb step gains an optional live, navigate or patch: on a LiveView transport a plain primary click on the step follows its address inside the LiveView (navigate as push_navigate, patch as push_patch) instead of loading the page. The renderer marks the drawn link with the data-a2ui-live attribute (its value the kind) and the AshA2ui hook follows it, across shadow roots; a modified or middle click, a cross-origin address, a renderer that ignores live and a page without the hook follow href as a normal link. It is additive over 3.6.0. The catalogId is unchanged.",
           "3.6.0": "Additive: review summaries. alertBanner gains an optional count (a binding to how many of the surface's review fields still wait, pending or missing, on the record its context selects: /detail/<context>/_review_summary_<component>/count); with it, linkHref and linkLabel bind to the same summary's href (the section of the card holding the first waiting field in declaration order, its section nav #anchor when listed, or the declared fallback) and label. Renderers that ignore count draw the alert and its link. The catalogId is unchanged.",
@@ -570,9 +571,94 @@
         "review": {
           "$ref": "common_types.json#/$defs/DataBinding",
           "description": "Optional (3.1): binding to a review field's review (/detail/<context>/_review_<field>), an object {state, stateLabel, page?, pageLabel?, href?, quote?} or null: state is pending (filled in automatically, not checked yet), reviewed (a person checked it) or missing (looked for, not found), stateLabel the state in words (translated), page the source page the value came from (from 1), pageLabel its tag (translated), href an address opening the source at that place and quote the words the value was read from. When present a pending value is highlighted and the state is written out, not only coloured, beside the page tag (a link when href is present). From 3.4 it may carry boxes ([{page, x, y, width, height}], fractions of the page): where the value sits in a documentPane's document; its href then opens the pane there."
+        },
+        "edit": {
+          "type": "object",
+          "description": "Optional (3.9): the field is edited in place. While editVisible is true, choosing or focusing the value opens it as an input of kind input, starting from editDraft when there is one, else editValue. Enter or leaving it with a changed value writes the value to editDraft and the card's recordId (resolved now) to /ui/edits/<component>/recordId; leaving it unchanged closes it; Escape closes it and drops the change. A value back at editValue removes the draft. Nothing is sent: a saveBar saves.",
+          "properties": {
+            "component": {"type": "string", "description": "The detail card the field is on."},
+            "field": {"type": "string", "description": "The field's name."},
+            "recordId": {"$ref": "common_types.json#/$defs/DynamicValue", "description": "The card's record id (bound to /detail/<context>/id)."},
+            "input": {"type": "string", "enum": ["text", "integer", "number", "date", "choice"], "description": "The input: text, a whole number, a number, a date (YYYY-MM-DD), or one of options."},
+            "options": {
+              "type": "array",
+              "description": "A choice input's options, labels translated.",
+              "items": {"type": "object", "properties": {"value": {"type": "string"}, "label": {"type": "string"}}, "required": ["value", "label"]}
+            }
+          },
+          "required": ["component", "field", "recordId", "input"],
+          "additionalProperties": false
+        },
+        "editValue": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (3.9): binding to the stored value the input starts from (/detail/<context>/_edit_<field>): the attribute behind a formatted value."
+        },
+        "editVisible": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (3.9): binding to whether the record offers editing on the card (/detail/<context>/_editable_<card>, a boolean). The value is read-only while it is not true; the server re-checks every save."
+        },
+        "editDraft": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (3.9): binding to the person's unsaved change (/ui/edits/<card>/values/<field>), absent while there is none. While present the value shows the draft, marked as changed."
+        },
+        "editError": {
+          "$ref": "common_types.json#/$defs/DataBinding",
+          "description": "Optional (3.9): binding to a refused save's message for the field (/ui/edit_errors/<card>/<field>), shown at the input."
         }
       },
       "required": ["component", "label", "value"]
+    },
+    "saveBar": {
+      "type": "object",
+      "allowedParents": ["entityPage"],
+      "description": "3.9: the bar pinned to the bottom of the page while a person has unsaved changes (/ui/edits holds a draft). It counts the fields under review still waiting, discards the changes, or saves them all through its action (the ash_a2ui catalog's ashAction save_changes, its context's bindings resolved at click time, choice added). A confirm opens a dialog first while fields still wait.",
+      "properties": {
+        "component": {"const": "saveBar"},
+        "message": {"type": "string", "description": "Optional: the bar's message, translated."},
+        "messageWaiting": {"type": "string", "description": "Optional: the message while fields under review still wait, translated."},
+        "status": {"type": "string", "description": "Optional: a tag counting the fields still waiting, shown while any wait; %{count} is replaced. Translated."},
+        "statusOne": {"type": "string", "description": "Optional: the tag when one field waits, translated."},
+        "saveLabel": {"type": "string", "description": "The Save button, translated."},
+        "discardLabel": {"type": "string", "description": "The Discard button, translated."},
+        "edits": {"$ref": "common_types.json#/$defs/DataBinding", "description": "Binding to the unsaved changes, /ui/edits: {<card>: {recordId, values: {<field>: value}}}."},
+        "record": {"$ref": "common_types.json#/$defs/DataBinding", "description": "Binding to the bar's record (/detail/<context>): its _review_<field> states and its thenVisible field."},
+        "reviews": {
+          "type": "array",
+          "description": "The fields under review the bar counts: each {component, field}, read at the record's _review_<field>. One waits while its state is pending or missing (and, with editReviews, it has no draft).",
+          "items": {"type": "object", "properties": {"component": {"type": "string"}, "field": {"type": "string"}}, "required": ["component", "field"]}
+        },
+        "editReviews": {"type": "boolean", "description": "Whether a field with a draft no longer counts as waiting: saving it reviews it."},
+        "action": {
+          "type": "object",
+          "description": "The save envelope: {action: save_changes, context: {edits, recordId, contexts?}}; the renderer adds choice (save or then).",
+          "properties": {
+            "action": {"type": "string"},
+            "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}}
+          },
+          "required": ["action", "context"]
+        },
+        "confirm": {
+          "type": "object",
+          "description": "Optional: the dialog a Save opens while fields still wait. title/message (and their One forms for one field) with %{count} replaced; Cancel (and Escape, close, backdrop) sends nothing; saveLabel sends choice save; thenLabel, while then is true and the record's thenVisible field is true (or no thenVisible), sends choice then. thenWhenClear: with nothing waiting, Save sends choice then when it is offered.",
+          "properties": {
+            "title": {"type": "string"},
+            "titleOne": {"type": "string"},
+            "message": {"type": "string"},
+            "messageOne": {"type": "string"},
+            "cancelLabel": {"type": "string"},
+            "saveLabel": {"type": "string"},
+            "thenLabel": {"type": "string"},
+            "then": {"type": "boolean"},
+            "thenVisible": {"type": "string"},
+            "thenWhenClear": {"type": "boolean"}
+          },
+          "required": ["title", "cancelLabel", "saveLabel"],
+          "additionalProperties": false
+        },
+        "domId": {"type": "string", "description": "Optional: a DOM id for the bar."},
+        "weight": {"type": "number"}
+      },
+      "required": ["component", "saveLabel", "discardLabel", "edits", "record", "reviews", "action"]
     },
     "formSection": {
       "type": "object",
@@ -974,7 +1060,7 @@
       "description": "The relative weight of this component within a Row or Column. This is similar to the CSS 'flex-grow' property. Note: this may ONLY be set when the component is a direct descendant of a Row or Column."
     },
     "anyComponent": {
-      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/alertBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/documentPane"}, {"$ref": "#/components/documentViewer"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
+      "oneOf": [{"$ref": "#/components/entityPage"}, {"$ref": "#/components/dataGrid"}, {"$ref": "#/components/emptyState"}, {"$ref": "#/components/pagination"}, {"$ref": "#/components/recordPanel"}, {"$ref": "#/components/fieldDisplay"}, {"$ref": "#/components/formSection"}, {"$ref": "#/components/actionBar"}, {"$ref": "#/components/statusBanner"}, {"$ref": "#/components/alertBanner"}, {"$ref": "#/components/confirmDialog"}, {"$ref": "#/components/calendarView"}, {"$ref": "#/components/liveDiagram"}, {"$ref": "#/components/documentPane"}, {"$ref": "#/components/documentViewer"}, {"$ref": "#/components/filterPicker"}, {"$ref": "#/components/saveBar"}, {"$ref": "#/components/TextField"}, {"$ref": "#/components/CheckBox"}, {"$ref": "#/components/ChoicePicker"}, {"$ref": "#/components/DateTimeInput"}, {"$ref": "#/components/Modal"}]
     },
     "anyFunction": {
       "oneOf": [{"$ref": "#/functions/openSurface"}]

@@ -227,7 +227,13 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     |> Enum.concat(editable_actions(components, target))
     |> Enum.concat(field_actions(Verifier.get_entities(dsl_state, [:a2ui]), components))
     |> Enum.concat(header_actions(Verifier.get_entities(dsl_state, [:a2ui])))
+    |> Enum.concat(save_bar_actions(Verifier.get_entities(dsl_state, [:a2ui])))
     |> MapSet.new()
+  end
+
+  # The action a save bar's confirm runs after a save (catalog 3.9).
+  defp save_bar_actions(entities) do
+    for %AshA2ui.SaveBar{confirm: %{then_action: action}} <- entities, action, do: action
   end
 
   # The actions a page header's buttons run (catalog 3.5).
