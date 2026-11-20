@@ -165,6 +165,25 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Row field actions, and rows in review summaries** (admin catalog
+  3.9.0). A field's `field_action` may sit on a field a table draws: each
+  row then carries a button beside the value (the dataGrid column's
+  `action`, the same entry shape as a detail card's, and `actionVisible`,
+  a row-relative `_action_<field>` gate). The `field_action` ashAction
+  names the table and the field; the server re-reads the row through the
+  table's own read and context filters, refuses it unless the row offers
+  the action, runs the update as the actor, refreshes the tables the
+  action's `refreshes` names and re-sends the records of the contexts the
+  table is filtered by. An action declaring no `:field` argument (one that
+  marks the whole record) now compiles and runs without the field's name,
+  on a detail card too. A `review_summary` also counts each row of a table
+  filtered by its context alone that still has a review field waiting,
+  once, in declaration order with the cards' fields, linking to the
+  table's section. The stock dataGrid draws the button after the cell's
+  review; a host swap reads `cellActionOffered(row, column)` and sends
+  with `onCellAction(entry, index)`. Additive over 3.8.0: the catalogId is
+  unchanged.
+
 - **A value and its document region, linked both ways** (admin catalog
   3.8.0). While a `document_pane` is shown beside the sections, pointing
   at a value that cites a region, or focusing inside it, shows the region

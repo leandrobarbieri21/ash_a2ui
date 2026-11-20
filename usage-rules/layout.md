@@ -340,8 +340,9 @@ topics for the full contracts.
 
 - A button beside one detail value, running an update action on the
   card's record for that field (mark this value reviewed, flag it, ask
-  about it). `field_action` names the update action; it must declare a
-  `:field` argument, which receives the field's name as a string.
+  about it). `field_action` names the update action; a `:field` argument,
+  when it declares one, receives the field's name as a string (an action
+  that marks the whole record declares none).
   `field_action_visible` names a boolean attribute or calculation saying
   per record whether the button is offered (omit it to always offer it).
 
@@ -379,16 +380,46 @@ topics for the full contracts.
   "field_action", context, icon?}`, the rowActions entry shape) and
   `actionVisible` (`/detail/<context>/_action_<field>`). The detail data
   carries `_action_<field>` (true or false) for every field action. The
-  basic catalog and tables draw no button.
+  basic catalog draws no button.
 - The `field_action` ashAction sends the card and the field, never the
   action: the server finds the action in the field's declaration, re-reads
   the record through the card's context as the actor, refuses it unless
   `field_action_visible` holds, runs the update as the actor and re-sends
   the card's record (`/detail/<context>`). Authorization is the action's
   own policies.
-- A `field_action` that is not an update action of the card's record, one
-  without a `:field` argument, or a `field_action_visible` that is not a
-  public field of that record does not compile.
+- In a table (catalog 3.9) the same declaration puts the button in each
+  row, beside the value, for an action on the row's record: one check per
+  line, say, that marks every value on it reviewed. The column carries
+  `action` and a row-relative `actionVisible` (`_action_<field>`), each row
+  its `_action_<field>`. The server re-reads the row through the table's
+  own read and context filters, so a row the table would not show is
+  refused, and after the update refreshes the action's `refreshes` tables
+  and re-sends the records of the contexts the table is filtered by (their
+  review summaries count its rows).
+
+  ```elixir
+  component :table, :lines do
+    resource MyApp.OrderLine
+    context_filter order_id: :order
+    fields [:service, :price]
+  end
+
+  field :price do
+    review :price_review
+    field_action :review_line      # an update of MyApp.OrderLine, no :field argument
+    field_action_visible :review_open
+  end
+
+  action :review_line do
+    label "Mark as reviewed"
+    icon "check"
+    refreshes [:lines]
+  end
+  ```
+
+- A `field_action` that is not an update action of the record of every
+  card or table drawing the field, or a `field_action_visible` that is not
+  a public field of that record, does not compile.
 
 ## Record pages (`page_header`, `section_nav`, `lead`, `alert`)
 
@@ -476,7 +507,10 @@ topics for the full contracts.
   `missing`) and a link to the first in declaration order, to its card's
   section (the nav's anchor, else `#section_<component>`), or to
   `fallback_href` once none waits. The alert's `message` stays the host's
-  words; the alert declares no link of its own.
+  words; the alert declares no link of its own. A table filtered by the
+  same context alone (every `context_filter` entry names it) counts too
+  (3.9): each row with a review field waiting, once, read through the
+  table's read action as the reader, in its `default_sort`.
 
   ```elixir
   component :detail, :to_review do

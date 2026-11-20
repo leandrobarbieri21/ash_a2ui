@@ -41,6 +41,7 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.HubRole
     resource AshA2ui.Test.Finding
     resource AshA2ui.Test.Dossier
+    resource AshA2ui.Test.DossierLine
     resource AshA2ui.Test.ExportContract
     resource AshA2ui.Test.ExportContractLine
   end

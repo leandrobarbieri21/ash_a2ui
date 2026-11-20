@@ -605,11 +605,11 @@ defmodule AshA2ui.ResolvedView do
   end
 
   @doc """
-  The field-action data a `:detail` record carries for its fields that
-  declare a `field_action`: `_action_<field>`, whether the action is
-  offered on this record (`field_action_visible`, see
-  `field_action_offered?/2`). Shared by the initial render and the context
-  refreshes.
+  The field-action data a `:detail` record, or a table row, carries for its
+  fields that declare a `field_action`: `_action_<field>`, whether the
+  action is offered on this record (`field_action_visible`, see
+  `field_action_offered?/2`). Shared by the initial render, the context
+  refreshes and every row a table sends.
   """
   @spec detail_field_action_data(t(), struct(), [atom]) :: %{String.t() => boolean}
   def detail_field_action_data(%__MODULE__{} = view, record, fields) do
@@ -624,7 +624,7 @@ defmodule AshA2ui.ResolvedView do
   The computed data a context's record carries beyond its fields' values:
   the page header's `_header_action_<name>` offers when the header reads
   that context (`AshA2ui.PageHeader.data/3`), and each review summary of
-  that context (`AshA2ui.ReviewSummary.data/3`). `opts` carries the read's
+  that context (`AshA2ui.ReviewSummary.data/4`). `opts` carries the read's
   `:actor` and `:tenant`. Shared by the initial render and every refresh of
   `/detail/<context>`.
   """
@@ -636,7 +636,7 @@ defmodule AshA2ui.ResolvedView do
         _other -> %{}
       end
 
-    Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record))
+    Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record, opts))
   end
 
   @doc """

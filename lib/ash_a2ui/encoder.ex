@@ -1513,7 +1513,44 @@ defmodule AshA2ui.Encoder do
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
       |> put_column_review(view, field, columns[field])
+      |> put_column_field_action(view, table, field)
     end)
+  end
+
+  # Catalog 3.9: a field action on a table's field is a button in each row
+  # beside the value, its entry shaped like the detail card's (3.2) and the
+  # grid's rowActions entries, and sent the same way. The context names the
+  # table and the field, never the Ash action; `recordId` binds the row's
+  # id, and `actionVisible` the row's `_action_<field>` (row-relative).
+  defp put_column_field_action(column, view, table, field) do
+    case view.fields[field] do
+      %{field_action: action} when not is_nil(action) ->
+        setting = Map.get(view.actions, action)
+
+        context =
+          %{
+            "component" => to_string(table.name),
+            "field" => to_string(field),
+            "recordId" => %{"@path" => "id"}
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+
+        entry =
+          %{
+            "label" => ResolvedView.action_label(view, action),
+            "action" => "field_action",
+            "context" => context
+          }
+          |> maybe_put("icon", setting && setting.icon)
+
+        column
+        |> Map.put("action", entry)
+        |> Map.put("actionVisible", %{"path" => "_action_#{field}"})
+
+      _other ->
+        column
+    end
   end
 
   # Catalog 3.3: a review field drawn in a table binds each row's review
@@ -5859,6 +5896,7 @@ defmodule AshA2ui.Encoder do
     |> Map.merge(AshA2ui.Timeline.row_data(table, record))
     |> Map.merge(primary_action_data(view, table, record))
     |> Map.merge(review_row_data(view, field_names, record))
+    |> Map.merge(ResolvedView.detail_field_action_data(view, record, field_names))
   end
 
   # Catalog 3.3: the review of each review field a row draws, at the
