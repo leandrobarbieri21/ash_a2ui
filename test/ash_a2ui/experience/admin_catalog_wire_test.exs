@@ -10,7 +10,6 @@ defmodule AshA2ui.Experience.AdminCatalogWireTest do
 
   alias AshA2ui.Experience
   alias AshA2ui.Test.Experience.Task
-  alias AshA2ui.Test.SchemaHelper
 
   setup do
     Application.put_env(:ash_a2ui, :catalog, :admin_v1)
