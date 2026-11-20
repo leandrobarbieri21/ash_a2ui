@@ -165,6 +165,25 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Pair reviews: a review and a button per item of a `pairs` field**
+  (admin catalog 3.10.0). An item of a `pairs` field may carry its own
+  `review` (`AshA2ui.Review`'s shape), a `key` (its address in the record)
+  and `action` (whether it offers the field's action). Each row carries
+  the normalized items at `_pairs_<field>` (`AshA2ui.Pairs`), bound by the
+  dataGrid column's `items`. A `field_action` on a `pairs` field is a
+  button per item (the column's `pairAction`, shaped like 3.9's `action`):
+  the renderer adds the item's key to the context as `item`, and the
+  server re-reads the row through the table's scoped read, refuses it
+  unless the record (`field_action_visible`) and the item both offer the
+  action, and runs it with the key as its `:item` argument. A pairs
+  field's action must declare `:item` and is drawn in tables only; both
+  are checked at compile time. A `review_summary` counts each waiting item
+  of such a column in a table it counts. The stock dataGrid draws the
+  items with their reviews and buttons; a host swap reads `pairItems(row,
+  column)`, `pairActionOffered(column, item)` and sends
+  `pairActionEntry(column, item)`. Additive over 3.9.0: the catalogId is
+  unchanged, and a renderer that ignores `items` draws the pairs as before.
+
 - **Row field actions, and rows in review summaries** (admin catalog
   3.9.0). A field's `field_action` may sit on a field a table draws: each
   row then carries a button beside the value (the dataGrid column's

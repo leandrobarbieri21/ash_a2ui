@@ -621,6 +621,25 @@ defmodule AshA2ui.ResolvedView do
   end
 
   @doc """
+  The pairs data a table row carries for its `pairs` fields (catalog 3.10):
+  `_pairs_<field>`, the normalized items (`AshA2ui.Pairs.normalize/3`),
+  each saying whether it offers the field's action when the field has one.
+  """
+  @spec pairs_data(t(), struct(), [atom]) :: %{String.t() => [map]}
+  def pairs_data(%__MODULE__{} = view, record, fields) do
+    pairs =
+      for name <- fields, %AshA2ui.Field{pairs: true} = field <- [view.fields[name]], do: field
+
+    offers =
+      for %{field_action: action} = field <- pairs,
+          action,
+          into: %{},
+          do: {field.name, field_action_offered?(field, record)}
+
+    AshA2ui.Pairs.data(record, pairs, view.l10n, offers)
+  end
+
+  @doc """
   The computed data a context's record carries beyond its fields' values:
   the page header's `_header_action_<name>` offers when the header reads
   that context (`AshA2ui.PageHeader.data/3`), and each review summary of

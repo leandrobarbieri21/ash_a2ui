@@ -276,6 +276,7 @@ msgid "Check in"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Check what was read"
 msgstr ""
@@ -548,6 +549,7 @@ msgid "Done tasks"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Dossier"
@@ -668,6 +670,7 @@ msgid "Export contract"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
@@ -725,11 +728,13 @@ msgid "Generate secret"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to history"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to the first field to check"
 msgstr ""
@@ -916,6 +921,7 @@ msgstr ""
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:87
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/enrollment.ex:1
@@ -1024,6 +1030,7 @@ msgstr ""
 msgid "Note title"
 msgstr ""
 
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/referral.ex:1
@@ -1405,6 +1412,7 @@ msgid "Search contracts or vendors"
 msgstr ""
 
 #: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Sections"
@@ -1703,6 +1711,7 @@ msgstr ""
 #: test/support/card_visits_ui.ex:1
 #: test/support/column_task.ex:1
 #: test/support/document_visits_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
