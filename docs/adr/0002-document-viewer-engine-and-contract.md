@@ -134,5 +134,13 @@ ICC files never requested `qcms_bg.wasm`: pdf.js drew them in their alternate co
   scanned documents. Each upgrade of `pdfjs-dist` is the host's, checked against its CVE list.
 - The admin catalog moves to 3.4.0 under the same id, after 3.3.0 (lukegalea/ash_a2ui#121, table review fields).
 - Not done here: lazy page drawing for long documents (every page draws when the document opens),
-  linking a field to its region on hover or focus (the `linked` state is in the contract; drawing
-  it from a field's focus is a later change), and printing or downloading from the viewer.
+  and printing or downloading from the viewer.
+- Done later, in admin catalog 3.8.0: a value and its region linked both ways while the pane is
+  shown. The renderer marks the element it draws for a value with `data-a2ui-region` (the review
+  hrefs the server already sends), and the pane listens for pointer and focus through
+  `composedPath()`, as the hook does for live links (3.7). Pointing at or focusing a value draws
+  its regions in the viewer's `linkedState` (`linked` by default) and scrolls only the viewer's
+  canvas; activating a region scrolls the page to the value and flashes it through the pane's
+  `flashSource`, and from the keyboard moves focus to it. It is presentation state the browser
+  keeps: nothing on the wire changes and no action is sent. Hover and focus link only while the
+  document is beside the sections (`sideBySide()`).

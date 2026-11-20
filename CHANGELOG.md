@@ -165,6 +165,21 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **A value and its document region, linked both ways** (admin catalog
+  3.8.0). While a `document_pane` is shown beside the sections, pointing
+  at a value that cites a region, or focusing inside it, shows the region
+  linked and scrolls the viewer (never the page) to it; nothing is
+  written, sent or focused, and leaving clears it. Activating a region
+  scrolls the page to the value citing it and flashes it for 3 seconds,
+  and from the keyboard moves focus to it. The stock `fieldDisplay` and
+  `dataGrid` (each row, all its cells' regions) mark what they draw with
+  `data-a2ui-region`, the review hrefs already on the wire; a swap puts
+  `REGION_ATTRIBUTE` on its own elements with `regionAddresses` and
+  `rowReviews`. New seams: the viewer's `linkedState(region)` (`linked` by
+  default), the pane's `flashSource(element, on)` and `sideBySide()`.
+  Stacked or hidden, nothing links. Additive over 3.7.0: the catalogId and
+  the wire are unchanged.
+
 - **Live links** (admin catalog 3.7.0). A page header `crumb` may declare
   `live: :navigate` (or `:patch`): on a LiveView, a plain click on it
   navigates inside the LiveView (`push_navigate` / `push_patch` semantics)

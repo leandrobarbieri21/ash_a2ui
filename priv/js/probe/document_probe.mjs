@@ -12,6 +12,11 @@
  *     id and shows it selected; a review's page tag opens the hidden pane at
  *     its region;
  *   - each page's text is in the accessibility tree (Chrome's, through CDP);
+ *   - 3.8, a value and its region linked both ways: pointing at or focusing
+ *     a value shows its region linked without scrolling the page, moving
+ *     focus or sending anything, and leaving clears it; clicking a region
+ *     brings its value into view and flashes it for 3 s, Enter also moves
+ *     focus to it; a hidden or stacked pane links nothing;
  *   - nothing logs an error and the CSP is never violated.
  *
  * Every check runs under a strict CSP (`script-src 'self' 'unsafe-inline'`:
@@ -442,6 +447,107 @@ async function main() {
     });
     await tag.close();
 
+    /* --- 3.8: a value and its region, linked both ways --------------------------- */
+    const links = await openCase(browser, base.strict, "payload=document_shown");
+    await waitReady(links);
+    await links.evaluate(() => {
+      window.__source = (id) => window.__deep(`[data-a2ui-region='#document=${id}']`);
+      window.__state = (id) => window.__vroot().querySelector(`[data-region='${id}']`).dataset.state;
+      window.__active = () => {
+        let element = document.activeElement;
+        while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+        return element;
+      };
+      window.__inWindow = (element) => {
+        const box = element.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= window.innerHeight;
+      };
+    });
+    const centre = (id) =>
+      links.evaluate((id) => {
+        const box = window.__source(id).getBoundingClientRect();
+        return {x: box.left + box.width / 2, y: box.top + box.height / 2};
+      }, id);
+
+    await check("3.8: each review field carries its region's address", async () => {
+      expect(await links.evaluate(() => [!!window.__source("title"), !!window.__source("status")]), [true, true], "marked");
+    });
+
+    await check("3.8: pointing at a value links its region; nothing scrolls the page, moves focus or is sent", async () => {
+      const base = await links.evaluate(() => window.__state("status"));
+      const sentBefore = await links.evaluate(() => window.__dispatched.length);
+      const scrollBefore = await links.evaluate(() => window.scrollY);
+      const at = await centre("status");
+      await links.mouse.move(at.x, at.y);
+      await links.waitForTimeout(400);
+      expect(await links.evaluate(() => window.__state("status")), "linked", "hovered");
+      expect(await links.evaluate(() => window.scrollY), scrollBefore, "the page did not scroll");
+      expect(await links.evaluate(() => window.__dispatched.length), sentBefore, "nothing sent");
+      expect(await links.evaluate(() => window.__surface.dataModel.get("/ui/documents/referral/selected") ?? null), null, "nothing written");
+      const visible = await links.evaluate(() => {
+        const box = window.__vroot().querySelector("[data-region='status']").getBoundingClientRect();
+        const area = window.__viewer().scrollArea().getBoundingClientRect();
+        return box.top >= area.top && box.bottom <= area.bottom;
+      });
+      truthy(visible, "the region is in the viewer's view");
+      await links.mouse.move(2, 2);
+      await links.waitForTimeout(200);
+      expect(await links.evaluate(() => window.__state("status")), base, "cleared on leave");
+    });
+
+    await check("3.8: focusing a value's page tag links its region and keeps focus there", async () => {
+      await links.evaluate(() => window.__deep("a[href='#document=title']").focus());
+      await links.waitForTimeout(300);
+      expect(await links.evaluate(() => window.__state("title")), "linked", "focused");
+      expect(await links.evaluate(() => window.__active()?.getAttribute("href")), "#document=title", "focus stays on the tag");
+      await links.evaluate(() => window.__active().blur());
+      await links.waitForTimeout(200);
+      truthy((await links.evaluate(() => window.__state("title"))) !== "linked", "cleared on blur");
+    });
+
+    await check("3.8: clicking a region brings its value into view and flashes it for 3 s", async () => {
+      await links.evaluate(() => window.scrollTo(0, document.scrollingElement.scrollHeight));
+      await links.evaluate(() => window.__vroot().querySelector("[data-region='title']").scrollIntoView({block: "center"}));
+      const box = await links.evaluate(() => {
+        const r = window.__vroot().querySelector("[data-region='title']").getBoundingClientRect();
+        return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+      });
+      await links.mouse.click(box.x, box.y);
+      await links.waitForTimeout(800);
+      expect(await links.evaluate(() => window.__source("title").hasAttribute("data-a2ui-flashed")), true, "flashed");
+      truthy(await links.evaluate(() => window.__inWindow(window.__source("title"))), "in the window");
+      expect(await links.evaluate(() => getComputedStyle(window.__source("title")).outlineStyle), "solid", "outlined");
+      truthy((await links.evaluate(() => window.__active()?.dataset?.region)) === "title", "a click keeps focus on the region");
+      await links.waitForTimeout(2600);
+      expect(await links.evaluate(() => window.__source("title").hasAttribute("data-a2ui-flashed")), false, "unflashed after 3 s");
+    });
+
+    await check("3.8: Enter on a region moves focus to its value", async () => {
+      await links.evaluate(() => window.__vroot().querySelector("[data-region='status']").focus());
+      await links.keyboard.press("Enter");
+      await links.waitForTimeout(800);
+      expect(await links.evaluate(() => window.__active() === window.__source("status")), true, "focus on the value");
+      expect(await links.evaluate(() => window.__source("status").hasAttribute("data-a2ui-flashed")), true, "flashed");
+      truthy(await links.evaluate(() => window.__inWindow(window.__source("status"))), "in the window");
+      expect(links.__errors, [], "errors");
+    });
+    await links.screenshot({path: join(probeDir, "screenshots", "document_links.png"), fullPage: false});
+    await links.close();
+
+    const hiddenLinks = await openCase(browser, base.strict, "payload=document_admin");
+    await check("3.8: with the pane hidden, pointing at a value does nothing", async () => {
+      await hiddenLinks.waitForTimeout(500);
+      await hiddenLinks.evaluate(() => (window.__source = (id) => window.__deep(`[data-a2ui-region='#document=${id}']`)));
+      const at = await hiddenLinks.evaluate(() => {
+        const box = window.__source("status").getBoundingClientRect();
+        return {x: box.left + box.width / 2, y: box.top + box.height / 2};
+      });
+      await hiddenLinks.mouse.move(at.x, at.y);
+      await hiddenLinks.waitForTimeout(300);
+      expect(await hiddenLinks.evaluate(() => [!!window.__viewer(), window.__pdfLoads, window.__dispatched.length]), [false, 0, 0], "viewer, loads, sent");
+    });
+    await hiddenLinks.close();
+
     /* --- narrow: stacked ---------------------------------------------------- */
     const narrow = await openCase(browser, base.strict, "payload=document_shown", {width: 700, height: 900});
     await waitReady(narrow);
@@ -453,6 +559,16 @@ async function main() {
       truthy(boxes[1].top >= boxes[0].bottom - 1, "below");
       truthy(Math.abs(boxes[0].left - boxes[1].left) < 1, "aligned");
       await assertGeometry(narrow, "narrow");
+    });
+    await check("3.8 narrow: pointing at a value does not link it (the document is not beside it)", async () => {
+      const before = await narrow.evaluate(() => window.__vroot().querySelector("[data-region='status']").dataset.state);
+      const at = await narrow.evaluate(() => {
+        const box = window.__deep("[data-a2ui-region='#document=status']").getBoundingClientRect();
+        return {x: box.left + box.width / 2, y: box.top + box.height / 2};
+      });
+      await narrow.mouse.move(at.x, at.y);
+      await narrow.waitForTimeout(300);
+      expect(await narrow.evaluate(() => window.__vroot().querySelector("[data-region='status']").dataset.state), before, "state");
     });
     await narrow.close();
 

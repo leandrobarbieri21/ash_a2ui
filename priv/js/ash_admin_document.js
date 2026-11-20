@@ -19,16 +19,39 @@
  * hides it, and a link inside its children whose href starts with
  * `regionHref` opens it at that region (a review field's page tag).
  *
+ * 3.8: while the pane is shown, a value and its region are linked both
+ * ways. The element drawing a value that cites a region carries
+ * REGION_ATTRIBUTE (`data-a2ui-region`), its value the region's address
+ * (the review's `href`, several separated by spaces for a table row).
+ * Pointing at it or focusing inside it links its regions in the viewer
+ * (`link(ids)`: drawn in `linkedState(region)`, the pane's own scroll area
+ * moved to the first one if it is out of view; nothing is written, sent or
+ * focused). Activating a region scrolls the page to the value that cites
+ * it and flashes it for 3 seconds; from the keyboard, focus moves to it.
+ * Hover and focus link only while the document sits beside the sections.
+ *
  * Both elements expose seams a host's catalog swap overrides to draw them
  * with its own design system, keeping the engine, the geometry and the
  * events:
  *
  *   documentPane    renderToggle({label, description, checked, onChange})
+ *                   flashSource(element, on)  draws a value's flash (3.8)
+ *                   sideBySide()  whether the document sits beside the
+ *                     sections (3.8; hover and focus link only then)
  *   documentViewer  renderFrame({fileName, status, pageInfo, zoomLabel,
  *                     controls, pages, message})
  *                   renderControls({page, count, zoomLabel, canZoomIn,
  *                     canZoomOut, previous, next, zoomIn, zoomOut, strings})
- *                   renderRegion(region, {state, label, style, activate})
+ *                   renderRegion(region, {state, label, style, activate,
+ *                     current})
+ *                     (3.8: `current` is whether the region is the one a
+ *                     person went to, for aria-current: a linked region
+ *                     drawn selected is not; `activate(event)`: called with
+ *                     no event, a key
+ *                     event or a click with detail 0, it is a keyboard
+ *                     activation)
+ *                   linkedState(region)  the state a linked region is
+ *                     drawn in (3.8; `linked` by default)
  *                   scrollArea()  the element that scrolls the pages
  *
  * The pure helpers (regions, states, hrefs, zoom) are exported for tests.
@@ -43,6 +66,24 @@ export const REGION_STATES = Object.freeze([
   "linked",
   "empty",
 ]);
+
+/**
+ * The attribute a drawn value carries when it cites regions (3.8): the
+ * regions' addresses (a review's `href`, `#<pane>=<id>`), separated by
+ * spaces. A host swap puts it on the element it draws for a value (a
+ * field's row, a table's row) from the same `review.href`.
+ */
+export const REGION_ATTRIBUTE = "data-a2ui-region";
+
+/**
+ * The event a region's activation by a person raises on the viewer (3.8):
+ * bubbling and composed, `detail` `{id, keyboard}`. The pane answers it by
+ * going to the value that cites the region.
+ */
+export const REGION_ACTIVATE_EVENT = "ash-a2ui:document-region";
+
+/** How long a value stays flashed after its region is activated (3.8). */
+export const FLASH_MS = 3000;
 
 /** The zoom steps, as factors of the width that fits the viewer. */
 export const ZOOM_STEPS = Object.freeze([0.5, 0.75, 1, 1.25, 1.5, 2, 3]);
@@ -83,13 +124,25 @@ export function parseRegions(value) {
 /**
  * The state a region is drawn in: the selected region (the one a person
  * went to) is selected, or reviewed-selected once reviewed; linked and
- * empty keep their state.
+ * empty keep their state. 3.8: a region in `linked` (the ids a value being
+ * pointed at or focused cites), and not selected, is drawn in
+ * `linkedState(region)`, `linked` by default.
  */
-export function drawnState(region, selectedId) {
-  if (selectedId == null || region.id !== selectedId) return region.state;
-  if (region.state === "reviewed" || region.state === "reviewed-selected") return "reviewed-selected";
-  if (region.state === "pending" || region.state === "selected") return "selected";
+export function drawnState(region, selectedId, {linked = null, linkedState = () => "linked"} = {}) {
+  if (selectedId != null && region.id === selectedId) return selectedState(region.state);
+  if (Array.isArray(linked) && linked.includes(region.id)) return linkedState(region);
   return region.state;
+}
+
+/**
+ * A state as its selected form: pending is selected, reviewed is
+ * reviewed-selected; linked and empty keep their state. A host whose
+ * linked regions read as selected returns it from `linkedState`.
+ */
+export function selectedState(state) {
+  if (state === "reviewed" || state === "reviewed-selected") return "reviewed-selected";
+  if (state === "pending" || state === "selected") return "selected";
+  return state;
 }
 
 /** The region id a link's href names under the pane's `prefix`, or null. */
@@ -103,6 +156,55 @@ export function regionFromHref(href, prefix) {
   } catch {
     return null;
   }
+}
+
+/**
+ * The region ids a REGION_ATTRIBUTE value names under the pane's `prefix`
+ * (3.8): its addresses, separated by spaces, each decoded; anything else is
+ * skipped, and an id named twice counts once.
+ */
+export function regionIdsOf(value, prefix) {
+  if (typeof value !== "string") return [];
+  const ids = [];
+  for (const href of value.split(/\s+/)) {
+    const id = regionFromHref(href, prefix);
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+/**
+ * What a pointer or focus event's composed path links to (3.8): the
+ * nearest element carrying REGION_ATTRIBUTE, or an element whose `href`
+ * names a region under `prefix` (a review's page tag), whichever comes
+ * first, as `{element, ids}`; null when there is none before `stop` (the
+ * pane, or its viewer: pointing at the document links nothing).
+ */
+export function linkSourceOf(path, prefix, stop = []) {
+  if (!Array.isArray(path)) return null;
+  for (const node of path) {
+    if (!node || stop.includes(node)) return null;
+    if (typeof node.getAttribute !== "function") continue;
+    const marked = node.getAttribute(REGION_ATTRIBUTE);
+    if (marked) {
+      const ids = regionIdsOf(marked, prefix);
+      if (ids.length) return {element: node, ids};
+    }
+    const id = regionFromHref(node.getAttribute("href"), prefix);
+    if (id) return {element: node, ids: [id]};
+  }
+  return null;
+}
+
+/**
+ * Whether a region's activation came from the keyboard (3.8): no event (a
+ * swap's key handler calls `activate()`), a key event, or a click with no
+ * pointer behind it (detail 0: Enter or Space on a button).
+ */
+export function keyboardActivation(event) {
+  if (!event) return true;
+  if (typeof event.type === "string" && event.type.startsWith("key")) return true;
+  return event.type === "click" && event.detail === 0;
 }
 
 /** The next zoom step in `direction` (1 in, -1 out), or the same at an end. */
@@ -157,6 +259,8 @@ const DEFAULT_STRINGS = {
   reviewed: "Reviewed",
   empty: "Not found in the document",
 };
+
+const sameIds = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((id, i) => id === b[i]);
 
 // The words a region's state reads as (selected states read as their base).
 const STATE_WORD = {
@@ -243,6 +347,7 @@ export function defineDocumentElements({
         _zoom: {state: true},
         _scale: {state: true},
         _selected: {state: true},
+        _linked: {state: true},
       };
 
       static styles = [
@@ -674,26 +779,84 @@ export function defineDocumentElements({
         }
         this._pending = null;
         await this.updateComplete;
+        if (!this.scrollToRegion(id)) return;
+        // The viewer's top above the window: bring it into view.
+        if (this.getBoundingClientRect().top < 0) this.scrollIntoView({block: "start", behavior: this.behavior()});
+      }
+
+      /**
+       * Scrolls the canvas, and only the canvas, so region `id`'s first box
+       * sits a third of the way down; with `ifHidden`, only when that box is
+       * not already in view. Returns whether the box was found.
+       */
+      scrollToRegion(id, {ifHidden = false} = {}) {
         const box = this.renderRoot.querySelector(`[data-region="${CSS.escape(id)}"]`);
         const area = this.scrollArea();
-        if (!box || !area) return;
+        if (!box || !area) return false;
         const boxRect = box.getBoundingClientRect();
         const areaRect = area.getBoundingClientRect();
+        const inView =
+          boxRect.top >= areaRect.top &&
+          boxRect.bottom <= areaRect.bottom &&
+          boxRect.left >= areaRect.left &&
+          boxRect.right <= areaRect.right;
+        if (ifHidden && inView) return true;
         area.scrollTo({
           top: area.scrollTop + (boxRect.top - areaRect.top) - area.clientHeight / 3,
           left: area.scrollLeft + (boxRect.left - areaRect.left) - area.clientWidth / 3,
           behavior: this.behavior(),
         });
-        // The viewer's top above the window: bring it into view.
-        if (this.getBoundingClientRect().top < 0) this.scrollIntoView({block: "start", behavior: this.behavior()});
+        return true;
       }
 
-      /** A person activated region `id`: select it, keep it, and send the action. */
-      activate(id) {
+      /**
+       * 3.8: shows regions `ids` linked (a value citing them is being
+       * pointed at or focused) and, if the first one drawn is out of view,
+       * scrolls the canvas to it. Presentation only: it never scrolls the
+       * page, moves focus, writes the data model or sends anything.
+       */
+      async link(ids) {
+        const list = (Array.isArray(ids) ? ids : [ids]).filter((id) => typeof id === "string" && id !== "");
+        if (list.length === 0) return this.unlink();
+        if (sameIds(list, this._linked)) return;
+        this._linked = list;
+        if (this._status !== "ready") return;
+        await this.updateComplete;
+        if (!sameIds(list, this._linked)) return;
+        list.find((id) => this.scrollToRegion(id, {ifHidden: true}));
+      }
+
+      /** 3.8: no region linked. */
+      unlink() {
+        this._linked = null;
+      }
+
+      /**
+       * 3.8: the state a linked region is drawn in. `linked` by default; a
+       * host whose linked values read as selected overrides it (for one,
+       * `selectedState(region.state)`).
+       */
+      linkedState(_region) {
+        return "linked";
+      }
+
+      /**
+       * A person activated region `id`: select it, keep it, and send the
+       * action. 3.8: then raise REGION_ACTIVATE_EVENT, so the pane goes to
+       * the value that cites it.
+       */
+      activate(id, event) {
         this._selected = id;
         this._boundSelected = id;
         write(this, "selected", id);
         send(this, this.props?.regionAction, {regionId: id});
+        this.dispatchEvent(
+          new CustomEvent(REGION_ACTIVATE_EVENT, {
+            detail: {id, keyboard: keyboardActivation(event)},
+            bubbles: true,
+            composed: true,
+          }),
+        );
       }
 
       regionLabel(region, state, strings) {
@@ -702,7 +865,7 @@ export function defineDocumentElements({
       }
 
       /** One region: a button over its box. */
-      renderRegion(region, {state, label, style, activate}) {
+      renderRegion(region, {state, label, style, activate, current}) {
         const css = Object.entries(style)
           .map(([key, value]) => `${key}:${value}`)
           .join(";");
@@ -712,7 +875,7 @@ export function defineDocumentElements({
           data-region=${region.id}
           data-state=${state}
           aria-label=${label}
-          aria-current=${state.endsWith("selected") ? "true" : nothing}
+          aria-current=${current ? "true" : nothing}
           title=${label}
           style=${css}
           @click=${activate}
@@ -725,6 +888,7 @@ export function defineDocumentElements({
         const width = Math.floor(meta.width * scale);
         const height = Math.floor(meta.height * scale);
         const selected = this._selected;
+        const linked = {linked: this._linked, linkedState: (region) => this.linkedState(region)};
         return html`<div
           class="page"
           data-page-sheet=${meta.number}
@@ -738,12 +902,13 @@ export function defineDocumentElements({
             ${regions
               .filter((region) => region.page === meta.number)
               .map((region) => {
-                const state = drawnState(region, selected);
+                const state = drawnState(region, selected, linked);
                 return this.renderRegion(region, {
                   state,
                   label: this.regionLabel(region, state, strings),
                   style: boxStyle(region),
-                  activate: () => this.activate(region.id),
+                  activate: (event) => this.activate(region.id, event),
+                  current: region.id === selected || region.state.endsWith("selected"),
                 });
               })}
           </div>
@@ -906,13 +1071,22 @@ export function defineDocumentElements({
 
       connectedCallback() {
         super.connectedCallback();
-        this._onClick ||= (event) => this.onLinkClick(event);
-        this.addEventListener("click", this._onClick);
+        this._listeners ||= {
+          click: (event) => this.onLinkClick(event),
+          // 3.8: a value and its region, linked both ways.
+          pointerover: (event) => this.onPointerOver(event),
+          pointerout: (event) => this.onPointerOut(event),
+          focusin: (event) => this.onFocusIn(event),
+          focusout: () => this.endLink("focus"),
+          [REGION_ACTIVATE_EVENT]: (event) => this.onRegionActivate(event),
+        };
+        for (const [type, listener] of Object.entries(this._listeners)) this.addEventListener(type, listener);
       }
 
       disconnectedCallback() {
         super.disconnectedCallback();
-        this.removeEventListener("click", this._onClick);
+        for (const [type, listener] of Object.entries(this._listeners || {})) this.removeEventListener(type, listener);
+        this.stopFlash();
       }
 
       willUpdate(changed) {
@@ -959,6 +1133,128 @@ export function defineDocumentElements({
         return this.renderRoot.querySelector("[data-role='document']")?.firstElementChild ?? null;
       }
 
+      // ── 3.8: a value and its region, linked both ways ────────────────────
+
+      /**
+       * Whether the document sits beside the sections (not stacked under
+       * them in a narrow pane): hover and focus link a value to its region
+       * only then. A swap that lays the pane out itself overrides it.
+       */
+      sideBySide() {
+        const content = this.renderRoot.querySelector(".content");
+        const document = this.renderRoot.querySelector("[data-role='document']");
+        if (!content || !document) return false;
+        const a = content.getBoundingClientRect();
+        const b = document.getBoundingClientRect();
+        return b.left >= a.right - 1 || b.right <= a.left + 1;
+      }
+
+      // What an event's path links to, while linking is on: {element, ids} or null.
+      linkSource(event) {
+        const prefix = this.props?.regionHref;
+        if (!prefix || !this.shown() || !this.sideBySide()) return null;
+        const viewer = this.viewer();
+        if (!viewer) return null;
+        return linkSourceOf(event.composedPath?.() || [], prefix, [viewer, this]);
+      }
+
+      onPointerOver(event) {
+        if (event.pointerType === "touch") return;
+        const source = this.linkSource(event);
+        if (source) this.startLink(source, "pointer");
+        else this.endLink("pointer");
+      }
+
+      onPointerOut(event) {
+        // Moving to another element inside the pane: its pointerover decides.
+        const to = event.relatedTarget;
+        if (to && (to === this || this.contains(to))) return;
+        this.endLink("pointer");
+      }
+
+      onFocusIn(event) {
+        const source = this.linkSource(event);
+        if (source) this.startLink(source, "focus");
+      }
+
+      startLink(source, by) {
+        this._linkBy = by;
+        this.viewer()?.link?.(source.ids);
+      }
+
+      // Ends a link made by `by` (pointer or focus); another one stays.
+      endLink(by) {
+        if (this._linkBy !== by) return;
+        this._linkBy = null;
+        this.viewer()?.unlink?.();
+      }
+
+      // A person activated a region: go to the value that cites it.
+      onRegionActivate(event) {
+        const {id, keyboard} = event.detail || {};
+        if (typeof id !== "string" || !this.shown()) return;
+        const source = this.findSource(id);
+        if (source) this.goToSource(source, {focus: Boolean(keyboard)});
+      }
+
+      /**
+       * The element drawing the value that cites region `id`: the first
+       * found among the sections (through every shadow root) whose
+       * REGION_ATTRIBUTE names it.
+       */
+      findSource(id) {
+        const prefix = this.props?.regionHref;
+        const content = this.renderRoot.querySelector(".content");
+        if (!prefix || !content) return null;
+        return findMarked(content, (element) => regionIdsOf(element.getAttribute(REGION_ATTRIBUTE), prefix).includes(id));
+      }
+
+      /**
+       * Scrolls the page so `element` sits a third of the way down the
+       * window (below the sticky line, `--ash-admin-nav-line`), flashes it
+       * for FLASH_MS and, from the keyboard, moves focus to it.
+       */
+      goToSource(element, {focus = false} = {}) {
+        const line = parseFloat(getComputedStyle(this).getPropertyValue("--ash-admin-nav-line")) || 0;
+        element.style.scrollMarginTop = `${Math.round(Math.max(line, window.innerHeight / 3))}px`;
+        const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        element.scrollIntoView({block: "start", behavior: reduce ? "auto" : "smooth"});
+        if (focus) {
+          if (element.tabIndex < 0 && !element.hasAttribute("tabindex")) element.setAttribute("tabindex", "-1");
+          element.focus({preventScroll: true});
+        }
+        this.flash(element);
+      }
+
+      flash(element) {
+        this.stopFlash();
+        this._flashed = element;
+        element.setAttribute("data-a2ui-flashed", "");
+        this.flashSource(element, true);
+        this._unflash = setTimeout(() => this.stopFlash(), FLASH_MS);
+      }
+
+      stopFlash() {
+        clearTimeout(this._unflash);
+        const element = this._flashed;
+        this._flashed = null;
+        if (!element) return;
+        element.removeAttribute("data-a2ui-flashed");
+        this.flashSource(element, false);
+      }
+
+      /**
+       * Draws (or clears) a value's flash. The stock one is the section
+       * nav's outline (`--ash-admin-nav-outline`); a swap draws its own.
+       */
+      flashSource(element, on) {
+        Object.assign(element.style, {
+          outline: on ? "2px solid var(--ash-admin-nav-outline, var(--am-primary))" : "",
+          outlineOffset: on ? "2px" : "",
+          borderRadius: on ? "var(--am-radius-m)" : "",
+        });
+      }
+
       /** The switch. A swap draws its own; `onChange(checked)` shows or hides. */
       renderToggle({label, description, checked, onChange}) {
         return html`<div class="toggle" data-role="toggle">
@@ -993,4 +1289,16 @@ export function defineDocumentElements({
 
     customElements.define(tag, AshAdminDocumentPane);
   }
+}
+
+// The first element under `root`, through every shadow root, that `test` accepts.
+function findMarked(root, test) {
+  for (const element of root.querySelectorAll?.(`[${REGION_ATTRIBUTE}]`) || []) {
+    if (test(element)) return element;
+  }
+  for (const element of root.querySelectorAll?.("*") || []) {
+    const found = element.shadowRoot && findMarked(element.shadowRoot, test);
+    if (found) return found;
+  }
+  return null;
 }

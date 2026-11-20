@@ -166,7 +166,53 @@ import {defineNbComponents} from "./nb_components.js";
 import {placeMarkerGroups, separate} from "./ash_a2ui_diagram_layout.js";
 
 // 3.4: the document pane and viewer (pdf.js loaded through deps.loadPdf).
-import {defineDocumentElements} from "./ash_admin_document.js";
+import {defineDocumentElements, REGION_ATTRIBUTE} from "./ash_admin_document.js";
+
+/**
+ * The attribute a drawn value carries when it cites regions of a document
+ * pane (3.8), its value the regions' addresses separated by spaces (see
+ * `regionAddresses`). A host swap that draws its own field or table row
+ * puts it on that element; the pane links the value and its regions both
+ * ways while the document is shown.
+ */
+export {REGION_ATTRIBUTE};
+
+// 3.1: the review a review field binds, {state, stateLabel, page?,
+// pageLabel?, href?, quote?}; anything without a known state is none.
+const REVIEW_STATES = ["pending", "reviewed", "missing"];
+
+function reviewEntry(value) {
+  if (!value || typeof value !== "object" || !REVIEW_STATES.includes(value.state)) return null;
+  return value;
+}
+
+/**
+ * 3.8: the REGION_ATTRIBUTE value for the reviews a value carries (a
+ * field's `review`, or a table row's reviews): their `href`s, separated by
+ * spaces, each once; "" when none has one.
+ */
+export function regionAddresses(reviews) {
+  const hrefs = [];
+  for (const review of Array.isArray(reviews) ? reviews : [reviews]) {
+    const href = reviewEntry(review)?.href;
+    if (typeof href === "string" && href !== "" && !hrefs.includes(href)) hrefs.push(href);
+  }
+  return hrefs.join(" ");
+}
+
+/**
+ * 3.8: a dataGrid row's reviews, in column order: each column's `review`
+ * and its subtitle's `reviewPath` (catalog 3.3), read from `row`. Pass them
+ * to `regionAddresses` for the row's REGION_ATTRIBUTE.
+ */
+export function rowReviews(row, columns) {
+  const reviews = [];
+  for (const column of Array.isArray(columns) ? columns : []) {
+    if (typeof column?.review?.path === "string") reviews.push(getByPath(row, column.review.path));
+    if (typeof column?.subtitle?.reviewPath === "string") reviews.push(getByPath(row, column.subtitle.reviewPath));
+  }
+  return reviews.map(reviewEntry).filter(Boolean);
+}
 
 // Schema builders from web_core's OWN zod (3.x), the instance the
 // GenericBinder introspects. Importing the module directly (rather than
@@ -190,7 +236,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.7.0";
+export const ADMIN_CATALOG_VERSION = "3.8.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -2702,6 +2748,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           <tr
             id="row-${rowId}"
             data-a2ui-row-id=${rowId}
+            data-a2ui-region=${regionAddresses(rowReviews(row, columns)) || nothing}
             class=${clickable ? "is-clickable" : ""}
             tabindex=${clickable ? "0" : nothing}
             @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
@@ -2738,6 +2785,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           <li
             class="card ${clickable ? "is-clickable" : ""}"
             data-a2ui-row-id=${this.rowIdentity(row, index)}
+            data-a2ui-region=${regionAddresses(rowReviews(row, columns)) || nothing}
             @click=${clickable ? (event) => this.onRowClick(event, index) : nothing}
           >
             <dl class="card-fields">
@@ -4112,6 +4160,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const links = linkEntries(props.link);
         // 3.1: a review field's state and citation, or null.
         const review = reviewEntry(props.review);
+        // 3.8: the regions the value cites, linked with it in a document pane.
+        const region = regionAddresses(review) || nothing;
         // 1.17: a steps field is empty when it has no steps.
         const steps = props.steps === undefined ? null : stepEntries(props.steps);
         const empty = steps ? steps.length === 0 : props.value == null || props.value === "";
@@ -4122,7 +4172,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         if (empty && props.emptyText) {
           return html`
-            <dl class="field" data-review=${review ? review.state : nothing}>
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value field-value-empty">${str(props.emptyText)}</dd>
             ${renderReview(review)}${this.renderFieldAction(props)}
@@ -4135,7 +4185,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           const tone = props.badgeTone ? badgeTone(props.badgeTone) : "neutral";
           const help = str(props.badgeHelp);
           return html`
-            <dl class="field" data-review=${review ? review.state : nothing}>
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">
                 <span class="am-badge" data-tone=${tone} title=${help || nothing}
@@ -4148,7 +4198,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         if (steps) {
           return html`
-            <dl class="field" data-review=${review ? review.state : nothing}>
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderSteps(steps)}</dd>
             ${renderReview(review)}${this.renderFieldAction(props)}
@@ -4158,7 +4208,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
         if (links.length > 0) {
           return html`
-            <dl class="field" data-review=${review ? review.state : nothing}>
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd class="field-value">${renderLinks(this, links)}</dd>
             ${renderReview(review)}${this.renderFieldAction(props)}
@@ -4169,7 +4219,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (isBoolean) {
           const value = formatDisplayValue(props.value, props.format);
           return html`
-            <dl class="field" data-review=${review ? review.state : nothing}>
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
               <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
               <dd
                 class="field-value field-value-boolean ${value === "Yes" ? "is-true" : "is-false"}"
@@ -4182,7 +4232,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         }
 
         return html`
-          <dl class="field" data-review=${review ? review.state : nothing}>
+          <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
             <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
             <dd class="field-value">${renderValue(props.value, props.format)}</dd>
           ${renderReview(review)}${this.renderFieldAction(props)}
@@ -4194,15 +4244,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
     customElements.define(tag, AshAdminFieldDisplay);
   }
 
-  // 3.1: the review a review field binds, {state, stateLabel, page?,
-  // pageLabel?, href?, quote?}; anything without a known state is none.
-  const REVIEW_STATES = ["pending", "reviewed", "missing"];
   const REVIEW_TONES = { pending: "warning", reviewed: "success", missing: "neutral" };
-
-  function reviewEntry(value) {
-    if (!value || typeof value !== "object" || !REVIEW_STATES.includes(value.state)) return null;
-    return value;
-  }
 
   // The state in words as a badge, then the page tag: a link to the source
   // when there is an address, its quote as the tooltip.

@@ -65,6 +65,14 @@ drawn beside the surface's sections with each value boxed on its page
   override the seams: `renderToggle` on the pane; `renderFrame`,
   `renderControls`, `renderRegion` and `scrollArea` on the viewer. Keep the
   engine, the geometry and the events.
+- 3.8 links a value and its region both ways while the document is
+  beside the sections. A swap that draws its own field or table row puts
+  `data-a2ui-region` (`REGION_ATTRIBUTE`) on it, from
+  `regionAddresses(review)` or `regionAddresses(rowReviews(row,
+  columns))`; a region key handler calls `activate()` (no event reads as
+  the keyboard). Override `linkedState(region)` on the viewer for the
+  state a linked region shows (`linked` by default), and `flashSource`
+  on the pane for the value's 3-second flash.
 - `--ash-admin-document-pane-top` sets where the shown document sticks
   under a sticky header; `--ash-admin-document-pane-height` and
   `--ash-admin-document-pane-stacked-height` its heights.
@@ -75,3 +83,5 @@ drawn beside the surface's sections with each value boxed on its page
 - ❌ Sending a document's text, or a client-supplied file address.
 - ❌ Importing `pdfjs-dist` into app.js or the catalog bundle.
 - ❌ Stamping or editing a PDF in the browser.
+- ❌ Wiring hover or focus between values and regions in the host, or
+  sending an action for it: the pane does it, in the browser only.
