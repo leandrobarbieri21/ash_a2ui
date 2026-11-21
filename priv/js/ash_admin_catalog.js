@@ -437,7 +437,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.12.0";
+export const ADMIN_CATALOG_VERSION = "3.13.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -877,6 +877,10 @@ export function buildSchemas(basicCatalog = null) {
           action: Str,
           context: RecordAny.optional(),
           destructive: Bool.optional(),
+          // 3.13: the ConfirmDialog's heading and body for a destructive
+          // entry, translated by the server; a body only for a destroy.
+          confirmTitle: Str.optional(),
+          confirmBody: Str.optional(),
           // 1.2: the row-relative per-row visibility of a visible_when
           // action (`_visible_<action>`: a non-empty list = offered), and
           // the prompt a prompt_fields action collects first —
@@ -3623,6 +3627,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             envelope,
             basePath: this.rowBasePath(index),
             label: str(action.label),
+            title: str(action.confirmTitle),
+            body: str(action.confirmBody),
             rowIdentity: this.rowIdentity((this.controller?.props?.rows || [])[index], index),
           };
           this.requestUpdate();
@@ -3685,8 +3691,10 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         }
 
         const dialog = this._confirmEl;
-        dialog.title = `${pending.label} this record?`;
-        dialog.body = "This action cannot be undone.";
+        // 3.13: the server sends the dialog's text, translated, and says
+        // "cannot be undone" only for a destroy.
+        dialog.title = pending.title || pending.label;
+        dialog.body = pending.body;
         dialog.confirmLabel = pending.label || "Confirm";
         dialog.destructive = true;
 

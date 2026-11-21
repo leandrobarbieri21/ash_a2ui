@@ -130,6 +130,8 @@
             },
             {
               "action": "invoke",
+              "confirmBody": "This action cannot be undone.",
+              "confirmTitle": "Destroy this record?",
               "context": {
                 "action": "destroy",
                 "component": "table",

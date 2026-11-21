@@ -3027,8 +3027,8 @@ defmodule AshA2ui do
     name: :action,
     describe: """
     Per-action metadata: the button label, refresh targets, argument
-    prompts, per-row visibility conditions, and host-delegated dispatch
-    (`via`).
+    prompts, per-row visibility conditions, a confirmation (`confirm`), and
+    host-delegated dispatch (`via`).
     """,
     examples: [
       """
@@ -3057,6 +3057,13 @@ defmodule AshA2ui do
       """
       action :confirm_merge do
         label "Confirm match"
+      end
+      """,
+      """
+      action :deactivate do
+        # Asked through the admin grid's confirmation dialog, as a destroy is.
+        confirm :destructive
+        visible_when lifecycle_status: :active
       end
       """,
       """
@@ -3135,6 +3142,21 @@ defmodule AshA2ui do
         server-side on every invoke; rendering hides the button per row.
         A bulk action applies the same check to each selected record and
         counts the records that fail it as skipped.
+        """
+      ],
+      confirm: [
+        type: {:in, [:destructive]},
+        doc: """
+        `:destructive` makes the admin catalog's grid ask for confirmation
+        through its ConfirmDialog before invoking this row action, as it
+        does for every destroy: the row button opens the dialog, and its
+        confirm control (labelled with the action's `label`) sends the
+        unchanged `invoke`. For an action whose effect is drastic without
+        being a destroy (deactivating a person). Unlike a destroy's, the
+        dialog does not say the action cannot be undone. Row actions only,
+        and not with `prompt_fields`, whose prompt is the confirmation. The
+        basic catalog has no confirmation dialog and invokes on click, as it
+        does for a destroy.
         """
       ],
       via: [

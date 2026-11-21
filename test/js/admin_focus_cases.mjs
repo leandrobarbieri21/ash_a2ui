@@ -186,6 +186,35 @@ export function focusCases({mode, admin, mergedCatalog}) {
     assert.ok(deepActive() === opener, "focus returns to the row's Delete button");
   });
 
+  test(`${mode}: the ConfirmDialog draws the text the server sent, and a body only when sent`, async () => {
+    const open = async (entry) => {
+      const hook = mountHook({catalogs: [mergedCatalog, admin]});
+      gridSurface(hook, {action: "invoke", destructive: true, ...entry});
+      const surface = await render(hook);
+      deep(surface, `[data-a2ui-action='${entry.context.action}'] button`).click();
+      await settle();
+      return deep(surface, "ash-admin-confirm-dialog").renderRoot;
+    };
+
+    const destroy = await open({
+      label: "Delete",
+      context: {action: "destroy", recordId: {"@path": "id"}},
+      confirmTitle: "Supprimer cet enregistrement ?",
+      confirmBody: "Cette action est irréversible.",
+    });
+    assert.equal(destroy.querySelector("[data-dialog-heading]").textContent.trim(), "Supprimer cet enregistrement ?");
+    assert.equal(destroy.querySelector(".dialog-body").textContent.trim(), "Cette action est irréversible.");
+
+    const declared = await open({
+      label: "Deactivate",
+      context: {action: "deactivate", recordId: {"@path": "id"}},
+      confirmTitle: "Deactivate this record?",
+    });
+    assert.equal(declared.querySelector("[data-dialog-heading]").textContent.trim(), "Deactivate this record?");
+    assert.equal(declared.querySelector(".dialog-body"), null, "no body was sent, so none is drawn");
+    assert.ok(buttonLabelled(declared, "Deactivate"), "the confirm control reads the action's label");
+  });
+
   test(`${mode}: the prompt dialog's trap and focus restore read the focused control`, async () => {
     const hook = mountHook({catalogs: [mergedCatalog, admin]});
     gridSurface(

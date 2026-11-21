@@ -194,6 +194,48 @@ defmodule AshA2ui.ManifestTest do
       assert %{action_type: :destroy, confirm: nil, confirm_label: nil} = discard.(:basic)
     end
 
+    test "a declared confirmation is the admin grid's dialog, on an update too" do
+      reopen = fn catalog ->
+        Enum.find(
+          Manifest.for_surface(ManifestTask, catalog: catalog).row_actions,
+          &(&1.ash_action == :reopen)
+        )
+      end
+
+      assert %{action_type: :update, confirm: :destructive, confirm_label: "Reopen"} =
+               reopen.(:admin_v1)
+
+      assert %{confirm: nil, confirm_label: nil} = reopen.(:basic)
+    end
+
+    test "the dialog's text is the server's, and only a destroy cannot be undone" do
+      rendered =
+        components(
+          AshA2ui.Info.build_surface(
+            ManifestTask,
+            [authorize?: false, catalog: :admin_v1] ++ @pseudo
+          )
+        )
+
+      entry = fn grid, action ->
+        Enum.find(rendered[grid]["rowActions"], &(&1["context"]["action"] == action))
+      end
+
+      discard = entry.("data_grid_open_tasks", "discard")
+      assert discard["destructive"] == true
+      assert discard["confirmTitle"] == "⟦#{discard["label"]} this record?⟧"
+      assert discard["confirmBody"] == "⟦This action cannot be undone.⟧"
+
+      reopen = entry.("data_grid_done_tasks", "reopen")
+      assert reopen["destructive"] == true
+      assert reopen["confirmTitle"] == "⟦#{reopen["label"]} this record?⟧"
+      refute Map.has_key?(reopen, "confirmBody")
+
+      complete = entry.("data_grid_open_tasks", "complete")
+      refute Map.has_key?(complete, "destructive")
+      refute Map.has_key?(complete, "confirmTitle")
+    end
+
     test "a surface without row actions has tables and no row actions" do
       for catalog <- @catalogs do
         manifest = Manifest.for_surface(Minimal, catalog: catalog)

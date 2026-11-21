@@ -38,6 +38,7 @@ defmodule AshA2ui.L10n.PseudoLocaleTest do
     {"domain pseudo-locale", AshA2ui.Test.DomainPseudoLocale}
   ]
   @display_keys ~w(text label title message body placeholder description moreNoun confirmLabel
+                   confirmTitle confirmBody
                    primary_label _range_text _empty_message _primary_label hint)
   # Row keys whose value is a label chosen by the record's value: an
   # enumerated value's label, a badge, an icon label, a detail line.

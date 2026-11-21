@@ -174,6 +174,19 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **A row action can ask for confirmation** (admin catalog 3.13.0). An
+  `action` entity's `confirm :destructive` makes the admin grid confirm a
+  row action through its ConfirmDialog before invoking it, as it does for
+  a destroy, so an update with a drastic effect (deactivating a person)
+  is asked about first. The manifest reports it as `confirm:
+  :destructive` with the action's label as `confirm_label`. The dialog's
+  heading and body now come from the server, translated, as the entry's
+  `confirmTitle` and `confirmBody`, instead of the renderer's own English;
+  only a destroy says "This action cannot be undone." Row actions only,
+  and refused with `prompt_fields`, whose prompt is the confirmation.
+  Additive: an existing surface's payload gains `confirmTitle` and
+  `confirmBody` on its destroy entries and nothing else.
+
 - **Editing a record in place, saved by a save bar** (admin catalog 3.11.0,
   ADR 0010). `editable` now goes on a `:detail` card too, with `visible`
   gating it per record; a field's new `edit` option names the attribute

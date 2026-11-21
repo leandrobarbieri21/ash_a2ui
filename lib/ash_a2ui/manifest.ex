@@ -104,8 +104,8 @@ defmodule AshA2ui.Manifest do
 
   `confirm` says what happens after the row button is clicked: `:prompt`
   opens the prompt, whose `confirm_label` control invokes the action;
-  `:destructive` (the admin catalog, a destroy action without a prompt)
-  opens a confirmation dialog whose `confirm_label` control does; `nil`
+  `:destructive` (the admin catalog, a destroy action without a prompt, or
+  an action declaring `confirm :destructive`) opens a confirmation dialog whose `confirm_label` control does; `nil`
   invokes the action on click.
 
   ## Selectors
@@ -420,7 +420,7 @@ defmodule AshA2ui.Manifest do
     setting = Map.get(view.actions, name)
     ash_action = ResourceInfo.action(table.resource, name)
     prompt? = match?(%{prompt_fields: [_ | _]}, setting)
-    {confirm, confirm_label} = confirm(view, ash_action, prompt?, name)
+    {confirm, confirm_label} = confirm(view, ash_action, setting, prompt?, name)
 
     %{
       id: row_action_id(table, name),
@@ -442,17 +442,21 @@ defmodule AshA2ui.Manifest do
   defp row_action_id(table, name), do: "#{table.name}.#{name}"
 
   # The prompt's confirm button (both catalogs, the encoder's "Confirm"); the
-  # admin grid's destructive ConfirmDialog, whose confirm button reads the
-  # action's label (ash_admin_catalog.js syncConfirmDialog); else none.
-  defp confirm(view, _ash_action, true, _name), do: {:prompt, L10n.t(view.l10n, msg("Confirm"))}
+  # admin grid's destructive ConfirmDialog, for a destroy or an action
+  # declaring `confirm :destructive`, whose confirm button reads the action's
+  # label (ash_admin_catalog.js syncConfirmDialog); else none.
+  defp confirm(view, _ash_action, _setting, true, _name),
+    do: {:prompt, L10n.t(view.l10n, msg("Confirm"))}
 
-  defp confirm(view, %Ash.Resource.Actions.Destroy{}, false, name) do
-    if Experience.admin?(view),
+  defp confirm(view, ash_action, setting, false, name) do
+    destructive? =
+      match?(%Ash.Resource.Actions.Destroy{}, ash_action) or
+        match?(%{confirm: :destructive}, setting)
+
+    if destructive? and Experience.admin?(view),
       do: {:destructive, ResolvedView.action_label(view, name)},
       else: {nil, nil}
   end
-
-  defp confirm(_view, _ash_action, false, _name), do: {nil, nil}
 
   defp prompt_title(view, name, setting) do
     case setting.prompt_title do

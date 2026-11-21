@@ -1880,8 +1880,8 @@ defmodule AshA2ui.Encoder do
   # Edit when the view has an update action; declared row actions as their
   # existing invoke envelopes (the prompt-fields confirm envelope when the
   # action declares prompt_fields) — destructive: true when the action is
-  # a destroy, so the renderer confirms through ConfirmDialog and
-  # dispatches the envelope unchanged.
+  # a destroy or declares `confirm :destructive`, so the renderer confirms
+  # through ConfirmDialog and dispatches the envelope unchanged.
   defp admin_row_actions(view, table, sfx) do
     # View only when the surface has a record panel to open (formless
     # surfaces ship no dead affordance); Edit only with a declared update
@@ -1916,7 +1916,7 @@ defmodule AshA2ui.Encoder do
           "action" => "invoke",
           "context" => context
         }
-        |> maybe_destructive(view.resource, action)
+        |> maybe_destructive(view, action, setting)
         |> put_visible_path(setting, action)
         |> put_admin_prompt(view, table, action, setting, sfx)
       end)
@@ -1998,11 +1998,28 @@ defmodule AshA2ui.Encoder do
 
   defp put_admin_prompt(entry, _view, _table, _action, _setting, _sfx), do: entry
 
-  defp maybe_destructive(envelope, resource, action) do
-    case ResourceInfo.action(resource, action) do
-      %Ash.Resource.Actions.Destroy{} -> Map.put(envelope, "destructive", true)
-      _other -> envelope
+  # The dialog's text travels translated with the entry. Only a destroy
+  # says it cannot be undone: a declared confirmation guards an action with
+  # an inverse (deactivate has activate).
+  defp maybe_destructive(envelope, view, action, setting) do
+    case {ResourceInfo.action(view.resource, action), setting} do
+      {%Ash.Resource.Actions.Destroy{}, _setting} ->
+        envelope
+        |> put_confirm_text(view)
+        |> Map.put("confirmBody", t(view, msg("This action cannot be undone.")))
+
+      {_other, %{confirm: :destructive}} ->
+        put_confirm_text(envelope, view)
+
+      _not_confirmed ->
+        envelope
     end
+  end
+
+  defp put_confirm_text(envelope, view) do
+    envelope
+    |> Map.put("destructive", true)
+    |> Map.put("confirmTitle", t(view, msg("%{action} this record?"), action: envelope["label"]))
   end
 
   defp admin_empty_state(view, table, sfx) do

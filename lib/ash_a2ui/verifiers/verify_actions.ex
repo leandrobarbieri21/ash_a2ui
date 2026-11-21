@@ -22,6 +22,8 @@ defmodule AshA2ui.Verifiers.VerifyActions do
       actions,
       and is mutually exclusive with `prompt_fields` — the prompt collects
       values cast against the direct Ash action, which `via` bypasses,
+    * `confirm` may only be declared on row actions, and not with
+      `prompt_fields`: the prompt is that action's confirmation,
     * every `prompt_options` scope names one of the action's
       `prompt_fields` that is a relationship select (an explicit
       `relationship` on its `field` entity, or a `belongs_to`
@@ -186,6 +188,8 @@ defmodule AshA2ui.Verifiers.VerifyActions do
          :ok <- verify_row_action_only(setting, :visible_when, per_record_names, module),
          :ok <- verify_row_action_only(setting, :via, per_record_names, module),
          :ok <- verify_via_exclusivity(setting, module),
+         :ok <- verify_row_action_only(setting, :confirm, row_action_names, module),
+         :ok <- verify_confirm_exclusivity(setting, module),
          :ok <- verify_prompt_fields(setting, target, module),
          :ok <- verify_prompt_options(setting, target, declared, module) do
       verify_visible_when(setting, target, module)
@@ -328,6 +332,23 @@ defmodule AshA2ui.Verifiers.VerifyActions do
          "action #{inspect(setting.name)} declares both via and prompt_fields — they are " <>
            "mutually exclusive: prompt_fields collects values for the direct Ash action, " <>
            "which via bypasses"
+     )}
+  end
+
+  # A prompt already stands between the click and the invocation, and its
+  # confirm control is what invokes; a second dialog would ask twice.
+  defp verify_confirm_exclusivity(%{confirm: nil}, _module), do: :ok
+
+  defp verify_confirm_exclusivity(%{prompt_fields: []}, _module), do: :ok
+
+  defp verify_confirm_exclusivity(setting, module) do
+    {:error,
+     DslError.exception(
+       module: module,
+       path: [:a2ui, :action, setting.name, :confirm],
+       message:
+         "action #{inspect(setting.name)} declares both confirm and prompt_fields — the " <>
+           "prompt is the action's confirmation, so drop confirm"
      )}
   end
 

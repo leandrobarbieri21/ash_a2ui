@@ -200,7 +200,7 @@ defmodule AshA2ui.Experience do
   `saveBar` that saves the changes.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.12.0"
+  def admin_catalog_version, do: "3.13.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders
