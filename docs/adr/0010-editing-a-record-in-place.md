@@ -1,7 +1,14 @@
-# 0003. Editing a record in place: drafts on the client, one save through declared actions
+# 0010. Editing a record in place: drafts on the client, one save through declared actions
 
 - Status: proposed
 - Date: 2026-11-20
+- Builds on: [0001](0001-custom-component-catalogs.md) section 8 (an additive minor
+  version, 3.11.0), [0004](0004-catalog-version-copies-are-pinned-by-tests.md) (its three
+  pinned copies), [0007](0007-authorization-has-no-side-channel.md) (the save runs the
+  declared actions as the actor) and
+  [0009](0009-untrusted-input-names-things-and-the-server-resolves-them.md) (the client
+  names cards and fields; each card's `editable` is the allowlist the server resolves the
+  action from).
 
 ## Context
 

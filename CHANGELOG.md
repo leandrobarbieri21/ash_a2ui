@@ -166,7 +166,7 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 ### Features
 
 - **Editing a record in place, saved by a save bar** (admin catalog 3.11.0,
-  ADR 0003). `editable` now goes on a `:detail` card too, with `visible`
+  ADR 0010). `editable` now goes on a `:detail` card too, with `visible`
   gating it per record; a field's new `edit` option names the attribute
   behind a display calculation. Choosing or focusing an editable value opens
   its input (text, number, date or a choice, from the attribute's type);
