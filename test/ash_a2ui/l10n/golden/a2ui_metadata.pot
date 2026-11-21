@@ -39,6 +39,7 @@ msgstr ""
 msgid "All visits"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 #: test/support/links.ex:135
@@ -275,6 +276,7 @@ msgstr ""
 msgid "Check in"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
@@ -549,6 +551,7 @@ msgstr ""
 msgid "Done tasks"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
@@ -734,6 +737,7 @@ msgstr ""
 msgid "Go to history"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 #: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
@@ -810,6 +814,7 @@ msgstr ""
 msgid "Kitchen sink"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 msgid "Label"
 msgstr ""
@@ -836,6 +841,7 @@ msgstr ""
 msgid "Line count"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
 #: test/support/dossier_lines_review_ui.ex:1
 msgid "Lines"
 msgstr ""

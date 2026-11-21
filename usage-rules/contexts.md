@@ -86,8 +86,10 @@ end
   with `AshA2ui.ContextRunner.context_record(context, :name)`, compare
   its primary key with the row's, and keep a path that reads for itself:
   only `build_surface/2`/`build_data_model/2` hand it, not a page, sort or
-  search the action handler runs alone. It is a read optimization, never
-  authorization: the record was read as the surface's actor.
+  search the action handler runs alone. A `review_summary` counting that
+  table's rows reads them with the record handed too. It is a read
+  optimization, never authorization: the record was read as the surface's
+  actor.
 - Wire contract (frozen): actions `"context_search"` / `"context_select"`
   / `"context_clear"`; paths `/context/<name>` (`{"search","value","label"}`,
   the whole `/context` map rewritten per change), `/options/<context>`
