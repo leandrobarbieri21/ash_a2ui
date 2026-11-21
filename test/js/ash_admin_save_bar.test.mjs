@@ -357,6 +357,34 @@ test("Save sends save_changes with the changes when nothing waits", async () => 
   assert.equal(call.context.recordId, "s1");
 });
 
+test("the bar is busy while its save is out, and ready again on the outcome", async () => {
+  const {hook, field, saveBar} = await mountPage();
+  await type(field, "Yearly fee", "Enter");
+  saveBar.onSave();
+  await settle();
+  assert.equal(saveBar.busy(), true);
+
+  // A second Save while the first is out sends nothing.
+  const before = sent(hook).length;
+  saveBar.onSave();
+  await settle();
+  assert.equal(sent(hook).length, before);
+
+  // The outcome settles it, as the server's success writes it.
+  hook.processMessages([
+    {version: "1.0", updateDataModel: {surfaceId: "s1", path: "/ui/edits", value: {}}},
+    {version: "1.0", updateDataModel: {surfaceId: "s1", path: "/ui/feedback", value: feedback("success", "Changes saved.")}},
+  ]);
+  await settle();
+  assert.equal(saveBar.busy(), false);
+
+  // The next change saves again.
+  await type(field, "Annual levy", "Enter");
+  saveBar.onSave();
+  await settle();
+  assert.equal(sent(hook).length, before + 1);
+});
+
 test("while fields wait, Save opens the dialog; its choices send save or then", async () => {
   // without editReviews, the edited title still waits
   const {hook, field, saveBar} = await mountPage({editReviews: false});

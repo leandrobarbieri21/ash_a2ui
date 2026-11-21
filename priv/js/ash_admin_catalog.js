@@ -4684,6 +4684,11 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         return new A2uiController(this, adminApis.saveBar);
       }
 
+      // The surface the bar reads and writes (its busy state settles on its outcomes).
+      get surface() {
+        return this.context?.dataContext?.surface;
+      }
+
       willUpdate(changedProperties) {
         super.willUpdate(changedProperties);
         applyWeight(this, this.controller?.props);
