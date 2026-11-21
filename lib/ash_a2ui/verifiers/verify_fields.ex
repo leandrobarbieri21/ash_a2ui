@@ -401,20 +401,41 @@ defmodule AshA2ui.Verifiers.VerifyFields do
 
     Enum.find_value(entities, :ok, fn
       %AshA2ui.Field{field_action: action, name: name} = field when not is_nil(action) ->
-        entities
-        |> Enum.filter(
-          &(match?(%AshA2ui.Component{name: kind} when kind in [:detail, :table], &1) and
-              name in (&1.fields || []))
-        )
-        |> Enum.map(record_resource)
-        |> Enum.filter(&((&1 && Code.ensure_loaded?(&1)) and Info.resource?(&1)))
-        |> Enum.uniq()
-        |> Enum.find_value(&field_action_error(&1, field, module))
+        drawing =
+          Enum.filter(
+            entities,
+            &(match?(%AshA2ui.Component{name: kind} when kind in [:detail, :table], &1) and
+                name in (&1.fields || []))
+          )
+
+        pairs_on_card_error(field, drawing, module) ||
+          drawing
+          |> Enum.map(record_resource)
+          |> Enum.filter(&((&1 && Code.ensure_loaded?(&1)) and Info.resource?(&1)))
+          |> Enum.uniq()
+          |> Enum.find_value(&field_action_error(&1, field, module))
 
       _other ->
         nil
     end)
   end
+
+  # Catalog 3.10: a pairs field's action is a button per item, which only a
+  # table's rows draw.
+  defp pairs_on_card_error(%AshA2ui.Field{pairs: true, name: name}, drawing, module) do
+    if Enum.any?(drawing, &match?(%AshA2ui.Component{name: :detail}, &1)) do
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :field, name, :field_action],
+         message:
+           "a pairs field's field_action is a button per item, drawn in a table's rows; " <>
+             "#{inspect(name)} is also on a :detail card"
+       )}
+    end
+  end
+
+  defp pairs_on_card_error(_field, _drawing, _module), do: nil
 
   defp field_action_error(resource, %AshA2ui.Field{name: name} = field, module) do
     error = fn message ->
@@ -427,13 +448,25 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     end
 
     case Info.action(resource, field.field_action) do
-      %{type: :update} ->
-        if field.field_action_visible &&
-             not MapSet.member?(known_field_names(resource), field.field_action_visible) do
-          error.(
-            "field_action_visible names #{inspect(field.field_action_visible)}, which is not " <>
-              "a public attribute, calculation or aggregate of #{inspect(resource)}"
-          )
+      %{type: :update, arguments: arguments} ->
+        cond do
+          field.field_action_visible &&
+              not MapSet.member?(known_field_names(resource), field.field_action_visible) ->
+            error.(
+              "field_action_visible names #{inspect(field.field_action_visible)}, which is not " <>
+                "a public attribute, calculation or aggregate of #{inspect(resource)}"
+            )
+
+          # Catalog 3.10: a pairs field's action runs for one item, named by
+          # its key; the action must take it.
+          field.pairs && not Enum.any?(arguments, &(&1.name == :item)) ->
+            error.(
+              "field_action #{inspect(field.field_action)} of #{inspect(resource)} declares no " <>
+                ":item argument, which receives the key of the pairs item it runs for"
+            )
+
+          true ->
+            nil
         end
 
       _other ->

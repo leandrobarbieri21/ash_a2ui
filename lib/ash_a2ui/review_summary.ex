@@ -16,6 +16,11 @@ defmodule AshA2ui.ReviewSummary do
   through the table's read action, as the reader, scoped to the record and
   in the table's `default_sort`.
 
+  So do the items of such a table's `pairs` fields (catalog 3.10): each
+  item whose own review waits counts once (see `AshA2ui.Pairs`), as each
+  has its own button. A row's review fields and its items count in the
+  table's field order.
+
   "First" is the surface's declaration order: its `:detail` components and
   those tables in order, each card's fields in order, each table's rows in
   order. The link goes to the section of the card or table holding it: its
@@ -35,7 +40,7 @@ defmodule AshA2ui.ReviewSummary do
   See `data/4`.
   """
 
-  alias AshA2ui.{ContextRunner, Label, QueryRunner, ResolvedView, Review}
+  alias AshA2ui.{ContextRunner, Label, Pairs, QueryRunner, ResolvedView, Review}
 
   defstruct [
     :link_label,
@@ -127,22 +132,42 @@ defmodule AshA2ui.ReviewSummary do
     end
   end
 
-  # A table's rows, once each, while one of its review fields waits.
+  # A table's rows, once each, while one of its review fields waits, and
+  # each waiting item of its `pairs` fields (3.10), in column order.
   defp rows_waiting(view, context, record, table, opts) do
-    with [_ | _] = fields <- review_fields(view, table),
+    with [_ | _] = fields <- counted_fields(view, table),
          {:ok, scope} <- scope(view, context, record, table),
          {:ok, rows} <- read_rows(table, fields, scope, opts) do
       for row <- rows,
-          %AshA2ui.Field{name: field} <- [Enum.find(fields, &waiting?(Map.get(row, &1.review)))],
-          do: {{table.name, Map.get(row, :id)}, field, table.component}
+          field <- fields,
+          key <- row_waiting(table, row, field),
+          do: {key, field.name, table.component}
     else
       _none -> []
     end
   end
 
-  defp review_fields(view, table) do
+  # A review field's wait is the row's (keyed by the row, so it counts
+  # once); a pairs field's are its items' (keyed by the item).
+  defp row_waiting(table, row, %AshA2ui.Field{pairs: true, name: name}) do
+    row
+    |> Map.get(name)
+    |> Pairs.normalize()
+    |> Enum.with_index()
+    |> Enum.filter(fn {item, _index} -> Pairs.waiting?(item) end)
+    |> Enum.map(fn {item, index} ->
+      {table.name, Map.get(row, :id), name, Map.get(item, "key", index)}
+    end)
+  end
+
+  defp row_waiting(table, row, %AshA2ui.Field{review: source}) do
+    if waiting?(Map.get(row, source)), do: [{table.name, Map.get(row, :id)}], else: []
+  end
+
+  defp counted_fields(view, table) do
     for name <- table.component.fields || [],
-        %AshA2ui.Field{review: source} = field when not is_nil(source) <- [view.fields[name]],
+        %AshA2ui.Field{} = field <- [view.fields[name]],
+        field.pairs == true or not is_nil(field.review),
         do: field
   end
 
@@ -160,7 +185,8 @@ defmodule AshA2ui.ReviewSummary do
 
   defp read_rows(table, fields, scope, opts) do
     loads =
-      for %{review: source} <- fields,
+      for field <- fields,
+          source = if(field.pairs == true, do: field.name, else: field.review),
           ResolvedView.calculation_or_aggregate?(table.resource, source),
           uniq: true,
           do: source

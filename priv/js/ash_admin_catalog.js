@@ -210,8 +210,48 @@ export function rowReviews(row, columns) {
   for (const column of Array.isArray(columns) ? columns : []) {
     if (typeof column?.review?.path === "string") reviews.push(getByPath(row, column.review.path));
     if (typeof column?.subtitle?.reviewPath === "string") reviews.push(getByPath(row, column.subtitle.reviewPath));
+    // 3.10: each item of a pairs column carries its own review.
+    for (const item of pairItems(row, column)) reviews.push(item.review);
   }
   return reviews.map(reviewEntry).filter(Boolean);
+}
+
+/**
+ * 3.10: a pairs column's items on `row`, read through its `items` binding:
+ * each `{term, value, key?, review?, action?}`. Empty when the column binds
+ * none (a 1.16 payload: draw the raw value) or the row has none.
+ */
+export function pairItems(row, column) {
+  const path = column?.items?.path;
+  if (typeof path !== "string") return [];
+  const items = getByPath(row, path);
+  return Array.isArray(items) ? items.filter((item) => item && typeof item === "object") : [];
+}
+
+/**
+ * 3.10: whether a pairs column's `pairAction` is offered for `item`: the
+ * column has one, and the item says so (`action: true`) with a key to send.
+ * Hiding is a rendering concern only: the server re-checks every call.
+ */
+export function pairActionOffered(column, item) {
+  const entry = column?.pairAction;
+  return Boolean(
+    entry &&
+      typeof entry === "object" &&
+      typeof entry.action === "string" &&
+      item?.action === true &&
+      typeof item.key === "string" &&
+      item.key !== "",
+  );
+}
+
+/**
+ * 3.10: the action spec a pairs column's `pairAction` sends for `item`: the
+ * entry's, with the item's key added to its context as `item`.
+ */
+export function pairActionEntry(column, item) {
+  const entry = column.pairAction;
+  return {...entry, context: {...(entry.context || {}), item: item.key}};
 }
 
 // Schema builders from web_core's OWN zod (3.x), the instance the
@@ -236,7 +276,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.9.0";
+export const ADMIN_CATALOG_VERSION = "3.10.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -630,6 +670,10 @@ export function buildSchemas(basicCatalog = null) {
           placement: EnumOf(["trailing", "expand", "group", "groupSubtitle", "leading"]).optional(),
           // 1.16: the value is a list of {term, value} pairs.
           pairs: Bool.optional(),
+          // 3.10: the row's normalized pairs ({path}, row-relative), each
+          // with its own review, key and offer, and the button per item.
+          items: RecordAny.optional(),
+          pairAction: RecordAny.optional(),
           // 1.14: the field's empty_text, for a list-rows renderer.
           emptyText: Str.optional(),
         }),
@@ -2864,6 +2908,70 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       /**
+       * 3.10: a pairs column bound to its row's items: one labeled line per
+       * item, its value followed by its own review and, while the item
+       * offers it, the column's pairAction as a quiet button.
+       */
+      renderPairs(row, column) {
+        const items = pairItems(row, column);
+        if (items.length === 0) return "—";
+        return html`<dl class="am-pairs">
+          ${items.map((item) => {
+            const review = reviewEntry(item.review);
+            return html`<div class="am-pair" data-a2ui-region=${regionAddresses(review) || nothing}>
+              <dt>${str(item.term)}</dt>
+              <dd>
+                <span class="am-cell-value" data-review=${review ? review.state : nothing}>${str(item.value)}</span>
+                ${renderCellReview(review)} ${this.renderPairAction(row, column, item)}
+              </dd>
+            </div>`;
+          })}
+        </dl>`;
+      }
+
+      /**
+       * 3.10: a pairs column's action for one item, busy until the outcome,
+       * sent like a row action with the item's key in its context. A click
+       * never reaches the row's own click.
+       */
+      renderPairAction(row, column, item) {
+        if (!pairActionOffered(column, item)) return nothing;
+        const entry = column.pairAction;
+        const rows = this.controller?.props?.rows || [];
+        const index = rows.indexOf(row);
+        const label = str(entry.label);
+        const identity = `${this.rowIdentity(row, index)}#${item.key}`;
+        const busy =
+          this._amBusyRowAction !== null &&
+          this._amBusyRowAction?.row === identity &&
+          this._amBusyRowAction?.label === label;
+        return html`<span class="am-cell-action" data-a2ui-action="field_action" data-a2ui-item=${item.key}
+          >${renderActionButton({
+            label,
+            icon: typeof entry.icon === "string" && entry.icon !== "" ? entry.icon : undefined,
+            tone: "quiet",
+            size: "sm",
+            busy,
+            onClick: (event) => {
+              event?.stopPropagation?.();
+              this.onPairAction(column, item, index);
+            },
+          })}</span
+        >`;
+      }
+
+      /** 3.10: sends a pairs column's action for one item. */
+      onPairAction(column, item, index) {
+        if (!pairActionOffered(column, item) || index < 0 || this._amBusyRowAction) return;
+        const entry = pairActionEntry(column, item);
+        const spec = adminActionSpec(entry);
+        if (!spec) return;
+        const rows = this.controller?.props?.rows || [];
+        this.markRowActionBusyByIdentity(entry, `${this.rowIdentity(rows[index], index)}#${item.key}`);
+        this.dispatchRowAction(spec, this.rowBasePath(index));
+      }
+
+      /**
        * One cell: its value (below), framed by the column's 1.8 hints when
        * it declares any — a leading icon and a "+N more" tag on the value's
        * line, a second line and a detail line under it.
@@ -3012,6 +3120,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
        * everything else through the format rules.
        */
       renderCellValue(row, column) {
+        // 3.10: a pairs column bound to its row's items.
+        if (column.pairs === true && typeof column.items?.path === "string") return this.renderPairs(row, column);
         if (column.link && typeof column.link.path === "string") {
           const links = linkEntries(getByPath(row, column.link.path));
           if (links.length > 0) return renderLinks(this, links);

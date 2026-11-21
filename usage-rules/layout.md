@@ -215,6 +215,41 @@ topics for the full contracts.
   `expandLabel`, and the pairs column `"pairs": true`. A renderer that
   ignores them draws the grid. The basic catalog draws its usual card,
   with the expand fields in its metadata grid.
+- Pair reviews (admin catalog 3.10): each pair may carry its own `review`
+  (a review field's shape: `state`, `page`, `href`, `quote`, `boxes`), a
+  `key` (its stable address in the record) and `action` (whether it
+  offers the field's action, `true` when absent). The row carries the
+  normalized items at `_pairs_<field>`, bound by the column's `items`, and
+  each item's review draws after its value. A `field_action` on a pairs
+  field is a button per item, not per row (the column's `pairAction`): it
+  runs the update for the item chosen, its key as the action's `:item`
+  argument, while the record offers it (`field_action_visible`) and the
+  item does (it has a key and does not say `action: false`). A review
+  summary counts each item whose review waits.
+
+  ```elixir
+  component :table, :clauses do
+    resource MyApp.Clause
+    display :cards
+    context_filter agreement_id: :agreement
+    fields [:kind, :terms]
+    row_layout do
+      title :kind
+      meta [:terms]
+    end
+  end
+
+  # terms: [%{term: "Notice", value: "60 days", key: "0",
+  #           review: %{state: :pending, page: 3}}, ...]
+  field :terms do
+    pairs true
+    field_action :review_term        # an update of MyApp.Clause with an :item argument
+    field_action_visible :terms_open
+  end
+  ```
+
+- A pairs field's action without an `:item` argument, or one shown on a
+  `:detail` card (which draws no button per item), does not compile.
 
 ## Step fields (`steps true`)
 

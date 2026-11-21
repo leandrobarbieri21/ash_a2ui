@@ -164,6 +164,15 @@ defmodule AshA2ui do
         record, such as a record's extracted terms. Its admin dataGrid column
         carries `"pairs": true` (admin catalog 1.16), and a renderer draws one
         labeled row per pair; renderers that ignore it show the raw list.
+        A pair may also carry its own `review` (`AshA2ui.Review`'s shape), a
+        `key` (its stable address in the record) and `action` (whether it
+        offers the field's action, `true` when absent): each row carries the
+        normalized items at `_pairs_<field>`, bound by the column's `items`
+        (admin catalog 3.10, see `AshA2ui.Pairs`). With a `field_action`, a
+        table draws its button per item, not per row (the column's
+        `pairAction`), and the action receives the item's key as its `:item`
+        argument, which it must declare. A review summary counts each item
+        whose review still waits.
         """
       ],
       steps: [
@@ -256,7 +265,10 @@ defmodule AshA2ui do
         gives the button its `label` (default: the humanized action name),
         its `icon` and the tables it `refreshes`; its `visible_when` gates
         row actions only. Several fields may share one action. The basic
-        catalog draws no button.
+        catalog draws no button. On a `pairs` field (3.10, tables only) the
+        button is per item: the action runs for the item the person chose,
+        its key as the `:item` argument, and only while the record offers
+        it and the item does (see `pairs`).
         """
       ],
       field_action_visible: [
