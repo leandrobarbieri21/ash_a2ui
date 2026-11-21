@@ -503,6 +503,29 @@ export function createAdminStyles(css) {
     .am-cell-review-page {
       color: var(--am-text-muted);
     }
+    /* 3.10: a pairs cell's items, one labeled line each, with its own
+     * review and button after the value. */
+    .am-pairs {
+      display: grid;
+      gap: var(--am-space-2xs);
+      margin: 0;
+    }
+    .am-pair {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--am-space-xs);
+    }
+    .am-pair dt {
+      color: var(--am-text-muted);
+    }
+    .am-pair dd {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--am-space-xs);
+      margin: 0;
+    }
     .am-cell-sub:has(.am-cell-review) {
       display: inline-flex;
       flex-wrap: wrap;

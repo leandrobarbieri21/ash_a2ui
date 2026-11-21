@@ -152,7 +152,11 @@ defmodule AshA2ui.ActionHandler do
       default. With `"component"` naming a table (catalog 3.9) the row is
       re-read through the table's own read and context filters (`"query"`
       carries its state), and a success re-reads the records of the
-      contexts the table is filtered by instead of a card's.
+      contexts the table is filtered by instead of a card's. On a `pairs`
+      field (catalog 3.10) the context also carries `"item"`, the key of
+      the item chosen: it is refused unless the row's items hold it and it
+      offers the action, and the update receives it as its `:item`
+      argument.
 
     * `"page_action"` — context `%{"action" => name, "recordId" => id,
       "contexts" => selections}`. Runs a page header button that runs an
@@ -1938,7 +1942,8 @@ defmodule AshA2ui.ActionHandler do
   defp field_action(context, %{view: view} = env) do
     with {:ok, target, field} <- field_action_target(view, context),
          {:ok, record_id} <- field_action_record_id(view, context),
-         {:ok, record} <- field_action_record(view, target, field, record_id, env) do
+         {:ok, record} <- field_action_record(view, target, field, record_id, env),
+         {:ok, item} <- field_action_item(view, field, record, context) do
       action = field.field_action
 
       env =
@@ -1947,8 +1952,8 @@ defmodule AshA2ui.ActionHandler do
         |> Map.put(:setting, Map.get(view.actions, action))
         |> Map.put(:shown_fields, [])
 
-      result =
-        update_record(record, action, field_action_params(record, action, field), env.ash_opts)
+      params = record |> field_action_params(action, field) |> put_item(item)
+      result = update_record(record, action, params, env.ash_opts)
 
       with {:ok, messages} <- after_write(result, env, completed_text(view, action)),
            {:ok, detail_messages} <- field_action_detail(view, target, record_id, env) do
@@ -1970,6 +1975,29 @@ defmodule AshA2ui.ActionHandler do
         %{}
     end
   end
+
+  # Catalog 3.10: a `pairs` field's action runs for one of its items, named
+  # by its key (`"item"`): the record's own items, read again, must hold it
+  # and offer the action. Any other field's action takes no item.
+  defp field_action_item(view, %AshA2ui.Field{pairs: true} = field, record, context) do
+    with key when is_binary(key) and key != "" <- Map.get(context, "item"),
+         %{"action" => true} <-
+           record
+           |> Map.get(field.name)
+           |> AshA2ui.Pairs.normalize(nil, true)
+           |> AshA2ui.Pairs.find(key) do
+      {:ok, key}
+    else
+      _unoffered -> {:error, [status(view, unavailable_text(view, field.field_action))]}
+    end
+  end
+
+  defp field_action_item(_view, _field, _record, _context), do: {:ok, nil}
+
+  # The item's key as the action's `:item` argument (the verifier makes a
+  # `pairs` field's action declare one).
+  defp put_item(params, nil), do: params
+  defp put_item(params, key), do: Map.put(params, :item, key)
 
   # The card (or table) and the field the client named, when that field of
   # that card (or table) declares a field action.

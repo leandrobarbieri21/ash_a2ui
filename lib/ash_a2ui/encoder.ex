@@ -1522,6 +1522,9 @@ defmodule AshA2ui.Encoder do
   # grid's rowActions entries, and sent the same way. The context names the
   # table and the field, never the Ash action; `recordId` binds the row's
   # id, and `actionVisible` the row's `_action_<field>` (row-relative).
+  # Catalog 3.10: on a `pairs` field it is a button per item instead, the
+  # column's `pairAction`; a renderer adds the item's key to the context as
+  # `item`, and each item says whether it offers it (its `action`).
   defp put_column_field_action(column, view, table, field) do
     case view.fields[field] do
       %{field_action: action} when not is_nil(action) ->
@@ -1544,9 +1547,13 @@ defmodule AshA2ui.Encoder do
           }
           |> maybe_put("icon", setting && setting.icon)
 
-        column
-        |> Map.put("action", entry)
-        |> Map.put("actionVisible", %{"path" => "_action_#{field}"})
+        if view.fields[field].pairs do
+          Map.put(column, "pairAction", entry)
+        else
+          column
+          |> Map.put("action", entry)
+          |> Map.put("actionVisible", %{"path" => "_action_#{field}"})
+        end
 
       _other ->
         column
@@ -1583,11 +1590,18 @@ defmodule AshA2ui.Encoder do
 
   defp expand_label(_view, _layout), do: nil
 
-  # Catalog 1.16: a field whose value is a list of {term, value} pairs.
+  # Catalog 1.16: a field whose value is a list of {term, value} pairs; 3.10:
+  # `items` binds each row's normalized items (`_pairs_<field>`, see
+  # AshA2ui.Pairs), each with its own review, key and action offer.
   defp put_column_pairs(column, view, field) do
     case view.fields[field] do
-      %{pairs: true} -> Map.put(column, "pairs", true)
-      _other -> column
+      %{pairs: true} ->
+        column
+        |> Map.put("pairs", true)
+        |> Map.put("items", %{"path" => "_pairs_#{field}"})
+
+      _other ->
+        column
     end
   end
 
@@ -5897,6 +5911,7 @@ defmodule AshA2ui.Encoder do
     |> Map.merge(primary_action_data(view, table, record))
     |> Map.merge(review_row_data(view, field_names, record))
     |> Map.merge(ResolvedView.detail_field_action_data(view, record, field_names))
+    |> Map.merge(ResolvedView.pairs_data(view, record, field_names))
   end
 
   # Catalog 3.3: the review of each review field a row draws, at the

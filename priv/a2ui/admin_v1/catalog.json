@@ -8,8 +8,9 @@
   "metadata": {
     "extensions": {
       "ash_a2ui": {
-        "version": "3.9.0",
+        "version": "3.10.0",
         "changelog": {
+          "3.10.0": "Additive: pair reviews. A dataGrid column with pairs gains an optional items (a row-relative binding, {path: \"_pairs_<field>\"}, to the row's normalized pairs: a list of {term, value, key?, review?, action?}, review in the shape of a review field's (3.1), key the item's address in the record, action whether the item offers the column's pairAction, a boolean) and an optional pairAction (the field action of the column's field as a button per item: {label, action, context, icon?}, shaped like the column's action (3.9) and sent the same way, with the item's key added to the context as item when it is sent). A renderer draws each item's review after its value, and the button while the item's action is true; the server re-checks every call. A review summary's count also counts each item of such a column, in a table it counts, whose review still waits. Renderers that ignore them draw the pairs as before. The catalogId is unchanged.",
           "3.9.0": "Additive: row field actions. A dataGrid column gains an optional action (the field action of the column's field, a button in each row beside the value: {label, action, context, icon?}, shaped like fieldDisplay's action and a rowActions entry and sent the same way, as the ash_a2ui catalog's ashAction; action is field_action and the context names the table (component) and the field, with recordId bound row-relatively to the row's id and query and contexts to the surface's) and an optional actionVisible (a row-relative binding, {path: \"_action_<field>\"}, to whether the row offers it, a boolean). A renderer draws the button only while the row offers it, dispatches the entry with its bindings resolved against the row, and holds it busy until the outcome; the server re-checks every call. A review summary's count also counts each row of a table filtered by its context alone that has a review field still waiting, once. Renderers that ignore them draw no button. The catalogId is unchanged.",
           "3.8.0": "Additive: a value and its document region linked both ways. A renderer marks the element it draws for a value that cites regions (a fieldDisplay with a review href, a dataGrid row with review cells) with data-a2ui-region, its value the reviews' hrefs separated by spaces. While a documentPane is shown with its document beside the sections, pointing at or focusing inside a marked element (or a link whose href starts with regionHref) shows its regions linked in the viewer, scrolling only the viewer's own canvas when the first is out of view; nothing is written, sent or focused, and leaving or blurring clears it. Activating a region (click, Enter or Space) also scrolls the page to the marked element citing it, flashes it for 3 seconds and, from the keyboard, moves focus to it. The state a linked region is drawn in is the renderer's (linked by default). Renderers that ignore the attribute draw as before. Nothing on the wire changes; the catalogId is unchanged.",
           "3.7.0": "Additive: live links. A page header breadcrumb step gains an optional live, navigate or patch: on a LiveView transport a plain primary click on the step follows its address inside the LiveView (navigate as push_navigate, patch as push_patch) instead of loading the page. The renderer marks the drawn link with the data-a2ui-live attribute (its value the kind) and the AshA2ui hook follows it, across shadow roots; a modified or middle click, a cross-origin address, a renderer that ignores live and a page without the hook follow href as a normal link. It is additive over 3.6.0. The catalogId is unchanged.",
@@ -286,6 +287,25 @@
               "pairs": {
                 "type": "boolean",
                 "description": "Optional (1.16): true when the value is a list of {term, value} objects: a renderer draws one labeled row per pair."
+              },
+              "items": {
+                "type": "object",
+                "description": "Optional (3.10), with pairs: row-relative binding ({path: \"_pairs_<field>\"}) to the row's normalized pairs, a list of {term, value, key?, review?, action?}: review in a review field's shape (3.1), drawn after the item's value; key the item's address in the record; action whether the item offers the column's pairAction, a boolean. Drawn instead of the raw value when present.",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": false
+              },
+              "pairAction": {
+                "type": "object",
+                "description": "Optional (3.10), with pairs: the field action of the column's field as a button per item, offered while the item's action is true. Shaped like the column's action (3.9) and dispatched the same way (the ash_a2ui catalog's ashAction, context bindings resolved against the row at click time), with the item's key added to the context as item.",
+                "properties": {
+                  "label": {"type": "string", "description": "The action's name in words (translated): the button's text, or its accessible name and tooltip when it draws as an icon."},
+                  "action": {"type": "string", "description": "The client action name dispatched: field_action."},
+                  "context": {"type": "object", "additionalProperties": {"$ref": "common_types.json#/$defs/DynamicValue"}, "description": "The action context: component (the table), field, recordId (bound row-relatively to the row's id), and query and contexts (bound to /query and /context on surfaces that have them). The renderer adds item, the chosen item's key."},
+                  "icon": {"type": "string", "description": "Optional: an icon name the button may draw as (\"check\")."}
+                },
+                "required": ["label", "action", "context"],
+                "additionalProperties": false
               },
               "emptyText": {
                 "type": "string",
