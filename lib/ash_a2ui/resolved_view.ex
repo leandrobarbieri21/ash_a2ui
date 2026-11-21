@@ -67,6 +67,7 @@ defmodule AshA2ui.ResolvedView do
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshA2ui.L10n
   alias AshA2ui.Label
+  alias AshA2ui.Masked
 
   import AshA2ui.Gettext, only: [msg: 1]
 
@@ -504,19 +505,35 @@ defmodule AshA2ui.ResolvedView do
   JSON-safe values — dates/datetimes to ISO 8601, decimals to strings, atoms
   to strings — with `"id"` always included). Declared `source` fields walk
   the loaded relationship path (nil-safe: an unloaded or nil relationship
-  serializes to `""`). When any of `fields` declares `link`/`links`, the
-  map carries the reserved `"_links"` key (see `AshA2ui.Links`); `opts`
-  carries the render's `:actor`/`:tenant` for the `AshA2ui.LinkResolver`.
+  serializes to `""`). A field the actor's field policies forbid draws the
+  masked text (`AshA2ui.Masked`) and the map carries the reserved
+  `"_masked"` key with the field's reason; `Ash.NotLoaded` and a visible
+  `nil` stay `null` with no entry. When any of `fields` declares
+  `link`/`links`, the map carries the reserved `"_links"` key (see
+  `AshA2ui.Links`); `opts` carries the render's `:actor`/`:tenant` for the
+  `AshA2ui.LinkResolver`.
 
   Used for `/detail/<context>` record values; matches the row serialization
   of `/records`.
   """
   @spec record_values(t(), Ash.Resource.record(), [atom], keyword) :: %{String.t() => term}
   def record_values(%__MODULE__{} = view, record, fields, opts \\ []) do
-    row =
+    {row, masked_fields} =
       fields
-      |> Map.new(fn name -> {to_string(name), serialized_field(view, record, name)} end)
+      |> Enum.reduce({%{}, []}, fn name, {row, masked_fields} ->
+        case serialized_field(view, record, name) do
+          {:masked, text} ->
+            {Map.put(row, to_string(name), text), [name | masked_fields]}
+
+          {:value, value} ->
+            {Map.put(row, to_string(name), value), masked_fields}
+        end
+      end)
+
+    row =
+      row
       |> Map.put("id", json_safe(Map.get(record, :id)))
+      |> Map.merge(Masked.row_data(Enum.reverse(masked_fields), view.l10n))
 
     view.fields
     |> then(&AshA2ui.Links.context(record.__struct__, &1, fields, opts))
@@ -719,17 +736,33 @@ defmodule AshA2ui.ResolvedView do
   defp serialized_field(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->
-        case walk_source(record, source) do
-          nil -> ""
-          value -> json_safe(value)
-        end
+        source_value(view, record, source)
 
       field ->
         case AshA2ui.Links.virtual_value(field, record) do
-          {:ok, value} -> value
-          :not_virtual -> json_safe(Map.get(record, name))
+          {:ok, value} -> {:value, value}
+          :not_virtual -> stored_value(view, record, name)
         end
     end
+  end
+
+  defp source_value(view, record, source) do
+    if Masked.forbidden_source?(record, source) do
+      {:masked, Masked.text(view.l10n)}
+    else
+      case walk_source(record, source) do
+        nil -> {:value, ""}
+        value -> {:value, json_safe(value)}
+      end
+    end
+  end
+
+  defp stored_value(view, record, name) do
+    value = Map.get(record, name)
+
+    if Masked.masked?(value),
+      do: {:masked, Masked.text(view.l10n)},
+      else: {:value, json_safe(value)}
   end
 
   defp walk_source(record, [attribute]), do: Map.get(record, attribute)

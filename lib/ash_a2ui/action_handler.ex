@@ -370,6 +370,7 @@ defmodule AshA2ui.ActionHandler do
   alias AshA2ui.Experience
   alias AshA2ui.L10n
   alias AshA2ui.Label
+  alias AshA2ui.Masked
   alias AshA2ui.QueryRunner
   alias AshA2ui.ResolvedView
 
@@ -4647,6 +4648,11 @@ defmodule AshA2ui.ActionHandler do
   defp update_data_model(view, path, value),
     do: Encoder.update_data_model(view.surface_id, path, value)
 
+  # The FORM variant of the record's values: the /form edit buffer
+  # (`form_population/2`) and the CSV export cells. A forbidden field stays
+  # `null` — submitting the form unchanged must never write the masked word
+  # into the column, and an export keeps the empty cell it always had. The
+  # display paths mask instead (`display_record_values/3`).
   defp record_values(view, record, fields) do
     fields
     |> Map.new(fn field -> {Atom.to_string(field), field_value(view, record, field)} end)
@@ -4655,7 +4661,8 @@ defmodule AshA2ui.ActionHandler do
 
   # `source` columns read through the loaded relationship path (nil-safe: a
   # nil or unloaded relationship serializes to ""); plain fields read the
-  # record key directly.
+  # record key directly. Forbidden values serialize as `nil` here — see
+  # `record_values/3` — never as the inspected placeholder struct.
   defp field_value(view, record, field) do
     case view.fields[field] do
       %{source: [_ | _] = source} ->
@@ -4672,10 +4679,67 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  # record_values/3 plus the reserved "_links" of the linked fields (detail
+  # The DISPLAY variant of `record_values/3`: a field the actor's field
+  # policies forbid draws the masked text (`AshA2ui.Masked`) — never `null`,
+  # which would read as known-and-empty — and the record carries the
+  # reserved `"_masked"` key with the field's reason. Shared by the detail
+  # refresh and the view panel's record, through `linked_record_values/4`.
+  defp display_record_values(view, record, fields) do
+    {row, masked_fields} =
+      fields
+      |> Enum.reduce({%{}, []}, fn field, {row, masked_fields} ->
+        case display_field_value(view, record, field) do
+          {:masked, text} ->
+            {Map.put(row, Atom.to_string(field), text), [field | masked_fields]}
+
+          {:value, value} ->
+            {Map.put(row, Atom.to_string(field), value), masked_fields}
+        end
+      end)
+
+    row
+    |> Map.put("id", json_value(Map.get(record, :id)))
+    |> Map.merge(Masked.row_data(Enum.reverse(masked_fields), view.l10n))
+  end
+
+  # `display_record_values/3`'s field reader: the same treatment the
+  # encoder's `field_value/3` gives a table row.
+  defp display_field_value(view, record, field) do
+    case view.fields[field] do
+      %{source: [_ | _] = source} ->
+        source_value(view, record, source)
+
+      declared ->
+        case AshA2ui.Links.virtual_value(declared, record) do
+          {:ok, value} -> {:value, value}
+          :not_virtual -> stored_value(view, record, field)
+        end
+    end
+  end
+
+  defp source_value(view, record, source) do
+    if Masked.forbidden_source?(record, source) do
+      {:masked, Masked.text(view.l10n)}
+    else
+      case walk_source(record, source) do
+        nil -> {:value, ""}
+        value -> {:value, json_value(value)}
+      end
+    end
+  end
+
+  defp stored_value(view, record, field) do
+    value = Map.get(record, field)
+
+    if Masked.masked?(value),
+      do: {:masked, Masked.text(view.l10n)},
+      else: {:value, json_value(value)}
+  end
+
+  # record_values plus the reserved "_links" of the linked fields (detail
   # and view-panel records; table rows merge theirs in rows/4).
   defp linked_record_values(view, record, fields, ash_opts) do
-    row = record_values(view, record, fields)
+    row = display_record_values(view, record, fields)
 
     record.__struct__
     |> AshA2ui.Links.context(view.fields, fields, ash_opts)

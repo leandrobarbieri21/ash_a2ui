@@ -437,7 +437,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.11.0";
+export const ADMIN_CATALOG_VERSION = "3.12.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -812,6 +812,9 @@ export function buildSchemas(basicCatalog = null) {
           // the row's offer of it ({path}, row-relative).
           action: RecordAny.optional(),
           actionVisible: RecordAny.optional(),
+          // 3.12: the row's masked-field reason ({path}, row-relative); a
+          // non-empty one draws the cell as plain text (the masked word).
+          masked: RecordAny.optional(),
           detail: RecordAny.optional(),
           // 1.10: header help ({title, body}) and the field a header
           // sorts by when it is not the column's own path.
@@ -967,6 +970,9 @@ export function buildSchemas(basicCatalog = null) {
       steps: DynamicValueSchema.nullable().optional(),
       // 3.1: how a review field's value was filled in: its state and citation.
       review: DynamicValueSchema.nullable().optional(),
+      // 3.12: the masked-field reason; a non-empty one draws the value as
+      // plain text (the masked word), ignoring format/link/badge/emptyText.
+      masked: DynamicValueSchema.nullable().optional(),
       // 3.2: a field action's button (a rowActions-shaped entry) and
       // whether the record offers it.
       action: RecordAny.optional(),
@@ -3313,6 +3319,20 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       renderCellValue(row, column) {
         // 3.10: a pairs column bound to its row's items.
         if (column.pairs === true && typeof column.items?.path === "string") return this.renderPairs(row, column);
+        // 3.12: a masked cell draws the value (the masked word) as plain
+        // text: format, link, badge and emptyText are ignored, the element
+        // is marked data-a2ui-masked, and the reason is its title and
+        // accessible description.
+        if (column.masked && typeof column.masked.path === "string") {
+          const maskedReason = str(getByPath(row, column.masked.path));
+          if (maskedReason) {
+            return html`<span
+              data-a2ui-masked
+              title=${maskedReason}
+              aria-description=${maskedReason}>${str(getByPath(row, column.path))}</span
+            >`;
+          }
+        }
         if (column.link && typeof column.link.path === "string") {
           const links = linkEntries(getByPath(row, column.link.path));
           if (links.length > 0) return renderLinks(this, links);
@@ -4679,6 +4699,32 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const props = this.controller?.props;
         if (!props) return nothing;
 
+        // 3.12: a masked field draws its value (the masked word) as plain
+        // text: format, link, badge, edit, emptyText and hideWhenEmpty are
+        // ignored (a value the reader may not see is not edited in place),
+        // the element is marked data-a2ui-masked, and the reason is its
+        // title and accessible description.
+        const maskedReason = str(props.masked || "");
+        if (maskedReason) {
+          this.hidden = false;
+          const review = reviewEntry(props.review);
+          const region = regionAddresses(review) || nothing;
+          return html`
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
+              <dd
+                class="field-value"
+                data-a2ui-masked
+                title=${maskedReason}
+                aria-description=${maskedReason}
+              >
+                ${str(props.value)}
+              </dd>
+            ${renderReview(review)}${this.renderFieldAction(props)}
+            </dl>
+          `;
+        }
+
         // 3.11: a field the record offers editing on draws its value as a
         // control that opens its input, and never hides.
         if (this.editOffered(props)) {
@@ -4692,6 +4738,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const review = reviewEntry(props.review);
         // 3.8: the regions the value cites, linked with it in a document pane.
         const region = regionAddresses(review) || nothing;
+
         // 1.17: a steps field is empty when it has no steps.
         const steps = props.steps === undefined ? null : stepEntries(props.steps);
         const empty = steps ? steps.length === 0 : props.value == null || props.value === "";

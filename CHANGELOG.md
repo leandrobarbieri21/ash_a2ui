@@ -194,6 +194,26 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   `waitingReviews`, `confirmTexts`, `saveDecision`) for host swaps.
   Additive: the catalogId is unchanged, and a renderer that ignores `edit`
   draws the card read-only.
+
+- **Hidden fields: a forbidden value renders masked, never empty**
+  (admin catalog 3.12.0). A field the actor's field policies forbid
+  (`%Ash.ForbiddenField{}`) used to serialize as `null`, which read as
+  "known and empty". Table rows, `:detail` cards and the view panel now
+  draw `AshA2ui.Masked.text/1` ("Hidden", translated) and carry the
+  reason at the reserved `_masked/<field>` key; nothing from the struct
+  (never `original_value`) reaches the wire. A `source` field is masked
+  when any step of its walk is forbidden. The `/form` edit buffer keeps
+  `null` (submitting unchanged must not write the masked word into the
+  column) and CSV exports keep the empty cell. Secondary text (badges,
+  detail help, canvas record labels, diagram markers — initials `"?"`)
+  draws the masked word too. The admin catalog's `fieldDisplay` and each
+  dataGrid column gain an optional `masked` binding to the reason, the
+  stock renderer marks the drawn value `data-a2ui-masked` with the reason
+  as its title and accessible description (and does not offer it for
+  editing in place), and the binding is emitted
+  only for fields a field policy covers, so surfaces over resources
+  without field policies are byte-for-byte unchanged.
+
 - **Pair reviews: a review and a button per item of a `pairs` field**
   (admin catalog 3.10.0). An item of a `pairs` field may carry its own
   `review` (`AshA2ui.Review`'s shape), a `key` (its address in the record)

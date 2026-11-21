@@ -268,21 +268,24 @@ defmodule AshA2ui.Column do
       {"_detail_#{column.name}", (text && Label.translate(l10n, text)) || ""}
       | detail_icon_data(column, value)
     ] ++
-      detail_help_data(column, record)
+      detail_help_data(column, record, l10n)
   end
 
-  defp detail_help_data(%{detail_help: field} = column, record) when not is_nil(field) do
+  defp detail_help_data(%{detail_help: field} = column, record, l10n) when not is_nil(field) do
+    value = Map.get(record, field)
+
     help =
-      case Map.get(record, field) do
-        nil -> ""
-        value when is_binary(value) -> value
-        value -> to_string(value)
+      cond do
+        AshA2ui.Masked.masked?(value) -> AshA2ui.Masked.text(l10n)
+        is_nil(value) -> ""
+        is_binary(value) -> value
+        true -> to_string(value)
       end
 
     [{"_detail_help_#{column.name}", help}]
   end
 
-  defp detail_help_data(_column, _record), do: []
+  defp detail_help_data(_column, _record, _l10n), do: []
 
   defp detail_icon_data(%{detail_icon_names: []}, _value), do: []
 

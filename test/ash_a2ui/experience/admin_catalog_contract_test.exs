@@ -217,8 +217,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
     basic = "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    assert contract(catalog)["version"] == "3.11.0"
-    assert Experience.admin_catalog_version() == "3.11.0"
+    assert contract(catalog)["version"] == "3.12.0"
+    assert Experience.admin_catalog_version() == "3.12.0"
     assert changelog(catalog)["3.0.0"] =~ "Breaking"
     assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
     assert catalog["$id"] == catalog["catalogId"]
@@ -242,7 +242,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     inputs = Regex.scan(~r/"(\w+)"/, list, capture: :all_but_first) |> List.flatten()
     assert Enum.sort(inputs ++ ["Modal"]) == Enum.sort(owned)
     assert source =~ "export const ADMIN_BASIC_KINDS = [...INPUT_OVERRIDE_KINDS, \"Modal\"]"
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.11.0")
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.12.0")
 
     # the functions state who may call them
     for {name, function} <- catalog["functions"],
@@ -276,6 +276,30 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert visible["$ref"] == "common_types.json#/$defs/DataBinding"
     refute "action" in field["required"]
     refute "actionVisible" in field["required"]
+  end
+
+  test "catalog 3.12 adds the masked binding, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.12.0"] =~ "masked fields"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    field = catalog["components"]["fieldDisplay"]
+    masked = field["properties"]["masked"]
+    assert masked["$ref"] == "common_types.json#/$defs/DataBinding"
+    assert masked["description"] =~ "data-a2ui-masked"
+    refute "masked" in field["required"]
+
+    column = catalog["components"]["dataGrid"]["properties"]["columns"]["items"]
+    column_masked = column["properties"]["masked"]
+    assert column_masked["required"] == ["path"]
+    assert Map.keys(column_masked["properties"]) == ["path"]
+    assert column_masked["description"] =~ "data-a2ui-masked"
+    refute "masked" in column["required"]
+
+    # the stock renderer draws the masked value and marks it
+    source = File.read!(@renderer_asset_path)
+    assert source =~ "data-a2ui-masked"
   end
 
   test "catalog 3.4 adds the document pane and viewer, under the same id" do

@@ -101,7 +101,13 @@ defmodule AshA2ui.RowLayout do
   end
 
   defp badge_text(layout, record, l10n) do
-    badge_text(layout, record, Map.get(record, layout.badge), l10n)
+    value = Map.get(record, layout.badge)
+
+    # A forbidden field draws the masked word (the tone stays neutral: the
+    # struct carries no enum value to tone by).
+    if AshA2ui.Masked.masked?(value),
+      do: AshA2ui.Masked.text(l10n),
+      else: badge_text(layout, record, value, l10n)
   end
 
   defp badge_text(_layout, _record, nil, _l10n), do: ""

@@ -267,6 +267,7 @@ defmodule AshA2ui.Encoder do
   alias AshA2ui.Experience
   alias AshA2ui.L10n
   alias AshA2ui.Label
+  alias AshA2ui.Masked
   alias AshA2ui.ResolvedView
 
   @version "1.0"
@@ -1514,6 +1515,7 @@ defmodule AshA2ui.Encoder do
       |> put_column_cells(columns[field], view.l10n)
       |> put_column_review(view, field, columns[field])
       |> put_column_field_action(view, table, field)
+      |> put_masked_binding(view, table.resource, field, %{"path" => "_masked/#{field}"})
     end)
   end
 
@@ -2172,6 +2174,51 @@ defmodule AshA2ui.Encoder do
     display
     |> maybe_put("format", admin_display_format(view, field))
     |> put_link_binding(view, field, "/ui/panel/record/_links/#{field}")
+    |> put_masked_binding(view, view.resource, field, %{
+      "@path" => "/ui/panel/record/_masked/#{field}"
+    })
+  end
+
+  # Catalog 3.12: the `masked` binding rides only on fields a field policy
+  # covers — for a `source` field, any resource along the walk — so
+  # surfaces over resources without field policies are byte-for-byte
+  # unchanged. The value itself is the masked word when the field is
+  # forbidden; the binding names the reason beside it (`AshA2ui.Masked`).
+  defp put_masked_binding(component, view, resource, field, binding) do
+    if masked_binding?(view, resource, field),
+      do: Map.put(component, "masked", binding),
+      else: component
+  end
+
+  defp masked_binding?(view, resource, field) do
+    case view.fields[field] && view.fields[field].source do
+      [_ | _] = source -> source_policies?(resource, source)
+      _source -> field_policies_cover?(resource, field)
+    end
+  end
+
+  defp field_policies_cover?(resource, field) do
+    case Ash.Policy.Info.field_policies_for_field(resource, field) do
+      nil -> false
+      [] -> false
+      _policies -> true
+    end
+  end
+
+  # A `source` field is covered when any resource along its walk declares a
+  # field policy for the step it reads: a forbidden relationship masks the
+  # whole field, so does a forbidden leaf.
+  defp source_policies?(resource, [attribute]), do: field_policies_cover?(resource, attribute)
+
+  defp source_policies?(resource, [relationship | rest]) do
+    if field_policies_cover?(resource, relationship) do
+      true
+    else
+      case ResourceInfo.relationship(resource, relationship) do
+        nil -> false
+        rel -> source_policies?(rel.destination, rest)
+      end
+    end
   end
 
   # The optional format hint: boolean/datetime from the resolved widget,
@@ -2247,6 +2294,9 @@ defmodule AshA2ui.Encoder do
         }
         |> maybe_put("format", display_format(view, resource, field))
         |> put_link_binding(view, field, "/detail/#{detail.context}/_links/#{field}")
+        |> put_masked_binding(view, resource, field, %{
+          "@path" => "/detail/#{detail.context}/_masked/#{field}"
+        })
         |> put_detail_badge(view, field, "/detail/#{detail.context}/")
         |> put_detail_steps(view, field, "/detail/#{detail.context}/")
         |> put_detail_review(view, field, "/detail/#{detail.context}/")
@@ -6052,34 +6102,47 @@ defmodule AshA2ui.Encoder do
   end
 
   # The row's fields, plus the values of rewritten choices at `_values`
-  # (absent when there are none).
+  # (absent when there are none) and the masked fields' reasons at
+  # `_masked` (absent when none are forbidden).
   defp field_values(view, record, names) do
-    {row, choice_values} =
+    {row, choice_values, masked_fields} =
       names
       |> Enum.uniq()
-      |> Enum.reduce({%{}, %{}}, fn name, {row, choice_values} ->
+      |> Enum.reduce({%{}, %{}, []}, fn name, {row, choice_values, masked_fields} ->
         key = to_string(name)
 
         case field_value(view, record, name) do
           {:choice, value, label} ->
-            {Map.put(row, key, label), Map.put(choice_values, key, value)}
+            {Map.put(row, key, label), Map.put(choice_values, key, value), masked_fields}
 
           {:value, value} ->
-            {Map.put(row, key, value), choice_values}
+            {Map.put(row, key, value), choice_values, masked_fields}
+
+          {:masked, text} ->
+            {Map.put(row, key, text), choice_values, [name | masked_fields]}
         end
       end)
 
-    if choice_values == %{}, do: row, else: Map.put(row, "_values", choice_values)
+    row =
+      if choice_values == %{},
+        do: row,
+        else: Map.put(row, "_values", choice_values)
+
+    Map.merge(row, Masked.row_data(Enum.reverse(masked_fields), view.l10n))
   end
 
   # `source` columns read through the loaded relationship path (nil-safe: a
   # nil or unloaded relationship serializes to ""); plain fields read the
-  # record key directly. A declared choice comes back as both its value and
-  # its label (`{:choice, value, label}`), anything else as `{:value, value}`.
+  # record key directly. A forbidden field — a forbidden leaf, or any
+  # forbidden step of a source walk — comes back as `{:masked, text}`: the
+  # masked word, and the record's `_masked/<field>` reason (see
+  # `AshA2ui.Masked`). A declared choice comes back as both its value and
+  # its label (`{:choice, value, label}`), anything else as
+  # `{:value, value}`.
   defp field_value(view, record, name) do
     case view.fields[name] do
       %{source: [_ | _] = source} ->
-        {:value, record |> walk_source(source) |> source_safe()}
+        source_value(view, record, source)
 
       field ->
         case AshA2ui.Links.virtual_value(field, record) do
@@ -6090,9 +6153,28 @@ defmodule AshA2ui.Encoder do
             # The record's own resource: a related table's rows are not the surface's.
             record
             |> Map.get(name)
-            |> json_safe()
-            |> humanize_choice(view, record.__struct__, name)
+            |> stored_value(view, record, name)
         end
+    end
+  end
+
+  defp source_value(view, record, source) do
+    if Masked.forbidden_source?(record, source) do
+      {:masked, Masked.text(view.l10n)}
+    else
+      {:value, record |> walk_source(source) |> source_safe()}
+    end
+  end
+
+  # A forbidden field masks; anything else serializes and may rewrite to a
+  # labelled choice.
+  defp stored_value(value, view, record, name) do
+    if Masked.masked?(value) do
+      {:masked, Masked.text(view.l10n)}
+    else
+      value
+      |> json_safe()
+      |> humanize_choice(view, record.__struct__, name)
     end
   end
 
