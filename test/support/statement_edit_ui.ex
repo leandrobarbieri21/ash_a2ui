@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.StatementEditUI do
   @moduledoc """
-  Standalone UI fixture for editing a record in place (admin catalog 3.9): a
+  Standalone UI fixture for editing a record in place (admin catalog 3.11): a
   statement's title, amount (shown as `amount_text`, edited as `:amount`)
   and kind, edited on its detail card while it is correctable, saved by the
   save bar through `:correct`; the bar counts the values still waiting and

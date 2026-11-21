@@ -16,9 +16,10 @@ defmodule AshA2ui.Verifiers.VerifyFields do
       of the same resource, and of the resource of every table drawing the
       field, and
     * a field's `field_action` names an update action of the record each
-      `:detail` card showing the field reads (its context's resource), one
-      declaring a `:field` argument, and its `field_action_visible` a
-      public attribute, calculation or aggregate of that resource.
+      `:detail` card showing the field reads (its context's resource) and of
+      each table drawing it (the table's resource), and its
+      `field_action_visible` a public attribute, calculation or aggregate of
+      that resource.
 
   Fields declared with a `source`, `relationship`, `link` or `links` option
   are exempt from both checks here — `AshA2ui.Verifiers.VerifyRelationships` validates them
@@ -60,7 +61,7 @@ defmodule AshA2ui.Verifiers.VerifyFields do
              :ok <- verify_link_urls(dsl_state, module, overridable),
              :ok <- verify_steps(dsl_state, module),
              :ok <- verify_reviews(dsl_state, module, target, overridable),
-             :ok <- verify_field_actions(dsl_state, module) do
+             :ok <- verify_field_actions(dsl_state, module, target) do
           verify_hide_empty(dsl_state, module)
         end
     end
@@ -381,30 +382,60 @@ defmodule AshA2ui.Verifiers.VerifyFields do
   defp resource_name(resource) when is_atom(resource), do: inspect(resource)
   defp resource_name(_dsl_state), do: "the resource"
 
-  # A field action runs on the record a detail card shows: its context's
-  # resource holds the update action (with a `:field` argument) and the
-  # per-record gate.
-  defp verify_field_actions(dsl_state, module) do
+  # A field action runs on the record a detail card shows (its context's
+  # resource) or on a table's row (the table's resource): that resource
+  # holds the update action and the per-record gate.
+  defp verify_field_actions(dsl_state, module, target) do
     entities = Verifier.get_entities(dsl_state, [:a2ui])
 
     contexts =
       for %AshA2ui.Context{} = context <- entities, into: %{}, do: {context.name, context}
 
+    record_resource = fn
+      %AshA2ui.Component{name: :detail} = component ->
+        contexts[component.context] && contexts[component.context].resource
+
+      %AshA2ui.Component{name: :table} = component ->
+        component.resource || target
+    end
+
     Enum.find_value(entities, :ok, fn
       %AshA2ui.Field{field_action: action, name: name} = field when not is_nil(action) ->
-        entities
-        |> Enum.filter(
-          &(match?(%AshA2ui.Component{name: :detail}, &1) and name in (&1.fields || []))
-        )
-        |> Enum.map(&(contexts[&1.context] && contexts[&1.context].resource))
-        |> Enum.filter(&((&1 && Code.ensure_loaded?(&1)) and Info.resource?(&1)))
-        |> Enum.uniq()
-        |> Enum.find_value(&field_action_error(&1, field, module))
+        drawing =
+          Enum.filter(
+            entities,
+            &(match?(%AshA2ui.Component{name: kind} when kind in [:detail, :table], &1) and
+                name in (&1.fields || []))
+          )
+
+        pairs_on_card_error(field, drawing, module) ||
+          drawing
+          |> Enum.map(record_resource)
+          |> Enum.filter(&((&1 && Code.ensure_loaded?(&1)) and Info.resource?(&1)))
+          |> Enum.uniq()
+          |> Enum.find_value(&field_action_error(&1, field, module))
 
       _other ->
         nil
     end)
   end
+
+  # Catalog 3.10: a pairs field's action is a button per item, which only a
+  # table's rows draw.
+  defp pairs_on_card_error(%AshA2ui.Field{pairs: true, name: name}, drawing, module) do
+    if Enum.any?(drawing, &match?(%AshA2ui.Component{name: :detail}, &1)) do
+      {:error,
+       DslError.exception(
+         module: module,
+         path: [:a2ui, :field, name, :field_action],
+         message:
+           "a pairs field's field_action is a button per item, drawn in a table's rows; " <>
+             "#{inspect(name)} is also on a :detail card"
+       )}
+    end
+  end
+
+  defp pairs_on_card_error(_field, _drawing, _module), do: nil
 
   defp field_action_error(resource, %AshA2ui.Field{name: name} = field, module) do
     error = fn message ->
@@ -419,17 +450,19 @@ defmodule AshA2ui.Verifiers.VerifyFields do
     case Info.action(resource, field.field_action) do
       %{type: :update, arguments: arguments} ->
         cond do
-          not Enum.any?(arguments, &(&1.name == :field)) ->
-            error.(
-              "field_action #{inspect(field.field_action)} of #{inspect(resource)} declares no " <>
-                ":field argument, which receives the field's name"
-            )
-
           field.field_action_visible &&
               not MapSet.member?(known_field_names(resource), field.field_action_visible) ->
             error.(
               "field_action_visible names #{inspect(field.field_action_visible)}, which is not " <>
                 "a public attribute, calculation or aggregate of #{inspect(resource)}"
+            )
+
+          # Catalog 3.10: a pairs field's action runs for one item, named by
+          # its key; the action must take it.
+          field.pairs && not Enum.any?(arguments, &(&1.name == :item)) ->
+            error.(
+              "field_action #{inspect(field.field_action)} of #{inspect(resource)} declares no " <>
+                ":item argument, which receives the key of the pairs item it runs for"
             )
 
           true ->

@@ -1,6 +1,6 @@
 defmodule AshA2ui.Test.Statement do
   @moduledoc """
-  Fixture resource for editing a record in place (admin catalog 3.9): a
+  Fixture resource for editing a record in place (admin catalog 3.11): a
   statement whose values were read from a document, which a person corrects
   (`:correct`) and then marks reviewed (`:review`). A locked statement is
   never corrected (`correctable`); `amount_text` is the amount as shown,

@@ -24,6 +24,14 @@ defmodule AshA2ui.Test.Owner do
     has_many :clinic_memberships, AshA2ui.Test.ClinicMembership, public?: true
   end
 
+  calculations do
+    # A value a table's row calculation reuses from the selected owner
+    # (`context_record`, AshA2ui.Test.SharedOwnerVisitsUI).
+    calculate :greeting, :string, expr("Hello " <> name) do
+      public? true
+    end
+  end
+
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
   end

@@ -1513,7 +1513,51 @@ defmodule AshA2ui.Encoder do
       |> put_column_sortable(table, field, columns[field])
       |> put_column_cells(columns[field], view.l10n)
       |> put_column_review(view, field, columns[field])
+      |> put_column_field_action(view, table, field)
     end)
+  end
+
+  # Catalog 3.9: a field action on a table's field is a button in each row
+  # beside the value, its entry shaped like the detail card's (3.2) and the
+  # grid's rowActions entries, and sent the same way. The context names the
+  # table and the field, never the Ash action; `recordId` binds the row's
+  # id, and `actionVisible` the row's `_action_<field>` (row-relative).
+  # Catalog 3.10: on a `pairs` field it is a button per item instead, the
+  # column's `pairAction`; a renderer adds the item's key to the context as
+  # `item`, and each item says whether it offers it (its `action`).
+  defp put_column_field_action(column, view, table, field) do
+    case view.fields[field] do
+      %{field_action: action} when not is_nil(action) ->
+        setting = Map.get(view.actions, action)
+
+        context =
+          %{
+            "component" => to_string(table.name),
+            "field" => to_string(field),
+            "recordId" => %{"@path" => "id"}
+          }
+          |> put_query_binding(view)
+          |> put_contexts_binding(view)
+
+        entry =
+          %{
+            "label" => ResolvedView.action_label(view, action),
+            "action" => "field_action",
+            "context" => context
+          }
+          |> maybe_put("icon", setting && setting.icon)
+
+        if view.fields[field].pairs do
+          Map.put(column, "pairAction", entry)
+        else
+          column
+          |> Map.put("action", entry)
+          |> Map.put("actionVisible", %{"path" => "_action_#{field}"})
+        end
+
+      _other ->
+        column
+    end
   end
 
   # Catalog 3.3: a review field drawn in a table binds each row's review
@@ -1546,11 +1590,18 @@ defmodule AshA2ui.Encoder do
 
   defp expand_label(_view, _layout), do: nil
 
-  # Catalog 1.16: a field whose value is a list of {term, value} pairs.
+  # Catalog 1.16: a field whose value is a list of {term, value} pairs; 3.10:
+  # `items` binds each row's normalized items (`_pairs_<field>`, see
+  # AshA2ui.Pairs), each with its own review, key and action offer.
   defp put_column_pairs(column, view, field) do
     case view.fields[field] do
-      %{pairs: true} -> Map.put(column, "pairs", true)
-      _other -> column
+      %{pairs: true} ->
+        column
+        |> Map.put("pairs", true)
+        |> Map.put("items", %{"path" => "_pairs_#{field}"})
+
+      _other ->
+        column
     end
   end
 
@@ -2306,7 +2357,7 @@ defmodule AshA2ui.Encoder do
     end
   end
 
-  # Catalog 3.9: a field of an editable card opens as an input in place.
+  # Catalog 3.11: a field of an editable card opens as an input in place.
   # `edit` names the card, the field and the input (its kind, and a choice's
   # options); `editValue` binds the stored value the input starts from,
   # `editVisible` whether the record offers editing, `editDraft` the
@@ -2368,7 +2419,7 @@ defmodule AshA2ui.Encoder do
   defp edit_type_kind(Ash.Type.Date), do: "date"
   defp edit_type_kind(_type), do: "text"
 
-  # Catalog 3.9: the save bar, last in the page.
+  # Catalog 3.11: the save bar, last in the page.
   defp save_bar_children(%{save_bar: nil}), do: []
   defp save_bar_children(_view), do: ["save_bar"]
 
@@ -5984,6 +6035,8 @@ defmodule AshA2ui.Encoder do
     |> Map.merge(AshA2ui.Timeline.row_data(table, record))
     |> Map.merge(primary_action_data(view, table, record))
     |> Map.merge(review_row_data(view, field_names, record))
+    |> Map.merge(ResolvedView.detail_field_action_data(view, record, field_names))
+    |> Map.merge(ResolvedView.pairs_data(view, record, field_names))
   end
 
   # Catalog 3.3: the review of each review field a row draws, at the

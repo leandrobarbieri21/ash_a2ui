@@ -1,6 +1,6 @@
 defmodule AshA2ui.Verifiers.VerifySaveBar do
   @moduledoc """
-  Verifies at compile time that a `save_bar` (admin catalog 3.9) is sound:
+  Verifies at compile time that a `save_bar` (admin catalog 3.11) is sound:
 
     * its `context` is a declared context,
     * the surface has an editable `:detail` card for it to save,

@@ -231,7 +231,7 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
     |> MapSet.new()
   end
 
-  # The action a save bar's confirm runs after a save (catalog 3.9).
+  # The action a save bar's confirm runs after a save (catalog 3.11).
   defp save_bar_actions(entities) do
     for %AshA2ui.SaveBar{confirm: %{then_action: action}} <- entities, action, do: action
   end
@@ -245,10 +245,11 @@ defmodule AshA2ui.Verifiers.VerifyComponents do
   end
 
   @doc false
-  # The field actions (catalog 3.2) of the fields a `:detail` card shows.
+  # The field actions of the fields a `:detail` card (catalog 3.2) or a
+  # table's rows (3.9) show.
   def field_actions(entities, components) do
     shown =
-      for %Component{name: :detail, fields: fields} <- components,
+      for %Component{name: name, fields: fields} when name in [:detail, :table] <- components,
           field <- fields || [],
           into: MapSet.new(),
           do: field

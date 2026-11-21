@@ -1,6 +1,6 @@
 defmodule AshA2ui.SaveBar do
   @moduledoc """
-  Target struct for the `save_bar` DSL entity (admin catalog 3.9): the bar
+  Target struct for the `save_bar` DSL entity (admin catalog 3.11): the bar
   pinned to the bottom of a page while a person has unsaved changes to the
   surface's editable `:detail` cards. It saves them all at once through the
   `"save_changes"` client action, or discards them.

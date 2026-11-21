@@ -170,7 +170,7 @@ same context; they share the `/detail/<context>` value.
 ### Editing a record in place
 
 A `:detail` card may let a person correct the values they read (admin
-catalog 3.9). `editable` lists the fields, the update action that saves them
+catalog 3.11). `editable` lists the fields, the update action that saves them
 and the per-record gate; a field shown as a display calculation names the
 attribute it edits with `edit`:
 
@@ -207,7 +207,7 @@ record with only its changed fields, in one transaction, then the bar's
 changes and writes each edited field's error to
 `/ui/edit_errors/<card>/<field>`. The bar counts the context's `review`
 fields still pending or missing, and its `confirm` asks before a save while
-any wait. See the `save_bar` entity docs and the admin catalog's 3.9
+any wait. See the `save_bar` entity docs and the admin catalog's 3.11
 changelog entry for the wire.
 
 ## Refreshes and transports

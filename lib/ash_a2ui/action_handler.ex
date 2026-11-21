@@ -145,10 +145,18 @@ defmodule AshA2ui.ActionHandler do
       the card's context as the actor (an authorized read, dependency
       filter included) with the field's `field_action_visible` loaded, and
       refused unless the record offers the action. The update action then
-      runs on it with the field's name as its `:field` argument. A success
-      re-reads the card's record into `/detail/<context>` (its review and
-      field-action data included) and refreshes the tables the action's
-      `refreshes` names, every table by default.
+      runs on it with the field's name as its `:field` argument (when it
+      declares one). A success re-reads the card's record into
+      `/detail/<context>` (its review and field-action data included) and
+      refreshes the tables the action's `refreshes` names, every table by
+      default. With `"component"` naming a table (catalog 3.9) the row is
+      re-read through the table's own read and context filters (`"query"`
+      carries its state), and a success re-reads the records of the
+      contexts the table is filtered by instead of a card's. On a `pairs`
+      field (catalog 3.10) the context also carries `"item"`, the key of
+      the item chosen: it is refused unless the row's items hold it and it
+      offers the action, and the update receives it as its `:item`
+      argument.
 
     * `"page_action"` — context `%{"action" => name, "recordId" => id,
       "contexts" => selections}`. Runs a page header button that runs an
@@ -166,7 +174,7 @@ defmodule AshA2ui.ActionHandler do
       id, "values" => %{field => value}}}, "choice" => "save" | "then",
       "recordId" => id, "contexts" => selections}`. Saves a person's
       unsaved changes to the surface's editable `:detail` cards (admin
-      catalog 3.9, the `save_bar`): the client names each card and field,
+      catalog 3.11, the `save_bar`): the client names each card and field,
       never the Ash action, so each card's `editable` is the allowlist. Each
       card's record is re-read through its context as the actor and refused
       unless it offers editing (`editable` `visible`); its `update_action`
@@ -1951,13 +1959,15 @@ defmodule AshA2ui.ActionHandler do
 
   # --- field_action ----------------------------------------------------------
 
-  # A detail field's action (catalog 3.2): the field's declaration names
-  # the Ash action, the card's context re-reads the record, and
+  # A field's action (catalog 3.2 on a detail card, 3.9 in a table's rows):
+  # the field's declaration names the Ash action, the card's context (or
+  # the table's scoped read) re-reads the record, and
   # `field_action_visible` gates it on the server as on the screen.
   defp field_action(context, %{view: view} = env) do
-    with {:ok, detail, field} <- field_action_target(view, context),
+    with {:ok, target, field} <- field_action_target(view, context),
          {:ok, record_id} <- field_action_record_id(view, context),
-         {:ok, record} <- field_action_record(view, detail, field, record_id, env) do
+         {:ok, record} <- field_action_record(view, target, field, record_id, env),
+         {:ok, item} <- field_action_item(view, field, record, context) do
       action = field.field_action
 
       env =
@@ -1966,33 +1976,73 @@ defmodule AshA2ui.ActionHandler do
         |> Map.put(:setting, Map.get(view.actions, action))
         |> Map.put(:shown_fields, [])
 
-      result =
-        update_record(record, action, %{field: Atom.to_string(field.name)}, env.ash_opts)
+      params = record |> field_action_params(action, field) |> put_item(item)
+      result = update_record(record, action, params, env.ash_opts)
 
       with {:ok, messages} <- after_write(result, env, completed_text(view, action)),
-           {:ok, detail_messages} <- field_action_detail(view, detail, record_id, env) do
+           {:ok, detail_messages} <- field_action_detail(view, target, record_id, env) do
         {:ok, detail_messages ++ messages}
       end
     end
   end
 
-  # The card and the field the client named, when that field of that card
-  # declares a field action.
+  # The field's name, as the action's `:field` argument when it declares one
+  # (an action that marks the whole record needs none).
+  defp field_action_params(record, action, field) do
+    case ResourceInfo.action(record.__struct__, action) do
+      %{arguments: arguments} ->
+        if Enum.any?(arguments, &(&1.name == :field)),
+          do: %{field: Atom.to_string(field.name)},
+          else: %{}
+
+      _other ->
+        %{}
+    end
+  end
+
+  # Catalog 3.10: a `pairs` field's action runs for one of its items, named
+  # by its key (`"item"`): the record's own items, read again, must hold it
+  # and offer the action. Any other field's action takes no item.
+  defp field_action_item(view, %AshA2ui.Field{pairs: true} = field, record, context) do
+    with key when is_binary(key) and key != "" <- Map.get(context, "item"),
+         %{"action" => true} <-
+           record
+           |> Map.get(field.name)
+           |> AshA2ui.Pairs.normalize(nil, true)
+           |> AshA2ui.Pairs.find(key) do
+      {:ok, key}
+    else
+      _unoffered -> {:error, [status(view, unavailable_text(view, field.field_action))]}
+    end
+  end
+
+  defp field_action_item(_view, _field, _record, _context), do: {:ok, nil}
+
+  # The item's key as the action's `:item` argument (the verifier makes a
+  # `pairs` field's action declare one).
+  defp put_item(params, nil), do: params
+  defp put_item(params, key), do: Map.put(params, :item, key)
+
+  # The card (or table) and the field the client named, when that field of
+  # that card (or table) declares a field action.
   defp field_action_target(view, context) do
     component = Map.get(context, "component")
     name = Map.get(context, "field")
 
     target =
       is_binary(component) and is_binary(name) and
-        Enum.find_value(view.details, fn detail ->
-          to_string(detail.name) == component &&
-            Enum.find_value(detail.fields, &declared_field_action(view, &1, name))
-            |> then(&(&1 && {detail, &1}))
-        end)
+        (Enum.find_value(
+           view.details,
+           &declared_target(view, :detail, &1, &1.fields, component, name)
+         ) ||
+           Enum.find_value(
+             view.tables,
+             &declared_target(view, :table, &1, &1.component.fields || [], component, name)
+           ))
 
     case target do
-      {detail, field} ->
-        {:ok, detail, field}
+      {target, field} ->
+        {:ok, target, field}
 
       _none ->
         {:error,
@@ -2003,6 +2053,17 @@ defmodule AshA2ui.ActionHandler do
                "of that card declares a field_action."
            )
          ]}
+    end
+  end
+
+  # `{{kind, card_or_table}, field}` when `source` is the named component and
+  # one of its `fields` is the named field declaring a field action.
+  defp declared_target(view, kind, source, fields, component, name) do
+    if to_string(source.name) == component do
+      case Enum.find_value(fields, &declared_field_action(view, &1, name)) do
+        nil -> nil
+        field -> {{kind, source}, field}
+      end
     end
   end
 
@@ -2026,33 +2087,56 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
-  defp field_action_record(view, detail, field, record_id, %{ash_opts: ash_opts} = env) do
+  defp field_action_record(view, {:detail, detail}, field, record_id, env) do
     context = view.contexts[detail.context]
 
-    case ContextRunner.fetch_selected(
-           view,
-           context,
-           record_id,
-           env.selected,
-           ash_opts,
-           detail.loads
-         ) do
-      {:ok, record} ->
-        if ResolvedView.field_action_offered?(field, record),
-          do: {:ok, record},
-          else: {:error, [status(view, unavailable_text(view, field.field_action))]}
+    view
+    |> ContextRunner.fetch_selected(
+      context,
+      record_id,
+      env.selected,
+      env.ash_opts,
+      detail.loads
+    )
+    |> offered_record(view, field)
+  end
 
-      :not_found ->
-        {:error, [status(view, unavailable_text(view, field.field_action))]}
+  # A row is re-read through its table's own read, scoped as the table is
+  # (its context filters): a row the table would not show is refused.
+  defp field_action_record(view, {:table, table}, field, record_id, env) do
+    case ContextRunner.table_scope(view, table, env.selected) do
+      {:ok, scope} ->
+        table
+        |> QueryRunner.preset_read(nil, env.ash_opts)
+        |> ContextRunner.apply_scope(scope)
+        |> Ash.Query.filter(id == ^record_id)
+        |> Ash.Query.load(table.loads)
+        |> Ash.read_one()
+        |> found()
+        |> offered_record(view, field)
 
-      {:error, error} ->
-        {:error, error_messages(view, error)}
+      :require_unmet ->
+        offered_record(:not_found, view, field)
     end
   end
 
+  defp found({:ok, nil}), do: :not_found
+  defp found(result), do: result
+
+  defp offered_record({:ok, record}, view, field) do
+    if ResolvedView.field_action_offered?(field, record),
+      do: {:ok, record},
+      else: {:error, [status(view, unavailable_text(view, field.field_action))]}
+  end
+
+  defp offered_record(:not_found, view, field),
+    do: {:error, [status(view, unavailable_text(view, field.field_action))]}
+
+  defp offered_record({:error, error}, view, _field), do: {:error, error_messages(view, error)}
+
   # The card's record again, as a context change writes it: every detail of
   # the same context shares the path.
-  defp field_action_detail(view, detail, record_id, %{ash_opts: ash_opts} = env) do
+  defp field_action_detail(view, {:detail, detail}, record_id, %{ash_opts: ash_opts} = env) do
     details =
       view |> ResolvedView.detail_sources() |> Enum.filter(&(&1.context == detail.context))
 
@@ -2070,9 +2154,32 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
+  # A row's action re-sends the records of the contexts its table is
+  # filtered by: what their cards show may count its rows (a review summary).
+  defp field_action_detail(view, {:table, table}, _record_id, %{ash_opts: ash_opts} = env) do
+    sources = ResolvedView.detail_sources(view)
+
+    table.context_filter
+    |> Enum.map(fn {_attribute, context} -> context end)
+    |> Enum.uniq()
+    |> Enum.map(fn context -> {context, Enum.filter(sources, &(&1.context == context))} end)
+    |> Enum.filter(fn {context, details} ->
+      details != [] and Map.has_key?(env.selected, context)
+    end)
+    |> Enum.reduce_while({:ok, []}, fn {context, details}, {:ok, acc} ->
+      case context_detail_value(view, context, details, env.selected, ash_opts) do
+        {:ok, value} ->
+          {:cont, {:ok, acc ++ [update_data_model(view, "/detail/#{context}", value)]}}
+
+        {:error, error} ->
+          {:halt, {:error, error_messages(view, error)}}
+      end
+    end)
+  end
+
   # --- save_changes ----------------------------------------------------------
 
-  # Catalog 3.9: a person's unsaved changes to the surface's editable cards,
+  # Catalog 3.11: a person's unsaved changes to the surface's editable cards,
   # saved at once through each card's declared update action, in one
   # transaction; `"then"` runs the save bar's then_action after them.
   defp save_changes(context, %{view: view} = env) do

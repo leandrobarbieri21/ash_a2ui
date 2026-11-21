@@ -1,4 +1,4 @@
-// Admin catalog 3.9: editing a record in place, saved by a save bar. A
+// Admin catalog 3.11: editing a record in place, saved by a save bar. A
 // fieldDisplay's `edit` opens its value as an input; Enter or leaving it
 // writes the change to /ui/edits (Escape drops it); the saveBar shows while
 // a change waits, counts the fields under review still waiting, discards,

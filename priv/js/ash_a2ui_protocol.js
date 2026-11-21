@@ -384,7 +384,7 @@ function overlay(value, kept) {
 }
 
 /**
- * Admin catalog 3.9: where a surface holds a person's unsaved changes to its
+ * Admin catalog 3.11: where a surface holds a person's unsaved changes to its
  * editable cards (`{<card>: {recordId, values: {<field>: value}}}`), until a
  * save bar saves or discards them.
  */

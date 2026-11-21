@@ -51,6 +51,8 @@ msgstr ""
 msgid "All visits"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 #: test/support/links.ex:135
 #: test/support/links.ex:230
@@ -287,6 +289,9 @@ msgstr ""
 msgid "Check in"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Check what was read"
 msgstr ""
@@ -519,6 +524,7 @@ msgstr ""
 #: test/support/card_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
 #: test/support/promotion.ex:1
+#: test/support/shared_owner_visits_ui.ex:1
 msgid "Details"
 msgstr ""
 
@@ -558,6 +564,9 @@ msgstr ""
 msgid "Done tasks"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Dossier"
@@ -677,6 +686,8 @@ msgstr ""
 msgid "Export contract"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
@@ -734,10 +745,15 @@ msgstr ""
 msgid "Generate secret"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to history"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Go to the first field to check"
 msgstr ""
@@ -816,6 +832,11 @@ msgstr ""
 msgid "Kitchen sink"
 msgstr ""
 
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Label"
+msgstr ""
+
 #: test/support/word_report_ui.ex:1
 #: test/support/word_report_ui.ex:100
 #: test/support/word_report_ui.ex:23
@@ -836,6 +857,11 @@ msgstr ""
 #: test/support/export_contract.ex:103
 #: test/support/hub_ui.ex:1
 msgid "Line count"
+msgstr ""
+
+#: test/support/dossier_handed_lines_ui.ex:1
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Lines"
 msgstr ""
 
 #: test/support/manifest_task.ex:1
@@ -919,6 +945,8 @@ msgstr ""
 #: test/support/board_task_ui.ex:188
 #: test/support/board_task_ui.ex:52
 #: test/support/board_task_ui.ex:87
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/enrollment.ex:1
@@ -944,6 +972,7 @@ msgstr ""
 #: test/support/promotion.ex:1
 #: test/support/record_page_ui.ex:1
 #: test/support/review_item.ex:1
+#: test/support/shared_owner_visits_ui.ex:1
 #: test/support/time_travel.ex:47
 msgid "Name"
 msgstr ""
@@ -1028,6 +1057,7 @@ msgstr ""
 msgid "Note title"
 msgstr ""
 
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 #: test/support/referral.ex:1
@@ -1114,12 +1144,17 @@ msgstr ""
 #: test/support/owner_overview_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
 #: test/support/record_page_ui.ex:1
+#: test/support/shared_owner_visits_ui.ex:1
 #: test/support/visit_review_table_ui.ex:1
 msgid "Owner"
 msgstr ""
 
 #: test/support/appointments_ui.ex:1
 msgid "Owner card"
+msgstr ""
+
+#: test/support/shared_owner_visits_ui.ex:1
+msgid "Owner greeting"
 msgstr ""
 
 #: test/support/canvas.ex:172
@@ -1157,6 +1192,10 @@ msgctxt "one_of:status"
 msgid "Pending"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
+msgid "Period"
+msgstr ""
+
 #: test/support/links.ex:135
 #: test/support/links.ex:230
 #: test/support/links.ex:267
@@ -1174,6 +1213,10 @@ msgstr ""
 
 #: test/support/links.ex:230
 msgid "Person name"
+msgstr ""
+
+#: test/support/shared_owner_visits_ui.ex:1
+msgid "Plain visits"
 msgstr ""
 
 #: test/support/time_travel.ex:47
@@ -1428,6 +1471,8 @@ msgstr ""
 msgid "Search contracts or vendors"
 msgstr ""
 
+#: test/support/dossier_lines_review_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/dossier_page_ui.ex:1
 #: test/support/dossier_review_ui.ex:1
 msgid "Sections"
@@ -1730,6 +1775,7 @@ msgstr ""
 #: test/support/card_visits_ui.ex:1
 #: test/support/column_task.ex:1
 #: test/support/document_visits_ui.ex:1
+#: test/support/dossier_notes_review_ui.ex:1
 #: test/support/finding_fields_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
@@ -1749,6 +1795,7 @@ msgstr ""
 #: test/support/prompt_scope.ex:161
 #: test/support/prompt_scope.ex:190
 #: test/support/record_page_ui.ex:1
+#: test/support/shared_owner_visits_ui.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/statement_edit_ui.ex:1
 #: test/support/submission.ex:1
@@ -1847,6 +1894,7 @@ msgstr ""
 #: test/support/headed_visits_ui.ex:1
 #: test/support/owner_overview_ui.ex:1
 #: test/support/owner_visits_ui.ex:1
+#: test/support/shared_owner_visits_ui.ex:1
 msgid "Visits"
 msgstr ""
 

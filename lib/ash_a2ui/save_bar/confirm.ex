@@ -1,6 +1,6 @@
 defmodule AshA2ui.SaveBar.Confirm do
   @moduledoc """
-  Target struct for a `save_bar`'s `confirm` entity (admin catalog 3.9): the
+  Target struct for a `save_bar`'s `confirm` entity (admin catalog 3.11): the
   dialog a save opens while fields under review still wait. Cancel closes it
   with nothing saved; the save choice saves; the `then` choice saves and
   then runs `then_action` on the bar's record, in the same transaction.

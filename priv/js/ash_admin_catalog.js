@@ -211,11 +211,51 @@ export function rowReviews(row, columns) {
   for (const column of Array.isArray(columns) ? columns : []) {
     if (typeof column?.review?.path === "string") reviews.push(getByPath(row, column.review.path));
     if (typeof column?.subtitle?.reviewPath === "string") reviews.push(getByPath(row, column.subtitle.reviewPath));
+    // 3.10: each item of a pairs column carries its own review.
+    for (const item of pairItems(row, column)) reviews.push(item.review);
   }
   return reviews.map(reviewEntry).filter(Boolean);
 }
 
-// --- 3.9: editing a record in place, saved by a save bar --------------------
+/**
+ * 3.10: a pairs column's items on `row`, read through its `items` binding:
+ * each `{term, value, key?, review?, action?}`. Empty when the column binds
+ * none (a 1.16 payload: draw the raw value) or the row has none.
+ */
+export function pairItems(row, column) {
+  const path = column?.items?.path;
+  if (typeof path !== "string") return [];
+  const items = getByPath(row, path);
+  return Array.isArray(items) ? items.filter((item) => item && typeof item === "object") : [];
+}
+
+/**
+ * 3.10: whether a pairs column's `pairAction` is offered for `item`: the
+ * column has one, and the item says so (`action: true`) with a key to send.
+ * Hiding is a rendering concern only: the server re-checks every call.
+ */
+export function pairActionOffered(column, item) {
+  const entry = column?.pairAction;
+  return Boolean(
+    entry &&
+      typeof entry === "object" &&
+      typeof entry.action === "string" &&
+      item?.action === true &&
+      typeof item.key === "string" &&
+      item.key !== "",
+  );
+}
+
+/**
+ * 3.10: the action spec a pairs column's `pairAction` sends for `item`: the
+ * entry's, with the item's key added to its context as `item`.
+ */
+export function pairActionEntry(column, item) {
+  const entry = column.pairAction;
+  return {...entry, context: {...(entry.context || {}), item: item.key}};
+}
+
+// --- 3.11: editing a record in place, saved by a save bar --------------------
 //
 // A fieldDisplay's `edit` opens its value as an input; a changed value is a
 // draft at /ui/edits/<card>/values/<field> (with the card's record id at
@@ -397,7 +437,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.9.0";
+export const ADMIN_CATALOG_VERSION = "3.11.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -768,6 +808,10 @@ export function buildSchemas(basicCatalog = null) {
           // 3.3: the row's review of the column's field ({path}); the
           // subtitle's own review rides on subtitle.reviewPath.
           review: RecordAny.optional(),
+          // 3.9: the column's field action (a rowActions-shaped entry) and
+          // the row's offer of it ({path}, row-relative).
+          action: RecordAny.optional(),
+          actionVisible: RecordAny.optional(),
           detail: RecordAny.optional(),
           // 1.10: header help ({title, body}) and the field a header
           // sorts by when it is not the column's own path.
@@ -788,6 +832,10 @@ export function buildSchemas(basicCatalog = null) {
           placement: EnumOf(["trailing", "expand", "group", "groupSubtitle", "leading"]).optional(),
           // 1.16: the value is a list of {term, value} pairs.
           pairs: Bool.optional(),
+          // 3.10: the row's normalized pairs ({path}, row-relative), each
+          // with its own review, key and offer, and the button per item.
+          items: RecordAny.optional(),
+          pairAction: RecordAny.optional(),
           // 1.14: the field's empty_text, for a list-rows renderer.
           emptyText: Str.optional(),
         }),
@@ -923,7 +971,7 @@ export function buildSchemas(basicCatalog = null) {
       // whether the record offers it.
       action: RecordAny.optional(),
       actionVisible: DynamicValueSchema.nullable().optional(),
-      // 3.9: editing in place: the card, field and input (static), the
+      // 3.11: editing in place: the card, field and input (static), the
       // stored value, whether the record offers editing, the unsaved change
       // and a refused save's message (bindings).
       edit: RecordAny.optional(),
@@ -934,7 +982,7 @@ export function buildSchemas(basicCatalog = null) {
       weight: Num.optional(),
     }),
 
-    // 3.9: the bar that saves or discards the unsaved changes.
+    // 3.11: the bar that saves or discards the unsaved changes.
     saveBar: EmptyObject.extend({
       message: Str.optional(),
       messageWaiting: Str.optional(),
@@ -3000,6 +3048,121 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       /**
+       * 3.9: whether a column's field action is offered on `row`: the
+       * column has one, and the row offers it (its `actionVisible` path is
+       * true; an unbound one always offers it). Hiding is a rendering
+       * concern only: the server re-checks every call.
+       */
+      cellActionOffered(row, column) {
+        const entry = column?.action;
+        if (!entry || typeof entry !== "object" || typeof entry.action !== "string") return false;
+        const path = column.actionVisible?.path;
+        return typeof path !== "string" || getByPath(row, path) === true;
+      }
+
+      /**
+       * 3.9: a column's field action, a quiet button on the value's line
+       * after its review, sent like a row action (the entry's bindings
+       * resolved against the row) and busy until the outcome. A click never
+       * reaches the row's own click.
+       */
+      renderCellAction(row, column) {
+        if (!this.cellActionOffered(row, column)) return nothing;
+        const entry = column.action;
+        const rows = this.controller?.props?.rows || [];
+        const index = rows.indexOf(row);
+        const rowIdentity = this.rowIdentity(row, index);
+        const label = str(entry.label);
+        const busy =
+          this._amBusyRowAction !== null &&
+          this._amBusyRowAction.row === rowIdentity &&
+          this._amBusyRowAction.label === label;
+        return html`<span class="am-cell-action" data-a2ui-action="field_action">${renderActionButton({
+          label,
+          icon: typeof entry.icon === "string" && entry.icon !== "" ? entry.icon : undefined,
+          tone: "quiet",
+          size: "sm",
+          busy,
+          onClick: (event) => {
+            event?.stopPropagation?.();
+            this.onCellAction(entry, index);
+          },
+        })}</span>`;
+      }
+
+      /** 3.9: sends a row's field action, the row's bindings resolved now. */
+      onCellAction(entry, index) {
+        const spec = adminActionSpec(entry);
+        if (!spec || index < 0 || this._amBusyRowAction) return;
+        this.markRowActionBusy(entry, index);
+        this.dispatchRowAction(spec, this.rowBasePath(index));
+      }
+
+      /**
+       * 3.10: a pairs column bound to its row's items: one labeled line per
+       * item, its value followed by its own review and, while the item
+       * offers it, the column's pairAction as a quiet button.
+       */
+      renderPairs(row, column) {
+        const items = pairItems(row, column);
+        if (items.length === 0) return "—";
+        return html`<dl class="am-pairs">
+          ${items.map((item) => {
+            const review = reviewEntry(item.review);
+            return html`<div class="am-pair" data-a2ui-region=${regionAddresses(review) || nothing}>
+              <dt>${str(item.term)}</dt>
+              <dd>
+                <span class="am-cell-value" data-review=${review ? review.state : nothing}>${str(item.value)}</span>
+                ${renderCellReview(review)} ${this.renderPairAction(row, column, item)}
+              </dd>
+            </div>`;
+          })}
+        </dl>`;
+      }
+
+      /**
+       * 3.10: a pairs column's action for one item, busy until the outcome,
+       * sent like a row action with the item's key in its context. A click
+       * never reaches the row's own click.
+       */
+      renderPairAction(row, column, item) {
+        if (!pairActionOffered(column, item)) return nothing;
+        const entry = column.pairAction;
+        const rows = this.controller?.props?.rows || [];
+        const index = rows.indexOf(row);
+        const label = str(entry.label);
+        const identity = `${this.rowIdentity(row, index)}#${item.key}`;
+        const busy =
+          this._amBusyRowAction !== null &&
+          this._amBusyRowAction?.row === identity &&
+          this._amBusyRowAction?.label === label;
+        return html`<span class="am-cell-action" data-a2ui-action="field_action" data-a2ui-item=${item.key}
+          >${renderActionButton({
+            label,
+            icon: typeof entry.icon === "string" && entry.icon !== "" ? entry.icon : undefined,
+            tone: "quiet",
+            size: "sm",
+            busy,
+            onClick: (event) => {
+              event?.stopPropagation?.();
+              this.onPairAction(column, item, index);
+            },
+          })}</span
+        >`;
+      }
+
+      /** 3.10: sends a pairs column's action for one item. */
+      onPairAction(column, item, index) {
+        if (!pairActionOffered(column, item) || index < 0 || this._amBusyRowAction) return;
+        const entry = pairActionEntry(column, item);
+        const spec = adminActionSpec(entry);
+        if (!spec) return;
+        const rows = this.controller?.props?.rows || [];
+        this.markRowActionBusyByIdentity(entry, `${this.rowIdentity(rows[index], index)}#${item.key}`);
+        this.dispatchRowAction(spec, this.rowBasePath(index));
+      }
+
+      /**
        * One cell: its value (below), framed by the column's 1.8 hints when
        * it declares any — a leading icon and a "+N more" tag on the value's
        * line, a second line and a detail line under it.
@@ -3012,7 +3175,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           !column.more &&
           !column.detail &&
           !column.caption &&
-          !column.review
+          !column.review &&
+          !column.action
         )
           return value;
 
@@ -3089,7 +3253,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 </svg>`
               : nothing}
             <span class="am-cell-value" data-review=${review ? review.state : nothing}>${value}</span>
-            ${renderCellReview(review)}
+            ${renderCellReview(review)} ${this.renderCellAction(row, column)}
             ${more > 0
               ? html`<span
                   class="am-badge"
@@ -3147,6 +3311,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
        * everything else through the format rules.
        */
       renderCellValue(row, column) {
+        // 3.10: a pairs column bound to its row's items.
+        if (column.pairs === true && typeof column.items?.path === "string") return this.renderPairs(row, column);
         if (column.link && typeof column.link.path === "string") {
           const links = linkEntries(getByPath(row, column.link.path));
           if (links.length > 0) return renderLinks(this, links);
@@ -4273,7 +4439,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             color: var(--am-text-muted);
           }
 
-          /* 3.9: an editable value is a control that opens its input; a
+          /* 3.11: an editable value is a control that opens its input; a
              changed value is marked, its change written as text. */
           .field-edit {
             all: unset;
@@ -4366,7 +4532,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._amFieldActionBusy = false;
       }
 
-      // --- 3.9: editing in place ------------------------------------------
+      // --- 3.11: editing in place ------------------------------------------
       //
       // A swap draws its own input and calls these: `editOffered` decides
       // whether to draw one, `editing` whether it is open, `openEdit` opens
@@ -4375,24 +4541,24 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       // lives in the surface's data model (`writeDraft`), so the saveBar
       // sees it and a refresh keeps it.
 
-      /** 3.9: whether the field is edited in place on this record. */
+      /** 3.11: whether the field is edited in place on this record. */
       editOffered(props) {
         if (!editEntry(props?.edit)) return false;
         const bound = this.context?.componentModel?.properties?.editVisible !== undefined;
         return !bound || props.editVisible === true;
       }
 
-      /** 3.9: whether the field's input is open. */
+      /** 3.11: whether the field's input is open. */
       editing() {
         return Boolean(this._amEditing);
       }
 
-      /** 3.9: the value the input starts from: the draft, else the stored value. */
+      /** 3.11: the value the input starts from: the draft, else the stored value. */
       editStart(props) {
         return hasDraft(props?.editDraft) ? props.editDraft : props?.editValue;
       }
 
-      /** 3.9: opens the input, focused once drawn. */
+      /** 3.11: opens the input, focused once drawn. */
       openEdit() {
         if (this._amEditing) return;
         this._amEditing = true;
@@ -4403,7 +4569,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         });
       }
 
-      /** 3.9: keeps `value` as the field's change (none when it is the stored value). */
+      /** 3.11: keeps `value` as the field's change (none when it is the stored value). */
       commitEdit(value) {
         if (!this._amEditing) return;
         this._amEditing = false;
@@ -4420,14 +4586,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this.requestUpdate();
       }
 
-      /** 3.9: closes the input and drops what it held. */
+      /** 3.11: closes the input and drops what it held. */
       cancelEdit() {
         if (!this._amEditing) return;
         this._amEditing = false;
         this.requestUpdate();
       }
 
-      /** 3.9: Enter keeps the input's value, Escape drops it. */
+      /** 3.11: Enter keeps the input's value, Escape drops it. */
       onEditKeydown(event) {
         if (event.key === "Enter") {
           event.preventDefault();
@@ -4439,7 +4605,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         }
       }
 
-      /** 3.9: the stock input for the field's `edit`. */
+      /** 3.11: the stock input for the field's `edit`. */
       renderEditInput(props) {
         const edit = editEntry(props.edit);
         const value = editText(this.editStart(props));
@@ -4464,7 +4630,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           @keydown=${keydown} @blur=${blur} />`;
       }
 
-      /** 3.9: an editable field: its input while open, else its value (the draft, marked as changed) as a control that opens it. */
+      /** 3.11: an editable field: its input while open, else its value (the draft, marked as changed) as a control that opens it. */
       renderEditable(props) {
         const review = reviewEntry(props.review);
         const region = regionAddresses(review) || nothing;
@@ -4513,7 +4679,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const props = this.controller?.props;
         if (!props) return nothing;
 
-        // 3.9: a field the record offers editing on draws its value as a
+        // 3.11: a field the record offers editing on draws its value as a
         // control that opens its input, and never hides.
         if (this.editOffered(props)) {
           this.hidden = false;
@@ -4609,7 +4775,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   }
 
 
-  // --- SaveBar: the unsaved changes, saved or discarded (3.9) ---------------
+  // --- SaveBar: the unsaved changes, saved or discarded (3.11) ---------------
   //
   // Shown while /ui/edits holds a change. Save sends save_changes (choice
   // "save"), or first opens the confirm dialog while fields under review

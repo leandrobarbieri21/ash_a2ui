@@ -1,6 +1,6 @@
 defmodule AshA2ui.SaveBarTest do
   @moduledoc """
-  Admin catalog 3.9, editing a record in place: a `:detail` card's
+  Admin catalog 3.11, editing a record in place: a `:detail` card's
   `editable` fields open as inputs (`edit` on their fieldDisplay), the
   changes wait in `/ui/edits`, and the surface's `save_bar` saves them all
   through `"save_changes"`: each card's update action on its record, with
@@ -184,8 +184,8 @@ defmodule AshA2ui.SaveBarTest do
       refute Map.has_key?(components, "save_bar")
     end
 
-    test "the admin catalog is 3.9 or later" do
-      assert Version.match?(AshA2ui.Experience.admin_catalog_version(), ">= 3.9.0")
+    test "the admin catalog is 3.11 or later" do
+      assert Version.match?(AshA2ui.Experience.admin_catalog_version(), ">= 3.11.0")
     end
   end
 

@@ -195,6 +195,7 @@ defmodule AshA2ui.ResolvedView do
           query_path: String.t() | nil,
           context_filter: [{atom, atom}],
           require_context: [atom],
+          context_record: [{atom, list}],
           select_context: atom | nil,
           sections: map | nil,
           editable: map | nil,
@@ -232,7 +233,7 @@ defmodule AshA2ui.ResolvedView do
   renders, the effective field list, and the `Ash.Query.load/2` statement its
   record fetch needs (source paths + calculations/aggregates, computed
   against the **context's** resource). The record map is written to
-  `/detail/<context>`. An editable card (catalog 3.9) also carries
+  `/detail/<context>`. An editable card (catalog 3.11) also carries
   `editable`: its fields, each with the attribute its input edits (`edits`),
   the update action a save runs and the per-record gate (`visible`).
   """
@@ -622,11 +623,11 @@ defmodule AshA2ui.ResolvedView do
   end
 
   @doc """
-  The field-action data a `:detail` record carries for its fields that
-  declare a `field_action`: `_action_<field>`, whether the action is
-  offered on this record (`field_action_visible`, see
-  `field_action_offered?/2`). Shared by the initial render and the context
-  refreshes.
+  The field-action data a `:detail` record, or a table row, carries for its
+  fields that declare a `field_action`: `_action_<field>`, whether the
+  action is offered on this record (`field_action_visible`, see
+  `field_action_offered?/2`). Shared by the initial render, the context
+  refreshes and every row a table sends.
   """
   @spec detail_field_action_data(t(), struct(), [atom]) :: %{String.t() => boolean}
   def detail_field_action_data(%__MODULE__{} = view, record, fields) do
@@ -638,10 +639,29 @@ defmodule AshA2ui.ResolvedView do
   end
 
   @doc """
+  The pairs data a table row carries for its `pairs` fields (catalog 3.10):
+  `_pairs_<field>`, the normalized items (`AshA2ui.Pairs.normalize/3`),
+  each saying whether it offers the field's action when the field has one.
+  """
+  @spec pairs_data(t(), struct(), [atom]) :: %{String.t() => [map]}
+  def pairs_data(%__MODULE__{} = view, record, fields) do
+    pairs =
+      for name <- fields, %AshA2ui.Field{pairs: true} = field <- [view.fields[name]], do: field
+
+    offers =
+      for %{field_action: action} = field <- pairs,
+          action,
+          into: %{},
+          do: {field.name, field_action_offered?(field, record)}
+
+    AshA2ui.Pairs.data(record, pairs, view.l10n, offers)
+  end
+
+  @doc """
   The computed data a context's record carries beyond its fields' values:
   the page header's `_header_action_<name>` offers when the header reads
   that context (`AshA2ui.PageHeader.data/3`), and each review summary of
-  that context (`AshA2ui.ReviewSummary.data/3`). `opts` carries the read's
+  that context (`AshA2ui.ReviewSummary.data/4`). `opts` carries the read's
   `:actor` and `:tenant`. Shared by the initial render and every refresh of
   `/detail/<context>`.
   """
@@ -653,12 +673,12 @@ defmodule AshA2ui.ResolvedView do
         _other -> %{}
       end
 
-    Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record))
+    Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record, opts))
   end
 
   @doc """
   The editing data a `:detail` record carries for the editable cards of
-  `details` (admin catalog 3.9): `_editable_<card>`, whether the record
+  `details` (admin catalog 3.11): `_editable_<card>`, whether the record
   offers editing on that card (its `editable` `visible`), and for each
   editable field `_edit_<field>`, the value of the attribute its input
   edits, JSON-safe. Shared by the initial render and the context refreshes.
@@ -940,6 +960,7 @@ defmodule AshA2ui.ResolvedView do
         query_path: query && ((multi? && "/query/#{name}") || "/query"),
         context_filter: component.context_filter,
         require_context: component.require_context,
+        context_record: component.context_record,
         select_context: component.select_context,
         sections: resolve_sections(component.sections, resource),
         editable: resolve_editable(resource, component.editable),
@@ -1204,7 +1225,7 @@ defmodule AshA2ui.ResolvedView do
     end)
   end
 
-  # A detail card's editing (catalog 3.9): the fields a person edits, each
+  # A detail card's editing (catalog 3.11): the fields a person edits, each
   # with the attribute its input edits (`edit`, else the field), the update
   # action a save runs and the per-record gate.
   defp resolve_detail_editable(_resource, nil, _fields), do: nil
@@ -1252,7 +1273,7 @@ defmodule AshA2ui.ResolvedView do
   # The page header's fields, an alert's fields and a lead card's `visible`
   # field are read with their context's record like a note: loaded and
   # written to /detail/<context>, never drawn as a card's rows.
-  # Catalog 3.9: a save bar's confirm reads whether its then_action is
+  # Catalog 3.11: a save bar's confirm reads whether its then_action is
   # offered with the bar's record, as a page header reads its fields.
   defp resolve_save_bar_reads(
          %AshA2ui.SaveBar{context: context, confirm: %{then_visible: visible}},
@@ -1360,7 +1381,7 @@ defmodule AshA2ui.ResolvedView do
     end
   end
 
-  # Catalog 3.9: the save bar, its words translated.
+  # Catalog 3.11: the save bar, its words translated.
   defp resolve_save_bar(resource_or_ui_module, l10n) do
     case AshA2ui.Info.save_bar(resource_or_ui_module) do
       nil ->

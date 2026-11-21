@@ -233,9 +233,9 @@ defmodule AshA2ui.FieldActionsTest do
                ~r/field_action names :read, which is not an update action/
     end
 
-    test "a field action without a :field argument" do
-      assert compile("NoFieldArgument", quote(do: field_action(:update))) =~
-               ~r/declares no :field argument/
+    # 3.9: an action that marks the whole record takes no field name.
+    test "a field action without a :field argument compiles" do
+      refute compile("NoFieldArgument", quote(do: field_action(:update))) =~ ~r/field_action/
     end
 
     test "a gate that is not a field of the card's record" do

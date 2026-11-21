@@ -165,7 +165,7 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
-- **Editing a record in place, saved by a save bar** (admin catalog 3.9.0,
+- **Editing a record in place, saved by a save bar** (admin catalog 3.11.0,
   ADR 0003). `editable` now goes on a `:detail` card too, with `visible`
   gating it per record; a field's new `edit` option names the attribute
   behind a display calculation. Choosing or focusing an editable value opens
@@ -185,6 +185,43 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   `waitingReviews`, `confirmTexts`, `saveDecision`) for host swaps.
   Additive: the catalogId is unchanged, and a renderer that ignores `edit`
   draws the card read-only.
+- **Pair reviews: a review and a button per item of a `pairs` field**
+  (admin catalog 3.10.0). An item of a `pairs` field may carry its own
+  `review` (`AshA2ui.Review`'s shape), a `key` (its address in the record)
+  and `action` (whether it offers the field's action). Each row carries
+  the normalized items at `_pairs_<field>` (`AshA2ui.Pairs`), bound by the
+  dataGrid column's `items`. A `field_action` on a `pairs` field is a
+  button per item (the column's `pairAction`, shaped like 3.9's `action`):
+  the renderer adds the item's key to the context as `item`, and the
+  server re-reads the row through the table's scoped read, refuses it
+  unless the record (`field_action_visible`) and the item both offer the
+  action, and runs it with the key as its `:item` argument. A pairs
+  field's action must declare `:item` and is drawn in tables only; both
+  are checked at compile time. A `review_summary` counts each waiting item
+  of such a column in a table it counts. The stock dataGrid draws the
+  items with their reviews and buttons; a host swap reads `pairItems(row,
+  column)`, `pairActionOffered(column, item)` and sends
+  `pairActionEntry(column, item)`. Additive over 3.9.0: the catalogId is
+  unchanged, and a renderer that ignores `items` draws the pairs as before.
+
+- **Row field actions, and rows in review summaries** (admin catalog
+  3.9.0). A field's `field_action` may sit on a field a table draws: each
+  row then carries a button beside the value (the dataGrid column's
+  `action`, the same entry shape as a detail card's, and `actionVisible`,
+  a row-relative `_action_<field>` gate). The `field_action` ashAction
+  names the table and the field; the server re-reads the row through the
+  table's own read and context filters, refuses it unless the row offers
+  the action, runs the update as the actor, refreshes the tables the
+  action's `refreshes` names and re-sends the records of the contexts the
+  table is filtered by. An action declaring no `:field` argument (one that
+  marks the whole record) now compiles and runs without the field's name,
+  on a detail card too. A `review_summary` also counts each row of a table
+  filtered by its context alone that still has a review field waiting,
+  once, in declaration order with the cards' fields, linking to the
+  table's section. The stock dataGrid draws the button after the cell's
+  review; a host swap reads `cellActionOffered(row, column)` and sends
+  with `onCellAction(entry, index)`. Additive over 3.8.0: the catalogId is
+  unchanged.
 
 - **A value and its document region, linked both ways** (admin catalog
   3.8.0). While a `document_pane` is shown beside the sections, pointing
@@ -359,6 +396,27 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Performance
 
+- **A table can reuse what its context's record already loaded
+  (`context_record`).** A table scoped by a context gave its read only the
+  selected id, so a row calculation that needed something already loaded
+  on the selected record (the record behind a `:detail` or the page
+  header) had to read it again. `context_record order: [:totals]` on a
+  table names contexts from its `context_filter` and the loads it needs;
+  `build_surface/2` and `build_data_model/2` now fetch each selected
+  record once, with those loads added to the details', before the tables
+  read, and hand it to the table's read in its query context. A
+  calculation reads it with `AshA2ui.ContextRunner.context_record/2`
+  (from its `Ash.Resource.Calculation.Context`, an `Ash.Query` or a
+  context map) and must still work without it: a read the action handler
+  runs alone (a page, a sort, a search) hands nothing. Additive: nothing
+  on the wire changes, and a surface without `context_record` reads what
+  it read before, details before tables.
+- **A review summary reads a table's rows with the record handed too.**
+  A `review_summary` counting the rows of a table that names its context
+  in `context_record` read those rows without the record, so a row review
+  calculation built on it read the record's values again on every build.
+  The summary's read now carries the record it summarizes, as the table's
+  own read does.
 - **A facet over a field writes the field into SQL once.** `facet_counts`
   counted every faceted filter with one filtered `count` per option, so a
   filter over a calculation repeated the calculation's expression once per

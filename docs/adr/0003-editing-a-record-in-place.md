@@ -56,7 +56,7 @@ types, so the dialog's words carry `%{count}` with a form for one, and the clien
 
 ## Consequences
 
-- Admin catalog 3.9.0: `fieldDisplay` gains `edit`, `editValue`, `editVisible`, `editDraft` and
+- Admin catalog 3.11.0: `fieldDisplay` gains `edit`, `editValue`, `editVisible`, `editDraft` and
   `editError`; a new `saveBar` component. Both are additive: a renderer or swap that ignores
   them draws the card read-only.
 - A surface with an editable card must declare a `save_bar` (nothing else would save it).

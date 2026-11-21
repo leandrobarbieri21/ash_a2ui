@@ -7,7 +7,7 @@ defmodule AshA2ui.Editable do
   On a `:table` the listed fields render as in-row inputs committing per
   cell through the `"edit_cell"` client action (see the inline-cell-editing
   section of the multi-section-surfaces topic). On a `:detail` card (admin
-  catalog 3.9) each listed field's value opens as an input in place; the
+  catalog 3.11) each listed field's value opens as an input in place; the
   change waits, with every other unsaved change on the surface, until the
   surface's `save_bar` saves them all through the `"save_changes"` client
   action (see the editing-a-record-in-place section of the

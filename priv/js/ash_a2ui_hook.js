@@ -709,7 +709,7 @@ export const AshA2ui = {
     if (!this.processor) return;
 
     // A refresh of the whole data model keeps a person's unsaved changes to
-    // editable cards (admin catalog 3.9) as it keeps their prompt edits.
+    // editable cards (admin catalog 3.11) as it keeps their prompt edits.
     const batch = keepPromptEdits(
       keepUnsavedEdits(
         replaceExistingSurfaces(messages, (id) => this.surfaceExists(id)),

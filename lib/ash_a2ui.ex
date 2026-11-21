@@ -164,6 +164,15 @@ defmodule AshA2ui do
         record, such as a record's extracted terms. Its admin dataGrid column
         carries `"pairs": true` (admin catalog 1.16), and a renderer draws one
         labeled row per pair; renderers that ignore it show the raw list.
+        A pair may also carry its own `review` (`AshA2ui.Review`'s shape), a
+        `key` (its stable address in the record) and `action` (whether it
+        offers the field's action, `true` when absent): each row carries the
+        normalized items at `_pairs_<field>`, bound by the column's `items`
+        (admin catalog 3.10, see `AshA2ui.Pairs`). With a `field_action`, a
+        table draws its button per item, not per row (the column's
+        `pairAction`), and the action receives the item's key as its `:item`
+        argument, which it must declare. A review summary counts each item
+        whose review still waits.
         """
       ],
       steps: [
@@ -243,16 +252,23 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         An update action of the record a `:detail` card shows, offered as a
-        button beside this field (admin catalog 3.2): choosing it runs the
-        action on that record, as the actor, with the field's name (a
-        string) as its `:field` argument, which the action must declare.
-        The record is re-read through the card's context first (an
-        authorized read), and the card's record is re-read and re-sent
-        afterwards. The `action` entity of the same name gives the button
-        its `label` (default: the humanized action name), its `icon` and
-        the tables it `refreshes`; its `visible_when` gates row actions
-        only. Several fields may share one action. The basic catalog and
-        tables draw no button.
+        button beside this field (admin catalog 3.2), or of the row a table
+        draws it in, offered in each row (3.9): choosing it runs the action
+        on that record, as the actor, with the field's name (a string) as
+        its `:field` argument when the action declares one (an action that
+        marks the whole record needs none). The record is re-read first, as
+        an authorized read: through the card's context, or through the
+        table's own read and its context filters. Afterwards the card's
+        record is re-read and re-sent; for a row, the records of the
+        contexts its table is filtered by are (a review summary counting
+        the table's rows reads them). The `action` entity of the same name
+        gives the button its `label` (default: the humanized action name),
+        its `icon` and the tables it `refreshes`; its `visible_when` gates
+        row actions only. Several fields may share one action. The basic
+        catalog draws no button. On a `pairs` field (3.10, tables only) the
+        button is per item: the action runs for the item the person chose,
+        its key as the `:item` argument, and only while the record offers
+        it and the item does (see `pairs`).
         """
       ],
       field_action_visible: [
@@ -269,7 +285,7 @@ defmodule AshA2ui do
         type: :atom,
         doc: """
         The attribute a person edits for this field on an editable `:detail`
-        card (admin catalog 3.9), when the field shown is not the stored
+        card (admin catalog 3.11), when the field shown is not the stored
         value itself: a display calculation (`:total_text`, a formatted
         amount) is edited as the attribute behind it (`:total`). The input
         starts from the attribute's value and its type picks the input (text,
@@ -1745,7 +1761,7 @@ defmodule AshA2ui do
     `/errors/<field>` write. Not supported together with a `row_layout`
     (card rows render read-only meta values).
 
-    On a `:detail` card (admin catalog 3.9), choosing or focusing a listed
+    On a `:detail` card (admin catalog 3.11), choosing or focusing a listed
     field's value opens it as an input in place; Enter or leaving it keeps a
     change, Escape drops it. Nothing is written yet: the change waits, with
     every other unsaved change on the surface, until the surface's
@@ -1811,7 +1827,7 @@ defmodule AshA2ui do
     name: :confirm,
     describe: """
     The dialog a save opens while fields under review still wait (admin
-    catalog 3.9): Cancel (with Escape, the close button and the backdrop)
+    catalog 3.11): Cancel (with Escape, the close button and the backdrop)
     closes it with nothing saved; the save choice saves the changes; the
     `then` choice saves them and then runs `then_action` on the bar's
     record, in the same transaction. Nothing waiting, a save saves at once,
@@ -1888,7 +1904,7 @@ defmodule AshA2ui do
     name: :save_bar,
     describe: """
     The bar pinned to the bottom of the page while a person has unsaved
-    changes to the surface's editable `:detail` cards (admin catalog 3.9):
+    changes to the surface's editable `:detail` cards (admin catalog 3.11):
     its message, how many fields under review still wait, Discard (drops
     every change) and Save (saves them all through the `"save_changes"`
     client action, each card's `update_action` on its record, in one
@@ -2863,6 +2879,25 @@ defmodule AshA2ui do
         Context names (a subset of this table's `context_filter` contexts) of
         which **at least one** must be selected before the table reads —
         otherwise it renders no records (and no read is executed).
+        """
+      ],
+      context_record: [
+        type: :keyword_list,
+        default: [],
+        doc: """
+        Hands the table's reads the record a context selected, so a row
+        calculation can use what is already loaded on it instead of reading
+        it again. Keys are context names from this table's `context_filter`,
+        values the loads the record must carry
+        (`context_record order: [:totals]`). The surface fetches each
+        selected record once, with these loads added to those of the
+        context's `:detail` components and page header, before the table
+        reads, and puts it in the read's query context; a calculation reads
+        it with `AshA2ui.ContextRunner.context_record/2`. A context with
+        nothing selected hands nothing. `AshA2ui.Info.build_surface/2` and
+        `build_data_model/2` hand it; a read the action handler runs alone
+        (a page, a sort, a search) does not, so the calculation must still
+        work without it.
         """
       ],
       column_order: [
