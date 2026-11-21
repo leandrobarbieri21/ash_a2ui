@@ -846,6 +846,12 @@ Every payload-producing change must keep the schema-validation test suite
 green (`mix test`) — the vendored A2UI 1.0 JSON Schemas in
 `priv/a2ui/v1_0/` are the executable spec.
 
+Decisions that bind this package are in [`docs/adr/`](docs/adr/README.md). A change to the
+DSL, a catalog, the wire format or the JS/Elixir contract needs an ADR or an amendment
+([ADR 0003](docs/adr/0003-adr-baseline-for-ash-extensions.md) sets the rule for every Ash
+extension: a DSL surface or its own persistence or registry keeps ADRs; a leaf utility
+keeps a README and usage rules only).
+
 The JavaScript under `priv/js/` has its own tests (`test/js/`, plain
 `node --test`, no npm dependencies): run them with `mix js.test` (or
 `node --test test/js/*.test.mjs` directly; Node 18+).
