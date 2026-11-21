@@ -10,6 +10,15 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: find a record by a business reference
+
+`AshA2ui.Shell.Search.find(term, entries, read_opts)` looks a typed term up
+across the surfaces a person may search: the term is cast to each listed
+field's type, each surface is one authorized read as the actor, and a
+surface whose read failed is reported in `failed` rather than as no match.
+Hosts list the entries in the new optional `AshA2ui.Shell.Host.searchable/1`
+callback. Existing hosts need no change.
+
 ### Breaking: A2UI 1.0 only
 
 ash_a2ui now speaks A2UI protocol 1.0 and nothing else. Support for v0.9.1,

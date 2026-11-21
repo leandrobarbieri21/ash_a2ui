@@ -22,6 +22,10 @@ defmodule AshA2ui.Shell.Host do
   usually the actor. `entries/1` runs when the shell first opens, not when
   the page mounts, so a page that is never asked for its palette never reads
   anything for it.
+
+  A host that finds records by a business reference also implements the
+  optional `searchable/1`, and hands its entries to
+  `AshA2ui.Shell.Search.find/3`.
   """
 
   @doc "The commands and surfaces `context` may use, in the ACP wire shapes."
@@ -34,4 +38,14 @@ defmodule AshA2ui.Shell.Host do
   """
   @callback invoke(AshA2ui.Shell.invocation(), context :: term(), socket :: term()) ::
               {:ok, term()} | {:error, String.t()}
+
+  @doc """
+  The surfaces `context` may search, as `AshA2ui.Shell.Search` entries.
+  Build them from the same registry and doors as `entries/1`: list only
+  surfaces the person may open, each with the attributes that identify one
+  of its records and the deep link a hit opens.
+  """
+  @callback searchable(context :: term()) :: [AshA2ui.Shell.Search.entry()]
+
+  @optional_callbacks searchable: 1
 end

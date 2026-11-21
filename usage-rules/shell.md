@@ -62,6 +62,26 @@ Implement `AshA2ui.Shell.Host`:
 - A command with an input hint goes into the input to finish rather than
   running bare.
 
+## Find a record by a business reference
+
+`AshA2ui.Shell.Search.find(term, entries, read_opts)` looks one typed term
+up across the surfaces a person may search, as that person.
+
+- List the entries in the optional `searchable(context)` callback of
+  `AshA2ui.Shell.Host`, from the same registry and doors as `entries/1`:
+  `%{key: :contracts, resource: MyApp.Contract, fields: [:number],
+  path: &"/app/r/contracts/#{&1}"}`. Extra keys are kept and come back in
+  each hit's `entry`.
+- `fields` are the attributes that identify one record to a person: a
+  business reference, or `:id` for a run id. The term is cast to each
+  field's type and compared only with the fields it casts to.
+- Pass the actor and tenant in `read_opts` (`actor:`, `tenant:`); they go
+  to `Ash.read/2` unchanged. `limit:` caps the records read per entry
+  (default 10).
+- The result is `%{hits: [...], failed: [...]}`. An entry whose read failed
+  is in `failed`: show it as "could not search", never as "no match".
+- A hit's `path` is a deep link. Re-authorize the record when it is opened.
+
 ## Testing
 
 - The hook pushes `"shell:open"` (`%{"mode" => "palette" | "launcher"}`),
@@ -71,3 +91,6 @@ Implement `AshA2ui.Shell.Host`:
 - The input is the form `#<id>-form` (`render_change` filters,
   `render_submit` runs the highlighted row). Rows are `#<id>-item-<n>`.
 - `AshA2ui.Shell.route/2` and `items/3` are pure: test the grammar there.
+- Test `Shell.Search.find/3` against your own resources and policies: a
+  record the actor may not read is not found, and a broken entry is in
+  `failed`.
