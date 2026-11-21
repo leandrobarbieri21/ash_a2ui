@@ -456,6 +456,79 @@ topics for the full contracts.
   card or table drawing the field, or a `field_action_visible` that is not
   a public field of that record, does not compile.
 
+
+## Editing a record in place (`editable` on a `:detail`, `save_bar`)
+
+- A detail card's values a person corrects where they read them (admin
+  catalog 3.11). `editable` on the `:detail` lists the fields, the update
+  action the save runs (default: the context resource's primary update)
+  and `visible`, a boolean field of the record gating it. A field shown as
+  a display calculation names the attribute it edits with `edit`. A
+  `save_bar` saves every change on the surface at once; a surface with an
+  editable card must declare one.
+
+  ```elixir
+  component :detail, :terms do
+    context :agreement
+    fields [:name, :fee_text, :payment_term]
+
+    editable do
+      fields [:name, :fee_text, :payment_term]
+      update_action :correct
+      visible :correctable
+    end
+  end
+
+  field :fee_text do
+    label "Fee"
+    edit :fee            # the attribute behind the formatted value
+    review :fee_review
+  end
+
+  save_bar do
+    context :agreement
+    message "You have unsaved changes"
+    message_waiting "Reviewing extracted details"
+    status "%{count} pending review"
+    status_one "1 pending review"
+    saved_message "Changes saved."
+    edit_reviews true     # :correct records a review of what it changes
+
+    confirm do
+      title "Save with %{count} fields not reviewed?"
+      title_one "Save with 1 field not reviewed?"
+      save_label "Save progress"
+      then_label "Save and mark reviewed"
+      then_action :review
+      then_visible :review_open
+      then_saved_message "Changes saved and marked as reviewed."
+    end
+  end
+  ```
+
+- Choosing or focusing an editable value opens its input (text, a number,
+  a date, or a choice of an atom's `one_of`/enum values, from the edited
+  attribute's type). Enter or leaving it keeps a change; Escape drops it.
+  Nothing is written: the change waits at `/ui/edits/<card>/values/<field>`
+  until Save. A refresh of the whole data model keeps the changes.
+- The bar shows while a change waits. It counts the fields under review
+  (`review` fields of the bar's context) still pending or missing, leaving
+  out edited ones with `edit_reviews`. Discard drops every change. Save
+  sends `save_changes`; with a `confirm` and fields still waiting it asks
+  first (Cancel / `save_label` / `then_label`). `then_when_clear` runs the
+  `then_action` without asking once nothing waits.
+- The server re-reads each card's record through its context as the actor,
+  refuses it unless `visible` holds, and runs each card's `update_action`
+  with only the changed fields, cast to their attributes, in one
+  transaction (on a data layer with transactions), then the `then_action`
+  on the bar's record. A refusal saves nothing, keeps the changes, puts
+  each field's error at its input (`/ui/edit_errors/<card>/<field>`) and
+  says the rest as the outcome. Authorization is the actions' own policies.
+- The `editable` fields (through their `edit` attribute) must be accepted
+  by the update action, `visible` and `then_visible` must be fields of the
+  record and `then_action` an update action of it, or the surface does not
+  compile. The basic catalog draws the card read-only and no bar.
+
 ## Record pages (`page_header`, `section_nav`, `lead`, `alert`)
 
 - A surface that is a whole record page declares the page around its

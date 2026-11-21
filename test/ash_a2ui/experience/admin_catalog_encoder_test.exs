@@ -401,6 +401,7 @@ defmodule AshA2ui.Experience.AdminCatalogEncoderTest do
       "report",
       "export",
       "edit_cell",
+      "save_changes",
       "query",
       "context_search",
       "context_select",

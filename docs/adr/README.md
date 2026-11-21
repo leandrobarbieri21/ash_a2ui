@@ -16,3 +16,4 @@ A record is `proposed` until a human merges the pull request that adds it.
 | [0007](0007-authorization-has-no-side-channel.md) | Authorization has no side channel: Ash policies decide, and the host supplies the actor through hooks | proposed |
 | [0008](0008-the-dsl-compiles-to-one-resolved-view-and-the-verifiers-are-the-validator.md) | The DSL resolves to one plain struct, and the compile-time verifiers are the only validator | proposed |
 | [0009](0009-untrusted-input-names-things-and-the-server-resolves-them.md) | Agent and client input only names things; the server resolves them through an allowlist it holds | proposed |
+| [0010](0010-editing-a-record-in-place.md) | Editing a record in place: drafts on the client, one save through declared actions | proposed |

@@ -195,10 +195,12 @@ defmodule AshA2ui.Experience do
   the dataGrid column `action` and `actionVisible` (a field action in each
   row), with table rows counted by review summaries; 3.10 the dataGrid
   column `items` and `pairAction` (a review and a field action per item of a
-  `pairs` column), with those items counted by review summaries.
+  `pairs` column), with those items counted by review summaries; 3.11 the
+  fieldDisplay `edit` keys (editing a detail card's value in place) and the
+  `saveBar` that saves the changes.
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.10.0"
+  def admin_catalog_version, do: "3.11.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

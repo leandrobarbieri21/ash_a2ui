@@ -139,6 +139,7 @@ import {
   actionSpec,
   bindingPath,
   dispatchActionSpec,
+  resolveEventContext,
   promptModalComponent,
   retagged,
   subscribeActionOutcomes,
@@ -146,7 +147,7 @@ import {
 } from "./ash_a2ui_catalog.js";
 
 // The ash_a2ui catalog's id: the admin envelopes are sent as its ashAction.
-import {ASH_A2UI_CATALOG_ID, LIVE_LINK_ATTRIBUTE, LIVE_LINK_KINDS} from "./ash_a2ui_protocol.js";
+import {ASH_A2UI_CATALOG_ID, EDITS_PATH, LIVE_LINK_ATTRIBUTE, LIVE_LINK_KINDS} from "./ash_a2ui_protocol.js";
 
 /**
  * The attribute a drawn link carries when the surface declared it live
@@ -254,6 +255,166 @@ export function pairActionEntry(column, item) {
   return {...entry, context: {...(entry.context || {}), item: item.key}};
 }
 
+// --- 3.11: editing a record in place, saved by a save bar --------------------
+//
+// A fieldDisplay's `edit` opens its value as an input; a changed value is a
+// draft at /ui/edits/<card>/values/<field> (with the card's record id at
+// /ui/edits/<card>/recordId) until the saveBar sends them all as
+// save_changes, or discards them. These pure helpers are the whole of that
+// state, shared by the stock elements and a host's swaps.
+
+/** Where a surface holds its unsaved changes (`/ui/edits`). */
+export {EDITS_PATH};
+
+/** Where a refused save writes each edited field's message. */
+export const EDIT_ERRORS_PATH = "/ui/edit_errors";
+
+const EDIT_INPUTS = ["text", "integer", "number", "date", "choice"];
+
+/** A fieldDisplay's `edit`, its `input` defaulted to text, or null. */
+export function editEntry(edit) {
+  if (!edit || typeof edit !== "object") return null;
+  if (typeof edit.component !== "string" || typeof edit.field !== "string") return null;
+  return {...edit, input: EDIT_INPUTS.includes(edit.input) ? edit.input : "text"};
+}
+
+/** Whether a field has an unsaved change: its bound `editDraft` is set. */
+export function hasDraft(draft) {
+  return draft !== undefined && draft !== null;
+}
+
+/** The text an input holds for a value: "" for none. */
+export function editText(value) {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+/**
+ * Keeps or drops a field's change in `dataModel`. `value` is what the input
+ * holds, `stored` the value it started from (`editValue`): a value back at
+ * it drops the field's draft (and the card's entry once it holds none);
+ * anything else is the draft, as text, with the card's `recordId`. Either
+ * way the field's message from a refused save goes.
+ *
+ * Each map is written whole (`/ui/edits`, `/ui/edit_errors`), never a path
+ * inside it: a binding of the whole map (the saveBar's `edits`) sees only
+ * the writes of its own path and its descendants' bindings.
+ */
+export function writeDraft(dataModel, edit, {recordId, value, stored}) {
+  const edits = jsonCopy(dataModel.get(EDITS_PATH));
+  const card = edits[edit.component] && typeof edits[edit.component] === "object" ? edits[edit.component] : {};
+  const values = card.values && typeof card.values === "object" ? {...card.values} : {};
+
+  if (editText(value) === editText(stored)) delete values[edit.field];
+  else values[edit.field] = editText(value);
+
+  if (Object.keys(values).length === 0) delete edits[edit.component];
+  else edits[edit.component] = {...card, recordId, values};
+  dataModel.set(EDITS_PATH, edits);
+
+  const errors = jsonCopy(dataModel.get(EDIT_ERRORS_PATH));
+  if (errors[edit.component] && Object.hasOwn(errors[edit.component], edit.field)) {
+    delete errors[edit.component][edit.field];
+    dataModel.set(EDIT_ERRORS_PATH, errors);
+  }
+}
+
+// A plain copy of a JSON map; {} for anything else.
+function jsonCopy(value) {
+  return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {};
+}
+
+/** Drops every unsaved change and every refused save's message. */
+export function discardEdits(dataModel) {
+  dataModel.set(EDITS_PATH, {});
+  dataModel.set(EDIT_ERRORS_PATH, {});
+}
+
+/** How many fields hold an unsaved change in `edits` (`/ui/edits`). */
+export function editCount(edits) {
+  if (!edits || typeof edits !== "object") return 0;
+  let count = 0;
+  for (const card of Object.values(edits)) {
+    const values = card && typeof card === "object" ? card.values : null;
+    if (values && typeof values === "object") count += Object.keys(values).length;
+  }
+  return count;
+}
+
+const WAITING_STATES = ["pending", "missing"];
+
+/**
+ * How many of a saveBar's fields under review still wait: their review on
+ * the bar's `record` is pending or missing, unless `editReviews` and the
+ * field has an unsaved change (saving it reviews it).
+ */
+export function waitingReviews(props) {
+  const record = props?.record && typeof props.record === "object" ? props.record : {};
+  const edits = props?.edits && typeof props.edits === "object" ? props.edits : {};
+  let waiting = 0;
+  for (const entry of Array.isArray(props?.reviews) ? props.reviews : []) {
+    const state = reviewEntry(record[`_review_${entry?.field}`])?.state;
+    if (!WAITING_STATES.includes(state)) continue;
+    const values = edits[entry.component]?.values;
+    if (props.editReviews === true && values && Object.hasOwn(values, entry.field)) continue;
+    waiting += 1;
+  }
+  return waiting;
+}
+
+/** A counted text: `one` for one when given, else `other`, `%{count}` replaced. */
+export function countText(other, one, count) {
+  const text = count === 1 && typeof one === "string" && one !== "" ? one : other;
+  return typeof text === "string" ? text.replaceAll("%{count}", String(count)) : "";
+}
+
+/** Whether a saveBar's confirm offers its second choice on the bar's record. */
+export function thenOffered(props) {
+  const confirm = props?.confirm;
+  if (!confirm || confirm.then !== true) return false;
+  if (typeof confirm.thenVisible !== "string" || confirm.thenVisible === "") return true;
+  return props.record?.[confirm.thenVisible] === true;
+}
+
+/**
+ * What a saveBar's Save does: "confirm" (open the dialog: fields still
+ * wait), "then" (save and run the confirm's then action: nothing waits, it
+ * is offered and `thenWhenClear`), else "save".
+ */
+export function saveDecision(props) {
+  const confirm = props?.confirm;
+  if (!confirm || typeof confirm !== "object") return "save";
+  if (waitingReviews(props) > 0) return "confirm";
+  return confirm.thenWhenClear === true && thenOffered(props) ? "then" : "save";
+}
+
+/**
+ * The words of a saveBar's dialog for the fields still waiting: title,
+ * message, and the buttons (`thenLabel` only while it is offered).
+ */
+export function confirmTexts(props) {
+  const confirm = props?.confirm || {};
+  const count = waitingReviews(props);
+  return {
+    count,
+    title: countText(confirm.title, confirm.titleOne, count),
+    message: countText(confirm.message, confirm.messageOne, count),
+    cancelLabel: confirm.cancelLabel || "",
+    saveLabel: confirm.saveLabel || "",
+    thenLabel: thenOffered(props) ? confirm.thenLabel || "" : "",
+  };
+}
+
+/** The save_changes envelope a saveBar sends for `choice` ("save" or "then"). */
+export function saveSpec(props, choice) {
+  const action = props?.action;
+  if (!action || typeof action.action !== "string") return null;
+  return {
+    name: action.action,
+    context: {...(action.context || {}), choice},
+    catalogId: ASH_A2UI_CATALOG_ID,
+  };
+}
+
 // Schema builders from web_core's OWN zod (3.x), the instance the
 // GenericBinder introspects. Importing the module directly (rather than
 // receiving builders through `deps`) guarantees instance identity: the
@@ -276,7 +437,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.10.0";
+export const ADMIN_CATALOG_VERSION = "3.11.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -371,6 +532,7 @@ const TAGS = {
   filterPicker: "ash-admin-filter-picker",
   documentPane: "ash-admin-document-pane",
   documentViewer: "ash-admin-document-viewer",
+  saveBar: "ash-admin-save-bar",
 };
 
 /** Basic input kinds this catalog replaces with a11y-hardened elements. */
@@ -809,6 +971,34 @@ export function buildSchemas(basicCatalog = null) {
       // whether the record offers it.
       action: RecordAny.optional(),
       actionVisible: DynamicValueSchema.nullable().optional(),
+      // 3.11: editing in place: the card, field and input (static), the
+      // stored value, whether the record offers editing, the unsaved change
+      // and a refused save's message (bindings).
+      edit: RecordAny.optional(),
+      editValue: DynamicValueSchema.nullable().optional(),
+      editVisible: DynamicValueSchema.nullable().optional(),
+      editDraft: DynamicValueSchema.nullable().optional(),
+      editError: DynamicValueSchema.nullable().optional(),
+      weight: Num.optional(),
+    }),
+
+    // 3.11: the bar that saves or discards the unsaved changes.
+    saveBar: EmptyObject.extend({
+      message: Str.optional(),
+      messageWaiting: Str.optional(),
+      status: Str.optional(),
+      statusOne: Str.optional(),
+      saveLabel: Str,
+      discardLabel: Str,
+      edits: DynamicValueSchema.nullable().optional(),
+      record: DynamicValueSchema.nullable().optional(),
+      reviews: ArrayOf(RecordAny).optional(),
+      editReviews: Bool.optional(),
+      // The save_changes envelope (static: the bar adds the choice and the
+      // context's bindings resolve at click time).
+      action: RecordAny.optional(),
+      confirm: RecordAny.optional(),
+      domId: Str.optional(),
       weight: Num.optional(),
     }),
 
@@ -1379,6 +1569,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
   defineConfirmDialog();
   defineCalendarView();
   defineLiveDiagram();
+  defineSaveBar();
   defineDocumentElements({
     A2uiLitElement,
     A2uiController,
@@ -4247,6 +4438,48 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
           .field-review-page {
             color: var(--am-text-muted);
           }
+
+          /* 3.11: an editable value is a control that opens its input; a
+             changed value is marked, its change written as text. */
+          .field-edit {
+            all: unset;
+            box-sizing: border-box;
+            display: inline-block;
+            min-width: 4rem;
+            min-height: 1.5em;
+            padding-inline: var(--am-space-2xs);
+            border-radius: var(--am-radius-s);
+            border: var(--am-border-width) dashed var(--am-border);
+            cursor: text;
+            overflow-wrap: anywhere;
+          }
+          .field-edit:hover,
+          .field-edit:focus-visible {
+            border-color: var(--am-primary);
+          }
+          .field[data-changed] .field-edit {
+            border-style: solid;
+            border-color: var(--am-primary);
+            font-weight: var(--am-font-weight-medium);
+          }
+          .field-edit-input {
+            font: inherit;
+            width: 100%;
+            max-width: 24rem;
+            box-sizing: border-box;
+            padding: var(--am-space-2xs) var(--am-space-xs);
+            border: var(--am-border-width) solid var(--am-border-strong);
+            border-radius: var(--am-radius-s);
+          }
+          .field-edit-input[aria-invalid="true"] {
+            border-color: var(--am-error);
+          }
+          .field-edit-error {
+            grid-column: 2;
+            margin: 0;
+            font-size: var(--am-font-size-xs);
+            color: var(--am-error);
+          }
           /* 3.2: a field action's button, under the value. */
           .field-action {
             grid-column: 2;
@@ -4299,6 +4532,130 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._amFieldActionBusy = false;
       }
 
+      // --- 3.11: editing in place ------------------------------------------
+      //
+      // A swap draws its own input and calls these: `editOffered` decides
+      // whether to draw one, `editing` whether it is open, `openEdit` opens
+      // it (on a click or focus), `commitEdit(value)` keeps what it holds
+      // (Enter, or leaving it), `cancelEdit` drops it (Escape). The draft
+      // lives in the surface's data model (`writeDraft`), so the saveBar
+      // sees it and a refresh keeps it.
+
+      /** 3.11: whether the field is edited in place on this record. */
+      editOffered(props) {
+        if (!editEntry(props?.edit)) return false;
+        const bound = this.context?.componentModel?.properties?.editVisible !== undefined;
+        return !bound || props.editVisible === true;
+      }
+
+      /** 3.11: whether the field's input is open. */
+      editing() {
+        return Boolean(this._amEditing);
+      }
+
+      /** 3.11: the value the input starts from: the draft, else the stored value. */
+      editStart(props) {
+        return hasDraft(props?.editDraft) ? props.editDraft : props?.editValue;
+      }
+
+      /** 3.11: opens the input, focused once drawn. */
+      openEdit() {
+        if (this._amEditing) return;
+        this._amEditing = true;
+        this.requestUpdate();
+        this.updateComplete.then(() => {
+          const input = this.renderRoot?.querySelector?.("[data-a2ui-edit-input]");
+          if (input && typeof input.focus === "function") input.focus();
+        });
+      }
+
+      /** 3.11: keeps `value` as the field's change (none when it is the stored value). */
+      commitEdit(value) {
+        if (!this._amEditing) return;
+        this._amEditing = false;
+        const props = this.controller?.props;
+        const edit = editEntry(props?.edit);
+        const dataModel = this.context?.dataContext?.surface?.dataModel;
+        if (edit && dataModel) {
+          writeDraft(dataModel, edit, {
+            recordId: resolveEventContext(edit.recordId, dataModel),
+            value,
+            stored: props.editValue,
+          });
+        }
+        this.requestUpdate();
+      }
+
+      /** 3.11: closes the input and drops what it held. */
+      cancelEdit() {
+        if (!this._amEditing) return;
+        this._amEditing = false;
+        this.requestUpdate();
+      }
+
+      /** 3.11: Enter keeps the input's value, Escape drops it. */
+      onEditKeydown(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.commitEdit(event.target.value);
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          this.cancelEdit();
+        }
+      }
+
+      /** 3.11: the stock input for the field's `edit`. */
+      renderEditInput(props) {
+        const edit = editEntry(props.edit);
+        const value = editText(this.editStart(props));
+        const label = str(props.label);
+        const invalid = str(props.editError) !== "";
+        const keydown = (event) => this.onEditKeydown(event);
+        const blur = (event) => this.commitEdit(event.target.value);
+
+        if (edit.input === "choice") {
+          const options = Array.isArray(edit.options) ? edit.options : [];
+          return html`<select class="field-edit-input" data-a2ui-edit-input aria-label=${label}
+            aria-invalid=${invalid ? "true" : "false"} @keydown=${keydown} @blur=${blur}>
+            <option value="" ?selected=${value === ""}></option>
+            ${options.map((option) => html`<option value=${str(option.value)} ?selected=${str(option.value) === value}>${str(option.label)}</option>`)}
+          </select>`;
+        }
+
+        const type = edit.input === "date" ? "date" : edit.input === "text" ? "text" : "number";
+        return html`<input class="field-edit-input" data-a2ui-edit-input type=${type}
+          step=${edit.input === "integer" ? "1" : edit.input === "number" ? "any" : nothing}
+          .value=${value} aria-label=${label} aria-invalid=${invalid ? "true" : "false"}
+          @keydown=${keydown} @blur=${blur} />`;
+      }
+
+      /** 3.11: an editable field: its input while open, else its value (the draft, marked as changed) as a control that opens it. */
+      renderEditable(props) {
+        const review = reviewEntry(props.review);
+        const region = regionAddresses(review) || nothing;
+        const draft = hasDraft(props.editDraft);
+        const error = str(props.editError);
+        const empty = props.value == null || props.value === "";
+        const shown = draft
+          ? editText(props.editDraft)
+          : empty
+            ? str(props.emptyText) || (review?.stateLabel ?? "")
+            : renderValue(props.value, props.format);
+
+        return html`
+          <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region} ?data-changed=${draft}>
+            <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
+            <dd class="field-value">${this._amEditing
+              ? this.renderEditInput(props)
+              : html`<button type="button" class="field-edit" data-a2ui-edit=${editEntry(props.edit).field}
+                  aria-label=${str(props.label)} @click=${() => this.openEdit()} @focus=${() => this.openEdit()}>${shown}</button>`}</dd>
+            ${error ? html`<dd class="field-edit-error" role="alert">${error}</dd>` : nothing}
+            ${renderReview(review)}${this.renderFieldAction(props)}
+          </dl>
+        `;
+      }
+
       /** 3.2: the field action's button, while the record offers it. */
       renderFieldAction(props) {
         if (!this.fieldActionOffered(props)) return nothing;
@@ -4321,6 +4678,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       render() {
         const props = this.controller?.props;
         if (!props) return nothing;
+
+        // 3.11: a field the record offers editing on draws its value as a
+        // control that opens its input, and never hides.
+        if (this.editOffered(props)) {
+          this.hidden = false;
+          return this.renderEditable(props);
+        }
 
         const isBoolean = props.format === "boolean";
         const links = linkEntries(props.link);
@@ -4408,6 +4772,200 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
     }
 
     customElements.define(tag, AshAdminFieldDisplay);
+  }
+
+
+  // --- SaveBar: the unsaved changes, saved or discarded (3.11) ---------------
+  //
+  // Shown while /ui/edits holds a change. Save sends save_changes (choice
+  // "save"), or first opens the confirm dialog while fields under review
+  // still wait (`saveDecision`). A swap draws its own bar and dialog and
+  // calls `onSave`, `onDiscard`, `choose(choice)` and `closeConfirm`; it
+  // reads `confirmOpen()`, `busy()` and the helpers (`editCount`,
+  // `waitingReviews`, `countText`, `confirmTexts`).
+
+  function defineSaveBar() {
+    const tag = TAGS.saveBar;
+    if (customElements.get(tag)) return;
+
+    class AshAdminSaveBar extends A2uiLitElement {
+      static styles = [
+        shared,
+        buttons,
+        content,
+        css`
+          :host {
+            display: block;
+            position: sticky;
+            bottom: 0;
+            z-index: 30;
+          }
+          :host([hidden]) {
+            display: none;
+          }
+          .bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: var(--am-space-s);
+            padding: var(--am-space-s) var(--am-space-m);
+            border-top: var(--am-border-width) solid var(--am-border);
+            background: var(--am-surface, #fff);
+          }
+          .bar-message {
+            margin: 0;
+            font-weight: var(--am-font-weight-semibold);
+          }
+          .bar-actions {
+            margin-inline-start: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--am-space-s);
+          }
+          dialog {
+            border: none;
+            border-radius: var(--am-radius-m);
+            padding: var(--am-space-l);
+            max-width: 34rem;
+          }
+          dialog h2 {
+            margin: 0 0 var(--am-space-s);
+            font-size: var(--am-font-size-l);
+          }
+          dialog p {
+            margin: 0 0 var(--am-space-m);
+          }
+          .dialog-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--am-space-s);
+          }
+          .dialog-actions .spacer {
+            flex: 1;
+          }
+        `,
+      ];
+
+      createController() {
+        return new A2uiController(this, adminApis.saveBar);
+      }
+
+      // The surface the bar reads and writes (its busy state settles on its outcomes).
+      get surface() {
+        return this.context?.dataContext?.surface;
+      }
+
+      willUpdate(changedProperties) {
+        super.willUpdate(changedProperties);
+        applyWeight(this, this.controller?.props);
+      }
+
+      /** Whether the confirm dialog is open. */
+      confirmOpen() {
+        return Boolean(this._amConfirmOpen);
+      }
+
+      /** Whether a save is on its way. */
+      busy() {
+        return Boolean(this._amSaveBusy);
+      }
+
+      /** Discard: drops every change and every refused save's message. */
+      onDiscard() {
+        const dataModel = this.context?.dataContext?.surface?.dataModel;
+        if (dataModel && !this._amSaveBusy) discardEdits(dataModel);
+      }
+
+      /** Save: sends at once, or opens the dialog while fields still wait. */
+      onSave() {
+        const props = this.controller?.props;
+        if (!props || this._amSaveBusy) return;
+        const decision = saveDecision(props);
+        if (decision === "confirm") {
+          this._amConfirmOpen = true;
+          this.requestUpdate();
+        } else {
+          this.choose(decision);
+        }
+      }
+
+      /** Sends save_changes with `choice` ("save" or "then"), closing the dialog. */
+      choose(choice) {
+        const spec = saveSpec(this.controller?.props, choice);
+        this.closeConfirm();
+        if (!spec || this._amSaveBusy || !this.context?.componentModel) return;
+        this._amSaveBusy = true;
+        markActionBusy(this);
+        this.requestUpdate();
+        dispatchActionSpec(this.context, spec);
+      }
+
+      /** Closes the dialog with nothing sent. */
+      closeConfirm() {
+        if (!this._amConfirmOpen) return;
+        this._amConfirmOpen = false;
+        this.requestUpdate();
+      }
+
+      onActionSettled() {
+        this._amSaveBusy = false;
+      }
+
+      updated(changed) {
+        super.updated?.(changed);
+        const dialog = this.renderRoot?.querySelector?.("dialog");
+        if (!dialog) return;
+        if (this._amConfirmOpen && !dialog.open && typeof dialog.showModal === "function") dialog.showModal();
+        if (!this._amConfirmOpen && dialog.open && typeof dialog.close === "function") dialog.close();
+      }
+
+      renderConfirm(props) {
+        if (!props.confirm || !this._amConfirmOpen) return nothing;
+        const texts = confirmTexts(props);
+        return html`<dialog aria-labelledby="save-confirm-title" @cancel=${(event) => {
+          event.preventDefault();
+          this.closeConfirm();
+        }} @click=${(event) => {
+          if (event.target === event.currentTarget) this.closeConfirm();
+        }}>
+          <h2 id="save-confirm-title">${texts.title}</h2>
+          ${texts.message ? html`<p>${texts.message}</p>` : nothing}
+          <div class="dialog-actions">
+            ${renderActionButton({label: texts.cancelLabel, onClick: () => this.closeConfirm()})}
+            <span class="spacer"></span>
+            ${renderActionButton({label: texts.saveLabel, onClick: () => this.choose("save")})}
+            ${texts.thenLabel
+              ? renderActionButton({label: texts.thenLabel, tone: "primary", onClick: () => this.choose("then")})
+              : nothing}
+          </div>
+        </dialog>`;
+      }
+
+      render() {
+        const props = this.controller?.props;
+        if (!props) return nothing;
+        const count = editCount(props.edits);
+        this.hidden = count === 0;
+        if (this.hidden) return nothing;
+
+        const waiting = waitingReviews(props);
+        const message = waiting > 0 && props.messageWaiting ? props.messageWaiting : props.message;
+        const status = waiting > 0 ? countText(props.status, props.statusOne, waiting) : "";
+        const busy = Boolean(this._amSaveBusy);
+
+        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${count} data-waiting=${waiting}>
+            ${message ? html`<p class="bar-message" aria-live="polite">${message}</p>` : nothing}
+            ${status ? html`<span class="am-badge" data-tone="warning">${status}</span>` : nothing}
+            <div class="bar-actions">
+              ${renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})}
+              ${renderActionButton({label: str(props.saveLabel), tone: "primary", busy, onClick: () => this.onSave()})}
+            </div>
+          </div>
+          ${this.renderConfirm(props)}`;
+      }
+    }
+
+    customElements.define(tag, AshAdminSaveBar);
   }
 
   const REVIEW_TONES = { pending: "warning", reviewed: "success", missing: "neutral" };

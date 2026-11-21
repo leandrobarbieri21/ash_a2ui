@@ -170,6 +170,27 @@ defmodule AshA2ui.ActionHandler do
       refreshes the tables the action's `refreshes` names, every table by
       default.
 
+    * `"save_changes"` — context `%{"edits" => %{card => %{"recordId" =>
+      id, "values" => %{field => value}}}, "choice" => "save" | "then",
+      "recordId" => id, "contexts" => selections}`. Saves a person's
+      unsaved changes to the surface's editable `:detail` cards (admin
+      catalog 3.11, the `save_bar`): the client names each card and field,
+      never the Ash action, so each card's `editable` is the allowlist. Each
+      card's record is re-read through its context as the actor and refused
+      unless it offers editing (`editable` `visible`); its `update_action`
+      then runs on it with the changed fields' values, cast to the
+      attributes they edit (a field's `edit`). Every card's write runs in one
+      transaction (on a data layer that has them): one refusal saves
+      nothing. `"then"` also runs the save bar `confirm`'s `then_action` on
+      the bar's record (`recordId`, refused unless its `then_visible`
+      holds), in the same transaction. A success clears `/ui/edits` and
+      `/ui/edit_errors`, re-reads each saved card's record into
+      `/detail/<context>`, refreshes the tables the update action's
+      `refreshes` names (every table by default), and reports the bar's
+      `saved_message` (`then_saved_message` after `"then"`). A refusal
+      keeps the changes, writes each edited field's message to
+      `/ui/edit_errors/<card>/<field>`, and reports the rest as the outcome.
+
     * `"document_pane"` / `"document_region"` — a `document_pane` (admin
       catalog 3.4, see `AshA2ui.DocumentPane`) shown or hidden, and a region
       of it a person went to. Context `%{"pane" => name, "shown" =>
@@ -373,7 +394,7 @@ defmodule AshA2ui.ActionHandler do
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
-  @writes ~w(submit_form invoke field_action page_action bulk_invoke prompt edit_cell
+  @writes ~w(submit_form invoke field_action page_action save_changes bulk_invoke prompt edit_cell
              nested_add nested_remove start_create start_edit wizard_next wizard_back)
 
   @pinned_refusal msg(
@@ -880,6 +901,8 @@ defmodule AshA2ui.ActionHandler do
   defp dispatch("field_action", context, env), do: field_action(context, env)
 
   defp dispatch("page_action", context, env), do: page_action(context, env)
+
+  defp dispatch("save_changes", context, env), do: save_changes(context, env)
 
   defp dispatch("bulk_invoke", context, env), do: bulk_invoke(context, env)
 
@@ -1819,6 +1842,7 @@ defmodule AshA2ui.ActionHandler do
              |> Map.merge(ResolvedView.detail_steps_data(view, record, fields))
              |> Map.merge(ResolvedView.detail_review_data(view, record, fields, context_name))
              |> Map.merge(ResolvedView.detail_field_action_data(view, record, fields))
+             |> Map.merge(ResolvedView.detail_edit_data(view, details, record))
              |> Map.merge(ResolvedView.detail_document_data(view, context_name, record, fields))
              |> Map.merge(ResolvedView.detail_context_data(view, context_name, record, ash_opts))}
 
@@ -2144,6 +2168,352 @@ defmodule AshA2ui.ActionHandler do
     end)
     |> Enum.reduce_while({:ok, []}, fn {context, details}, {:ok, acc} ->
       case context_detail_value(view, context, details, env.selected, ash_opts) do
+        {:ok, value} ->
+          {:cont, {:ok, acc ++ [update_data_model(view, "/detail/#{context}", value)]}}
+
+        {:error, error} ->
+          {:halt, {:error, error_messages(view, error)}}
+      end
+    end)
+  end
+
+  # --- save_changes ----------------------------------------------------------
+
+  # Catalog 3.11: a person's unsaved changes to the surface's editable cards,
+  # saved at once through each card's declared update action, in one
+  # transaction; `"then"` runs the save bar's then_action after them.
+  defp save_changes(context, %{view: view} = env) do
+    with {:ok, bar} <- declared_save_bar(view),
+         {:ok, choice} <- save_choice(bar, Map.get(context, "choice", "save"), view),
+         {:ok, targets} <- save_targets(view, Map.get(context, "edits"), choice),
+         {:ok, saves} <- fetch_save_records(view, targets, env),
+         {:ok, then} <- then_target(view, bar, choice, Map.get(context, "recordId"), env) do
+      run_saves(view, bar, saves, then, env)
+    end
+  end
+
+  defp declared_save_bar(%{save_bar: nil} = view),
+    do: {:error, [status(view, "save_changes is not allowed: the surface declares no save_bar.")]}
+
+  defp declared_save_bar(%{save_bar: bar}), do: {:ok, bar}
+
+  defp save_choice(_bar, "save", _view), do: {:ok, :save}
+
+  defp save_choice(%{confirm: %{then_action: action}}, "then", _view) when action != nil,
+    do: {:ok, :then}
+
+  defp save_choice(_bar, choice, view),
+    do: {:error, [status(view, "save_changes choice #{inspect(choice)} is not allowed.")]}
+
+  # The changed fields of each card the client named: every card must be an
+  # editable :detail and every field one of its editable fields.
+  defp save_targets(view, edits, choice) when is_map(edits) do
+    edits
+    |> Enum.reduce_while({:ok, []}, fn {card, entry}, {:ok, acc} ->
+      case save_target(view, card, entry) do
+        {:ok, nil} -> {:cont, {:ok, acc}}
+        {:ok, target} -> {:cont, {:ok, [target | acc]}}
+        {:error, _messages} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, []} when choice == :save -> {:error, [status(view, t(view, msg("Nothing to save.")))]}
+      {:ok, targets} -> {:ok, Enum.reverse(targets)}
+      error -> error
+    end
+  end
+
+  defp save_targets(_view, nil, :then), do: {:ok, []}
+
+  defp save_targets(view, _edits, _choice),
+    do: {:error, [status(view, ~s(Malformed save_changes: context is missing "edits".))]}
+
+  defp save_target(view, card, entry) when is_map(entry) do
+    detail = Enum.find(view.details, &(to_string(&1.name) == card and &1[:editable]))
+    values = Map.get(entry, "values") || %{}
+    record_id = Map.get(entry, "recordId")
+
+    cond do
+      is_nil(detail) ->
+        {:error,
+         [status(view, "save_changes on #{inspect(card)} is not allowed: no editable :detail.")]}
+
+      values == %{} ->
+        {:ok, nil}
+
+      not (is_binary(record_id) and record_id != "") ->
+        {:error, [status(view, ~s(Malformed save_changes: #{inspect(card)} has no "recordId".))]}
+
+      true ->
+        with {:ok, params} <- edited_params(view, detail, values) do
+          {:ok, %{detail: detail, record_id: record_id, params: params, values: values}}
+        end
+    end
+  end
+
+  defp save_target(view, card, _entry),
+    do: {:error, [status(view, "Malformed save_changes: #{inspect(card)} is not a map.")]}
+
+  # Each changed field's value under the attribute its input edits, cast
+  # against the card's update action. A cleared input is no value.
+  defp edited_params(view, %{editable: editable} = detail, values) do
+    by_name = Map.new(editable.fields, &{to_string(&1), &1})
+
+    Enum.reduce_while(values, {:ok, %{}}, fn {field, value}, {:ok, acc} ->
+      case Map.fetch(by_name, field) do
+        {:ok, name} ->
+          attr = Map.fetch!(editable.edits, name)
+          {:cont, {:ok, Map.put(acc, to_string(attr), blank_to_nil(value))}}
+
+        :error ->
+          {:halt,
+           {:error,
+            [
+              status(
+                view,
+                "save_changes field #{inspect(field)} of #{inspect(to_string(detail.name))} " <>
+                  "is not allowed: it is not an editable field of that card."
+              )
+            ]}}
+      end
+    end)
+    |> case do
+      {:ok, params} ->
+        resource = view.contexts[detail.context].resource
+        {:ok, cast_values(resource, editable.update_action, params)}
+
+      error ->
+        error
+    end
+  end
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
+
+  # Each card's record, re-read through its context as the actor, refused
+  # unless it offers editing.
+  defp fetch_save_records(view, targets, env) do
+    targets
+    |> Enum.reduce_while({:ok, []}, fn target, {:ok, acc} ->
+      case fetch_save_record(view, target, env) do
+        {:ok, save} -> {:cont, {:ok, [save | acc]}}
+        error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, saves} -> {:ok, Enum.reverse(saves)}
+      error -> error
+    end
+  end
+
+  defp fetch_save_record(view, %{detail: detail} = target, %{ash_opts: ash_opts} = env) do
+    unavailable =
+      {:error, [status(view, t(view, msg("Editing is not available for this record.")))]}
+
+    case ContextRunner.fetch_selected(
+           view,
+           view.contexts[detail.context],
+           target.record_id,
+           env.selected,
+           ash_opts,
+           detail.loads
+         ) do
+      {:ok, record} ->
+        if ResolvedView.editable_offered?(detail.editable, record),
+          do: {:ok, Map.put(target, :record, record)},
+          else: unavailable
+
+      :not_found ->
+        unavailable
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
+  # The bar's record `"then"` runs its then_action on, refused unless the
+  # record offers it.
+  defp then_target(_view, _bar, :save, _record_id, _env), do: {:ok, nil}
+
+  defp then_target(view, bar, :then, record_id, %{ash_opts: ash_opts} = env)
+       when is_binary(record_id) and record_id != "" do
+    confirm = bar.confirm
+    context = view.contexts[bar.context]
+
+    loads =
+      if confirm.then_visible, do: then_loads(context.resource, confirm.then_visible), else: []
+
+    unavailable = [status(view, unavailable_text(view, confirm.then_action))]
+
+    case ContextRunner.fetch_selected(view, context, record_id, env.selected, ash_opts, loads) do
+      {:ok, record} ->
+        if is_nil(confirm.then_visible) or Map.get(record, confirm.then_visible) == true,
+          do:
+            {:ok,
+             %{
+               resource: context.resource,
+               record_id: record_id,
+               action: confirm.then_action,
+               context: context,
+               loads: loads
+             }},
+          else: {:error, unavailable}
+
+      :not_found ->
+        {:error, unavailable}
+
+      {:error, error} ->
+        {:error, error_messages(view, error)}
+    end
+  end
+
+  defp then_target(view, _bar, :then, _record_id, _env),
+    do: {:error, [status(view, ~s(Malformed save_changes: context is missing "recordId".))]}
+
+  defp then_loads(resource, field) do
+    if Ash.Resource.Info.calculation(resource, field) ||
+         Ash.Resource.Info.aggregate(resource, field),
+       do: [field],
+       else: []
+  end
+
+  # Every write in one transaction: the cards' saves, then the then_action
+  # on the bar's record read again (a save may have changed it).
+  defp run_saves(view, bar, saves, then, %{ash_opts: ash_opts} = env) do
+    resources =
+      (Enum.map(saves, &view.contexts[&1.detail.context].resource) ++
+         List.wrap(then && then.resource))
+      |> Enum.uniq()
+
+    result =
+      Ash.DataLayer.transaction(resources, fn ->
+        with :ok <- write_saves(saves, ash_opts),
+             :ok <- write_then(view, then, env) do
+          :ok
+        else
+          {:error, _failure} = error -> abandon(resources, error)
+        end
+      end)
+
+    case result do
+      {:ok, :ok} -> saved(view, bar, saves, then, env)
+      {:ok, {:error, failure}} -> {:error, save_failure(view, failure)}
+      {:error, {:error, failure}} -> {:error, save_failure(view, failure)}
+      {:error, error} -> {:error, error_messages(view, error)}
+    end
+  end
+
+  # A data layer with transactions undoes the writes made so far; one
+  # without has nothing to undo them with.
+  defp abandon([resource | _] = _resources, error) do
+    if Ash.DataLayer.data_layer_can?(resource, :transact),
+      do: Ash.DataLayer.rollback(resource, error),
+      else: error
+  end
+
+  defp write_saves(saves, ash_opts) do
+    Enum.reduce_while(saves, :ok, fn save, :ok ->
+      case update_record(save.record, save.detail.editable.update_action, save.params, ash_opts) do
+        {:ok, _record} -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, {save, error}}}
+      end
+    end)
+  end
+
+  defp write_then(_view, nil, _env), do: :ok
+
+  defp write_then(view, then, %{ash_opts: ash_opts} = env) do
+    with {:ok, record} <-
+           ContextRunner.fetch_selected(
+             view,
+             then.context,
+             then.record_id,
+             env.selected,
+             ash_opts,
+             then.loads
+           ),
+         {:ok, _record} <- update_record(record, then.action, %{}, ash_opts) do
+      :ok
+    else
+      :not_found -> {:error, {:unavailable, then.action}}
+      {:error, error} -> {:error, {nil, error}}
+    end
+  end
+
+  # A refused save: each edited field's message at its input
+  # (`/ui/edit_errors/<card>/<field>`), the standard field and outcome
+  # writes for the rest.
+  defp save_failure(view, {:unavailable, action}),
+    do: [status(view, unavailable_text(view, action))]
+
+  defp save_failure(view, {nil, error}), do: error_messages(view, error)
+
+  defp save_failure(view, {%{detail: detail, values: values}, error}) do
+    edited =
+      for {field, attr} <- detail.editable.edits,
+          Map.has_key?(values, to_string(field)),
+          into: %{},
+          do: {to_string(attr), to_string(field)}
+
+    field_messages =
+      for {[attr | _rest], text} <- field_errors(view.l10n, error),
+          field = Map.get(edited, to_string(attr)),
+          into: %{},
+          do: {field, text}
+
+    [update_data_model(view, "/ui/edit_errors", %{to_string(detail.name) => field_messages})] ++
+      error_messages(view, error, Map.keys(edited))
+  end
+
+  defp saved(view, bar, saves, then, env) do
+    action =
+      (then && then.action) ||
+        (List.first(saves) && List.first(saves).detail.editable.update_action)
+
+    env =
+      env
+      |> Map.put(:invoked, action)
+      |> Map.put(:setting, action && Map.get(view.actions, action))
+      |> Map.put(:shown_fields, [])
+
+    text =
+      case {then, bar.confirm} do
+        {%{}, %{then_saved_message: message}} when is_binary(message) -> message
+        _save -> bar.saved_message
+      end
+
+    contexts =
+      (Enum.map(saves, & &1.detail.context) ++ List.wrap(then && then.context.name))
+      |> Enum.uniq()
+
+    record_ids =
+      Map.new(saves, &{&1.detail.context, &1.record_id})
+      |> then_record_id(then)
+
+    with {:ok, messages} <- success(env, text),
+         {:ok, details} <- saved_details(view, contexts, record_ids, env) do
+      {:ok,
+       [
+         update_data_model(view, "/ui/edits", %{}),
+         update_data_model(view, "/ui/edit_errors", %{})
+       ] ++ details ++ messages}
+    end
+  end
+
+  defp then_record_id(ids, nil), do: ids
+  defp then_record_id(ids, then), do: Map.put_new(ids, then.context.name, then.record_id)
+
+  defp saved_details(view, contexts, record_ids, %{ash_opts: ash_opts} = env) do
+    Enum.reduce_while(contexts, {:ok, []}, fn context, {:ok, acc} ->
+      details =
+        view |> ResolvedView.detail_sources() |> Enum.filter(&(&1.context == context))
+
+      record_id = Map.fetch!(record_ids, context)
+
+      selected =
+        Map.update(env.selected, context, %{value: record_id}, &Map.put(&1, :value, record_id))
+
+      case context_detail_value(view, context, details, selected, ash_opts) do
         {:ok, value} ->
           {:cont, {:ok, acc ++ [update_data_model(view, "/detail/#{context}", value)]}}
 

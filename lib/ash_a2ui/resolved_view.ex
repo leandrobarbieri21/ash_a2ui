@@ -65,7 +65,10 @@ defmodule AshA2ui.ResolvedView do
   """
 
   alias Ash.Resource.Info, as: ResourceInfo
+  alias AshA2ui.L10n
   alias AshA2ui.Label
+
+  import AshA2ui.Gettext, only: [msg: 1]
 
   # One key per resolved aspect of the surface; the struct is the frozen
   # interface every track codes against.
@@ -102,6 +105,7 @@ defmodule AshA2ui.ResolvedView do
     diagrams: [],
     page_header: nil,
     section_nav: nil,
+    save_bar: nil,
     document_panes: [],
     l10n: nil
   ]
@@ -229,15 +233,25 @@ defmodule AshA2ui.ResolvedView do
   renders, the effective field list, and the `Ash.Query.load/2` statement its
   record fetch needs (source paths + calculations/aggregates, computed
   against the **context's** resource). The record map is written to
-  `/detail/<context>`.
+  `/detail/<context>`. An editable card (catalog 3.11) also carries
+  `editable`: its fields, each with the attribute its input edits (`edits`),
+  the update action a save runs and the per-record gate (`visible`).
   """
   @type detail :: %{
-          name: atom,
-          component: AshA2ui.Component.t(),
-          context: atom,
-          fields: [atom],
-          loads: list,
-          detail_path: String.t()
+          required(:name) => atom,
+          required(:component) => AshA2ui.Component.t(),
+          required(:context) => atom,
+          required(:fields) => [atom],
+          required(:loads) => list,
+          required(:detail_path) => String.t(),
+          optional(:editable) =>
+            %{
+              fields: [atom],
+              edits: %{atom => atom},
+              update_action: atom | nil,
+              visible: atom | nil
+            }
+            | nil
         }
 
   @typedoc """
@@ -311,6 +325,7 @@ defmodule AshA2ui.ResolvedView do
           diagrams: [AshA2ui.Diagram.t()],
           page_header: AshA2ui.PageHeader.t() | nil,
           section_nav: AshA2ui.SectionNav.t() | nil,
+          save_bar: AshA2ui.SaveBar.t() | nil,
           document_panes: [AshA2ui.DocumentPane.t()],
           l10n: AshA2ui.L10n.t()
         }
@@ -419,13 +434,15 @@ defmodule AshA2ui.ResolvedView do
       details: resolve_details(components, contexts, fields),
       notes:
         resolve_notes(components, contexts, fields) ++
-          resolve_page_reads(page_header, components, contexts, fields),
+          resolve_page_reads(page_header, components, contexts, fields) ++
+          resolve_save_bar_reads(AshA2ui.Info.save_bar(resource_or_ui_module), contexts, fields),
       reports: resolve_reports(resource, components),
       prompts: resolve_prompts(resource, actions, declared, prompt_selects, l10n),
       prompt_selects: prompt_selects,
       diagrams: AshA2ui.Info.diagrams(resource_or_ui_module),
       page_header: page_header,
       section_nav: resolve_section_nav(resource_or_ui_module, l10n),
+      save_bar: resolve_save_bar(resource_or_ui_module, l10n),
       document_panes: AshA2ui.DocumentPane.panes(resource_or_ui_module),
       l10n: l10n
     }
@@ -658,6 +675,36 @@ defmodule AshA2ui.ResolvedView do
 
     Map.merge(header, AshA2ui.ReviewSummary.data(view, context, record, opts))
   end
+
+  @doc """
+  The editing data a `:detail` record carries for the editable cards of
+  `details` (admin catalog 3.11): `_editable_<card>`, whether the record
+  offers editing on that card (its `editable` `visible`), and for each
+  editable field `_edit_<field>`, the value of the attribute its input
+  edits, JSON-safe. Shared by the initial render and the context refreshes.
+  """
+  @spec detail_edit_data(t(), [detail], struct()) :: %{String.t() => term}
+  def detail_edit_data(%__MODULE__{}, details, record) do
+    for %{editable: %{} = editable, name: name} <- details, reduce: %{} do
+      data ->
+        values =
+          for {field, attr} <- editable.edits,
+              into: %{},
+              do: {"_edit_#{field}", json_safe(Map.get(record, attr))}
+
+        data
+        |> Map.merge(values)
+        |> Map.put("_editable_#{name}", editable_offered?(editable, record))
+    end
+  end
+
+  @doc """
+  Whether a detail card's resolved `editable` is offered on `record`: always
+  without a `visible`, else only when that field of the record is `true`.
+  """
+  @spec editable_offered?(map, struct()) :: boolean
+  def editable_offered?(%{visible: nil}, _record), do: true
+  def editable_offered?(%{visible: visible}, record), do: Map.get(record, visible) == true
 
   @doc """
   Whether a field's `field_action` is offered on `record`: always without a
@@ -1160,16 +1207,45 @@ defmodule AshA2ui.ResolvedView do
           )
 
       detail_fields = component.fields || []
+      editable = resolve_detail_editable(context.resource, component.editable, fields)
 
       %{
         name: AshA2ui.Component.key(component),
         component: component,
         context: context.name,
         fields: detail_fields,
-        loads: field_loads(context.resource, detail_fields, fields),
-        detail_path: "/detail/#{context.name}"
+        loads:
+          Enum.uniq(
+            field_loads(context.resource, detail_fields, fields) ++
+              editable_loads(context.resource, editable)
+          ),
+        detail_path: "/detail/#{context.name}",
+        editable: editable
       }
     end)
+  end
+
+  # A detail card's editing (catalog 3.11): the fields a person edits, each
+  # with the attribute its input edits (`edit`, else the field), the update
+  # action a save runs and the per-record gate.
+  defp resolve_detail_editable(_resource, nil, _fields), do: nil
+
+  defp resolve_detail_editable(resource, editable, fields) do
+    %{
+      fields: editable.fields,
+      edits: Map.new(editable.fields, &{&1, (fields[&1] && fields[&1].edit) || &1}),
+      update_action: editable.update_action || primary_action_name(resource, :update),
+      visible: editable.visible
+    }
+  end
+
+  # The gate is loaded with the record it gates.
+  defp editable_loads(_resource, nil), do: []
+
+  defp editable_loads(resource, editable) do
+    if editable.visible && calculation_or_aggregate?(resource, editable.visible),
+      do: [editable.visible],
+      else: []
   end
 
   # A section or footer note reads with its context's record, like a
@@ -1197,6 +1273,34 @@ defmodule AshA2ui.ResolvedView do
   # The page header's fields, an alert's fields and a lead card's `visible`
   # field are read with their context's record like a note: loaded and
   # written to /detail/<context>, never drawn as a card's rows.
+  # Catalog 3.11: a save bar's confirm reads whether its then_action is
+  # offered with the bar's record, as a page header reads its fields.
+  defp resolve_save_bar_reads(
+         %AshA2ui.SaveBar{context: context, confirm: %{then_visible: visible}},
+         contexts,
+         fields
+       )
+       when not is_nil(visible) do
+    case Enum.find(contexts, &(&1.name == context)) do
+      nil ->
+        []
+
+      %{resource: resource} ->
+        [
+          %{
+            name: :save_bar,
+            component: nil,
+            context: context,
+            fields: [visible],
+            loads: field_loads(resource, [visible], fields),
+            detail_path: "/detail/#{context}"
+          }
+        ]
+    end
+  end
+
+  defp resolve_save_bar_reads(_bar, _contexts, _fields), do: []
+
   defp resolve_page_reads(page_header, components, contexts, fields) do
     by_name = Map.new(contexts, &{&1.name, &1})
 
@@ -1276,6 +1380,52 @@ defmodule AshA2ui.ResolvedView do
       _none -> Label.resolve(l10n, nil, run || name)
     end
   end
+
+  # Catalog 3.11: the save bar, its words translated.
+  defp resolve_save_bar(resource_or_ui_module, l10n) do
+    case AshA2ui.Info.save_bar(resource_or_ui_module) do
+      nil ->
+        nil
+
+      bar ->
+        %{
+          bar
+          | message: translate(l10n, bar.message),
+            message_waiting: translate(l10n, bar.message_waiting),
+            status: counted(l10n, bar.status),
+            status_one: counted(l10n, bar.status_one),
+            save_label:
+              translate(l10n, bar.save_label) || AshA2ui.Experience.save_changes_label(l10n),
+            discard_label:
+              translate(l10n, bar.discard_label) || L10n.t(l10n, msg("Discard changes")),
+            saved_message:
+              translate(l10n, bar.saved_message) || L10n.t(l10n, msg("Changes saved.")),
+            confirm: resolve_confirm(bar.confirm, l10n)
+        }
+    end
+  end
+
+  defp resolve_confirm(nil, _l10n), do: nil
+
+  defp resolve_confirm(confirm, l10n) do
+    %{
+      confirm
+      | title: counted(l10n, confirm.title),
+        title_one: counted(l10n, confirm.title_one),
+        message: counted(l10n, confirm.message),
+        message_one: counted(l10n, confirm.message_one),
+        cancel_label: translate(l10n, confirm.cancel_label) || L10n.t(l10n, msg("Cancel")),
+        save_label: translate(l10n, confirm.save_label) || L10n.t(l10n, msg("Save")),
+        then_label: translate(l10n, confirm.then_label),
+        then_saved_message: translate(l10n, confirm.then_saved_message)
+    }
+  end
+
+  defp translate(_l10n, nil), do: nil
+  defp translate(l10n, text), do: Label.translate(l10n, text)
+
+  defp counted(_l10n, nil), do: nil
+  defp counted(l10n, text), do: L10n.counted(l10n, text)
 
   defp resolve_section_nav(resource_or_ui_module, l10n) do
     case AshA2ui.Info.section_nav(resource_or_ui_module) do

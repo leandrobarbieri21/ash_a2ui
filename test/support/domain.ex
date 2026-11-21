@@ -40,6 +40,7 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.HubLine
     resource AshA2ui.Test.HubRole
     resource AshA2ui.Test.Finding
+    resource AshA2ui.Test.Statement
     resource AshA2ui.Test.Dossier
     resource AshA2ui.Test.DossierLine
     resource AshA2ui.Test.DossierNote

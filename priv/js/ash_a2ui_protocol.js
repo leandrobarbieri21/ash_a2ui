@@ -384,6 +384,57 @@ function overlay(value, kept) {
 }
 
 /**
+ * Admin catalog 3.11: where a surface holds a person's unsaved changes to its
+ * editable cards (`{<card>: {recordId, values: {<field>: value}}}`), until a
+ * save bar saves or discards them.
+ */
+export const EDITS_PATH = "/ui/edits";
+
+/**
+ * Rewrites the writes in `messages` that would replace a surface's unsaved
+ * changes so they keep them: a write of the whole data model (`/`), of
+ * `/ui`, or a surface created again over one the processor holds. Only the
+ * server's own write of `/ui/edits` (a save, which clears them) replaces
+ * them. `editsOf(surfaceId)` returns the surface's current changes, or
+ * null/undefined/{} when it has none. Returns a new array; the messages
+ * themselves are not modified.
+ */
+export function keepUnsavedEdits(messages, editsOf) {
+  const kept = new Map();
+  const editsFor = (surfaceId) => {
+    if (!kept.has(surfaceId)) {
+      const edits = editsOf(surfaceId);
+      kept.set(surfaceId, edits && typeof edits === "object" && Object.keys(edits).length > 0 ? edits : null);
+    }
+    return kept.get(surfaceId);
+  };
+  const withEdits = (model, edits) => {
+    const base = model && typeof model === "object" ? model : {};
+    const ui = base.ui && typeof base.ui === "object" ? base.ui : {};
+    return {...base, ui: {...ui, edits}};
+  };
+
+  return messages.map((message) => {
+    const update = message && message.updateDataModel;
+    if (update && (update.path === "/" || update.path === "" || update.path === undefined)) {
+      const edits = editsFor(update.surfaceId);
+      return edits ? {...message, updateDataModel: {...update, value: withEdits(update.value, edits)}} : message;
+    }
+    if (update && update.path === "/ui") {
+      const edits = editsFor(update.surfaceId);
+      const ui = update.value && typeof update.value === "object" ? update.value : {};
+      return edits ? {...message, updateDataModel: {...update, value: {...ui, edits}}} : message;
+    }
+    const create = message && message.createSurface;
+    if (create && create.dataModel) {
+      const edits = editsFor(create.surfaceId);
+      return edits ? {...message, createSurface: {...create, dataModel: withEdits(create.dataModel, edits)}} : message;
+    }
+    return message;
+  });
+}
+
+/**
  * Rewrites the pre-fill writes in `messages` so they keep what the person
  * typed. `prompts` lists the open prompts awaiting their pre-fill, each
  * `{surfaceId, action, values, selects}`: `values` maps each edited field
