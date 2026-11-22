@@ -10,6 +10,23 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: seams for browser tests and static pages
+
+All additive.
+
+- The hook container carries `data-a2ui-pending="true"` while an `ashAction`
+  call is unanswered (cleared on success, error and timeout).
+- The admin grid's cells carry `data-a2ui-column="<field>"`, and
+  `AshA2ui.Manifest` declares the attribute (`attributes.column`) and gives
+  each list table a `row_frame` naming the element that frames a row and
+  whether only the visible one counts.
+- `AshA2ui.LiveRenderer` takes a page with no Spark `:ui`: with a
+  `:surface_fn`, `:ui` may be omitted or any value that is not a Spark
+  module.
+- A message the browser cannot apply shows a `role="alert"` element with
+  `data-a2ui-error` in the hook container instead of leaving a blank
+  surface.
+
 ### Added: find a record by a business reference
 
 `AshA2ui.Shell.Search.find(term, entries, read_opts)` looks a typed term up

@@ -85,6 +85,46 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    describe "a page with no Spark ui module" do
+      test "mounts and pushes its surface without a :ui", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/static")
+
+        assert_push_event(view, "a2ui:messages", %{messages: messages}, 1_000)
+        Enum.each(messages, &SchemaHelper.assert_valid_agent_message/1)
+        assert_receive {:surface_fn, nil, _opts}
+
+        assert :sys.get_state(view.pid).socket.assigns.ash_a2ui_ui == nil
+      end
+
+      test "a :ui that is not a Spark module is passed through untouched", %{conn: conn} do
+        {:ok, view, _html} = live(conn, "/live-renderer/static-string")
+
+        assert_push_event(view, "a2ui:messages", %{messages: [_ | _]}, 1_000)
+        assert_receive {:surface_fn, "guide", _opts}
+
+        # A browser-side error (a message it could not apply) is only logged.
+        log =
+          capture_log(fn ->
+            render_hook(view, "a2ui:message", %{
+              "version" => "1.0",
+              "error" => %{
+                "code" => "VALIDATION_FAILED",
+                "surfaceId" => "guide",
+                "path" => "/version",
+                "message" => "version: expected \"1.0\""
+              }
+            })
+          end)
+
+        assert log =~ "VALIDATION_FAILED"
+        assert Process.alive?(view.pid)
+      end
+
+      test "without :ui or :surface_fn the renderer refuses to build" do
+        assert_raise KeyError, fn -> AshA2ui.LiveRenderer.build_config(actor_fn: & &1) end
+      end
+    end
+
     describe "localization options" do
       test "locale_fn and the translator reach the build and every action", %{conn: conn} do
         {:ok, view, _html} = live(conn, "/live-renderer/localized")

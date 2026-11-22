@@ -3006,8 +3006,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             ${columns.map((column, columnIndex) => {
               const cell = this.renderCell(row, column);
               return columnIndex === 0
-                ? html`<th scope="row" class=${alignClass(column)}>${cell}</th>`
-                : html`<td class=${alignClass(column)}>${cell}</td>`;
+                ? html`<th scope="row" class=${alignClass(column)} data-a2ui-column=${column.path || nothing}>${cell}</th>`
+                : html`<td class=${alignClass(column)} data-a2ui-column=${column.path || nothing}>${cell}</td>`;
             })}
             ${this.inlinePrimary()
               ? html`<td class="cell-primary">${this.renderPrimaryAction(row, index)}</td>`
@@ -3042,7 +3042,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 (column) => html`
                   <div class="card-field">
                     <dt>${str(column.label)}</dt>
-                    <dd>${this.renderCell(row, column)}</dd>
+                    <dd data-a2ui-column=${column.path || nothing}>${this.renderCell(row, column)}</dd>
                   </div>
                 `,
               )}

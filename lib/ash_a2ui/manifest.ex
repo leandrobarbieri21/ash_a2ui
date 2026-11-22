@@ -39,7 +39,7 @@ defmodule AshA2ui.Manifest do
         tables: [table],
         row_actions: [row_action],
         attributes: %{row_id: "data-a2ui-row-id", action: "data-a2ui-action",
-                      component: "data-a2ui-id"}
+                      component: "data-a2ui-id", column: "data-a2ui-column"}
       }
 
   A **table** (one per `:table` component, in declaration order):
@@ -52,6 +52,7 @@ defmodule AshA2ui.Manifest do
         display: :list,                   # :list | :rows | :cards | :board | :calendar | :timeline | :matrix
         sectioned: false,                 # true: one rendered table per section record
         component_id: "data_grid",        # the element carrying the rows (see Selectors)
+        row_frame: %{selector: "[data-a2ui-row-id]", visible_only: true} | nil,
         records_path: "/records",
         columns: [%{name: :code, label: "Code"}],
         query: %{name: :default, default_preset: :active, preset_picker_label: "View",
@@ -122,10 +123,19 @@ defmodule AshA2ui.Manifest do
     * `data-a2ui-row-id="<record id>"` on each rendered row: the admin
       grid's `<tr>` and its narrow-layout card `<li>`, or the basic record
       row content element (which carries `data-a2ui-id` too).
+    * `data-a2ui-column="<field>"` on each cell of the admin grid's table
+      rows and card fields: the field of the table's `columns` the cell
+      shows, so a cell is found by what it shows and not by its position.
     * `data-a2ui-action="<action>"` on each row action control: a wrapper
       around the admin grid's button (so a host-drawn button is covered),
       or the basic catalog's button element. A row action's `selector`
       matches it.
+
+  A table's `row_frame` says which element frames one of its rows:
+  `selector` matches it (with `data-a2ui-row-id` set to the record id), and
+  `visible_only: true` says the grid draws each row twice, a `<tr>` and a
+  narrow-layout card, of which only the visible one is the frame (Playwright:
+  `selector >> visible=true`). It is `nil` where `component_id` is.
 
   The admin grid draws its rows in its own shadow root, inside a
   `<table>` named by the table's `label`: `tr` and `[role=row]` find them
@@ -148,7 +158,8 @@ defmodule AshA2ui.Manifest do
   @attributes %{
     row_id: "data-a2ui-row-id",
     action: "data-a2ui-action",
-    component: "data-a2ui-id"
+    component: "data-a2ui-id",
+    column: "data-a2ui-column"
   }
 
   @resolve_opts [
@@ -202,6 +213,7 @@ defmodule AshA2ui.Manifest do
           display: atom,
           sectioned: boolean,
           component_id: String.t() | nil,
+          row_frame: %{selector: String.t(), visible_only: boolean} | nil,
           records_path: String.t(),
           columns: [%{name: atom, label: String.t()}],
           query: map | nil,
@@ -220,7 +232,12 @@ defmodule AshA2ui.Manifest do
           catalog: :basic | :admin_v1,
           tables: [table],
           row_actions: [row_action],
-          attributes: %{row_id: String.t(), action: String.t(), component: String.t()}
+          attributes: %{
+            row_id: String.t(),
+            action: String.t(),
+            component: String.t(),
+            column: String.t()
+          }
         }
 
   @doc "The manifest format version, bumped on any incompatible change."
@@ -341,6 +358,7 @@ defmodule AshA2ui.Manifest do
       display: table.component.display,
       sectioned: not is_nil(table.sections),
       component_id: component_id(view, table),
+      row_frame: row_frame(view, table),
       records_path: table.records_path,
       columns: columns(view, table),
       query: query_controls(view, table.query),
@@ -364,6 +382,12 @@ defmodule AshA2ui.Manifest do
       table.component.row_layout -> "record_row#{table_suffix(view, table)}_body"
       true -> "record_row#{table_suffix(view, table)}_content"
     end
+  end
+
+  # Only the admin grid draws each row twice (table row and narrow card).
+  defp row_frame(view, table) do
+    if component_id(view, table),
+      do: %{selector: "[data-a2ui-row-id]", visible_only: Experience.admin?(view)}
   end
 
   defp table_suffix(view, table) do

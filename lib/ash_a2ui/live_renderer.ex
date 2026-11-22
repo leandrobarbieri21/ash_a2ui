@@ -52,8 +52,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Options
 
-      * `:ui` (required) — the resource or standalone UI module whose `a2ui`
-        section defines the surface.
+      * `:ui` (required unless `:surface_fn` is given) — the resource or
+        standalone UI module whose `a2ui` section defines the surface. With a
+        `:surface_fn` it may be omitted, or be any value that is not a Spark
+        module, for a static page (see the usage rules, "A page with no
+        DSL"): it has no document panes and answers no actions.
       * `:actor_fn` (optional) — a 1-arity function `socket -> actor` used to
         derive the actor on mount; the actor is passed to every surface,
         data-model and action call. Defaults to `nil` (no actor).
@@ -284,7 +287,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     them in applications:
 
       * `:surface_fn` — `(ui, opts -> [message])`, defaults to
-        `AshA2ui.Info.build_surface/2`.
+        `AshA2ui.Info.build_surface/2`. Public for a static page, which has
+        no `:ui` (see `:ui`).
       * `:data_model_fn` — `(ui, opts -> message)`, defaults to
         `AshA2ui.Info.build_data_model/2`.
       * `:action_fn` — `(ui, message, opts -> {:ok, [message]} |
@@ -376,10 +380,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # `:ui` is a resource or UI module of the AshA2ui DSL, or, with a
+    # `:surface_fn`, anything the host's callbacks understand (a static page
+    # has no DSL).
+    defp fetch_ui!(opts) do
+      case {Keyword.fetch(opts, :ui), Keyword.get(opts, :surface_fn)} do
+        {{:ok, ui}, _surface_fn} -> ui
+        {:error, surface_fn} when is_function(surface_fn) -> nil
+        {:error, _none} -> raise KeyError, key: :ui, term: opts
+      end
+    end
+
     @doc false
     def build_config(opts) do
       %{
-        ui: Keyword.fetch!(opts, :ui),
+        ui: fetch_ui!(opts),
         actor_fn: Keyword.get(opts, :actor_fn) || fn _socket -> nil end,
         tenant_fn: Keyword.get(opts, :tenant_fn) || fn _socket -> nil end,
         pubsub: normalize_pubsub(Keyword.get(opts, :pubsub)),

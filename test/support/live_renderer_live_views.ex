@@ -271,6 +271,24 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       action_fn: &Stubs.action/3
   end
 
+  defmodule AshA2ui.Test.StaticPageLive do
+    @moduledoc false
+
+    # A page with no AshA2ui DSL: no `:ui` at all.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer, surface_fn: &Stubs.surface/2
+  end
+
+  defmodule AshA2ui.Test.StaticStringPageLive do
+    @moduledoc false
+
+    # A `:ui` that is not a Spark module is just the token the callbacks get.
+    alias AshA2ui.Test.LiveRendererStubs, as: Stubs
+
+    use AshA2ui.LiveRenderer, ui: "guide", surface_fn: &Stubs.surface/2
+  end
+
   defmodule AshA2ui.Test.FunctionCallLive do
     @moduledoc false
 

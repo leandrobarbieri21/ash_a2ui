@@ -106,7 +106,7 @@ msgstr ""
 msgid "%{name} is viewing this surface"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:193
+#: lib/ash_a2ui/document_pane.ex:206
 msgid "%{page} of %{count}"
 msgstr ""
 
@@ -174,7 +174,7 @@ msgstr ""
 
 #: lib/ash_a2ui/encoder.ex:1987
 #: lib/ash_a2ui/encoder.ex:4444
-#: lib/ash_a2ui/manifest.ex:449
+#: lib/ash_a2ui/manifest.ex:473
 msgid "Confirm"
 msgstr ""
 
@@ -267,7 +267,7 @@ msgstr ""
 msgid "Next"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:196
+#: lib/ash_a2ui/document_pane.ex:209
 msgid "Next page"
 msgstr ""
 
@@ -275,7 +275,7 @@ msgstr ""
 msgid "No %{resource} records yet."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:201
+#: lib/ash_a2ui/document_pane.ex:214
 #: lib/ash_a2ui/review.ex:155
 msgid "Not found in the document"
 msgstr ""
@@ -284,7 +284,7 @@ msgstr ""
 msgid "Not recorded"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:199
+#: lib/ash_a2ui/document_pane.ex:212
 #: lib/ash_a2ui/review.ex:153
 msgid "Not reviewed"
 msgstr ""
@@ -297,7 +297,7 @@ msgstr ""
 msgid "Now"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:191
+#: lib/ash_a2ui/document_pane.ex:204
 msgid "Opening the document"
 msgstr ""
 
@@ -305,7 +305,7 @@ msgstr ""
 msgid "Overdue"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:194
+#: lib/ash_a2ui/document_pane.ex:207
 msgid "Page %{page} of %{count}"
 msgstr ""
 
@@ -318,7 +318,7 @@ msgstr ""
 msgid "Previous"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:195
+#: lib/ash_a2ui/document_pane.ex:208
 msgid "Previous page"
 msgstr ""
 
@@ -336,7 +336,7 @@ msgstr[1] ""
 msgid "Return to now"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:200
+#: lib/ash_a2ui/document_pane.ex:213
 #: lib/ash_a2ui/review.ex:154
 msgid "Reviewed"
 msgstr ""
@@ -384,7 +384,7 @@ msgid_plural "Selected the first %{cap} of %{count} records: a bulk action runs 
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/document_pane.ex:173
+#: lib/ash_a2ui/document_pane.ex:186
 msgid "Show document"
 msgstr ""
 
@@ -413,7 +413,7 @@ msgstr ""
 msgid "This diagram is unavailable."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:192
+#: lib/ash_a2ui/document_pane.ex:205
 msgid "This document can't be shown here."
 msgstr ""
 
@@ -463,7 +463,7 @@ msgstr ""
 #: lib/ash_a2ui/encoder.ex:1893
 #: lib/ash_a2ui/encoder.ex:3543
 #: lib/ash_a2ui/encoder.ex:3884
-#: lib/ash_a2ui/manifest.ex:390
+#: lib/ash_a2ui/manifest.ex:414
 msgid "View"
 msgstr ""
 
@@ -491,11 +491,11 @@ msgstr ""
 msgid "You do not have access to this value."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:197
+#: lib/ash_a2ui/document_pane.ex:210
 msgid "Zoom in"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:198
+#: lib/ash_a2ui/document_pane.ex:211
 msgid "Zoom out"
 msgstr ""
 

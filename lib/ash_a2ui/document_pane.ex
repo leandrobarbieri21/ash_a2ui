@@ -108,9 +108,22 @@ defmodule AshA2ui.DocumentPane do
   @doc "The `document_pane` entities of `resource_or_ui_module`, in order."
   @spec panes(module | Spark.Dsl.t()) :: [t()]
   def panes(resource_or_ui_module) do
-    resource_or_ui_module
-    |> Extension.get_entities([:a2ui])
-    |> Enum.filter(&is_struct(&1, __MODULE__))
+    if spark_module?(resource_or_ui_module) do
+      resource_or_ui_module
+      |> Extension.get_entities([:a2ui])
+      |> Enum.filter(&is_struct(&1, __MODULE__))
+    else
+      []
+    end
+  end
+
+  # A `LiveRenderer` whose `:ui` is no Spark module (a static page) has no
+  # panes.
+  defp spark_module?(dsl) when is_map(dsl), do: true
+
+  defp spark_module?(module) do
+    is_atom(module) and not is_nil(module) and Code.ensure_loaded?(module) and
+      function_exported?(module, :spark_dsl_config, 0)
   end
 
   @doc "The key of the pane's document in its context's record: `_document_<name>`."

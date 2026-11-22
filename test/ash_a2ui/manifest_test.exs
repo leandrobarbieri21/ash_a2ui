@@ -116,6 +116,25 @@ defmodule AshA2ui.ManifestTest do
              ]
     end
 
+    test "a table says which element frames a row, and the column attribute is declared" do
+      assert [%{row_frame: %{selector: "[data-a2ui-row-id]", visible_only: true}}] =
+               Manifest.for_surface(Referral, catalog: :admin_v1).tables
+
+      assert [%{row_frame: %{selector: "[data-a2ui-row-id]", visible_only: false}}, _done] =
+               Manifest.for_surface(ManifestTask, catalog: :basic).tables
+
+      assert %{attributes: %{column: "data-a2ui-column"}} =
+               Manifest.for_surface(Referral, catalog: :admin_v1)
+    end
+
+    test "a table with no static row element has no row frame" do
+      for %{component_id: nil} = table <-
+            Manifest.for_surface(AshA2ui.Test.Promotion, catalog: :admin_v1).tables ++
+              Manifest.for_surface(ManifestTask, catalog: :admin_v1).tables do
+        assert table.row_frame == nil
+      end
+    end
+
     test "a row action with visible_when lists its conditions" do
       %{row_actions: actions} = Manifest.for_surface(ManifestTask, catalog: :basic)
       by_id = Map.new(actions, &{&1.id, &1})
