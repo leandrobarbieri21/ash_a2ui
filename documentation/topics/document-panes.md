@@ -94,7 +94,10 @@ states.
   stacks under them.
 - Each page with its text layer, so a screen reader reads the document and
   a person can select its words; zoom (50% to 300% of the width that fits)
-  and page navigation.
+  and page navigation. The pages open fitted to the scroll area's usable
+  width (inside its padding and any scrollbar it shows), and the fit
+  follows that width: a resize, or a scrollbar appearing or going away.
+  A zoom the person chose keeps its scale until they zoom again.
 - Each region over its box: a button named by its label and state. Choosing
   it selects it and sends the `document_region` action with its id.
 - A value and its region, linked both ways (admin catalog 3.8). While the

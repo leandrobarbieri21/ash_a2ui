@@ -10,6 +10,18 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Fixed: a document viewer's fit follows its scroll area
+
+- `documentViewer` fits the widest page to its scroll area's usable width
+  (`clientWidth` less its padding) and re-fits when that width changes. It
+  watches the scroll area, not its own box, so a vertical scrollbar
+  appearing as the pages draw (scrollbars always shown) re-fits, and the
+  pages never reach under it with a sideways scrollbar. A scrollbar the
+  wider fit would bring back keeps the narrower fit.
+- Only the fit zoom follows the width: a zoom the person chose keeps its
+  scale on a resize until they zoom again.
+- `usableWidth(area)` is exported for tests and swaps.
+
 ### Added: values recalculated from unsaved changes (admin catalog 3.15.0)
 
 Additive, under the same catalog id.
