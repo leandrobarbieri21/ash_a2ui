@@ -29,6 +29,7 @@ import {
   selectedState,
   toPdfEngine,
   usableWidth,
+  fittedWidth,
 } from "../../priv/js/ash_admin_document.js";
 
 async function settle(rounds = 8) {
@@ -585,37 +586,39 @@ test("the fit follows the scroll area: a scrollbar appearing re-fits; a zoom the
   const sheetWidth = () => viewer.renderRoot.querySelector("[data-page-sheet='1']").style.width;
   const zoom = () => viewer.renderRoot.querySelector("[data-role='zoom']").textContent.trim();
 
-  // No scrollbar yet: the pages fill the 1000px inside the padding.
+  // No scrollbar yet: the pages take the 1000px inside the padding, less 1px of slack.
   sizeArea(area, {outer: 1032});
   await resized();
-  assert.equal(sheetWidth(), "1000px");
+  assert.equal(sheetWidth(), "999px");
   assert.equal(zoom(), "163%");
+  assert.equal(area.style.overflowX, "hidden", "no sideways scrolling at the fit zoom");
 
   // The pages' height brings a 15px scrollbar: the viewer keeps its size, the fit follows.
   sizeArea(area, {outer: 1032, scrollbar: 15});
   await resized();
-  assert.equal(sheetWidth(), "985px");
+  assert.equal(sheetWidth(), "984px");
 
   // The scrollbar goes away, but the pages fitted wider would bring it back: the fit stays.
   sizeArea(area, {outer: 1032});
   await resized();
-  assert.equal(sheetWidth(), "985px");
+  assert.equal(sheetWidth(), "984px");
 
   // A box tall enough for the wider pages: the scrollbar stays away and the fit follows.
   sizeArea(area, {outer: 1032, height: 5000});
   await resized();
-  assert.equal(sheetWidth(), "1000px");
+  assert.equal(sheetWidth(), "999px");
 
   // A wider box: the fit follows it.
   sizeArea(area, {outer: 1232, scrollbar: 15});
   await resized();
-  assert.equal(sheetWidth(), "1185px");
+  assert.equal(sheetWidth(), "1184px");
 
-  // A zoom the person chose keeps its scale when the box changes...
+  // A zoom the person chose keeps its scale when the box changes, and scrolls sideways...
   viewer.zoomBy(1);
   await settle();
   const chosen = zoom();
-  assert.equal(chosen, `${Math.round((1185 / 612) * 1.25 * 100)}%`);
+  assert.equal(chosen, `${Math.round((1184 / 612) * 1.25 * 100)}%`);
+  assert.equal(area.style.overflowX, "", "a chosen zoom scrolls both ways");
   sizeArea(area, {outer: 832, scrollbar: 15});
   await resized();
   assert.equal(zoom(), chosen);
@@ -623,5 +626,50 @@ test("the fit follows the scroll area: a scrollbar appearing re-fits; a zoom the
   // ...and back at the fit zoom, the pages fit the box as it is now.
   viewer.zoomBy(-1);
   await settle();
-  assert.equal(sheetWidth(), "785px");
+  assert.equal(sheetWidth(), "784px");
+  assert.equal(area.style.overflowX, "hidden");
+});
+
+test("fitted width: whole pixels, 1px short of the usable width", () => {
+  assert.equal(fittedWidth(1052.4), 1051);
+  assert.equal(fittedWidth(1052), 1051);
+  assert.equal(fittedWidth(0.5), 0);
+});
+
+test("a fractional usable width: the fitted page never reaches past the scroll area", async (t) => {
+  const observers = [];
+  const Original = globalThis.ResizeObserver;
+  globalThis.ResizeObserver = class {
+    constructor(callback) {
+      this.callback = callback;
+      observers.push(this);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  t.after(() => (globalThis.ResizeObserver = Original));
+
+  const {pane} = await mountPane({shown: true});
+  await settle(20);
+  const viewer = pane.renderRoot.querySelector("ash-admin-document-viewer");
+  const area = viewer.scrollArea();
+  // A 2x screen lays the area out at 1084.4px; clientWidth rounds it to 1084, and the
+  // fractional padding leaves 1052.4px usable (1052.0 really, after the rounding).
+  area.style.padding = "0 15.8px";
+  area.style.overflowY = "auto";
+  sizeArea(area, {outer: 1099, scrollbar: 15});
+  const real = 1084.4 - 2 * 15.8 - 0.4;
+  assert.ok(Math.abs(usableWidth(area) - 1052.4) < 1e-9);
+  observers.forEach((o) => o.callback([]));
+  await refit();
+  await settle();
+
+  const sheet = viewer.renderRoot.querySelector("[data-page-sheet='1']");
+  const drawn = parseFloat(sheet.style.width);
+  assert.equal(drawn, Math.floor(drawn), "whole CSS pixels");
+  // scrollWidth <= clientWidth: the page and its padding fit the area as really laid out.
+  assert.ok(drawn <= real, `${drawn}px fits in ${real}px`);
+  assert.ok(drawn + 2 * 15.8 <= area.clientWidth);
+  assert.equal(area.style.overflowX, "hidden");
 });

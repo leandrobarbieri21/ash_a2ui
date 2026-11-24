@@ -99,6 +99,16 @@ export function usableWidth(area) {
   return area.clientWidth - padding;
 }
 
+/**
+ * The width a fitted page is drawn at in a usable width: whole CSS pixels,
+ * 1px short of it. `clientWidth` is rounded, and the area's real width (on
+ * a 2x screen, half pixels) can be a fraction below it, so a page as wide
+ * as the rounded width can still reach past the edge.
+ */
+export function fittedWidth(usable) {
+  return Math.max(0, Math.floor(usable) - 1);
+}
+
 const fraction = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
 
 /**
@@ -671,11 +681,12 @@ export function defineDocumentElements({
         const area = this.scrollArea();
         if (!area || this._pages.length === 0) return;
         const width = usableWidth(area);
-        if (width <= 0) return;
+        const fitted = fittedWidth(width);
+        if (fitted <= 0) return;
         const widest = Math.max(...this._pages.map((page) => page.width));
         this._fitWidth = width;
         this._fitOuter = area.offsetWidth;
-        this._fit = width / widest;
+        this._fit = fitted / widest;
         if (this._zoom === 1 || !this._scaled) this.applyScale();
       }
 
@@ -684,6 +695,11 @@ export function defineDocumentElements({
         if (!scale) return;
         this._scale = scale;
         this._scaled = true;
+        // At the fit zoom the pages fit by construction: no sideways
+        // scrolling, so a rounding difference never draws a scrollbar. A zoom
+        // the person chose scrolls both ways.
+        const area = this.scrollArea();
+        if (area) area.style.overflowX = this._zoom === 1 ? "hidden" : "";
         await this.updateComplete;
         this.paint();
       }
@@ -933,8 +949,10 @@ export function defineDocumentElements({
       renderPage(meta, regions, strings) {
         const count = this._pages.length;
         const scale = this._scale || 0;
-        const width = Math.floor(meta.width * scale);
-        const height = Math.floor(meta.height * scale);
+        // Whole CSS pixels, never wider than the scale gives (the epsilon keeps
+        // 783.99999 from a fit of 784px at 784).
+        const width = Math.floor(meta.width * scale + 1e-6);
+        const height = Math.floor(meta.height * scale + 1e-6);
         const selected = this._selected;
         const linked = {linked: this._linked, linkedState: (region) => this.linkedState(region)};
         return html`<div

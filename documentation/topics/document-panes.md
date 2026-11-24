@@ -97,6 +97,8 @@ states.
   and page navigation. The pages open fitted to the scroll area's usable
   width (inside its padding and any scrollbar it shows), and the fit
   follows that width: a resize, or a scrollbar appearing or going away.
+  At the fit zoom the pages are drawn in whole pixels, 1px short of that
+  width, and the area never scrolls sideways.
   A zoom the person chose keeps its scale until they zoom again.
 - Each region over its box: a button named by its label and state. Choosing
   it selects it and sends the `document_region` action with its id.

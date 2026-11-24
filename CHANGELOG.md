@@ -18,9 +18,15 @@ Requires Elixir 1.20 or later.
   appearing as the pages draw (scrollbars always shown) re-fits, and the
   pages never reach under it with a sideways scrollbar. A scrollbar the
   wider fit would bring back keeps the narrower fit.
+- A fitted page is drawn in whole CSS pixels, 1px short of the usable
+  width (`fittedWidth(usable)`), because `clientWidth` is rounded and the
+  area's real width on a 2x screen can be a fraction below it. At the fit
+  zoom the scroll area takes `overflow-x: hidden`, so a rounding difference
+  never draws a sideways scrollbar; a zoom the person chose scrolls both
+  ways.
 - Only the fit zoom follows the width: a zoom the person chose keeps its
   scale on a resize until they zoom again.
-- `usableWidth(area)` is exported for tests and swaps.
+- `usableWidth(area)` and `fittedWidth(usable)` are exported for tests and swaps.
 
 ### Added: values recalculated from unsaved changes (admin catalog 3.15.0)
 
