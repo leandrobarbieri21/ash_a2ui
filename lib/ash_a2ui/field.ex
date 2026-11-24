@@ -63,7 +63,7 @@ defmodule AshA2ui.Field do
           review: atom | nil,
           field_action: atom | nil,
           field_action_visible: atom | nil,
-          edit: atom | nil,
+          edit: atom | [atom] | nil,
           badge_text: keyword(String.t()),
           badge_tones: keyword(atom),
           badge_help: keyword(String.t()),

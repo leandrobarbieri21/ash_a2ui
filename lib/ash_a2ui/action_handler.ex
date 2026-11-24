@@ -2256,15 +2256,17 @@ defmodule AshA2ui.ActionHandler do
     do: {:error, [status(view, "Malformed save_changes: #{inspect(card)} is not a map.")]}
 
   # Each changed field's value under the attribute its input edits, cast
-  # against the card's update action. A cleared input is no value.
+  # against the card's update action. A cleared input is no value. A field
+  # edited through a relationship goes in the relationship's map, the input
+  # `manage_relationship` takes (the related record's key joins it once the
+  # record is read, `put_related_keys/3`).
   defp edited_params(view, %{editable: editable} = detail, values) do
     by_name = Map.new(editable.fields, &{to_string(&1), &1})
 
     Enum.reduce_while(values, {:ok, %{}}, fn {field, value}, {:ok, acc} ->
       case Map.fetch(by_name, field) do
         {:ok, name} ->
-          attr = Map.fetch!(editable.edits, name)
-          {:cont, {:ok, Map.put(acc, to_string(attr), blank_to_nil(value))}}
+          {:cont, {:ok, put_edited(acc, Map.fetch!(editable.edits, name), blank_to_nil(value))}}
 
         :error ->
           {:halt,
@@ -2288,8 +2290,49 @@ defmodule AshA2ui.ActionHandler do
     end
   end
 
+  defp put_edited(params, [relationship, attribute], value) do
+    Map.update(
+      params,
+      to_string(relationship),
+      %{to_string(attribute) => value},
+      &Map.put(&1, to_string(attribute), value)
+    )
+  end
+
+  defp put_edited(params, attribute, value), do: Map.put(params, to_string(attribute), value)
+
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
+
+  # The primary key of each related record a field is edited through, in its
+  # relationship's map, so the update action matches the record it updates.
+  # Nothing is added while there is no related record.
+  defp put_related_keys(params, %{editable: editable}, record) do
+    editable.edits
+    |> Enum.flat_map(fn
+      {_field, [relationship, _attribute]} -> [relationship]
+      _own -> []
+    end)
+    |> Enum.uniq()
+    |> Enum.reduce(params, &put_related_key(&2, &1, Map.get(record, &1)))
+  end
+
+  defp put_related_key(params, relationship, %{__struct__: resource} = related) do
+    with %{} = values <- Map.get(params, relationship),
+         true <- Ash.Resource.Info.resource?(resource) do
+      Map.put(params, relationship, Map.merge(values, primary_key(resource, related)))
+    else
+      _not_edited -> params
+    end
+  end
+
+  defp put_related_key(params, _relationship, _no_related), do: params
+
+  defp primary_key(resource, record) do
+    for key <- Ash.Resource.Info.primary_key(resource),
+        into: %{},
+        do: {to_string(key), Map.get(record, key)}
+  end
 
   # Each card's record, re-read through its context as the actor, refused
   # unless it offers editing.
@@ -2321,7 +2364,11 @@ defmodule AshA2ui.ActionHandler do
          ) do
       {:ok, record} ->
         if ResolvedView.editable_offered?(detail.editable, record),
-          do: {:ok, Map.put(target, :record, record)},
+          do:
+            {:ok,
+             target
+             |> Map.put(:record, record)
+             |> Map.put(:params, put_related_keys(target.params, detail, record))},
           else: unavailable
 
       :not_found ->
@@ -2400,7 +2447,10 @@ defmodule AshA2ui.ActionHandler do
       {:ok, :ok} -> saved(view, bar, saves, then, env)
       {:ok, {:error, failure}} -> {:error, save_failure(view, failure)}
       {:error, {:error, failure}} -> {:error, save_failure(view, failure)}
-      {:error, error} -> {:error, error_messages(view, error)}
+      # Rolled back from inside an action (a related record's action
+      # refusing within the transaction): no save is named, so each card's
+      # edited fields claim their errors.
+      {:error, error} -> {:error, edit_failure(view, saves, error)}
     end
   end
 
@@ -2449,21 +2499,58 @@ defmodule AshA2ui.ActionHandler do
 
   defp save_failure(view, {nil, error}), do: error_messages(view, error)
 
-  defp save_failure(view, {%{detail: detail, values: values}, error}) do
+  defp save_failure(view, {%{detail: _detail} = save, error}),
+    do: edit_failure(view, [save], error)
+
+  # Each failing card's field errors at their inputs
+  # (`/ui/edit_errors/<card>/<field>`), the rest as the outcome.
+  defp edit_failure(view, [], error), do: error_messages(view, error)
+
+  defp edit_failure(view, saves, error) do
+    errors = field_errors(view.l10n, error_class(error))
+
+    {messages, shown} =
+      Enum.reduce(saves, {%{}, []}, fn save, {messages, shown} ->
+        {field_messages, card_shown} = card_errors(save, errors)
+        {Map.put(messages, to_string(save.detail.name), field_messages), shown ++ card_shown}
+      end)
+
+    [update_data_model(view, "/ui/edit_errors", messages)] ++
+      error_messages(view, error, Enum.uniq(shown))
+  end
+
+  # One card's field errors by its field, and the fields shown at their
+  # inputs: an attribute of the card's record, or a relationship one of
+  # whose edited attributes holds the error.
+  defp card_errors(%{detail: detail, values: values}, errors) do
     edited =
       for {field, attr} <- detail.editable.edits,
           Map.has_key?(values, to_string(field)),
           into: %{},
-          do: {to_string(attr), to_string(field)}
+          do: {edited_key(attr), to_string(field)}
 
-    field_messages =
-      for {[attr | _rest], text} <- field_errors(view.l10n, error),
-          field = Map.get(edited, to_string(attr)),
-          into: %{},
-          do: {field, text}
+    mapped =
+      for {[first | _rest] = segments, text} <- errors,
+          field = edited_field(edited, segments),
+          do: {to_string(first), field, text}
 
-    [update_data_model(view, "/ui/edit_errors", %{to_string(detail.name) => field_messages})] ++
-      error_messages(view, error, Map.keys(edited))
+    shown =
+      for(key <- Map.keys(edited), is_binary(key), do: key) ++
+        for({first, _field, _text} <- mapped, do: first)
+
+    {Map.new(mapped, fn {_first, field, text} -> {field, text} end), shown}
+  end
+
+  # An edited field's error key: its attribute, or for a field edited
+  # through a relationship, the relationship and the related attribute (the
+  # update action reports the related record's errors under the
+  # relationship's path).
+  defp edited_key([relationship, attribute]), do: {to_string(relationship), to_string(attribute)}
+  defp edited_key(attribute), do: to_string(attribute)
+
+  defp edited_field(edited, [first | _rest] = segments) do
+    Map.get(edited, {to_string(first), to_string(List.last(segments))}) ||
+      Map.get(edited, to_string(first))
   end
 
   defp saved(view, bar, saves, then, env) do

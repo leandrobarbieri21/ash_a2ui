@@ -248,7 +248,7 @@ defmodule AshA2ui.ResolvedView do
           optional(:editable) =>
             %{
               fields: [atom],
-              edits: %{atom => atom},
+              edits: %{atom => atom | [atom]},
               update_action: atom | nil,
               visible: atom | nil
             }
@@ -698,7 +698,8 @@ defmodule AshA2ui.ResolvedView do
   `details` (admin catalog 3.11): `_editable_<card>`, whether the record
   offers editing on that card (its `editable` `visible`), and for each
   editable field `_edit_<field>`, the value of the attribute its input
-  edits, JSON-safe. Shared by the initial render and the context refreshes.
+  edits (`edit_value/2`), JSON-safe. Shared by the initial render and the
+  context refreshes.
   """
   @spec detail_edit_data(t(), [detail], struct()) :: %{String.t() => term}
   def detail_edit_data(%__MODULE__{}, details, record) do
@@ -707,13 +708,45 @@ defmodule AshA2ui.ResolvedView do
         values =
           for {field, attr} <- editable.edits,
               into: %{},
-              do: {"_edit_#{field}", json_safe(Map.get(record, attr))}
+              do: {"_edit_#{field}", json_safe(edit_value(record, attr))}
 
         data
         |> Map.merge(values)
         |> Map.put("_editable_#{name}", editable_offered?(editable, record))
     end
   end
+
+  @doc """
+  The value an edited field's input starts from: the record's attribute, or
+  for a field edited through a relationship (`[relationship, attribute]`),
+  that attribute of the related record, `nil` while there is none.
+  """
+  @spec edit_value(struct(), atom | [atom]) :: term
+  def edit_value(record, [relationship, attribute]) do
+    case Map.get(record, relationship) do
+      %{__struct__: _} = related when not is_struct(related, Ash.NotLoaded) ->
+        Map.get(related, attribute)
+
+      _none ->
+        nil
+    end
+  end
+
+  def edit_value(record, attribute), do: Map.get(record, attribute)
+
+  @doc """
+  The resource and attribute an edited field's input edits: the record's
+  own, or for `[relationship, attribute]` the related resource's.
+  """
+  @spec edit_target(module, atom | [atom]) :: {module, atom}
+  def edit_target(resource, [relationship, attribute]) do
+    case Ash.Resource.Info.relationship(resource, relationship) do
+      %{destination: destination} -> {destination, attribute}
+      nil -> {resource, attribute}
+    end
+  end
+
+  def edit_target(resource, attribute), do: {resource, attribute}
 
   @doc """
   Whether a detail card's resolved `editable` is offered on `record`: always
@@ -1272,13 +1305,19 @@ defmodule AshA2ui.ResolvedView do
     }
   end
 
-  # The gate is loaded with the record it gates.
+  # The gate is loaded with the record it gates, and so is each related
+  # record a field is edited through.
   defp editable_loads(_resource, nil), do: []
 
   defp editable_loads(resource, editable) do
-    if editable.visible && calculation_or_aggregate?(resource, editable.visible),
-      do: [editable.visible],
-      else: []
+    gate =
+      if editable.visible && calculation_or_aggregate?(resource, editable.visible),
+        do: [editable.visible],
+        else: []
+
+    related = for {_field, [relationship, _attribute]} <- editable.edits, do: relationship
+
+    gate ++ Enum.uniq(related)
   end
 
   # A section or footer note reads with its context's record, like a

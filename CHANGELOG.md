@@ -220,6 +220,15 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Editing a related record's values in place.** A detail field's `edit`
+  may name `[relationship, attribute]`: an attribute of the record a
+  `belongs_to` or `has_one` leads to (a contract's renewal term). Its input
+  starts from, and is typed by, the related attribute; a save sends it to
+  the card's update action as the relationship's argument, a map holding
+  the related record's primary key, so `manage_relationship` updates the
+  related record through its own action. The related record's errors are
+  shown at the field's input. The verifier checks the relationship, the
+  attribute and the argument. Nothing changes on the wire.
 - **A row action can ask for confirmation** (admin catalog 3.13.0). An
   `action` entity's `confirm :destructive` makes the admin grid confirm a
   row action through its ConfirmDialog before invoking it, as it does for
