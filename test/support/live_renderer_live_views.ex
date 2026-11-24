@@ -138,6 +138,32 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       Fixtures.update_data_model()
     end
 
+    # A document pane's surface (VisitDocumentUI): the visit's record at
+    # /detail/appointment carries the referral the test chose
+    # (`:live_renderer_test_document`, a document unless set), or `nil`.
+    def document_surface(ui, opts) do
+      Fixtures.notify({:surface_fn, ui, opts})
+      [create] = Fixtures.surface_messages()
+      [put_in(create, ["createSurface", "dataModel", "detail"], visit_detail())]
+    end
+
+    # Its refresh: the whole data model, the record with it.
+    def document_data_model(ui, opts) do
+      Fixtures.notify({:data_model_fn, ui, opts})
+      Fixtures.write("/", %{"records" => [], "detail" => visit_detail()})
+    end
+
+    defp visit_detail do
+      document =
+        Application.get_env(:ash_a2ui, :live_renderer_test_document, %{
+          "src" => "/referrals/1/file",
+          "fileName" => "referral.pdf",
+          "regions" => []
+        })
+
+      %{"appointment" => %{"id" => "1", "title" => "Checkup", "_document_referral" => document}}
+    end
+
     def action(ui, envelope, opts) do
       Fixtures.notify({:action_fn, ui, envelope, opts})
 
@@ -409,16 +435,17 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     # A document pane (catalog 3.4) kept in the address: the URL's
     # ?document=shown seeds the bootstrap, the pane's switch push_patches
     # it, and back/forward shows or hides the pane again. The surface build
-    # is stubbed (it reports its opts); the real ActionHandler answers the
-    # pane's actions, which read nothing.
+    # is stubbed (it reports its opts, and the visit carries the referral
+    # the test chose); the real ActionHandler answers the pane's actions,
+    # which read nothing.
     alias AshA2ui.Test.LiveRendererStubs, as: Stubs
 
     use AshA2ui.LiveRenderer,
       ui: AshA2ui.Test.VisitDocumentUI,
       deep_link: true,
       pubsub: [module: AshA2ui.Test.PubSub, topics: ["ash_a2ui_test:documents"]],
-      surface_fn: &Stubs.surface/2,
-      data_model_fn: &Stubs.data_model/2
+      surface_fn: &Stubs.document_surface/2,
+      data_model_fn: &Stubs.document_data_model/2
   end
 
   defmodule AshA2ui.Test.OpenSurfaceCallbackLive do
