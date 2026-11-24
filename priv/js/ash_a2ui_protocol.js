@@ -54,6 +54,7 @@ export const QUIET_ACTIONS = Object.freeze([
   "open_surface",
   "document_pane",
   "document_region",
+  "preview_changes",
 ]);
 
 /** Whether `ashAction` args name a quiet action (see `QUIET_ACTIONS`). */
@@ -391,44 +392,53 @@ function overlay(value, kept) {
 export const EDITS_PATH = "/ui/edits";
 
 /**
+ * Admin catalog 3.15: where a surface holds the values the server worked out
+ * again with the unsaved changes (`{<context>: {<field>: {value, steps?}}}`).
+ */
+export const PREVIEW_PATH = "/ui/preview";
+
+/**
  * Rewrites the writes in `messages` that would replace a surface's unsaved
  * changes so they keep them: a write of the whole data model (`/`), of
  * `/ui`, or a surface created again over one the processor holds. Only the
  * server's own write of `/ui/edits` (a save, which clears them) replaces
  * them. `editsOf(surfaceId)` returns the surface's current changes, or
- * null/undefined/{} when it has none. Returns a new array; the messages
- * themselves are not modified.
+ * null/undefined/{} when it has none. With the changes it keeps the values
+ * worked out from them (3.15, `/ui/preview`), which `previewOf(surfaceId)`
+ * returns the same way. Returns a new array; the messages themselves are
+ * not modified.
  */
-export function keepUnsavedEdits(messages, editsOf) {
+export function keepUnsavedEdits(messages, editsOf, previewOf = () => null) {
+  const nonEmpty = (value) => (value && typeof value === "object" && Object.keys(value).length > 0 ? value : null);
   const kept = new Map();
-  const editsFor = (surfaceId) => {
+  const keptFor = (surfaceId) => {
     if (!kept.has(surfaceId)) {
-      const edits = editsOf(surfaceId);
-      kept.set(surfaceId, edits && typeof edits === "object" && Object.keys(edits).length > 0 ? edits : null);
+      const edits = nonEmpty(editsOf(surfaceId));
+      const preview = edits ? nonEmpty(previewOf(surfaceId)) : null;
+      kept.set(surfaceId, edits ? (preview ? {edits, preview} : {edits}) : null);
     }
     return kept.get(surfaceId);
   };
-  const withEdits = (model, edits) => {
+  const withUi = (ui, keep) => ({...(ui && typeof ui === "object" ? ui : {}), ...keep});
+  const withEdits = (model, keep) => {
     const base = model && typeof model === "object" ? model : {};
-    const ui = base.ui && typeof base.ui === "object" ? base.ui : {};
-    return {...base, ui: {...ui, edits}};
+    return {...base, ui: withUi(base.ui, keep)};
   };
 
   return messages.map((message) => {
     const update = message && message.updateDataModel;
     if (update && (update.path === "/" || update.path === "" || update.path === undefined)) {
-      const edits = editsFor(update.surfaceId);
-      return edits ? {...message, updateDataModel: {...update, value: withEdits(update.value, edits)}} : message;
+      const keep = keptFor(update.surfaceId);
+      return keep ? {...message, updateDataModel: {...update, value: withEdits(update.value, keep)}} : message;
     }
     if (update && update.path === "/ui") {
-      const edits = editsFor(update.surfaceId);
-      const ui = update.value && typeof update.value === "object" ? update.value : {};
-      return edits ? {...message, updateDataModel: {...update, value: {...ui, edits}}} : message;
+      const keep = keptFor(update.surfaceId);
+      return keep ? {...message, updateDataModel: {...update, value: withUi(update.value, keep)}} : message;
     }
     const create = message && message.createSurface;
     if (create && create.dataModel) {
-      const edits = editsFor(create.surfaceId);
-      return edits ? {...message, createSurface: {...create, dataModel: withEdits(create.dataModel, edits)}} : message;
+      const keep = keptFor(create.surfaceId);
+      return keep ? {...message, createSurface: {...create, dataModel: withEdits(create.dataModel, keep)}} : message;
     }
     return message;
   });

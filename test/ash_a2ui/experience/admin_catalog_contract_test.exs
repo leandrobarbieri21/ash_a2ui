@@ -217,8 +217,8 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
     basic = "priv/a2ui/v1_0/catalogs/basic/v1/catalog.json" |> File.read!() |> Jason.decode!()
 
-    assert contract(catalog)["version"] == "3.14.0"
-    assert Experience.admin_catalog_version() == "3.14.0"
+    assert contract(catalog)["version"] == "3.15.0"
+    assert Experience.admin_catalog_version() == "3.15.0"
     assert changelog(catalog)["3.0.0"] =~ "Breaking"
     assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
     assert catalog["$id"] == catalog["catalogId"]
@@ -242,7 +242,7 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     inputs = Regex.scan(~r/"(\w+)"/, list, capture: :all_but_first) |> List.flatten()
     assert Enum.sort(inputs ++ ["Modal"]) == Enum.sort(owned)
     assert source =~ "export const ADMIN_BASIC_KINDS = [...INPUT_OVERRIDE_KINDS, \"Modal\"]"
-    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.14.0")
+    assert source =~ ~s(export const ADMIN_CATALOG_VERSION = "3.15.0")
 
     # the functions state who may call them
     for {name, function} <- catalog["functions"],
@@ -276,6 +276,21 @@ defmodule AshA2ui.Experience.AdminCatalogContractTest do
     assert visible["$ref"] == "common_types.json#/$defs/DataBinding"
     refute "action" in field["required"]
     refute "actionVisible" in field["required"]
+  end
+
+  test "catalog 3.15 previews values recalculated from unsaved changes, under the same id" do
+    catalog = @admin_catalog_path |> File.read!() |> Jason.decode!()
+
+    assert changelog(catalog)["3.15.0"] =~ "preview_changes"
+    assert catalog["catalogId"] == "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3"
+
+    field = catalog["components"]["fieldDisplay"]
+    assert field["properties"]["preview"]["$ref"] == "common_types.json#/$defs/DataBinding"
+    refute "preview" in field["required"]
+
+    bar = catalog["components"]["saveBar"]
+    assert bar["properties"]["preview"]["required"] == ["action", "context"]
+    refute "preview" in (bar["required"] || [])
   end
 
   test "catalog 3.14 shows a save bar while reviews wait, under the same id" do

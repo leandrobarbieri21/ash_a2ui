@@ -42,6 +42,8 @@ defmodule AshA2ui.Test.Domain do
     resource AshA2ui.Test.Finding
     resource AshA2ui.Test.Statement
     resource AshA2ui.Test.StatementTerm
+    resource AshA2ui.Test.Lease
+    resource AshA2ui.Test.LeaseTerm
     resource AshA2ui.Test.Dossier
     resource AshA2ui.Test.DossierLine
     resource AshA2ui.Test.DossierNote

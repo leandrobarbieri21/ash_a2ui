@@ -173,6 +173,7 @@ spark_locals_without_parens = [
   query: 2,
   range_filters: 1,
   read_action: 1,
+  recalculate: 1,
   record_argument: 1,
   record_label: 1,
   refreshes: 1,

@@ -10,6 +10,29 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: values recalculated from unsaved changes (admin catalog 3.15.0)
+
+Additive, under the same catalog id.
+
+- A field's `recalculate true`: on `:detail` cards whose context has an
+  editable card, the value follows a person's unsaved changes before Save.
+  The new `preview_changes` action (quiet) runs each card's
+  `update_action` with the changes, as `save_changes` would, reads the
+  recalculated fields with the record, and rolls the transaction back:
+  nothing is written, no notification is sent. The result goes to
+  `/ui/preview/<context>/<field>` (`{value, steps?}`); no change, a record
+  that does not offer editing or a refused update writes an empty preview.
+  A save clears it. The verifier requires a context with an editable card,
+  a field that is not itself editable, and a data layer with transactions.
+- The admin catalog's `fieldDisplay` gains the optional `preview` binding
+  and the `saveBar` the optional `preview` envelope, sent whenever
+  `/ui/edits` changes (to empty too). Discard clears `/ui/preview`; a
+  whole-model refresh keeps it while it keeps `/ui/edits`. The JS module
+  exports `previewedProps` (a fieldDisplay's props as it draws them),
+  `previewEntry`, `previewSpec`, `editsKey` and `PREVIEW_PATH`, for a host's
+  swap; the stock saveBar's `sendPreview` runs from its `updated`.
+- See [ADR 0011](docs/adr/0011-values-recalculated-from-unsaved-changes.md).
+
 ### Added: a save bar shown for the whole review (admin catalog 3.14.0)
 
 Additive, under the same catalog id.

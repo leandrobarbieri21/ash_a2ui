@@ -190,6 +190,22 @@ defmodule AshA2ui.ActionHandler do
       `saved_message` (`then_saved_message` after `"then"`). A refusal
       keeps the changes, writes each edited field's message to
       `/ui/edit_errors/<card>/<field>`, and reports the rest as the outcome.
+      On a surface with recalculated fields a success also clears
+      `/ui/preview`.
+
+    * `"preview_changes"` — context `%{"edits" => edits, "contexts" =>
+      selections}`, the edits shaped as `save_changes` takes them. Works out
+      the surface's recalculated fields (admin catalog 3.15, a field's
+      `recalculate`) with a person's unsaved changes applied, before Save:
+      each card's record is re-read and refused as `save_changes` does, its
+      `update_action` runs with the changed fields, the recalculated fields
+      are read again with each context's record, and the transaction is
+      rolled back, so nothing is written and no notification is sent. The
+      result goes to `/ui/preview/<context>/<field>` as `%{"value" => _}`
+      (with `"steps"` for a steps field). No change, a record that does not
+      offer editing, or an update the action refuses writes an empty
+      `/ui/preview`: the stored values show, and Save reports the refusal.
+      Quiet: it leaves `/ui/feedback` alone.
 
     * `"document_pane"` / `"document_region"` — a `document_pane` (admin
       catalog 3.4, see `AshA2ui.DocumentPane`) shown or hidden, and a region
@@ -391,11 +407,12 @@ defmodule AshA2ui.ActionHandler do
   # handler leaves /ui/feedback as it was (see quiet_actions/0).
   @quiet_actions ~w(query option_search context_search option_select nested_add nested_remove
                     bulk_select prompt wizard_next wizard_back open_surface document_pane
-                    document_region)
+                    document_region preview_changes)
 
   # Actions that write, or open a form that would. On a surface pinned to an
   # instant (`:as_of`) every one is refused.
-  @writes ~w(submit_form invoke field_action page_action save_changes bulk_invoke prompt edit_cell
+  @writes ~w(submit_form invoke field_action page_action save_changes preview_changes bulk_invoke
+             prompt edit_cell
              nested_add nested_remove start_create start_edit wizard_next wizard_back)
 
   @pinned_refusal msg(
@@ -407,7 +424,7 @@ defmodule AshA2ui.ActionHandler do
   pickers and panel steps (`query`, `option_search`, `context_search`,
   `option_select`, `nested_add`, `nested_remove`, `bulk_select`, `prompt`,
   `wizard_next`, `wizard_back`, `open_surface`, `document_pane`,
-  `document_region`).
+  `document_region`, `preview_changes`).
 
   A renderer writes no pending feedback for an `ashAction` call to one of
   them, and the handler leaves `/ui/feedback` as it was unless the action
@@ -904,6 +921,7 @@ defmodule AshA2ui.ActionHandler do
   defp dispatch("page_action", context, env), do: page_action(context, env)
 
   defp dispatch("save_changes", context, env), do: save_changes(context, env)
+  defp dispatch("preview_changes", context, env), do: preview_changes(context, env)
 
   defp dispatch("bulk_invoke", context, env), do: bulk_invoke(context, env)
 
@@ -2584,7 +2602,7 @@ defmodule AshA2ui.ActionHandler do
        [
          update_data_model(view, "/ui/edits", %{}),
          update_data_model(view, "/ui/edit_errors", %{})
-       ] ++ details ++ messages}
+       ] ++ preview_cleared(view) ++ details ++ messages}
     end
   end
 
@@ -2610,6 +2628,161 @@ defmodule AshA2ui.ActionHandler do
       end
     end)
   end
+
+  # --- preview_changes -------------------------------------------------------
+
+  # Catalog 3.15: the recalculated fields worked out with a person's unsaved
+  # changes, by the actions a save would run, inside a transaction that is
+  # always rolled back. The client is trusted no further than a save trusts
+  # it: the same allowlist, the same re-read as the actor, the same
+  # `visible` gate. An update the action refuses previews nothing.
+  defp preview_changes(context, %{view: view} = env) do
+    with {:ok, _bar} <- declared_save_bar(view),
+         :ok <- preview_declared(view),
+         {:ok, targets} <- save_targets(view, Map.get(context, "edits") || %{}, :then) do
+      case targets do
+        [] -> {:ok, [update_data_model(view, "/ui/preview", %{})]}
+        targets -> preview_targets(view, targets, env)
+      end
+    end
+  end
+
+  defp preview_declared(%{recalculated: recalculated} = view)
+       when map_size(recalculated) == 0,
+       do:
+         {:error,
+          [status(view, "preview_changes is not allowed: the surface recalculates no field.")]}
+
+  defp preview_declared(_view), do: :ok
+
+  defp preview_targets(view, targets, env) do
+    values =
+      with {:ok, saves} <- fetch_save_records(view, targets, env),
+           {:ok, values} <- run_preview(view, saves, env) do
+        values
+      else
+        _refused -> %{}
+      end
+
+    {:ok, [update_data_model(view, "/ui/preview", values)]}
+  end
+
+  # Runs the saves and reads the recalculated fields inside one transaction,
+  # then rolls it back. The values leave the transaction through the process
+  # dictionary: each data layer reports a rollback's value in its own shape
+  # (Mnesia wraps it in an error), so the rollback value carries nothing.
+  # The notifications the actions queued are dropped with the writes, as
+  # `Ash.transaction/3` drops them on a rollback.
+  defp run_preview(view, saves, %{ash_opts: ash_opts} = env) do
+    resources = saves |> Enum.map(&view.contexts[&1.detail.context].resource) |> Enum.uniq()
+
+    if Enum.all?(resources, &Ash.DataLayer.data_layer_can?(&1, :transact)) do
+      key = {__MODULE__, :preview, make_ref()}
+      queued = Process.get(:ash_notifications)
+
+      try do
+        Ash.DataLayer.transaction(resources, fn ->
+          result =
+            with :ok <- write_previews(saves, ash_opts),
+                 do: preview_values(view, saves, env)
+
+          Process.put(key, result)
+          Ash.DataLayer.rollback(hd(resources), :preview)
+        end)
+
+        Process.get(key, {:error, :rolled_back})
+      after
+        Process.delete(key)
+        restore_notifications(queued)
+      end
+    else
+      {:error, :no_transaction}
+    end
+  end
+
+  defp restore_notifications(nil), do: Process.delete(:ash_notifications)
+  defp restore_notifications(queued), do: Process.put(:ash_notifications, queued)
+
+  # The saves as `save_changes` runs them, their notifications returned
+  # rather than sent (the transaction is rolled back).
+  defp write_previews(saves, ash_opts) do
+    Enum.reduce_while(saves, :ok, fn save, :ok ->
+      save.record
+      |> Ash.Changeset.for_update(save.detail.editable.update_action, save.params, ash_opts)
+      |> Ash.update(return_notifications?: true)
+      |> case do
+        {:ok, _record, _notifications} -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
+
+  # Each context's recalculated fields, read again with its record (the one
+  # a save named, else the selection), as the cards draw them: the display
+  # value, and a steps field's normalized steps.
+  defp preview_values(view, saves, %{ash_opts: ash_opts} = env) do
+    record_ids = Map.new(saves, &{&1.detail.context, &1.record_id})
+
+    Enum.reduce_while(view.recalculated, {:ok, %{}}, fn {context, fields}, {:ok, acc} ->
+      case preview_record(view, context, record_ids, env.selected, ash_opts) do
+        {:ok, nil} ->
+          {:cont, {:ok, acc}}
+
+        {:ok, record} ->
+          {:cont, {:ok, Map.put(acc, to_string(context), preview_entries(view, record, fields))}}
+
+        error ->
+          {:halt, error}
+      end
+    end)
+  end
+
+  defp preview_record(view, context, record_ids, selected, ash_opts) do
+    case Map.get(record_ids, context) || get_in(selected, [context, :value]) do
+      nil ->
+        {:ok, nil}
+
+      record_id ->
+        selected =
+          Map.update(selected, context, %{value: record_id}, &Map.put(&1, :value, record_id))
+
+        view
+        |> ContextRunner.fetch_selected(
+          view.contexts[context],
+          record_id,
+          selected,
+          ash_opts,
+          ResolvedView.recalculate_loads(view, context)
+        )
+        |> case do
+          {:ok, record} -> {:ok, record}
+          :not_found -> {:ok, nil}
+          {:error, error} -> {:error, error}
+        end
+    end
+  end
+
+  defp preview_entries(view, record, fields) do
+    values = display_record_values(view, record, fields)
+    steps = ResolvedView.detail_steps_data(view, record, fields)
+
+    Map.new(fields, fn field ->
+      entry = %{"value" => Map.get(values, to_string(field))}
+
+      entry =
+        case Map.fetch(steps, "_steps_#{field}") do
+          {:ok, field_steps} -> Map.put(entry, "steps", field_steps)
+          :error -> entry
+        end
+
+      {to_string(field), entry}
+    end)
+  end
+
+  # A save clears the preview on a surface that has one: the stored values
+  # are the saved ones now.
+  defp preview_cleared(%{recalculated: recalculated}) when map_size(recalculated) == 0, do: []
+  defp preview_cleared(view), do: [update_data_model(view, "/ui/preview", %{})]
 
   # --- page_action -----------------------------------------------------------
 

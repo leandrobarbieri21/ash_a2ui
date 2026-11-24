@@ -107,6 +107,7 @@ defmodule AshA2ui.ResolvedView do
     page_header: nil,
     section_nav: nil,
     save_bar: nil,
+    recalculated: %{},
     document_panes: [],
     l10n: nil
   ]
@@ -407,6 +408,7 @@ defmodule AshA2ui.ResolvedView do
     declared = Map.new(declared_fields, &{&1.name, &1})
     prompt_selects = resolve_prompt_selects(resource, actions, declared)
     page_header = resolve_page_header(resource_or_ui_module, actions, l10n)
+    details = resolve_details(components, contexts, fields)
 
     %__MODULE__{
       resource: resource,
@@ -432,7 +434,8 @@ defmodule AshA2ui.ResolvedView do
       nested_forms: resolve_nested_forms(resource, form, create_action || update_action, l10n),
       contexts: Map.new(contexts, &{&1.name, &1}),
       context_order: Enum.map(contexts, & &1.name),
-      details: resolve_details(components, contexts, fields),
+      details: details,
+      recalculated: resolve_recalculated(details, fields),
       notes:
         resolve_notes(components, contexts, fields) ++
           resolve_page_reads(page_header, components, contexts, fields) ++
@@ -1289,6 +1292,39 @@ defmodule AshA2ui.ResolvedView do
         editable: editable
       }
     end)
+  end
+
+  # Catalog 3.15: the `recalculate` fields of each context with an editable
+  # card, in the order its cards draw them: the values a person's unsaved
+  # changes to that record are previewed for.
+  defp resolve_recalculated(details, fields) do
+    edited = for %{editable: %{}, context: context} <- details, uniq: true, do: context
+
+    for %{context: context, fields: card_fields} <- details,
+        context in edited,
+        field <- card_fields,
+        match?(%{recalculate: true}, fields[field]),
+        reduce: %{} do
+      acc -> Map.update(acc, context, [field], &Enum.uniq(&1 ++ [field]))
+    end
+  end
+
+  @doc """
+  The fields of `context`'s record a person's unsaved changes are previewed
+  for (admin catalog 3.15): its `recalculate` fields drawn on its `:detail`
+  cards, when it has an editable card. `[]` otherwise.
+  """
+  @spec recalculated(t(), atom) :: [atom]
+  def recalculated(%__MODULE__{recalculated: recalculated}, context),
+    do: Map.get(recalculated, context, [])
+
+  @doc """
+  The `Ash.Query.load/2` statement that reads `context`'s recalculated
+  fields (calculations, aggregates and source paths) with its record.
+  """
+  @spec recalculate_loads(t(), atom) :: list
+  def recalculate_loads(%__MODULE__{} = view, context) do
+    field_loads(view.contexts[context].resource, recalculated(view, context), view.fields)
   end
 
   # A detail card's editing (catalog 3.11): the fields a person edits, each

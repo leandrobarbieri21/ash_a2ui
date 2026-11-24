@@ -634,6 +634,7 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
+#: test/support/lease_edit_ui.ex:1
 #: test/support/statement_term_edit_ui.ex:1
 msgid "Ends"
 msgstr ""
@@ -859,6 +860,7 @@ msgstr ""
 msgid "Label"
 msgstr ""
 
+#: test/support/lease_edit_ui.ex:1
 #: test/support/secured_lease.ex:117
 msgid "Lease"
 msgstr ""
@@ -1097,8 +1099,13 @@ msgstr ""
 msgid "Notes"
 msgstr ""
 
+#: test/support/lease_edit_ui.ex:1
 #: test/support/statement_term_edit_ui.ex:1
 msgid "Notice"
+msgstr ""
+
+#: test/support/lease_edit_ui.ex:1
+msgid "Notice by"
 msgstr ""
 
 #: test/support/diagram_flow.ex:138
@@ -1406,6 +1413,10 @@ msgstr ""
 
 #: test/support/hub_ui.ex:1
 msgid "Renews soon"
+msgstr ""
+
+#: test/support/lease_edit_ui.ex:1
+msgid "Rent"
 msgstr ""
 
 #: test/support/manifest_task.ex:1
@@ -1789,6 +1800,10 @@ msgstr ""
 msgid "Term"
 msgstr ""
 
+#: test/support/lease_edit_ui.ex:1
+msgid "Terms"
+msgstr ""
+
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 msgid "Their notes"
@@ -1810,6 +1825,10 @@ msgstr ""
 
 #: test/support/time_travel.ex:47
 msgid "Tier"
+msgstr ""
+
+#: test/support/lease_edit_ui.ex:1
+msgid "Timeline"
 msgstr ""
 
 #: test/support/adoption.ex:243
@@ -1841,6 +1860,7 @@ msgstr ""
 #: test/support/finding_fields_ui.ex:1
 #: test/support/grouped_visits_ui.ex:1
 #: test/support/headed_visits_ui.ex:1
+#: test/support/lease_edit_ui.ex:1
 #: test/support/linked_filters_ui.ex:1
 #: test/support/linked_visits_ui.ex:1
 #: test/support/links.ex:135
@@ -2020,6 +2040,10 @@ msgstr ""
 #: test/support/word_report_ui.ex:23
 #: test/support/word_report_ui.ex:48
 msgid "Word"
+msgstr ""
+
+#: test/support/lease_edit_ui.ex:1
+msgid "Yearly rent"
 msgstr ""
 
 #: test/support/statement_edit_ui.ex:1
