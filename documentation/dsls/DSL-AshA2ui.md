@@ -808,7 +808,8 @@ client action, each card's `update_action` on its record, in one
 transaction). A refused save keeps the changes and says why: each
 field's error at its input, the rest as the outcome. A `confirm` asks
 first while fields still wait. Unsaved changes survive a refresh of the
-surface's data.
+surface's data. With `show_while_waiting` it also shows while fields
+under review wait, before anything changed (admin catalog 3.14).
 
 
 ### Nested DSLs
@@ -822,6 +823,17 @@ save_bar do
   message "You have unsaved changes"
   status "%{count} to check"
   saved_message "Changes saved."
+end
+
+```
+
+```
+save_bar do
+  context :order
+  message "You have unsaved changes"
+  message_waiting "Reviewing the order"
+  status "%{count} to check"
+  show_while_waiting :correctable
 end
 
 ```
@@ -842,6 +854,7 @@ end
 | [`discard_label`](#a2ui-save_bar-discard_label){: #a2ui-save_bar-discard_label } | `String.t` |  | The Discard button. Translated. Defaults to the library's "Discard changes". |
 | [`saved_message`](#a2ui-save_bar-saved_message){: #a2ui-save_bar-saved_message } | `String.t` |  | The outcome's message after a save. Translated. Defaults to the library's "Changes saved." |
 | [`edit_reviews`](#a2ui-save_bar-edit_reviews){: #a2ui-save_bar-edit_reviews } | `boolean` | `false` | Whether saving an edited field reviews it (the host's update action records the review), so the count of fields still waiting leaves out the ones being edited. |
+| [`show_while_waiting`](#a2ui-save_bar-show_while_waiting){: #a2ui-save_bar-show_while_waiting } | `boolean \| atom` | `false` | Admin catalog 3.14: whether the bar also shows while fields under review still wait, before anything changed (a review the person works through: the bar reads `message_waiting` with its `status`, and Save opens the `confirm`). `true` shows it on every record; a public attribute, calculation or aggregate of the bar's record shows it where that is `true` (who may save there). Discard shows only while a change waits, and a save with no change sends nothing but the `confirm`'s `then` choice. Off by default: the bar shows only while a change waits. |
 | [`id`](#a2ui-save_bar-id){: #a2ui-save_bar-id } | `String.t` |  | A DOM id for the bar. |
 
 

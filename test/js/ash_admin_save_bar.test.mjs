@@ -17,6 +17,9 @@ const {
   waitingReviews,
   countText,
   saveDecision,
+  saveBarState,
+  showsWhileWaiting,
+  choiceSends,
   thenOffered,
   confirmTexts,
   writeDraft,
@@ -99,12 +102,81 @@ test("Save opens the dialog while fields wait, else saves", () => {
   const waiting = {reviews, record: record("pending", "reviewed", {review_open: true}), confirm};
   assert.equal(saveDecision(waiting), "confirm");
 
-  const clear = {reviews, record: record("reviewed", "reviewed", {review_open: true}), confirm};
+  const changed = {facts: {recordId: "s1", values: {title: "x"}}};
+  const clear = {reviews, record: record("reviewed", "reviewed", {review_open: true}), confirm, edits: changed};
   assert.equal(saveDecision(clear), "save");
   assert.equal(saveDecision({...clear, confirm: {...confirm, thenWhenClear: true}}), "then");
 
-  // without a confirm, Save always saves
-  assert.equal(saveDecision({reviews, record: record("pending", "pending")}), "save");
+  // without a confirm, Save saves the changes
+  const edits = {facts: {recordId: "s1", values: {title: "x"}}};
+  assert.equal(saveDecision({reviews, record: record("pending", "pending"), edits}), "save");
+});
+
+test("3.14: with no change, Save opens the dialog while fields wait and else sends nothing", () => {
+  const waiting = {reviews, record: record("pending", "reviewed", {review_open: true}), confirm};
+  assert.equal(saveDecision(waiting), "confirm");
+
+  // no dialog to open and no change: nothing to send
+  assert.equal(saveDecision({reviews, record: record("pending", "pending")}), "none");
+  const clear = {reviews, record: record("reviewed", "reviewed", {review_open: true}), confirm};
+  assert.equal(saveDecision(clear), "none");
+  // ...unless saving finishes the review
+  assert.equal(saveDecision({...clear, confirm: {...confirm, thenWhenClear: true}}), "then");
+
+  // the dialog's save choice sends only a change; its then choice always sends
+  assert.equal(choiceSends(waiting, "save"), false);
+  assert.equal(choiceSends(waiting, "then"), true);
+  assert.equal(choiceSends({...waiting, edits: {facts: {values: {title: "x"}}}}, "save"), true);
+});
+
+test("3.14: showWhileWaiting is true, or the record's field that is true", () => {
+  assert.equal(showsWhileWaiting({}), false);
+  assert.equal(showsWhileWaiting({showWhileWaiting: false}), false);
+  assert.equal(showsWhileWaiting({showWhileWaiting: true}), true);
+  assert.equal(showsWhileWaiting({showWhileWaiting: "open", record: {open: true}}), true);
+  assert.equal(showsWhileWaiting({showWhileWaiting: "open", record: {open: false}}), false);
+  assert.equal(showsWhileWaiting({showWhileWaiting: "open"}), false);
+});
+
+test("3.14: what the bar draws, with and without a change, while fields wait and once none does", () => {
+  const base = {
+    reviews,
+    message: "You have unsaved changes",
+    messageWaiting: "Reviewing the statement",
+    status: "%{count} to check",
+    statusOne: "1 to check",
+  };
+
+  // the 3.11 rule: no change, no bar, even while fields wait
+  assert.equal(saveBarState({...base, record: record("pending", "pending")}).shown, false);
+
+  // showWhileWaiting: fields wait, no change: the bar, without Discard
+  const waiting = {...base, showWhileWaiting: true, record: record("pending", "missing")};
+  assert.deepEqual(saveBarState(waiting), {
+    shown: true,
+    edits: 0,
+    waiting: 2,
+    message: "Reviewing the statement",
+    status: "2 to check",
+    discard: false,
+  });
+
+  // a change: Discard too
+  const edited = {...waiting, edits: {facts: {recordId: "s1", values: {title: "x"}}}};
+  assert.equal(saveBarState(edited).discard, true);
+  assert.equal(saveBarState(edited).edits, 1);
+
+  // nothing waits and nothing changed: no bar
+  const done = {...base, showWhileWaiting: true, record: record("reviewed", "reviewed")};
+  assert.equal(saveBarState(done).shown, false);
+  // a change with nothing waiting: the plain message, no tag
+  const doneEdited = {...done, edits: edited.edits};
+  assert.equal(saveBarState(doneEdited).shown, true);
+  assert.equal(saveBarState(doneEdited).message, "You have unsaved changes");
+  assert.equal(saveBarState(doneEdited).status, "");
+
+  // a record with no review fields at all: no bar
+  assert.equal(saveBarState({...base, showWhileWaiting: true, record: {id: "s1"}}).shown, false);
 });
 
 test("the dialog offers its second choice only where the record offers it", () => {
@@ -237,7 +309,13 @@ const bar = {
   confirm,
 };
 
-async function mountPage({editable = true, review = "pending", reviewOpen = true, editReviews = true} = {}) {
+async function mountPage({
+  editable = true,
+  review = "pending",
+  reviewOpen = true,
+  editReviews = true,
+  showWhileWaiting = undefined,
+} = {}) {
   const hook = mountHook({catalogs: [mergedCatalog, admin]});
   hook.processMessages([
     {
@@ -254,7 +332,7 @@ async function mountPage({editable = true, review = "pending", reviewOpen = true
             value: {"@path": "/detail/statement/title"},
             ...facts,
           },
-          {...bar, editReviews},
+          {...bar, editReviews, ...(showWhileWaiting === undefined ? {} : {showWhileWaiting})},
         ],
         dataModel: {
           detail: {
@@ -263,6 +341,7 @@ async function mountPage({editable = true, review = "pending", reviewOpen = true
               title: "Annual fee",
               _edit_title: "Annual fee",
               _editable_facts: editable,
+              correctable: editable,
               _review_title: {state: review, stateLabel: "Not reviewed"},
               review_open: reviewOpen,
             },
@@ -406,4 +485,73 @@ test("while fields wait, Save opens the dialog; its choices send save or then", 
   saveBar.choose("then");
   await settle();
   assert.equal(sent(hook).at(-1).callAgentFunction.callFunction.args.context.choice, "then");
+});
+
+// --- 3.14: the bar while reviews wait ----------------------------------------
+
+const buttons = (saveBar) => [...saveBar.renderRoot.querySelectorAll("button")].map((b) => b.textContent.trim());
+
+test("3.14: while values wait, the bar shows before any change, with Save and no Discard", async () => {
+  const {saveBar} = await mountPage({showWhileWaiting: "correctable"});
+  assert.equal(saveBar.hidden, false, "the bar shows from the first render");
+  const barEl = saveBar.renderRoot.querySelector(".bar");
+  assert.equal(barEl.dataset.editCount, "0");
+  assert.equal(barEl.dataset.waiting, "1");
+  assert.match(saveBar.renderRoot.textContent, /Reviewing the statement/);
+  assert.match(saveBar.renderRoot.textContent, /1 to check/);
+  assert.deepEqual(buttons(saveBar), ["Save changes"]);
+});
+
+test("3.14: a change adds Discard; discarding keeps the bar while values wait", async () => {
+  const {field, saveBar} = await mountPage({showWhileWaiting: "correctable", editReviews: false});
+  await type(field, "Yearly fee", "Enter");
+  assert.deepEqual(buttons(saveBar), ["Discard changes", "Save changes"]);
+
+  saveBar.onDiscard();
+  await settle();
+  assert.equal(saveBar.hidden, false);
+  assert.deepEqual(buttons(saveBar), ["Save changes"]);
+});
+
+test("3.14: the bar stays hidden where the record's field is false, and once nothing waits", async () => {
+  const locked = await mountPage({showWhileWaiting: "correctable", editable: false});
+  assert.equal(locked.saveBar.hidden, true);
+
+  const reviewed = await mountPage({showWhileWaiting: "correctable", review: "reviewed"});
+  assert.equal(reviewed.saveBar.hidden, true);
+
+  // the last value reviewed (the server writes the record back whole): the bar goes
+  const {hook, saveBar, model} = await mountPage({showWhileWaiting: "correctable"});
+  assert.equal(saveBar.hidden, false);
+  const statement = {...model.get("/detail/statement"), _review_title: {state: "reviewed"}};
+  hook.processMessages([
+    {version: "1.0", updateDataModel: {surfaceId: "s1", path: "/detail/statement", value: statement}},
+  ]);
+  await settle();
+  assert.equal(saveBar.hidden, true);
+});
+
+test("3.14: Save with no change opens the dialog; its save sends nothing, its then sends then", async () => {
+  const {hook, saveBar} = await mountPage({showWhileWaiting: "correctable"});
+  const before = sent(hook).length;
+
+  saveBar.onSave();
+  await settle();
+  assert.equal(saveBar.confirmOpen(), true);
+
+  saveBar.choose("save");
+  await settle();
+  assert.equal(saveBar.confirmOpen(), false, "the dialog closes");
+  assert.equal(sent(hook).length, before, "a save with nothing changed sends nothing");
+  assert.equal(saveBar.busy(), false);
+
+  saveBar.onSave();
+  await settle();
+  saveBar.choose("then");
+  await settle();
+  assert.equal(sent(hook).length, before + 1);
+  const call = sent(hook).at(-1).callAgentFunction.callFunction.args;
+  assert.equal(call.name, "save_changes");
+  assert.equal(call.context.choice, "then");
+  assert.equal(call.context.recordId, "s1");
 });

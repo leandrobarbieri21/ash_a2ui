@@ -2517,7 +2517,18 @@ defmodule AshA2ui.Encoder do
       |> maybe_put("statusOne", bar.status_one)
       |> maybe_put("domId", bar.id)
       |> maybe_put("confirm", save_bar_confirm(bar.confirm))
+      |> maybe_put("showWhileWaiting", show_while_waiting(bar))
     ]
+  end
+
+  # Catalog 3.14: true, or the name of the record's field gating it.
+  defp show_while_waiting(%{show_while_waiting: true}), do: true
+
+  defp show_while_waiting(bar) do
+    case AshA2ui.SaveBar.show_field(bar) do
+      nil -> nil
+      field -> to_string(field)
+    end
   end
 
   # The fields under review the bar counts: every `review` field of a

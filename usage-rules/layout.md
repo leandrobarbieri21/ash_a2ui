@@ -517,6 +517,15 @@ topics for the full contracts.
   sends `save_changes`; with a `confirm` and fields still waiting it asks
   first (Cancel / `save_label` / `then_label`). `then_when_clear` runs the
   `then_action` without asking once nothing waits.
+- `show_while_waiting` (admin catalog 3.14) keeps the bar up for the whole
+  review: it also shows while fields under review wait, before anything
+  changed, with `message_waiting`, the `status` tag and Save (Discard only
+  once a change waits). `true` shows it on every record; a field of the
+  bar's record (`show_while_waiting :correctable`) shows it where that is
+  `true`, so a reader who cannot save never sees it. Save with no change
+  opens the `confirm`; its `save_label` then sends nothing (there is
+  nothing to write) and its `then_label` runs the `then_action` alone. The
+  bar goes once nothing waits and nothing changed.
 - The server re-reads each card's record through its context as the actor,
   refuses it unless `visible` holds, and runs each card's `update_action`
   with only the changed fields, cast to their attributes, in one

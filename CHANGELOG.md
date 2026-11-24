@@ -10,6 +10,24 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: a save bar shown for the whole review (admin catalog 3.14.0)
+
+Additive, under the same catalog id.
+
+- `save_bar`'s `show_while_waiting` (`true`, or a field of the bar's record
+  that must be `true`): the bar also shows while fields under review still
+  wait, before anything changed, with `message_waiting`, the `status` tag
+  and Save. Discard shows only while a change waits. The record's field is
+  read with the bar's record and verified at compile time.
+- With no change, Save opens the `confirm` while fields wait. Its save
+  choice sends nothing and closes the dialog; its `then` choice runs the
+  `then_action` alone. Once nothing waits and nothing changed, the bar goes.
+- The admin catalog's `saveBar` gains the optional `showWhileWaiting`. The
+  JS module exports `saveBarState` (what the bar draws: shown, counts,
+  message, status, whether it offers Discard), `showsWhileWaiting` and
+  `choiceSends`, for a host's swap. `saveDecision` answers `"none"` when
+  there is no change and no dialog to open.
+
 ### Added: seams for browser tests and static pages
 
 All additive.
