@@ -617,6 +617,10 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
+#: test/support/statement_term_edit_ui.ex:1
+msgid "Ends"
+msgstr ""
+
 #: test/support/calendar_event.ex:151
 msgid "Ends at"
 msgstr ""
@@ -1065,6 +1069,10 @@ msgstr ""
 msgid "Notes"
 msgstr ""
 
+#: test/support/statement_term_edit_ui.ex:1
+msgid "Notice"
+msgstr ""
+
 #: test/support/diagram_flow.ex:138
 msgid "Offline"
 msgstr ""
@@ -1350,6 +1358,10 @@ msgctxt "one_of:status"
 msgid "Rejected"
 msgstr ""
 
+#: test/support/statement_term_edit_ui.ex:1
+msgid "Renewal"
+msgstr ""
+
 #: test/support/hub_ui.ex:1
 msgctxt "one_of:status"
 msgid "Renewal scheduled"
@@ -1598,6 +1610,7 @@ msgid "State"
 msgstr ""
 
 #: test/support/statement_edit_ui.ex:1
+#: test/support/statement_term_edit_ui.ex:1
 msgid "Statement"
 msgstr ""
 
@@ -1731,6 +1744,10 @@ msgstr ""
 msgid "Team"
 msgstr ""
 
+#: test/support/statement_term_edit_ui.ex:1
+msgid "Term"
+msgstr ""
+
 #: test/support/links.ex:267
 #: test/support/links.ex:333
 msgid "Their notes"
@@ -1798,6 +1815,7 @@ msgstr ""
 #: test/support/shared_owner_visits_ui.ex:1
 #: test/support/sort_only_ui.ex:1
 #: test/support/statement_edit_ui.ex:1
+#: test/support/statement_term_edit_ui.ex:1
 #: test/support/submission.ex:1
 #: test/support/tabbed_presets_ui.ex:1
 #: test/support/visit_document_ui.ex:1

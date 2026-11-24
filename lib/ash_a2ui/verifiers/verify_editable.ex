@@ -12,8 +12,11 @@ defmodule AshA2ui.Verifiers.VerifyEditable do
       card's context's resource): the resolved `update_action` is an update
       action of the resource, and every editable field (a detail field's
       `edit` attribute, else the field) is accepted by it (an attribute in
-      its `accept` list or an argument); a detail card's `visible` is a
-      field of the resource.
+      its `accept` list or an argument); a field edited through a
+      relationship (`[relationship, attribute]`) names a `belongs_to` or
+      `has_one` relationship, an attribute of its destination, and the
+      action takes an argument named after the relationship; a detail
+      card's `visible` is a field of the resource.
 
   Raises `Spark.Error.DslError` (surfaced by Spark as a compile-time
   diagnostic) on failure. Checks needing the target resource degrade
@@ -129,7 +132,7 @@ defmodule AshA2ui.Verifiers.VerifyEditable do
   defp verify_action(component, key, action_name, resource, dsl_state, module) do
     case action_name && ResourceInfo.action(resource, action_name) do
       %{type: :update} = action ->
-        with :ok <- verify_accepted_fields(component, key, action, dsl_state, module) do
+        with :ok <- verify_accepted_fields(component, key, action, resource, dsl_state, module) do
           verify_visible(component, key, resource, module)
         end
 
@@ -145,17 +148,25 @@ defmodule AshA2ui.Verifiers.VerifyEditable do
     end
   end
 
-  defp verify_accepted_fields(component, key, action, dsl_state, module) do
+  defp verify_accepted_fields(component, key, action, resource, dsl_state, module) do
     accepted =
       MapSet.new(List.wrap(Map.get(action, :accept)) ++ Enum.map(action.arguments, & &1.name))
 
     edits = edit_attributes(component, dsl_state)
 
-    case Enum.find(component.editable.fields, &(not MapSet.member?(accepted, edits[&1]))) do
+    problem =
+      Enum.find_value(component.editable.fields, fn field ->
+        case edit_problem(edits[field], resource, accepted) do
+          nil -> nil
+          problem -> {field, problem}
+        end
+      end)
+
+    case problem do
       nil ->
         :ok
 
-      field ->
+      {field, problem} ->
         shown = if edits[field] == field, do: "", else: " (edited as #{inspect(edits[field])})"
 
         {:error,
@@ -163,10 +174,60 @@ defmodule AshA2ui.Verifiers.VerifyEditable do
            module: module,
            path: [:a2ui, :component, key, :editable, :fields],
            message:
-             "editable field #{inspect(field)}#{shown} is not accepted by update action " <>
-               "#{inspect(action.name)} (accepts/arguments: #{inspect(MapSet.to_list(accepted))})"
+             "editable field #{inspect(field)}#{shown} " <>
+               problem_text(problem, action, accepted, resource)
          )}
     end
+  end
+
+  # What is wrong with the attribute a field edits, or nil. A field edited
+  # through a relationship names a to-one relationship of the record, an
+  # attribute of the record it leads to, and the action takes an argument
+  # named after the relationship.
+  defp edit_problem(attribute, _resource, accepted) when is_atom(attribute) do
+    if MapSet.member?(accepted, attribute), do: nil, else: :not_accepted
+  end
+
+  defp edit_problem([relationship, attribute], resource, accepted)
+       when is_atom(relationship) and is_atom(attribute) do
+    case ResourceInfo.relationship(resource, relationship) do
+      %{cardinality: :one, destination: destination} ->
+        cond do
+          is_nil(ResourceInfo.attribute(destination, attribute)) -> {:no_attribute, destination}
+          not MapSet.member?(accepted, relationship) -> {:no_argument, relationship}
+          true -> nil
+        end
+
+      _missing_or_many ->
+        {:not_to_one, relationship}
+    end
+  end
+
+  defp edit_problem(_path, _resource, _accepted), do: :bad_path
+
+  defp problem_text(:not_accepted, action, accepted, _resource) do
+    "is not accepted by update action #{inspect(action.name)} " <>
+      "(accepts/arguments: #{inspect(MapSet.to_list(accepted))})"
+  end
+
+  defp problem_text({:no_argument, relationship}, action, accepted, _resource) do
+    "edits through #{inspect(relationship)}, but update action #{inspect(action.name)} " <>
+      "takes no #{inspect(relationship)} argument " <>
+      "(accepts/arguments: #{inspect(MapSet.to_list(accepted))})"
+  end
+
+  defp problem_text({:no_attribute, destination}, _action, _accepted, _resource) do
+    "names no attribute of #{inspect(destination)}"
+  end
+
+  defp problem_text({:not_to_one, relationship}, _action, _accepted, resource) do
+    "edits through #{inspect(relationship)}, which is not a belongs_to or has_one " <>
+      "relationship of #{inspect(resource_name(resource))}"
+  end
+
+  defp problem_text(:bad_path, _action, _accepted, _resource) do
+    "must name an attribute, or a relationship and an attribute of the record it leads " <>
+      "to ([relationship, attribute])"
   end
 
   # Each editable field with the attribute its input edits: a detail

@@ -165,6 +165,15 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
 
 ### Features
 
+- **Editing a related record's values in place.** A detail field's `edit`
+  may name `[relationship, attribute]`: an attribute of the record a
+  `belongs_to` or `has_one` leads to (a contract's renewal term). Its input
+  starts from, and is typed by, the related attribute; a save sends it to
+  the card's update action as the relationship's argument, a map holding
+  the related record's primary key, so `manage_relationship` updates the
+  related record through its own action. The related record's errors are
+  shown at the field's input. The verifier checks the relationship, the
+  attribute and the argument. Nothing changes on the wire.
 - **Editing a record in place, saved by a save bar** (admin catalog 3.11.0,
   ADR 0010). `editable` now goes on a `:detail` card too, with `visible`
   gating it per record; a field's new `edit` option names the attribute

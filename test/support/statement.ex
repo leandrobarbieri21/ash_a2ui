@@ -33,12 +33,31 @@ defmodule AshA2ui.Test.Statement do
     attribute :reviewed, :boolean, public?: true, default: false
   end
 
+  relationships do
+    # The term the statement states, on its own record (editing a related
+    # record's values in place, `AshA2ui.Test.StatementTermEditUI`).
+    has_one :term, AshA2ui.Test.StatementTerm do
+      public? true
+      destination_attribute :statement_id
+    end
+  end
+
   actions do
     defaults [:read, :destroy, create: :*, update: :*]
 
     update :correct do
       accept [:title, :amount, :kind, :due_on]
       require_atomic? false
+
+      # The term's values, corrected through the term's own action.
+      argument :term, :map
+
+      change manage_relationship(:term,
+               on_match: {:update, :correct},
+               on_no_match: :error,
+               on_missing: :ignore,
+               on_lookup: :ignore
+             )
 
       validate compare(:amount, greater_than_or_equal_to: 0)
 
@@ -57,6 +76,22 @@ defmodule AshA2ui.Test.Statement do
 
   calculations do
     calculate :correctable, :boolean, expr(not locked), public?: true
+
+    calculate :term_ends_text,
+              :string,
+              {AshA2ui.Test.StatementTermText, field: :ends_on},
+              public?: true
+
+    calculate :term_notice_text,
+              :string,
+              {AshA2ui.Test.StatementTermText, field: :notice_days},
+              public?: true
+
+    calculate :term_renewal_text,
+              :string,
+              {AshA2ui.Test.StatementTermText, field: :renewal},
+              public?: true
+
     calculate :review_open, :boolean, expr(not reviewed), public?: true
 
     calculate :amount_text,

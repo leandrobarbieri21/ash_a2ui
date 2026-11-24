@@ -2390,8 +2390,11 @@ defmodule AshA2ui.Encoder do
   defp put_edit(display, _view, _detail, _field), do: display
 
   # The input an edited attribute takes, from its type: a choice of an
-  # enum's or `one_of`'s values, a number, a date, else text.
-  defp edit_input(view, resource, attr) do
+  # enum's or `one_of`'s values, a number, a date, else text. A field
+  # edited through a relationship takes the related attribute's.
+  defp edit_input(view, resource, edit) do
+    {resource, attr} = ResolvedView.edit_target(resource, edit)
+
     case AshA2ui.TypeMapper.choices(resource, attr, view.l10n) do
       [_ | _] = choices ->
         %{

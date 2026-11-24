@@ -524,10 +524,37 @@ topics for the full contracts.
   on the bar's record. A refusal saves nothing, keeps the changes, puts
   each field's error at its input (`/ui/edit_errors/<card>/<field>`) and
   says the rest as the outcome. Authorization is the actions' own policies.
+- A value kept on a related record is edited through its relationship:
+  `edit [:term, :ends_on]` names an attribute of the record a `belongs_to`
+  or `has_one` leads to. The input starts from, and is typed by, that
+  attribute (empty while there is no related record). A save sends it as
+  the relationship's argument, the map `manage_relationship` takes, with
+  the related record's primary key; the card's update action passes it on
+  to an action of the related record, which keeps its own validations,
+  changes and policies:
+
+  ```elixir
+  # the card's resource
+  update :correct do
+    argument :term, :map
+    change manage_relationship(:term, on_match: {:update, :correct},
+             on_no_match: :error, on_missing: :ignore, on_lookup: :ignore)
+  end
+
+  # the surface
+  field :term_ends_text do
+    label "Ends"
+    edit [:term, :ends_on]   # sent as %{"term" => %{"id" => ..., "ends_on" => ...}}
+  end
+  ```
+
+  The related record's errors land at the field's input too.
 - The `editable` fields (through their `edit` attribute) must be accepted
-  by the update action, `visible` and `then_visible` must be fields of the
-  record and `then_action` an update action of it, or the surface does not
-  compile. The basic catalog draws the card read-only and no bar.
+  by the update action (for `[relationship, attribute]`: a to-one
+  relationship, an attribute of its destination, and an argument named
+  after the relationship), `visible` and `then_visible` must be fields of
+  the record and `then_action` an update action of it, or the surface does
+  not compile. The basic catalog draws the card read-only and no bar.
 
 ## Record pages (`page_header`, `section_nav`, `lead`, `alert`)
 

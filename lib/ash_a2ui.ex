@@ -282,7 +282,7 @@ defmodule AshA2ui do
         """
       ],
       edit: [
-        type: :atom,
+        type: {:or, [:atom, {:list, :atom}]},
         doc: """
         The attribute a person edits for this field on an editable `:detail`
         card (admin catalog 3.11), when the field shown is not the stored
@@ -292,6 +292,18 @@ defmodule AshA2ui do
         number, date, or a choice of an atom's `one_of` values). Defaults to
         the field itself. The card's `editable` `update_action` must accept
         it.
+
+        A value kept on a related record is edited through its relationship:
+        `[:term, :ends_on]` names an attribute of the record a `belongs_to` or
+        `has_one` relationship leads to. The input starts from, and is typed
+        by, that record's attribute (empty while there is no related record).
+        A save sends it to the card's
+        `update_action` as the relationship's argument: a map of the edited
+        attributes and the related record's primary key
+        (`%{"term" => %{"id" => ..., "ends_on" => "2027-06-30"}}`), the input
+        `manage_relationship` takes, so the action updates the related record
+        through an action of its own (`on_match: {:update, :correct}`). The
+        `update_action` must take an argument named after the relationship.
         """
       ],
       empty_text: [
