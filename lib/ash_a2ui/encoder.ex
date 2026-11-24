@@ -2319,6 +2319,7 @@ defmodule AshA2ui.Encoder do
         |> put_detail_review(view, field, "/detail/#{detail.context}/")
         |> put_field_action(view, detail, field)
         |> put_edit(view, detail, field)
+        |> put_preview(view, detail, field)
         |> put_empty_text(view, field)
         |> put_field_note(view, field)
         |> maybe_put("hideWhenEmpty", field in detail.component.hide_empty || nil)
@@ -2456,6 +2457,16 @@ defmodule AshA2ui.Encoder do
 
   defp put_edit(display, _view, _detail, _field), do: display
 
+  # Catalog 3.15: a recalculated field binds its value worked out again
+  # with the unsaved changes applied (`/ui/preview/<context>/<field>`, a map
+  # with its `value` and, for a steps field, its `steps`), absent while
+  # there is none.
+  defp put_preview(display, view, detail, field) do
+    if field in ResolvedView.recalculated(view, detail.context),
+      do: Map.put(display, "preview", %{"@path" => "/ui/preview/#{detail.context}/#{field}"}),
+      else: display
+  end
+
   # The input an edited attribute takes, from its type: a choice of an
   # enum's or `one_of`'s values, a number, a date, else text. A field
   # edited through a relationship takes the related attribute's.
@@ -2521,7 +2532,18 @@ defmodule AshA2ui.Encoder do
       |> maybe_put("domId", bar.id)
       |> maybe_put("confirm", save_bar_confirm(bar.confirm))
       |> maybe_put("showWhileWaiting", show_while_waiting(bar))
+      |> maybe_put("preview", save_bar_preview(view))
     ]
+  end
+
+  # Catalog 3.15: the envelope the bar sends whenever the unsaved changes
+  # change, for the server to work out the recalculated fields with them.
+  # Only on a surface with recalculated fields.
+  defp save_bar_preview(%{recalculated: recalculated}) when map_size(recalculated) == 0, do: nil
+
+  defp save_bar_preview(view) do
+    context = put_contexts_binding(%{"edits" => %{"@path" => "/ui/edits"}}, view)
+    %{"action" => "preview_changes", "context" => context}
   end
 
   # Catalog 3.14: true, or the name of the record's field gating it.

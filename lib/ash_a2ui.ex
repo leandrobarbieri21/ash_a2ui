@@ -220,6 +220,28 @@ defmodule AshA2ui do
         catalog (`fieldDisplay`'s `note`); translated in the metadata domain.
         """
       ],
+      recalculate: [
+        type: :boolean,
+        doc: """
+        On `:detail` cards, this field's value follows a person's unsaved
+        changes to the record's editable cards (admin catalog 3.15): while a
+        change waits for the `save_bar`, the server works the value out
+        again with the changes applied and the cards show that result, before
+        Save. A notice deadline that comes from an expiry date and a notice
+        period, say. Discard puts the stored value back.
+
+        The server's own rule decides it, never a copy in the browser: it runs
+        each card's `update_action` with the changes, as the save would (its
+        changes and the related records' actions included), reads the field
+        again with the record, and rolls the transaction back, so nothing is
+        written and nothing is notified. The context's resource must have a
+        data layer with transactions. The field must be drawn on a `:detail`
+        card whose context has an editable card, and must not be an editable
+        field of that context. The admin `fieldDisplay` binds the result as
+        `preview` (`/ui/preview/<context>/<field>`); the basic catalog shows
+        the stored value.
+        """
+      ],
       review: [
         type: :atom,
         doc: """
@@ -3349,6 +3371,7 @@ defmodule AshA2ui do
     AshA2ui.Verifiers.VerifyTableDisplays,
     AshA2ui.Verifiers.VerifyEditable,
     AshA2ui.Verifiers.VerifySaveBar,
+    AshA2ui.Verifiers.VerifyRecalculate,
     AshA2ui.Verifiers.VerifyReports,
     AshA2ui.Verifiers.VerifyExport,
     AshA2ui.Verifiers.VerifyRelationships,

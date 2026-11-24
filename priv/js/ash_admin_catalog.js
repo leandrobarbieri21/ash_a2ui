@@ -147,7 +147,7 @@ import {
 } from "./ash_a2ui_catalog.js";
 
 // The ash_a2ui catalog's id: the admin envelopes are sent as its ashAction.
-import {ASH_A2UI_CATALOG_ID, EDITS_PATH, LIVE_LINK_ATTRIBUTE, LIVE_LINK_KINDS} from "./ash_a2ui_protocol.js";
+import {ASH_A2UI_CATALOG_ID, EDITS_PATH, PREVIEW_PATH, LIVE_LINK_ATTRIBUTE, LIVE_LINK_KINDS} from "./ash_a2ui_protocol.js";
 
 /**
  * The attribute a drawn link carries when the surface declared it live
@@ -264,7 +264,7 @@ export function pairActionEntry(column, item) {
 // state, shared by the stock elements and a host's swaps.
 
 /** Where a surface holds its unsaved changes (`/ui/edits`). */
-export {EDITS_PATH};
+export {EDITS_PATH, PREVIEW_PATH};
 
 /** Where a refused save writes each edited field's message. */
 export const EDIT_ERRORS_PATH = "/ui/edit_errors";
@@ -323,10 +323,52 @@ function jsonCopy(value) {
   return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : {};
 }
 
-/** Drops every unsaved change and every refused save's message. */
+/**
+ * Drops every unsaved change, every refused save's message and every value
+ * worked out from the changes (3.15).
+ */
 export function discardEdits(dataModel) {
   dataModel.set(EDITS_PATH, {});
   dataModel.set(EDIT_ERRORS_PATH, {});
+  dataModel.set(PREVIEW_PATH, {});
+}
+
+// --- 3.15: values recalculated from the unsaved changes ---------------------
+//
+// A recalculated fieldDisplay binds `preview` (/ui/preview/<context>/<field>):
+// the server's own result for the field with the unsaved changes applied,
+// `{value, steps?}`. The saveBar sends its `preview` envelope whenever
+// /ui/edits changes, and the server writes /ui/preview whole. The browser
+// never works a value out: it draws what the server sent.
+
+/** A fieldDisplay's bound `preview`, or null while there is none. */
+export function previewEntry(preview) {
+  return preview && typeof preview === "object" && !Array.isArray(preview) ? preview : null;
+}
+
+/**
+ * A fieldDisplay's props as it draws them: with a preview, its `value` (and
+ * a steps field's `steps`) are the preview's. The stock element and a
+ * host's swap both draw from it.
+ */
+export function previewedProps(props) {
+  const preview = previewEntry(props?.preview);
+  if (!preview) return props;
+  const shown = {...props, value: preview.value ?? null};
+  if (props.steps !== undefined || preview.steps !== undefined) shown.steps = preview.steps ?? [];
+  return shown;
+}
+
+/** The preview_changes envelope a saveBar sends, or null when it has none. */
+export function previewSpec(props) {
+  const preview = props?.preview;
+  if (!preview || typeof preview.action !== "string") return null;
+  return {name: preview.action, context: {...(preview.context || {})}, catalogId: ASH_A2UI_CATALOG_ID};
+}
+
+/** The key a saveBar compares to tell its unsaved changes changed. */
+export function editsKey(edits) {
+  return JSON.stringify(edits && typeof edits === "object" ? edits : {});
 }
 
 /** How many fields hold an unsaved change in `edits` (`/ui/edits`). */
@@ -482,7 +524,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.14.0";
+export const ADMIN_CATALOG_VERSION = "3.15.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -1034,6 +1076,8 @@ export function buildSchemas(basicCatalog = null) {
       editVisible: DynamicValueSchema.nullable().optional(),
       editDraft: DynamicValueSchema.nullable().optional(),
       editError: DynamicValueSchema.nullable().optional(),
+      // 3.15: the field worked out again with the unsaved changes ({value, steps?}).
+      preview: DynamicValueSchema.nullable().optional(),
       weight: Num.optional(),
     }),
 
@@ -1054,6 +1098,9 @@ export function buildSchemas(basicCatalog = null) {
       // The save_changes envelope (static: the bar adds the choice and the
       // context's bindings resolve at click time).
       action: RecordAny.optional(),
+      // 3.15: the preview_changes envelope, sent whenever the changes change
+      // (static: the context's bindings resolve when it is sent).
+      preview: RecordAny.optional(),
       confirm: RecordAny.optional(),
       domId: Str.optional(),
       weight: Num.optional(),
@@ -4751,7 +4798,9 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       }
 
       render() {
-        const props = this.controller?.props;
+        // 3.15: a recalculated field draws the server's result for the
+        // unsaved changes while there is one.
+        const props = previewedProps(this.controller?.props);
         if (!props) return nothing;
 
         // 3.12: a masked field draws its value (the masked word) as plain
@@ -5020,8 +5069,25 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this._amSaveBusy = false;
       }
 
+      /**
+       * 3.15: sends the bar's preview envelope (preview_changes, quiet) once
+       * the unsaved changes differ from the ones last sent, emptied ones
+       * too, so the server's last answer always matches the changes held.
+       * A swap that overrides `updated` keeps this by calling super.
+       */
+      sendPreview() {
+        const props = this.controller?.props;
+        const spec = previewSpec(props);
+        if (!spec || !this.context?.componentModel) return;
+        const key = editsKey(props.edits);
+        if (key === (this._amPreviewKey ?? editsKey({}))) return;
+        this._amPreviewKey = key;
+        dispatchActionSpec(this.context, spec);
+      }
+
       updated(changed) {
         super.updated?.(changed);
+        this.sendPreview();
         const dialog = this.renderRoot?.querySelector?.("dialog");
         if (!dialog) return;
         if (this._amConfirmOpen && !dialog.open && typeof dialog.showModal === "function") dialog.showModal();

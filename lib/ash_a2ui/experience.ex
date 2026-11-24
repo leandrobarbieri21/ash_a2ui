@@ -197,10 +197,11 @@ defmodule AshA2ui.Experience do
   column `items` and `pairAction` (a review and a field action per item of a
   `pairs` column), with those items counted by review summaries; 3.11 the
   fieldDisplay `edit` keys (editing a detail card's value in place) and the
-  `saveBar` that saves the changes.
+  `saveBar` that saves the changes; 3.15 the fieldDisplay and saveBar
+  `preview` (values recalculated from the unsaved changes).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.14.0"
+  def admin_catalog_version, do: "3.15.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders

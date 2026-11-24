@@ -558,6 +558,28 @@ topics for the full contracts.
   ```
 
   The related record's errors land at the field's input too.
+- A value worked out from editable ones follows the unsaved changes with
+  `recalculate true` on its field (admin catalog 3.15): a notice date from
+  an end date and a notice period, a yearly amount from a monthly one.
+  Whenever the changes change, the bar sends `preview_changes`; the server
+  runs each card's `update_action` with them as a save would (its changes,
+  validations and the related records' actions), reads the recalculated
+  fields with the record, and rolls the transaction back. The cards draw
+  the result from `/ui/preview/<context>/<field>`; Discard and a save clear
+  it. Nothing is written and nothing is notified, and the browser never
+  computes a value. An update the action refuses shows the stored values
+  (Save reports why).
+
+  ```elixir
+  field :notice_by_text do
+    label "Notice by"
+    note "Calculated"
+    recalculate true   # on any :detail card of a context with an editable card
+  end
+  ```
+
+  The context's resource needs a data layer with transactions (Postgres,
+  Mnesia; not ETS), and a recalculated field may not be an editable one.
 - The `editable` fields (through their `edit` attribute) must be accepted
   by the update action (for `[relationship, attribute]`: a to-one
   relationship, an attribute of its destination, and an argument named

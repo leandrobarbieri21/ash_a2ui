@@ -194,6 +194,7 @@
 
 import {
   EDITS_PATH,
+  PREVIEW_PATH,
   FEEDBACK_PATH,
   FEEDBACK_TEXT_PATH,
   PROTOCOL_VERSION,
@@ -722,14 +723,17 @@ export const AshA2ui = {
     if (!this.processor) return;
 
     // A refresh of the whole data model keeps a person's unsaved changes to
-    // editable cards (admin catalog 3.11) as it keeps their prompt edits.
+    // editable cards (admin catalog 3.11), and the values worked out from
+    // them (3.15), as it keeps their prompt edits.
+    const kept = (path) => (id) => {
+      const dataModel = this.surfaceDataModel(id);
+      return dataModel ? copyJson(dataModel.get(path)) : null;
+    };
     const batch = keepPromptEdits(
       keepUnsavedEdits(
         replaceExistingSurfaces(messages, (id) => this.surfaceExists(id)),
-        (id) => {
-          const dataModel = this.surfaceDataModel(id);
-          return dataModel ? copyJson(dataModel.get(EDITS_PATH)) : null;
-        },
+        kept(EDITS_PATH),
+        kept(PREVIEW_PATH),
       ),
       this.promptEdits(),
     );
