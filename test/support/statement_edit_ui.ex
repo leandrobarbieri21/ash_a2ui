@@ -48,7 +48,7 @@ defmodule AshA2ui.Test.StatementEditUI do
       status "%{count} to check"
       status_one "1 to check"
       edit_reviews true
-      show_while_waiting(:correctable)
+      show_while_waiting :correctable
 
       confirm do
         title "Save with %{count} values unchecked?"

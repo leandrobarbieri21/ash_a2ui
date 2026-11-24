@@ -28,6 +28,17 @@ Additive, under the same catalog id.
   `choiceSends`, for a host's swap. `saveDecision` answers `"none"` when
   there is no change and no dialog to open.
 
+### Added: whether a document pane is drawn, for the page around it
+
+- `AshA2ui.LiveRenderer` assigns `:ash_a2ui_document_shown`
+  (`%{"<pane>" => true}`): the panes open in the address *with a document to
+  draw*. `:ash_a2ui_document_state` still follows the address alone, so an
+  old or shared link holds a pane open on a record with no document; a page
+  whose layout follows the pane reads the new assign. It follows the address
+  until the surface has built, then drops a pane whose record arrives with
+  `_document_<name>` nil (the bootstrap, a refresh, a context change, an
+  action that re-sends the record).
+
 ### Added: seams for browser tests and static pages
 
 All additive.

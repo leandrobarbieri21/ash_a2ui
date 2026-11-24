@@ -733,6 +733,59 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         assert opts[:document_state] == %{"referral" => true}
       end
 
+      test "document panes: the page is told a pane is shown only with a document to draw", %{
+        conn: conn
+      } do
+        # With a document: the address and the drawn pane agree.
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane?document=shown")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+        assert document_assigns(view) == {%{"referral" => true}, %{"referral" => true}}
+
+        # Closed by the switch: both follow the person.
+        hide = %{"pane" => "referral", "shown" => false}
+        render_hook(view, "a2ui:message", Messages.call("document_pane", "visit_document", hide))
+        assert document_assigns(view) == {%{}, %{}}
+
+        # Without one (an old or shared link to a record with no document):
+        # the address holds the pane open, but nothing is drawn.
+        Application.put_env(:ash_a2ui, :live_renderer_test_document, nil)
+        on_exit(fn -> Application.delete_env(:ash_a2ui, :live_renderer_test_document) end)
+
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane?document=shown")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+        assert document_assigns(view) == {%{"referral" => true}, %{}}
+
+        # Back/forward keeps it undrawn.
+        render_patch(view, "/live-renderer/document-pane")
+        render_patch(view, "/live-renderer/document-pane?document=shown")
+        assert document_assigns(view) == {%{"referral" => true}, %{}}
+      end
+
+      test "document panes: a refresh that brings a document draws the open pane", %{conn: conn} do
+        Application.put_env(:ash_a2ui, :live_renderer_test_document, nil)
+        on_exit(fn -> Application.delete_env(:ash_a2ui, :live_renderer_test_document) end)
+
+        {:ok, view, _html} = live(conn, "/live-renderer/document-pane?document=shown")
+        assert_push_event(view, "a2ui:messages", %{messages: _initial}, 1_000)
+        assert document_assigns(view) == {%{"referral" => true}, %{}}
+
+        Application.put_env(:ash_a2ui, :live_renderer_test_document, %{
+          "src" => "/referrals/1/file",
+          "fileName" => "referral.pdf",
+          "regions" => []
+        })
+
+        send(view.pid, :anything_changed)
+        assert_receive {:data_model_fn, AshA2ui.Test.VisitDocumentUI, _opts}, 1_000
+        assert document_assigns(view) == {%{"referral" => true}, %{"referral" => true}}
+      end
+
+      # What the address holds open, and what is drawn.
+      defp document_assigns(view) do
+        assigns = :sys.get_state(view.pid).socket.assigns
+        {assigns.ash_a2ui_document_state, assigns.ash_a2ui_document_shown}
+      end
+
       test "deep_link: back/forward to other ctx params re-applies them", %{
         conn: conn,
         ada: ada
