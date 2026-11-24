@@ -88,6 +88,27 @@ export const FLASH_MS = 3000;
 /** The zoom steps, as factors of the width that fits the viewer. */
 export const ZOOM_STEPS = Object.freeze([0.5, 0.75, 1, 1.25, 1.5, 2, 3]);
 
+/**
+ * The width the pages may take in their scroll area: its `clientWidth`
+ * (inside its borders, without a scrollbar it shows) less its padding.
+ */
+export function usableWidth(area) {
+  if (!area) return 0;
+  const style = getComputedStyle(area);
+  const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+  return area.clientWidth - padding;
+}
+
+/**
+ * The width a fitted page is drawn at in a usable width: whole CSS pixels,
+ * 1px short of it. `clientWidth` is rounded, and the area's real width (on
+ * a 2x screen, half pixels) can be a fraction below it, so a page as wide
+ * as the rounded width can still reach past the edge.
+ */
+export function fittedWidth(usable) {
+  return Math.max(0, Math.floor(usable) - 1);
+}
+
 const fraction = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1;
 
 /**
@@ -558,6 +579,8 @@ export function defineDocumentElements({
         super.disconnectedCallback();
         this._resize?.disconnect();
         this._resize = null;
+        this._sized = null;
+        clearTimeout(this._refit);
         this._scroller?.removeEventListener("scroll", this._onScroll);
         this._scroller = null;
         this.close();
@@ -589,6 +612,7 @@ export function defineDocumentElements({
       updated(changed) {
         super.updated?.(changed);
         this.watchScroll();
+        if (this._status === "ready") this.watchSize();
       }
 
       // ── the file ─────────────────────────────────────────────────────────
@@ -596,6 +620,8 @@ export function defineDocumentElements({
       async open(src) {
         this.close();
         this._status = "loading";
+        // A new file is fitted afresh, at the zoom the person chose.
+        this._scaled = false;
         this._pages = [];
         try {
           const engine = await loadEngine();
@@ -648,23 +674,32 @@ export function defineDocumentElements({
         return [...this.renderRoot.querySelectorAll("[data-page-sheet]")];
       }
 
-      // The scale that fits the first page's width in the canvas, then the zoom on it.
+      // The scale that fits the widest page in the canvas's usable width, then
+      // the zoom on it. Only the fit zoom follows the width: a zoom the person
+      // chose keeps its scale until they zoom again.
       fit() {
         const area = this.scrollArea();
-        const first = this._pages[0];
-        if (!area || !first) return;
-        const style = getComputedStyle(area);
-        const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
-        const width = area.clientWidth - padding;
-        if (width <= 0) return;
-        this._fit = width / first.width;
-        this.applyScale();
+        if (!area || this._pages.length === 0) return;
+        const width = usableWidth(area);
+        const fitted = fittedWidth(width);
+        if (fitted <= 0) return;
+        const widest = Math.max(...this._pages.map((page) => page.width));
+        this._fitWidth = width;
+        this._fitOuter = area.offsetWidth;
+        this._fit = fitted / widest;
+        if (this._zoom === 1 || !this._scaled) this.applyScale();
       }
 
       async applyScale() {
         const scale = this._fit * this._zoom;
         if (!scale) return;
         this._scale = scale;
+        this._scaled = true;
+        // At the fit zoom the pages fit by construction: no sideways
+        // scrolling, so a rounding difference never draws a scrollbar. A zoom
+        // the person chose scrolls both ways.
+        const area = this.scrollArea();
+        if (area) area.style.overflowX = this._zoom === 1 ? "hidden" : "";
         await this.updateComplete;
         this.paint();
       }
@@ -702,17 +737,46 @@ export function defineDocumentElements({
         }
       }
 
+      // Re-fits when the scroll area's usable width changes: the window or the
+      // pane resized, or a scrollbar appeared or went away. The viewer's own
+      // box keeps its size when a scrollbar comes, so the scroll area is what
+      // is watched.
       watchSize() {
-        if (this._resize) return;
-        let width = this.scrollArea()?.clientWidth;
-        this._resize = new ResizeObserver(() => {
-          const now = this.scrollArea()?.clientWidth;
-          if (!now || now === width) return;
-          width = now;
-          clearTimeout(this._refit);
-          this._refit = setTimeout(() => this.fit(), 150);
-        });
-        this._resize.observe(this);
+        const area = this.scrollArea();
+        if (!area || area === this._sized || typeof ResizeObserver === "undefined") return;
+        this._resize ||= new ResizeObserver(() => this.onResize());
+        if (this._sized) this._resize.unobserve(this._sized);
+        this._sized = area;
+        this._resize.observe(area);
+      }
+
+      onResize() {
+        const area = this.scrollArea();
+        const width = usableWidth(area);
+        if (width <= 0 || width === this._fitWidth) return;
+        // Wider in the same box because its scrollbar went away, but the pages
+        // fitted to the wider width would bring it back: keep the narrower
+        // fit, or the two would take turns.
+        const scrollbarOnly = area.offsetWidth === this._fitOuter;
+        if (this._zoom === 1 && scrollbarOnly && width > this._fitWidth && this.scrollsAt(width)) return;
+        clearTimeout(this._refit);
+        this._refit = setTimeout(() => this.fit(), 150);
+      }
+
+      // Whether the pages, fitted to `width`, would be taller than the scroll
+      // area (so it would show its vertical scrollbar). Only an `auto` area
+      // takes a scrollbar away when the pages get shorter.
+      scrollsAt(width) {
+        const area = this.scrollArea();
+        const sheets = this.sheets();
+        if (!area || sheets.length === 0 || !this._fitWidth) return false;
+        const style = getComputedStyle(area);
+        if (style.overflowY !== "auto") return false;
+        const rects = sheets.map((sheet) => sheet.getBoundingClientRect());
+        const pages = rects.reduce((sum, rect) => sum + rect.height, 0);
+        const gaps = rects.at(-1).bottom - rects[0].top - pages;
+        const padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+        return pages * (width / this._fitWidth) + gaps + padding > area.clientHeight;
       }
 
       watchScroll() {
@@ -885,8 +949,10 @@ export function defineDocumentElements({
       renderPage(meta, regions, strings) {
         const count = this._pages.length;
         const scale = this._scale || 0;
-        const width = Math.floor(meta.width * scale);
-        const height = Math.floor(meta.height * scale);
+        // Whole CSS pixels, never wider than the scale gives (the epsilon keeps
+        // 783.99999 from a fit of 784px at 784).
+        const width = Math.floor(meta.width * scale + 1e-6);
+        const height = Math.floor(meta.height * scale + 1e-6);
         const selected = this._selected;
         const linked = {linked: this._linked, linkedState: (region) => this.linkedState(region)};
         return html`<div
