@@ -203,6 +203,7 @@ spark_locals_without_parens = [
   sections: 0,
   sections: 1,
   select_context: 1,
+  show_while_waiting: 1,
   sort: 1,
   sort_by: 1,
   sort_first: 1,
