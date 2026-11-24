@@ -10,6 +10,24 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: a save bar counts the table rows still waiting (admin catalog 3.16.0)
+
+Additive, under the same catalog id.
+
+- A `save_bar` counted only its context's `:detail` review fields, so a
+  table's rows still waiting for review (a `review` column, 3.3; a row's
+  ✓, 3.9; `pairs` items, 3.10) never kept it up: checking every field made
+  the bar go while a `review_summary` still counted lines. The bar now
+  counts them too, the rows a `review_summary` counts (tables filtered by
+  the context alone), each once.
+- The server counts them in the same walk and the same read as the review
+  summary (`AshA2ui.ReviewSummary.data/4`) and puts them on the bar's
+  record at `_review_rows` (`AshA2ui.SaveBar.rows_key/0`),
+  `%{"waiting" => n}`, refreshed with the record, so a row's ✓ counts down.
+- In the browser, `waitingReviews` adds them (`rowsWaiting`): the bar
+  shows while they wait (`show_while_waiting`), its `status` counts them,
+  Save opens the `confirm`, and `then_when_clear` waits for them.
+
 ### Fixed: a blank body child holds no gap in the record page
 
 Renderer only; the wire is unchanged.

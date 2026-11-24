@@ -385,14 +385,24 @@ export function editCount(edits) {
 const WAITING_STATES = ["pending", "missing"];
 
 /**
+ * 3.16: the table rows (and pairs items) still waiting on a saveBar's
+ * record, as the server counts them (`_review_rows.waiting`); 0 without.
+ */
+export function rowsWaiting(record) {
+  const count = record?._review_rows?.waiting;
+  return Number.isInteger(count) && count > 0 ? count : 0;
+}
+
+/**
  * How many of a saveBar's fields under review still wait: their review on
  * the bar's `record` is pending or missing, unless `editReviews` and the
- * field has an unsaved change (saving it reviews it).
+ * field has an unsaved change (saving it reviews it); plus (3.16) the
+ * table rows still waiting on the record (`rowsWaiting`).
  */
 export function waitingReviews(props) {
   const record = props?.record && typeof props.record === "object" ? props.record : {};
   const edits = props?.edits && typeof props.edits === "object" ? props.edits : {};
-  let waiting = 0;
+  let waiting = rowsWaiting(record);
   for (const entry of Array.isArray(props?.reviews) ? props.reviews : []) {
     const state = reviewEntry(record[`_review_${entry?.field}`])?.state;
     if (!WAITING_STATES.includes(state)) continue;
@@ -524,7 +534,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.15.0";
+export const ADMIN_CATALOG_VERSION = "3.16.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no

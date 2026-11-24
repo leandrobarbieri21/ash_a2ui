@@ -526,6 +526,12 @@ topics for the full contracts.
   opens the `confirm`; its `save_label` then sends nothing (there is
   nothing to write) and its `then_label` runs the `then_action` alone. The
   bar goes once nothing waits and nothing changed.
+- The rows of the context's tables count with its fields (admin catalog
+  3.16), the ones a `review_summary` counts: a table filtered by the
+  context alone, each row waiting once. The server carries them on the
+  bar's record at `_review_rows` (`%{"waiting" => n}`), refreshed with the
+  record, so a row's ✓ counts down and the bar stays until the last line
+  is checked.
 - The server re-reads each card's record through its context as the actor,
   refuses it unless `visible` holds, and runs each card's `update_action`
   with only the changed fields, cast to their attributes, in one

@@ -28,6 +28,11 @@ defmodule AshA2ui.ReviewSummary do
   section's own id (`#section_<component>`). With nothing waiting it is
   `fallback_href`, worded `fallback_label`.
 
+  The save bar of the same context counts those rows too (admin catalog
+  3.16): its record carries `_review_rows` (`AshA2ui.SaveBar.rows_key/0`),
+  `%{"waiting" => n}`, the rows and items above still waiting, read by the
+  same walk and in the same read, so the bar and the summary always agree.
+
   The record carries the summary at `/detail/<context>/_review_summary_<component>`:
 
       %{
@@ -63,24 +68,38 @@ defmodule AshA2ui.ReviewSummary do
 
   @doc """
   The review summaries of `context`'s record: one `_review_summary_<component>`
-  per `:detail` component of that context declaring a `review_summary`.
-  `opts` are the read options (`:actor`, `:tenant`, ...) a counted table's
-  rows are read with.
+  per `:detail` component of that context declaring a `review_summary`, and,
+  when the surface's `save_bar` reads that context, its `_review_rows` (the
+  counted tables' rows and items still waiting, catalog 3.16). `opts` are
+  the read options (`:actor`, `:tenant`, ...) a counted table's rows are
+  read with; they are read once for both.
   """
   @spec data(ResolvedView.t(), atom, struct(), keyword) :: %{String.t() => map}
   def data(view, context, record, opts \\ []) do
-    case for(
-           %{component: %{review_summary: %__MODULE__{}} = component} <- view.details,
-           component.context == context,
-           do: component
-         ) do
-      [] ->
-        %{}
+    components =
+      for %{component: %{review_summary: %__MODULE__{}} = component} <- view.details,
+          component.context == context,
+          do: component
 
-      components ->
-        waiting = waiting(view, context, record, opts)
-        Map.new(components, &{key(&1), summary(view, &1.review_summary, waiting)})
+    bar? = match?(%AshA2ui.SaveBar{context: ^context}, view.save_bar)
+
+    if components == [] and not bar? do
+      %{}
+    else
+      waiting = waiting(view, context, record, opts)
+      summaries = Map.new(components, &{key(&1), summary(view, &1.review_summary, waiting)})
+
+      if bar?,
+        do: Map.put(summaries, AshA2ui.SaveBar.rows_key(), rows(view, waiting)),
+        else: summaries
     end
+  end
+
+  # The save bar's share: what waits in the counted tables, not on the cards
+  # (the bar counts the cards' fields itself, with the unsaved changes).
+  defp rows(view, waiting) do
+    tables = MapSet.new(view.tables, & &1.component)
+    %{"waiting" => Enum.count(waiting, fn {_key, _field, component} -> component in tables end)}
   end
 
   defp summary(view, summary, waiting) do

@@ -809,7 +809,9 @@ transaction). A refused save keeps the changes and says why: each
 field's error at its input, the rest as the outcome. A `confirm` asks
 first while fields still wait. Unsaved changes survive a refresh of the
 surface's data. With `show_while_waiting` it also shows while fields
-under review wait, before anything changed (admin catalog 3.14).
+under review wait, before anything changed (admin catalog 3.14). The
+rows of the context's tables count with its fields, as a
+`review_summary` counts them (3.16).
 
 
 ### Nested DSLs

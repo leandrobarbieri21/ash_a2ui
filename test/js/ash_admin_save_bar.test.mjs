@@ -15,6 +15,7 @@ import {feedback, keepUnsavedEdits} from "../../priv/js/ash_a2ui_protocol.js";
 const {
   editCount,
   waitingReviews,
+  rowsWaiting,
   countText,
   saveDecision,
   saveBarState,
@@ -177,6 +178,27 @@ test("3.14: what the bar draws, with and without a change, while fields wait and
 
   // a record with no review fields at all: no bar
   assert.equal(saveBarState({...base, showWhileWaiting: true, record: {id: "s1"}}).shown, false);
+});
+
+test("3.16: the table rows still waiting on the record count with the fields", () => {
+  const rows = (waiting) => ({_review_rows: {waiting}});
+  assert.equal(rowsWaiting(rows(3)), 3);
+  assert.equal(rowsWaiting({}), 0);
+  assert.equal(rowsWaiting(rows("2")), 0);
+  assert.equal(rowsWaiting(rows(-1)), 0);
+  assert.equal(rowsWaiting(null), 0);
+
+  // two lines wait beside one field
+  assert.equal(waitingReviews({reviews, record: record("pending", "reviewed", rows(2))}), 3);
+  // every field reviewed, lines still waiting: the bar stays, counting them
+  const base = {reviews, showWhileWaiting: true, status: "%{count} to check", statusOne: "1 to check"};
+  const linesOnly = saveBarState({...base, record: record("reviewed", "reviewed", rows(1))});
+  assert.equal(linesOnly.shown, true);
+  assert.equal(linesOnly.status, "1 to check");
+  // and Save asks first while they wait
+  assert.equal(saveDecision({...base, confirm, record: record("reviewed", "reviewed", rows(1))}), "confirm");
+  // none left: the bar goes
+  assert.equal(saveBarState({...base, record: record("reviewed", "reviewed", rows(0))}).shown, false);
 });
 
 test("the dialog offers its second choice only where the record offers it", () => {
