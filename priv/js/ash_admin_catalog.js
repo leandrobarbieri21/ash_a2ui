@@ -1880,6 +1880,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         for (const path of Object.values(props?.leadVisible || {})) {
           if (typeof path === "string") paths.push(path);
         }
+        for (const ref of childRefs(props?.children)) paths.push(...this.blankPaths(ref.id));
         return [...new Set(paths)];
       }
 
@@ -2063,8 +2064,62 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
       renderBody(props) {
         return html`<div class="page-body">
-          ${childRefs(props.children).map((ref) => html`${this.renderNode(ref)}`)}
+          ${this.shownChildren(props).map((ref) => html`${this.renderNode(ref)}`)}
         </div>`;
+      }
+
+      /**
+       * The body children with something to show. A blank child (a Column
+       * with no children, or whose Texts are all empty: the
+       * `action_result_panel` until a generic action returns text) is not
+       * drawn, so it holds no gap in the page's column; it is drawn as soon
+       * as one of its Texts has words (watchedPaths re-renders the page). A
+       * host that draws the body itself filters through this too.
+       */
+      shownChildren(props) {
+        return childRefs(props?.children).filter((ref) => !this.blankChild(ref.id));
+      }
+
+      /** A component as the surface holds it, or null. */
+      bodyComponent(id) {
+        try {
+          return this.surface?.componentsModel?.get(id) ?? null;
+        } catch {
+          return null;
+        }
+      }
+
+      /**
+       * Whether a component draws nothing: a Column of blank parts, or a
+       * Text whose words (literal or bound) are empty. Anything else, and
+       * anything the surface does not hold yet, draws.
+       */
+      blankChild(id, depth = 0) {
+        const node = this.bodyComponent(id);
+        if (!node || depth > 8) return false;
+        if (node.type === "Text") {
+          const text = node.properties?.text;
+          const path = bindingPath(text);
+          return str(typeof path === "string" ? this.read(path) : text).trim() === "";
+        }
+        if (node.type === "Column") {
+          return childRefs(node.properties?.children).every((ref) => this.blankChild(ref.id, depth + 1));
+        }
+        return false;
+      }
+
+      /** The paths a blank-able body child's Texts are bound to. */
+      blankPaths(id, depth = 0) {
+        const node = this.bodyComponent(id);
+        if (!node || depth > 8) return [];
+        if (node.type === "Text") {
+          const path = bindingPath(node.properties?.text);
+          return typeof path === "string" ? [path] : [];
+        }
+        if (node.type === "Column") {
+          return childRefs(node.properties?.children).flatMap((ref) => this.blankPaths(ref.id, depth + 1));
+        }
+        return [];
       }
 
       // --- the section nav --------------------------------------------------

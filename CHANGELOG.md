@@ -10,6 +10,21 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Fixed: a blank body child holds no gap in the record page
+
+Renderer only; the wire is unchanged.
+
+- The stock `entityPage` draws only the body children that have something
+  to show (`shownChildren/1`). A blank child is not drawn: a `Column` with
+  no children, or one whose `Text`s are all empty, such as the
+  `action_result_panel` until a generic action returns text. Drawn, it was
+  a zero-height item that still held a gap (`--am-space-xl`) in the page's
+  column, after the last section. It is drawn as soon as one of its Texts
+  has words, and goes again when they empty: the page watches the paths
+  those Texts are bound to.
+- A host swap that draws the body itself filters through
+  `shownChildren(props)` to get the same.
+
 ### Fixed: a document viewer's fit follows its scroll area
 
 - `documentViewer` fits the widest page to its scroll area's usable width
