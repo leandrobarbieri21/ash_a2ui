@@ -75,6 +75,7 @@ defmodule AshA2ui.Diagram do
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshA2ui.L10n
   alias AshA2ui.Label
+  alias AshA2ui.Masked
   alias AshA2ui.ResolvedView
 
   # `rendered_source` and `link_buttons?` are render annotations the
@@ -263,15 +264,19 @@ defmodule AshA2ui.Diagram do
 
   defp normalize({marker, index}, diagram, link_context, l10n) when is_map(marker) do
     node_id = required_string(marker, :node_id, diagram)
-    label = required_string(marker, :label, diagram)
+    label = marker_label(marker, l10n, diagram)
     status = status!(fetch(marker, :status), diagram)
+    masked? = Masked.masked?(fetch(marker, :label))
 
     %{
       "id" => optional_string(marker, :id) || "#{node_id}:#{index}",
       "nodeId" => node_id,
-      "nodeLabel" => optional_string(marker, :node_label) || node_id,
+      "nodeLabel" => marker_node_label(marker, node_id, l10n),
       "label" => label,
-      "initials" => optional_string(marker, :initials) || initials(label),
+      # A marker whose label is masked shows "?": never initials of the
+      # hidden value, nor of the masked word.
+      "initials" =>
+        if(masked?, do: "?", else: optional_string(marker, :initials) || initials(label)),
       "status" => Atom.to_string(status),
       "statusLabel" => status_label(status, l10n),
       "tone" => tone!(fetch(marker, :tone), status, diagram)
@@ -282,6 +287,20 @@ defmodule AshA2ui.Diagram do
   defp normalize({marker, _index}, diagram, _link_context, _l10n) do
     raise ArgumentError,
           "diagram #{inspect(diagram.name)}: a marker must be a map, got: #{inspect(marker)}"
+  end
+
+  # A forbidden label (or node label) draws the masked word: the struct must
+  # neither raise on the required `:label` nor reach the wire.
+  defp marker_label(marker, l10n, diagram) do
+    if Masked.masked?(fetch(marker, :label)),
+      do: Masked.text(l10n),
+      else: required_string(marker, :label, diagram)
+  end
+
+  defp marker_node_label(marker, node_id, l10n) do
+    if Masked.masked?(fetch(marker, :node_label)),
+      do: Masked.text(l10n),
+      else: optional_string(marker, :node_label) || node_id
   end
 
   defp status_label(:active, l10n), do: L10n.t(l10n, msg("Active"))

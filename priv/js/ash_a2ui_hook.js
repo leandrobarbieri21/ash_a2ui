@@ -39,6 +39,16 @@
  *      the container, `detail = {functionCallId, surfaceId, response}`,
  *      where `response` is `{value}` or `{error: {code, message}}`.
  *
+ * ## Settled marker: `data-a2ui-pending`
+ *
+ * While any `ashAction` call of this hook is unanswered (a quiet one
+ * included), the hook's container carries `data-a2ui-pending="true"`. It is
+ * removed when the last call settles: answered, failed, timed out or
+ * cancelled. A test or a screenshot waits for
+ * `:not([data-a2ui-pending])` instead of reading the surface's data model.
+ * A surface whose first render is still on its way carries the skeleton,
+ * not this marker.
+ *
  * A `query` or `report` call also sets the surface's reserved `/ui/loading`
  * flag (and `/ui/loading_visible`, see `AshA2ui.Loading`) while any such
  * call is unanswered, so an empty table or report reads as "rows on the
@@ -630,6 +640,9 @@ export const AshA2ui = {
     // The functionCallIds of the ashAction calls this hook sent and has not
     // had answered: their agentFunctionResponse is routed here.
     this.pendingCalls = new Set();
+    // The calls behind `data-a2ui-pending`: sent and not yet settled, whether
+    // answered or failed (pendingCalls keeps a timed-out call for routing).
+    this.inFlight = new Set();
     // The `prompt` calls not yet answered, by functionCallId: the values
     // their dialog showed when each went out (see "Prompt pre-fill").
     this.pendingPrompts = new Map();
@@ -720,7 +733,9 @@ export const AshA2ui = {
       ),
       this.promptEdits(),
     );
-    for (const error of this.apply(batch)) this.send(error);
+    const errors = this.apply(batch);
+    this.showErrors(batch, errors);
+    for (const error of errors) this.send(error);
 
     // An answered call no longer routes its (late or repeated) responses here.
     for (const message of batch) {
@@ -744,6 +759,38 @@ export const AshA2ui = {
       this.panelVisible = visible;
       if (visible && !wasVisible) this.schedulePanelReveal();
     }
+  },
+
+  /**
+   * Shows the messages the processor could not apply as a `role="alert"`
+   * element with `data-a2ui-error` in the container, so a malformed message
+   * reads as a failure and never as a blank surface. A batch that creates a
+   * surface cleanly removes it.
+   */
+  showErrors(batch, errors) {
+    if (!this.el || typeof this.el.querySelector !== "function") return;
+    const shown = this.el.querySelector("[data-a2ui-error]");
+    if (errors.length === 0) {
+      if (shown && batch.some((message) => message && message.createSurface)) shown.remove();
+      return;
+    }
+    const alert = shown || document.createElement("div");
+    alert.setAttribute("role", "alert");
+    alert.setAttribute("data-a2ui-error", "");
+    alert.style.cssText = "padding:1rem;border:1px solid currentColor;white-space:pre-wrap";
+    alert.textContent = errors
+      .map(({error}) => (error && [error.code, error.message].filter(Boolean).join(": ")) || "error")
+      .join("\n");
+    if (!shown) this.el.appendChild(alert);
+  },
+
+  /** Marks the container while an `ashAction` call is unanswered. */
+  markPending(functionCallId, pending) {
+    if (pending) this.inFlight.add(functionCallId);
+    else this.inFlight.delete(functionCallId);
+    if (!this.el || typeof this.el.setAttribute !== "function") return;
+    if (this.inFlight.size > 0) this.el.setAttribute("data-a2ui-pending", "true");
+    else this.el.removeAttribute("data-a2ui-pending");
   },
 
   /** Applies messages, returning the `error` message of each it could not. */
@@ -775,6 +822,7 @@ export const AshA2ui = {
     }
 
     this.pendingCalls.add(functionCallId);
+    this.markPending(functionCallId, true);
     if (args && args.name === "prompt") this.watchPrompt(surfaceId, args.context, functionCallId);
 
     let response;
@@ -798,6 +846,7 @@ export const AshA2ui = {
     }
 
     if (fetches) this.trackFetch(surfaceId, functionCallId, false);
+    this.markPending(functionCallId, false);
 
     if (this.el && typeof this.el.dispatchEvent === "function") {
       this.el.dispatchEvent(

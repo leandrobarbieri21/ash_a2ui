@@ -808,7 +808,8 @@ client action, each card's `update_action` on its record, in one
 transaction). A refused save keeps the changes and says why: each
 field's error at its input, the rest as the outcome. A `confirm` asks
 first while fields still wait. Unsaved changes survive a refresh of the
-surface's data.
+surface's data. With `show_while_waiting` it also shows while fields
+under review wait, before anything changed (admin catalog 3.14).
 
 
 ### Nested DSLs
@@ -822,6 +823,17 @@ save_bar do
   message "You have unsaved changes"
   status "%{count} to check"
   saved_message "Changes saved."
+end
+
+```
+
+```
+save_bar do
+  context :order
+  message "You have unsaved changes"
+  message_waiting "Reviewing the order"
+  status "%{count} to check"
+  show_while_waiting :correctable
 end
 
 ```
@@ -842,6 +854,7 @@ end
 | [`discard_label`](#a2ui-save_bar-discard_label){: #a2ui-save_bar-discard_label } | `String.t` |  | The Discard button. Translated. Defaults to the library's "Discard changes". |
 | [`saved_message`](#a2ui-save_bar-saved_message){: #a2ui-save_bar-saved_message } | `String.t` |  | The outcome's message after a save. Translated. Defaults to the library's "Changes saved." |
 | [`edit_reviews`](#a2ui-save_bar-edit_reviews){: #a2ui-save_bar-edit_reviews } | `boolean` | `false` | Whether saving an edited field reviews it (the host's update action records the review), so the count of fields still waiting leaves out the ones being edited. |
+| [`show_while_waiting`](#a2ui-save_bar-show_while_waiting){: #a2ui-save_bar-show_while_waiting } | `boolean \| atom` | `false` | Admin catalog 3.14: whether the bar also shows while fields under review still wait, before anything changed (a review the person works through: the bar reads `message_waiting` with its `status`, and Save opens the `confirm`). `true` shows it on every record; a public attribute, calculation or aggregate of the bar's record shows it where that is `true` (who may save there). Discard shows only while a change waits, and a save with no change sends nothing but the `confirm`'s `then` choice. Off by default: the bar shows only while a change waits. |
 | [`id`](#a2ui-save_bar-id){: #a2ui-save_bar-id } | `String.t` |  | A DOM id for the bar. |
 
 
@@ -1757,8 +1770,8 @@ action name
 
 
 Per-action metadata: the button label, refresh targets, argument
-prompts, per-row visibility conditions, and host-delegated dispatch
-(`via`).
+prompts, per-row visibility conditions, a confirmation (`confirm`), and
+host-delegated dispatch (`via`).
 
 
 ### Nested DSLs
@@ -1803,6 +1816,15 @@ end
 ```
 
 ```
+action :deactivate do
+  # Asked through the admin grid's confirmation dialog, as a destroy is.
+  confirm :destructive
+  visible_when lifecycle_status: :active
+end
+
+```
+
+```
 action :check_in do
   # The host's engine facade completes the work (it invokes the Ash
   # action itself); the surface only renders the outcome.
@@ -1828,6 +1850,7 @@ end
 | [`prompt_fields`](#a2ui-action-prompt_fields){: #a2ui-action-prompt_fields } | `list(atom)` | `[]` | Arguments/accepts of the Ash action collected from the user in a per-row Modal prompt before the action is invoked (row actions only). Clicking the row button opens the Modal instead of invoking directly; its confirm button sends `invoke` with a `"values"` map. A relationship prompt field lists every option the actor can read unless a `prompt_options` entity scopes it to the row. |
 | [`prompt_title`](#a2ui-action-prompt_title){: #a2ui-action-prompt_title } | `String.t` |  | Heading shown inside the prompt Modal. Defaults to the action's `label`, else the humanized action name. |
 | [`visible_when`](#a2ui-action-visible_when){: #a2ui-action-visible_when } | `keyword` | `[]` | Per-record conditions gating this row action, ANDed together (`visible_when status: :pending`). Keys are public attributes or public expression calculations; `nil` values mean `is_nil`, list values mean membership, anything else is equality. Enforced server-side on every invoke; rendering hides the button per row. A bulk action applies the same check to each selected record and counts the records that fail it as skipped. |
+| [`confirm`](#a2ui-action-confirm){: #a2ui-action-confirm } | `:destructive` |  | `:destructive` makes the admin catalog's grid ask for confirmation through its ConfirmDialog before invoking this row action, as it does for every destroy: the row button opens the dialog, and its confirm control (labelled with the action's `label`) sends the unchanged `invoke`. For an action whose effect is drastic without being a destroy (deactivating a person). Unlike a destroy's, the dialog does not say the action cannot be undone. Row actions only, and not with `prompt_fields`, whose prompt is the confirmation. The basic catalog has no confirmation dialog and invokes on click, as it does for a destroy. |
 | [`via`](#a2ui-action-via){: #a2ui-action-via } | `mfa` |  | Delegate this row action to a host-provided function instead of running the mapped Ash action directly (`via {MyApp.Tasks, :check_in, ["board"]}`). The framework knows nothing about the host's engine: at click time the handler fetches the row's record (with any `visible_when` condition calculations loaded, enforced as always) and calls     apply(module, function, [context \| extra_args]) where `context` is a map carrying the dispatch state:   * `:record` — the row's record, loaded as the surface loads it   * `:actor` — the actor the host passed to the handler (`nil` when none)   * `:tenant` — the tenant the host passed to the handler   * `:action` — the row-action name (atom)   * `:surface_id` — the surface's id   * `:selected` — the surface's context selections (see     `AshA2ui.ContextRunner.selected/2`; `%{}` without contexts) The MFA returns the same shape the direct path does — `:ok` \| `{:ok, term}` \| `{:error, Ash.Error.t()}` (any Ash error class or exception; mapped exactly like a direct invocation's failure: `Ash.Error.Forbidden` to a not-authorized status, validation errors to `/errors/<field>`) — and the result renders through the standard success/error channels unchanged: success refreshes the tables (honoring `refreshes`) and reports the action's status text; errors go to the typed `/ui/feedback` error. The client is unaware `via` exists: the emitted button is the ordinary `invoke` row action, addressed by the same action name. The named Ash action must still exist (it remains the row-action allowlist entry and the button's label source); `via` only reroutes the dispatch. Mutually exclusive with `prompt_fields` (the prompt exists to collect values cast against the direct Ash action). Row and bulk actions only; a bulk action calls the MFA once per selected record. |
 
 

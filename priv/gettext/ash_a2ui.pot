@@ -11,12 +11,16 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Domain: ash_a2ui\n"
 
-#: lib/ash_a2ui/action_handler.ex:2878
+#: lib/ash_a2ui/action_handler.ex:2879
 msgid "%{action} completed."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2883
+#: lib/ash_a2ui/action_handler.ex:2884
 msgid "%{action} is not available for this record."
+msgstr ""
+
+#: lib/ash_a2ui/encoder.ex:2022
+msgid "%{action} this record?"
 msgstr ""
 
 #: lib/ash_a2ui/bulk.ex:359
@@ -25,8 +29,8 @@ msgid_plural "%{action}: %{ok} of %{selected} selected records done"
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/action_handler.ex:2690
-#: lib/ash_a2ui/action_handler.ex:2875
+#: lib/ash_a2ui/action_handler.ex:2691
+#: lib/ash_a2ui/action_handler.ex:2876
 msgid "%{action}: done."
 msgstr ""
 
@@ -64,16 +68,16 @@ msgid_plural "%{count} skipped"
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/encoder.ex:3654
+#: lib/ash_a2ui/encoder.ex:3732
 msgid "%{field} from"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3654
+#: lib/ash_a2ui/encoder.ex:3732
 msgid "%{field} to"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3306
-#: lib/ash_a2ui/action_handler.ex:4466
+#: lib/ash_a2ui/action_handler.ex:3307
+#: lib/ash_a2ui/action_handler.ex:4467
 msgid "%{field}: %{message}"
 msgstr ""
 
@@ -81,8 +85,8 @@ msgstr ""
 msgid "%{first}, %{rest}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3311
-#: lib/ash_a2ui/action_handler.ex:4646
+#: lib/ash_a2ui/action_handler.ex:3312
+#: lib/ash_a2ui/action_handler.ex:4647
 msgid "%{first}; %{rest}"
 msgstr ""
 
@@ -102,7 +106,7 @@ msgstr ""
 msgid "%{name} is viewing this surface"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:193
+#: lib/ash_a2ui/document_pane.ex:206
 msgid "%{page} of %{count}"
 msgstr ""
 
@@ -120,25 +124,25 @@ msgid_plural "+%{count} more"
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/diagram.ex:287
+#: lib/ash_a2ui/diagram.ex:306
 msgid "Active"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:5583
-#: lib/ash_a2ui/encoder.ex:5609
+#: lib/ash_a2ui/encoder.ex:5661
+#: lib/ash_a2ui/encoder.ex:5687
 msgid "Add"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3473
-#: lib/ash_a2ui/encoder.ex:3505
+#: lib/ash_a2ui/encoder.ex:3551
+#: lib/ash_a2ui/encoder.ex:3583
 msgid "All"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3103
+#: lib/ash_a2ui/encoder.ex:3181
 msgid "All days"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3667
+#: lib/ash_a2ui/encoder.ex:3745
 msgid "Apply"
 msgstr ""
 
@@ -150,17 +154,17 @@ msgstr ""
 msgid "Back"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:4836
-#: lib/ash_a2ui/resolved_view.ex:1456
+#: lib/ash_a2ui/encoder.ex:4914
+#: lib/ash_a2ui/resolved_view.ex:1493
 msgid "Cancel"
 msgstr ""
 
-#: lib/ash_a2ui/resolved_view.ex:1441
+#: lib/ash_a2ui/resolved_view.ex:1478
 msgid "Changes saved."
 msgstr ""
 
 #: lib/ash_a2ui/bulk.ex:422
-#: lib/ash_a2ui/encoder.ex:5042
+#: lib/ash_a2ui/encoder.ex:5120
 msgid "Clear"
 msgstr ""
 
@@ -168,9 +172,9 @@ msgstr ""
 msgid "Complete"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:1985
-#: lib/ash_a2ui/encoder.ex:4380
-#: lib/ash_a2ui/manifest.ex:447
+#: lib/ash_a2ui/encoder.ex:1987
+#: lib/ash_a2ui/encoder.ex:4458
+#: lib/ash_a2ui/manifest.ex:473
 msgid "Confirm"
 msgstr ""
 
@@ -178,7 +182,7 @@ msgstr ""
 msgid "Create %{resource}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1878
+#: lib/ash_a2ui/action_handler.ex:1879
 msgid "Created successfully."
 msgstr ""
 
@@ -186,20 +190,20 @@ msgstr ""
 msgid "Current"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3141
+#: lib/ash_a2ui/encoder.ex:3219
 msgid "Day"
 msgstr ""
 
-#: lib/ash_a2ui/resolved_view.ex:1439
+#: lib/ash_a2ui/resolved_view.ex:1476
 msgid "Discard changes"
 msgstr ""
 
-#: lib/ash_a2ui/diagram.ex:291
+#: lib/ash_a2ui/diagram.ex:310
 msgid "Done"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:1895
-#: lib/ash_a2ui/encoder.ex:3825
+#: lib/ash_a2ui/encoder.ex:1897
+#: lib/ash_a2ui/encoder.ex:3903
 msgid "Edit"
 msgstr ""
 
@@ -207,37 +211,41 @@ msgstr ""
 msgid "Edit %{resource}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2354
+#: lib/ash_a2ui/action_handler.ex:2355
 msgid "Editing is not available for this record."
 msgstr ""
 
-#: lib/ash_a2ui/diagram.ex:288
+#: lib/ash_a2ui/diagram.ex:307
 msgid "Executing"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:5453
+#: lib/ash_a2ui/encoder.ex:5531
 msgid "Export CSV"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3764
+#: lib/ash_a2ui/action_handler.ex:3765
 msgid "Exported %{filename} (%{count} rows)."
 msgid_plural "Exported %{filename} (%{count} rows)."
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/diagram.ex:290
+#: lib/ash_a2ui/diagram.ex:309
 msgid "Failed"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3572
+#: lib/ash_a2ui/encoder.ex:3650
 msgid "False"
+msgstr ""
+
+#: lib/ash_a2ui/masked.ex:36
+msgid "Hidden"
 msgstr ""
 
 #: lib/ash_a2ui/time_scrubber.ex:312
 msgid "Live: now"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:5365
+#: lib/ash_a2ui/encoder.ex:5443
 msgid "Loading"
 msgstr ""
 
@@ -245,7 +253,7 @@ msgstr ""
 msgid "Moments"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3139
+#: lib/ash_a2ui/encoder.ex:3217
 msgid "Month"
 msgstr ""
 
@@ -253,13 +261,13 @@ msgstr ""
 msgid "Move through time"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3068
-#: lib/ash_a2ui/encoder.ex:3729
+#: lib/ash_a2ui/encoder.ex:3146
+#: lib/ash_a2ui/encoder.ex:3807
 #: lib/ash_a2ui/wizard.ex:84
 msgid "Next"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:196
+#: lib/ash_a2ui/document_pane.ex:209
 msgid "Next page"
 msgstr ""
 
@@ -267,7 +275,7 @@ msgstr ""
 msgid "No %{resource} records yet."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:201
+#: lib/ash_a2ui/document_pane.ex:214
 #: lib/ash_a2ui/review.ex:155
 msgid "Not found in the document"
 msgstr ""
@@ -276,12 +284,12 @@ msgstr ""
 msgid "Not recorded"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:199
+#: lib/ash_a2ui/document_pane.ex:212
 #: lib/ash_a2ui/review.ex:153
 msgid "Not reviewed"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:2220
+#: lib/ash_a2ui/action_handler.ex:2221
 msgid "Nothing to save."
 msgstr ""
 
@@ -289,7 +297,7 @@ msgstr ""
 msgid "Now"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:191
+#: lib/ash_a2ui/document_pane.ex:204
 msgid "Opening the document"
 msgstr ""
 
@@ -297,7 +305,7 @@ msgstr ""
 msgid "Overdue"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:194
+#: lib/ash_a2ui/document_pane.ex:207
 msgid "Page %{page} of %{count}"
 msgstr ""
 
@@ -305,20 +313,20 @@ msgstr ""
 msgid "People viewing this surface"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3063
-#: lib/ash_a2ui/encoder.ex:3713
+#: lib/ash_a2ui/encoder.ex:3141
+#: lib/ash_a2ui/encoder.ex:3791
 msgid "Previous"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:195
+#: lib/ash_a2ui/document_pane.ex:208
 msgid "Previous page"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:5630
+#: lib/ash_a2ui/encoder.ex:5708
 msgid "Remove"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3629
+#: lib/ash_a2ui/action_handler.ex:3630
 msgid "Report complete: %{count} row."
 msgid_plural "Report complete: %{count} rows."
 msgstr[0] ""
@@ -328,17 +336,17 @@ msgstr[1] ""
 msgid "Return to now"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:200
+#: lib/ash_a2ui/document_pane.ex:213
 #: lib/ash_a2ui/review.ex:154
 msgid "Reviewed"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:5350
+#: lib/ash_a2ui/encoder.ex:5428
 msgid "Run"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:4224
-#: lib/ash_a2ui/resolved_view.ex:1457
+#: lib/ash_a2ui/encoder.ex:4302
+#: lib/ash_a2ui/resolved_view.ex:1494
 msgid "Save"
 msgstr ""
 
@@ -346,11 +354,11 @@ msgstr ""
 msgid "Save changes"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3443
-#: lib/ash_a2ui/encoder.ex:4925
-#: lib/ash_a2ui/encoder.ex:4942
-#: lib/ash_a2ui/encoder.ex:5056
-#: lib/ash_a2ui/encoder.ex:5077
+#: lib/ash_a2ui/encoder.ex:3521
+#: lib/ash_a2ui/encoder.ex:5003
+#: lib/ash_a2ui/encoder.ex:5020
+#: lib/ash_a2ui/encoder.ex:5134
+#: lib/ash_a2ui/encoder.ex:5155
 msgid "Search"
 msgstr ""
 
@@ -358,7 +366,7 @@ msgstr ""
 msgid "Select"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3686
+#: lib/ash_a2ui/action_handler.ex:3687
 msgid "Select at least one column to export."
 msgstr ""
 
@@ -376,7 +384,7 @@ msgid_plural "Selected the first %{cap} of %{count} records: a bulk action runs 
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/document_pane.ex:173
+#: lib/ash_a2ui/document_pane.ex:186
 msgid "Show document"
 msgstr ""
 
@@ -384,24 +392,28 @@ msgstr ""
 msgid "Showing %{first}–%{last}"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:629
-#: lib/ash_a2ui/action_handler.ex:665
-#: lib/ash_a2ui/action_handler.ex:4569
-#: lib/ash_a2ui/action_handler.ex:4593
+#: lib/ash_a2ui/action_handler.ex:630
+#: lib/ash_a2ui/action_handler.ex:666
+#: lib/ash_a2ui/action_handler.ex:4570
+#: lib/ash_a2ui/action_handler.ex:4594
 msgid "The action failed."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1378
-#: lib/ash_a2ui/action_handler.ex:1660
-#: lib/ash_a2ui/action_handler.ex:1745
+#: lib/ash_a2ui/action_handler.ex:1379
+#: lib/ash_a2ui/action_handler.ex:1661
+#: lib/ash_a2ui/action_handler.ex:1746
 msgid "The selected option was not found."
 msgstr ""
 
-#: lib/ash_a2ui/diagram.ex:201
+#: lib/ash_a2ui/encoder.ex:2009
+msgid "This action cannot be undone."
+msgstr ""
+
+#: lib/ash_a2ui/diagram.ex:202
 msgid "This diagram is unavailable."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:192
+#: lib/ash_a2ui/document_pane.ex:205
 msgid "This document can't be shown here."
 msgstr ""
 
@@ -409,7 +421,7 @@ msgstr ""
 msgid "This is taking longer than usual. Still working…"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:400
+#: lib/ash_a2ui/action_handler.ex:401
 msgid "This view shows an earlier moment, so nothing on it can be changed. Return to now to make changes."
 msgstr ""
 
@@ -417,7 +429,7 @@ msgstr ""
 msgid "Time travel"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3071
+#: lib/ash_a2ui/encoder.ex:3149
 msgid "Today"
 msgstr ""
 
@@ -427,7 +439,7 @@ msgid_plural "Too many records selected (%{count}): a bulk action runs on at mos
 msgstr[0] ""
 msgstr[1] ""
 
-#: lib/ash_a2ui/encoder.ex:3571
+#: lib/ash_a2ui/encoder.ex:3649
 msgid "True"
 msgstr ""
 
@@ -435,23 +447,23 @@ msgstr ""
 msgid "Upcoming"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:3872
+#: lib/ash_a2ui/action_handler.ex:3873
 msgid "Updated %{field}."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:1887
+#: lib/ash_a2ui/action_handler.ex:1888
 msgid "Updated successfully."
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:4572
+#: lib/ash_a2ui/action_handler.ex:4573
 msgid "Validation failed. Please review the field errors."
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:1442
-#: lib/ash_a2ui/encoder.ex:1891
-#: lib/ash_a2ui/encoder.ex:3479
-#: lib/ash_a2ui/encoder.ex:3820
-#: lib/ash_a2ui/manifest.ex:390
+#: lib/ash_a2ui/encoder.ex:1443
+#: lib/ash_a2ui/encoder.ex:1893
+#: lib/ash_a2ui/encoder.ex:3557
+#: lib/ash_a2ui/encoder.ex:3898
+#: lib/ash_a2ui/manifest.ex:414
 msgid "View"
 msgstr ""
 
@@ -459,11 +471,11 @@ msgstr ""
 msgid "View %{resource}"
 msgstr ""
 
-#: lib/ash_a2ui/diagram.ex:289
+#: lib/ash_a2ui/diagram.ex:308
 msgid "Waiting"
 msgstr ""
 
-#: lib/ash_a2ui/encoder.ex:3140
+#: lib/ash_a2ui/encoder.ex:3218
 msgid "Week"
 msgstr ""
 
@@ -471,15 +483,19 @@ msgstr ""
 msgid "Working…"
 msgstr ""
 
-#: lib/ash_a2ui/action_handler.ex:4450
+#: lib/ash_a2ui/action_handler.ex:4451
 msgid "You are not authorized to perform this action."
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:197
+#: lib/ash_a2ui/masked.ex:43
+msgid "You do not have access to this value."
+msgstr ""
+
+#: lib/ash_a2ui/document_pane.ex:210
 msgid "Zoom in"
 msgstr ""
 
-#: lib/ash_a2ui/document_pane.ex:198
+#: lib/ash_a2ui/document_pane.ex:211
 msgid "Zoom out"
 msgstr ""
 

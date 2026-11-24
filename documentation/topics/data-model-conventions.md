@@ -73,6 +73,44 @@ otherwise. The row also carries the value itself at the reserved
 translated label, a detail line per state). Only fields whose value was
 rewritten appear there; a row without any has no `_values` key.
 
+### `_masked` — fields the reader may not see
+
+When a field policy forbids a field, Ash returns `%Ash.ForbiddenField{}`
+in its place. A surface must never draw that as `null` — an empty cell
+reads as "known and empty" — and never carry the struct (its
+`original_value` in particular) onto the wire. The rule lives in
+`AshA2ui.Masked`: the field's value is the masked text ("Hidden",
+translated for the reader), and the record carries the reason at the
+reserved `_masked` key — `%{"<field>" => "You do not have access to this
+value."}`, listed for masked fields only; a record with no masked field
+has no `_masked` key:
+
+```json
+{
+  "id": "…",
+  "subject": "Printer on fire",
+  "margin": "Hidden",
+  "_masked": { "margin": "You do not have access to this value." }
+}
+```
+
+The same treatment applies on `/detail/<context>` records and the view
+panel's `/ui/panel/record`; a `source` field is masked when any step of
+its relationship walk is forbidden. Two deliberate exceptions keep the
+masked word out of data that is written back or taken further:
+
+- **The `/form` edit buffer stays `null`** for a forbidden field.
+  Submitting the form unchanged must not write the word "Hidden" into
+  the column — the host decides what a hidden value sent back means.
+  A `:detail` card's in-place edit value (`_edit_<field>`) stays `null`
+  too, and the stock renderer does not offer a masked value for editing
+  in place.
+- **CSV exports keep an empty cell**, exactly as before: an export is a
+  data file, not a surface.
+
+`Ash.NotLoaded` and a `nil` the reader may see are not masked: they stay
+`null` and carry no `_masked` entry.
+
 Because `updateDataModel` replaces the value at `path`, refreshes are
 whole-region: the list is replaced, not diffed. On multi-table surfaces the
 region is one table (`/records/<component_name>`), and `action` entities with

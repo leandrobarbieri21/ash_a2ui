@@ -10,6 +10,61 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: a save bar shown for the whole review (admin catalog 3.14.0)
+
+Additive, under the same catalog id.
+
+- `save_bar`'s `show_while_waiting` (`true`, or a field of the bar's record
+  that must be `true`): the bar also shows while fields under review still
+  wait, before anything changed, with `message_waiting`, the `status` tag
+  and Save. Discard shows only while a change waits. The record's field is
+  read with the bar's record and verified at compile time.
+- With no change, Save opens the `confirm` while fields wait. Its save
+  choice sends nothing and closes the dialog; its `then` choice runs the
+  `then_action` alone. Once nothing waits and nothing changed, the bar goes.
+- The admin catalog's `saveBar` gains the optional `showWhileWaiting`. The
+  JS module exports `saveBarState` (what the bar draws: shown, counts,
+  message, status, whether it offers Discard), `showsWhileWaiting` and
+  `choiceSends`, for a host's swap. `saveDecision` answers `"none"` when
+  there is no change and no dialog to open.
+
+### Added: whether a document pane is drawn, for the page around it
+
+- `AshA2ui.LiveRenderer` assigns `:ash_a2ui_document_shown`
+  (`%{"<pane>" => true}`): the panes open in the address *with a document to
+  draw*. `:ash_a2ui_document_state` still follows the address alone, so an
+  old or shared link holds a pane open on a record with no document; a page
+  whose layout follows the pane reads the new assign. It follows the address
+  until the surface has built, then drops a pane whose record arrives with
+  `_document_<name>` nil (the bootstrap, a refresh, a context change, an
+  action that re-sends the record).
+
+### Added: seams for browser tests and static pages
+
+All additive.
+
+- The hook container carries `data-a2ui-pending="true"` while an `ashAction`
+  call is unanswered (cleared on success, error and timeout).
+- The admin grid's cells carry `data-a2ui-column="<field>"`, and
+  `AshA2ui.Manifest` declares the attribute (`attributes.column`) and gives
+  each list table a `row_frame` naming the element that frames a row and
+  whether only the visible one counts.
+- `AshA2ui.LiveRenderer` takes a page with no Spark `:ui`: with a
+  `:surface_fn`, `:ui` may be omitted or any value that is not a Spark
+  module.
+- A message the browser cannot apply shows a `role="alert"` element with
+  `data-a2ui-error` in the hook container instead of leaving a blank
+  surface.
+
+### Added: find a record by a business reference
+
+`AshA2ui.Shell.Search.find(term, entries, read_opts)` looks a typed term up
+across the surfaces a person may search: the term is cast to each listed
+field's type, each surface is one authorized read as the actor, and a
+surface whose read failed is reported in `failed` rather than as no match.
+Hosts list the entries in the new optional `AshA2ui.Shell.Host.searchable/1`
+callback. Existing hosts need no change.
+
 ### Breaking: A2UI 1.0 only
 
 ash_a2ui now speaks A2UI protocol 1.0 and nothing else. Support for v0.9.1,
@@ -174,6 +229,19 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   related record through its own action. The related record's errors are
   shown at the field's input. The verifier checks the relationship, the
   attribute and the argument. Nothing changes on the wire.
+- **A row action can ask for confirmation** (admin catalog 3.13.0). An
+  `action` entity's `confirm :destructive` makes the admin grid confirm a
+  row action through its ConfirmDialog before invoking it, as it does for
+  a destroy, so an update with a drastic effect (deactivating a person)
+  is asked about first. The manifest reports it as `confirm:
+  :destructive` with the action's label as `confirm_label`. The dialog's
+  heading and body now come from the server, translated, as the entry's
+  `confirmTitle` and `confirmBody`, instead of the renderer's own English;
+  only a destroy says "This action cannot be undone." Row actions only,
+  and refused with `prompt_fields`, whose prompt is the confirmation.
+  Additive: an existing surface's payload gains `confirmTitle` and
+  `confirmBody` on its destroy entries and nothing else.
+
 - **Editing a record in place, saved by a save bar** (admin catalog 3.11.0,
   ADR 0010). `editable` now goes on a `:detail` card too, with `visible`
   gating it per record; a field's new `edit` option names the attribute
@@ -194,6 +262,26 @@ dependency. Replace the 2.0.0 id wherever the host writes it out
   `waitingReviews`, `confirmTexts`, `saveDecision`) for host swaps.
   Additive: the catalogId is unchanged, and a renderer that ignores `edit`
   draws the card read-only.
+
+- **Hidden fields: a forbidden value renders masked, never empty**
+  (admin catalog 3.12.0). A field the actor's field policies forbid
+  (`%Ash.ForbiddenField{}`) used to serialize as `null`, which read as
+  "known and empty". Table rows, `:detail` cards and the view panel now
+  draw `AshA2ui.Masked.text/1` ("Hidden", translated) and carry the
+  reason at the reserved `_masked/<field>` key; nothing from the struct
+  (never `original_value`) reaches the wire. A `source` field is masked
+  when any step of its walk is forbidden. The `/form` edit buffer keeps
+  `null` (submitting unchanged must not write the masked word into the
+  column) and CSV exports keep the empty cell. Secondary text (badges,
+  detail help, canvas record labels, diagram markers — initials `"?"`)
+  draws the masked word too. The admin catalog's `fieldDisplay` and each
+  dataGrid column gain an optional `masked` binding to the reason, the
+  stock renderer marks the drawn value `data-a2ui-masked` with the reason
+  as its title and accessible description (and does not offer it for
+  editing in place), and the binding is emitted
+  only for fields a field policy covers, so surfaces over resources
+  without field policies are byte-for-byte unchanged.
+
 - **Pair reviews: a review and a button per item of a `pairs` field**
   (admin catalog 3.10.0). An item of a `pairs` field may carry its own
   `review` (`AshA2ui.Review`'s shape), a `key` (its address in the record)

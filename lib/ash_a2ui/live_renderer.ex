@@ -52,8 +52,11 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
     ## Options
 
-      * `:ui` (required) — the resource or standalone UI module whose `a2ui`
-        section defines the surface.
+      * `:ui` (required unless `:surface_fn` is given) — the resource or
+        standalone UI module whose `a2ui` section defines the surface. With a
+        `:surface_fn` it may be omitted, or be any value that is not a Spark
+        module, for a static page (see the usage rules, "A page with no
+        DSL"): it has no document panes and answers no actions.
       * `:actor_fn` (optional) — a 1-arity function `socket -> actor` used to
         derive the actor on mount; the actor is passed to every surface,
         data-model and action call. Defaults to `nil` (no actor).
@@ -241,6 +244,16 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     (`%{"<pane>" => true}` while open), so the page around the surface can
     follow it.
 
+    The address alone can hold a pane open on a record with no document (an
+    old or shared link: the switch is not drawn there, see
+    `AshA2ui.DocumentPane`). `:ash_a2ui_document_shown` (same shape) holds
+    only the panes open *with a document to draw*: until the surface has
+    built it follows the address, so the usual case lays out once; once the
+    record arrives (the bootstrap, a refresh, a context change, an action
+    that re-sends it) a pane whose `_document_<name>` is `nil` drops out. A
+    page whose layout follows the pane (wider while it is drawn) reads this
+    one.
+
     ## Time travel
 
     With `time_travel: true` the surface reads as of the instant in the
@@ -284,7 +297,8 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
     them in applications:
 
       * `:surface_fn` — `(ui, opts -> [message])`, defaults to
-        `AshA2ui.Info.build_surface/2`.
+        `AshA2ui.Info.build_surface/2`. Public for a static page, which has
+        no `:ui` (see `:ui`).
       * `:data_model_fn` — `(ui, opts -> message)`, defaults to
         `AshA2ui.Info.build_data_model/2`.
       * `:action_fn` — `(ui, message, opts -> {:ok, [message]} |
@@ -376,10 +390,21 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
       end
     end
 
+    # `:ui` is a resource or UI module of the AshA2ui DSL, or, with a
+    # `:surface_fn`, anything the host's callbacks understand (a static page
+    # has no DSL).
+    defp fetch_ui!(opts) do
+      case {Keyword.fetch(opts, :ui), Keyword.get(opts, :surface_fn)} do
+        {{:ok, ui}, _surface_fn} -> ui
+        {:error, surface_fn} when is_function(surface_fn) -> nil
+        {:error, _none} -> raise KeyError, key: :ui, term: opts
+      end
+    end
+
     @doc false
     def build_config(opts) do
       %{
-        ui: Keyword.fetch!(opts, :ui),
+        ui: fetch_ui!(opts),
         actor_fn: Keyword.get(opts, :actor_fn) || fn _socket -> nil end,
         tenant_fn: Keyword.get(opts, :tenant_fn) || fn _socket -> nil end,
         pubsub: normalize_pubsub(Keyword.get(opts, :pubsub)),
@@ -424,11 +449,13 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           ash_a2ui_uri: nil,
           ash_a2ui_url_ctx: url_state.ctx,
           ash_a2ui_document_state: url_state.documents,
+          ash_a2ui_document_present: %{},
           ash_a2ui_pending_calls: %{},
           ash_a2ui_surfaces: %{},
           ash_a2ui_page: page,
           ash_a2ui_page_sent: nil
         )
+        |> sync_document_shown()
 
       socket =
         if connected?(socket) do
@@ -668,7 +695,10 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
       cond do
         first? or not connected?(socket) ->
-          {:noreply, assign(socket, ash_a2ui_url_ctx: ctx, ash_a2ui_document_state: documents)}
+          {:noreply,
+           socket
+           |> assign(ash_a2ui_url_ctx: ctx, ash_a2ui_document_state: documents)
+           |> sync_document_shown()}
 
         # A new instant rebuilds the surface: pinned and live surfaces carry
         # different controls, so a data-model refresh is not enough.
@@ -707,6 +737,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
 
         socket
         |> assign(:ash_a2ui_document_state, documents)
+        |> sync_document_shown()
         |> push_messages(messages)
       end
     end
@@ -734,6 +765,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             |> assign(:ash_a2ui_url_ctx, ctx)
             |> track_query_state([data_model])
             |> track_context_state([data_model])
+            |> track_documents(config, [data_model])
 
           {:noreply, push_messages(socket, [data_model])}
       end
@@ -897,6 +929,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             socket
             |> track_query_state(messages)
             |> track_context_state(messages)
+            |> track_documents(config, messages)
             |> push_messages(messages)
             |> maybe_patch_context(config, previous_context)
             |> maybe_patch_document(config, outcome, message)
@@ -996,7 +1029,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
             do: Map.put(socket.assigns.ash_a2ui_document_state, name, true),
             else: Map.delete(socket.assigns.ash_a2ui_document_state, name)
 
-        socket = assign(socket, :ash_a2ui_document_state, documents)
+        socket = socket |> assign(:ash_a2ui_document_state, documents) |> sync_document_shown()
 
         case socket.assigns[:ash_a2ui_uri] do
           uri when is_binary(uri) ->
@@ -1060,6 +1093,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         socket
         |> track_query_state(messages)
         |> track_context_state(messages)
+        |> track_documents(config, messages)
         |> push_messages(messages)
         |> assign(:ash_a2ui_page_sent, built_page(messages))
 
@@ -1094,6 +1128,7 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
         socket
         |> track_query_state([data_model])
         |> track_context_state([data_model])
+        |> track_documents(config, [data_model])
 
       {socket, surface_models} = refresh_surfaces(config, socket)
 
@@ -1225,6 +1260,78 @@ if Code.ensure_loaded?(Phoenix.LiveView) do
           root_value(message, "context", acc)
       end)
     end
+
+    # Whether each document pane's record carries a document, from every
+    # message that sends the record (`/detail/<context>`, whole or in part):
+    # `%{"<pane>" => boolean}`, a pane absent until its record has arrived.
+    defp track_documents(socket, config, messages) do
+      panes = AshA2ui.DocumentPane.panes(config.ui)
+
+      present =
+        Enum.reduce(messages, socket.assigns.ash_a2ui_document_present, fn message, acc ->
+          Enum.reduce(panes, acc, &put_document_present(&2, &1, message))
+        end)
+
+      socket |> assign(:ash_a2ui_document_present, present) |> sync_document_shown()
+    end
+
+    defp put_document_present(present, pane, message) do
+      case pane_document(message, pane) do
+        {:ok, document} -> Map.put(present, Atom.to_string(pane.name), is_map(document))
+        :none -> present
+      end
+    end
+
+    # The panes open in the address, less those whose record arrived with no
+    # document (see the moduledoc's "Document panes").
+    defp sync_document_shown(socket) do
+      present = socket.assigns[:ash_a2ui_document_present] || %{}
+
+      shown =
+        for {name, true} <- socket.assigns[:ash_a2ui_document_state] || %{},
+            Map.get(present, name, true),
+            into: %{},
+            do: {name, true}
+
+      assign(socket, :ash_a2ui_document_shown, shown)
+    end
+
+    # `{:ok, document | nil}` when `message` sends the pane's document (or
+    # the record it travels in, or no record), `:none` when it says nothing
+    # about it.
+    defp pane_document(%{"createSurface" => %{"dataModel" => %{} = model}}, pane),
+      do: {:ok, get_in(model, ["detail", Atom.to_string(pane.context), data_key(pane)])}
+
+    defp pane_document(%{"updateDataModel" => %{"value" => value} = update}, pane) do
+      context = Atom.to_string(pane.context)
+      key = data_key(pane)
+      record = "/detail/" <> context
+      document = record <> "/" <> key
+
+      case Map.get(update, "path", "/") do
+        root when root in ["/", ""] -> model_document(value, ["detail", context, key])
+        "/detail" -> model_document(value, [context, key])
+        ^record -> record_document(value, key)
+        ^document -> {:ok, value}
+        _other -> :none
+      end
+    end
+
+    defp pane_document(_message, _pane), do: :none
+
+    defp data_key(pane), do: AshA2ui.DocumentPane.data_key(pane)
+
+    defp model_document(%{} = value, path), do: {:ok, get_in(value, path)}
+    defp model_document(_value, _path), do: :none
+
+    # A record re-sent whole carries the key (`nil` without a document); a
+    # partial write that leaves it out says nothing about it.
+    defp record_document(nil, _key), do: {:ok, nil}
+
+    defp record_document(%{} = record, key) when is_map_key(record, key),
+      do: {:ok, Map.get(record, key)}
+
+    defp record_document(_record, _key), do: :none
 
     # An extra surface's tracked query/context state.
     defp track_states(state, messages) do

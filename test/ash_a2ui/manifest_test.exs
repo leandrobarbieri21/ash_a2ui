@@ -116,6 +116,25 @@ defmodule AshA2ui.ManifestTest do
              ]
     end
 
+    test "a table says which element frames a row, and the column attribute is declared" do
+      assert [%{row_frame: %{selector: "[data-a2ui-row-id]", visible_only: true}}] =
+               Manifest.for_surface(Referral, catalog: :admin_v1).tables
+
+      assert [%{row_frame: %{selector: "[data-a2ui-row-id]", visible_only: false}}, _done] =
+               Manifest.for_surface(ManifestTask, catalog: :basic).tables
+
+      assert %{attributes: %{column: "data-a2ui-column"}} =
+               Manifest.for_surface(Referral, catalog: :admin_v1)
+    end
+
+    test "a table with no static row element has no row frame" do
+      for %{component_id: nil} = table <-
+            Manifest.for_surface(AshA2ui.Test.Promotion, catalog: :admin_v1).tables ++
+              Manifest.for_surface(ManifestTask, catalog: :admin_v1).tables do
+        assert table.row_frame == nil
+      end
+    end
+
     test "a row action with visible_when lists its conditions" do
       %{row_actions: actions} = Manifest.for_surface(ManifestTask, catalog: :basic)
       by_id = Map.new(actions, &{&1.id, &1})
@@ -192,6 +211,48 @@ defmodule AshA2ui.ManifestTest do
                discard.(:admin_v1)
 
       assert %{action_type: :destroy, confirm: nil, confirm_label: nil} = discard.(:basic)
+    end
+
+    test "a declared confirmation is the admin grid's dialog, on an update too" do
+      reopen = fn catalog ->
+        Enum.find(
+          Manifest.for_surface(ManifestTask, catalog: catalog).row_actions,
+          &(&1.ash_action == :reopen)
+        )
+      end
+
+      assert %{action_type: :update, confirm: :destructive, confirm_label: "Reopen"} =
+               reopen.(:admin_v1)
+
+      assert %{confirm: nil, confirm_label: nil} = reopen.(:basic)
+    end
+
+    test "the dialog's text is the server's, and only a destroy cannot be undone" do
+      rendered =
+        components(
+          AshA2ui.Info.build_surface(
+            ManifestTask,
+            [authorize?: false, catalog: :admin_v1] ++ @pseudo
+          )
+        )
+
+      entry = fn grid, action ->
+        Enum.find(rendered[grid]["rowActions"], &(&1["context"]["action"] == action))
+      end
+
+      discard = entry.("data_grid_open_tasks", "discard")
+      assert discard["destructive"] == true
+      assert discard["confirmTitle"] == "⟦#{discard["label"]} this record?⟧"
+      assert discard["confirmBody"] == "⟦This action cannot be undone.⟧"
+
+      reopen = entry.("data_grid_done_tasks", "reopen")
+      assert reopen["destructive"] == true
+      assert reopen["confirmTitle"] == "⟦#{reopen["label"]} this record?⟧"
+      refute Map.has_key?(reopen, "confirmBody")
+
+      complete = entry.("data_grid_open_tasks", "complete")
+      refute Map.has_key?(complete, "destructive")
+      refute Map.has_key?(complete, "confirmTitle")
     end
 
     test "a surface without row actions has tables and no row actions" do

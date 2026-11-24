@@ -209,7 +209,7 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
       object = %Object{
         ref: ref,
-        label: Registry.label(registry, record) || default_record_label(record),
+        label: Registry.label(registry, record) || default_record_label(record, l10n(opts)),
         description: nil,
         projections: host_projections(registry, record, record_projections(capabilities)),
         capabilities: capabilities,
@@ -419,9 +419,11 @@ defmodule AshA2ui.Canvas.ObjectResolver do
 
   # --- labels -----------------------------------------------------------------
 
-  defp default_record_label(record) do
+  defp default_record_label(record, l10n) do
     Enum.find_value([:name, :title, :label], fn attr ->
       case Map.get(record, attr) do
+        # A forbidden name draws the masked word, never the struct.
+        %Ash.ForbiddenField{} -> AshA2ui.Masked.text(l10n)
         nil -> nil
         value -> to_string(value)
       end

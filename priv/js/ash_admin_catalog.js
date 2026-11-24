@@ -376,15 +376,60 @@ export function thenOffered(props) {
 }
 
 /**
+ * Whether a saveBar shows while its fields under review wait, before
+ * anything changed (3.14): its `showWhileWaiting` is true, or names a field
+ * of the bar's record that is true.
+ */
+export function showsWhileWaiting(props) {
+  const show = props?.showWhileWaiting;
+  if (show === true) return true;
+  if (typeof show !== "string" || show === "") return false;
+  return props?.record?.[show] === true;
+}
+
+/**
+ * What a saveBar draws, from its props: `shown` (a change waits, or, with
+ * `showWhileWaiting`, fields under review wait), the change and waiting
+ * counts, its message (`messageWaiting` while fields wait), its status tag
+ * ("" when none waits) and whether it offers Discard (only while a change
+ * waits). The stock bar and a host's swap both draw from it.
+ */
+export function saveBarState(props) {
+  const edits = editCount(props?.edits);
+  const waiting = waitingReviews(props);
+  const shown = edits > 0 || (waiting > 0 && showsWhileWaiting(props));
+  const message = waiting > 0 && props?.messageWaiting ? props.messageWaiting : props?.message;
+  return {
+    shown,
+    edits,
+    waiting,
+    message: typeof message === "string" ? message : "",
+    status: waiting > 0 ? countText(props?.status, props?.statusOne, waiting) : "",
+    discard: edits > 0,
+  };
+}
+
+/**
  * What a saveBar's Save does: "confirm" (open the dialog: fields still
  * wait), "then" (save and run the confirm's then action: nothing waits, it
- * is offered and `thenWhenClear`), else "save".
+ * is offered and `thenWhenClear`), "save", or "none" (no change and no
+ * dialog to open: nothing to send).
  */
 export function saveDecision(props) {
   const confirm = props?.confirm;
-  if (!confirm || typeof confirm !== "object") return "save";
-  if (waitingReviews(props) > 0) return "confirm";
-  return confirm.thenWhenClear === true && thenOffered(props) ? "then" : "save";
+  const hasConfirm = Boolean(confirm) && typeof confirm === "object";
+  if (hasConfirm && waitingReviews(props) > 0) return "confirm";
+  const decision = hasConfirm && confirm.thenWhenClear === true && thenOffered(props) ? "then" : "save";
+  return decision === "save" && !choiceSends(props, "save") ? "none" : decision;
+}
+
+/**
+ * Whether choosing `choice` sends anything: "then" always does (the then
+ * action runs, with the changes if any); "save" only while a change waits.
+ * A save with nothing changed writes nothing, so it sends nothing.
+ */
+export function choiceSends(props, choice) {
+  return choice === "then" || editCount(props?.edits) > 0;
 }
 
 /**
@@ -437,7 +482,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.11.0";
+export const ADMIN_CATALOG_VERSION = "3.14.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -812,6 +857,9 @@ export function buildSchemas(basicCatalog = null) {
           // the row's offer of it ({path}, row-relative).
           action: RecordAny.optional(),
           actionVisible: RecordAny.optional(),
+          // 3.12: the row's masked-field reason ({path}, row-relative); a
+          // non-empty one draws the cell as plain text (the masked word).
+          masked: RecordAny.optional(),
           detail: RecordAny.optional(),
           // 1.10: header help ({title, body}) and the field a header
           // sorts by when it is not the column's own path.
@@ -874,6 +922,10 @@ export function buildSchemas(basicCatalog = null) {
           action: Str,
           context: RecordAny.optional(),
           destructive: Bool.optional(),
+          // 3.13: the ConfirmDialog's heading and body for a destructive
+          // entry, translated by the server; a body only for a destroy.
+          confirmTitle: Str.optional(),
+          confirmBody: Str.optional(),
           // 1.2: the row-relative per-row visibility of a visible_when
           // action (`_visible_<action>`: a non-empty list = offered), and
           // the prompt a prompt_fields action collects first —
@@ -967,6 +1019,9 @@ export function buildSchemas(basicCatalog = null) {
       steps: DynamicValueSchema.nullable().optional(),
       // 3.1: how a review field's value was filled in: its state and citation.
       review: DynamicValueSchema.nullable().optional(),
+      // 3.12: the masked-field reason; a non-empty one draws the value as
+      // plain text (the masked word), ignoring format/link/badge/emptyText.
+      masked: DynamicValueSchema.nullable().optional(),
       // 3.2: a field action's button (a rowActions-shaped entry) and
       // whether the record offers it.
       action: RecordAny.optional(),
@@ -994,6 +1049,8 @@ export function buildSchemas(basicCatalog = null) {
       record: DynamicValueSchema.nullable().optional(),
       reviews: ArrayOf(RecordAny).optional(),
       editReviews: Bool.optional(),
+      // 3.14: also shown while reviews wait: true, or the record's field gating it.
+      showWhileWaiting: Any.optional(),
       // The save_changes envelope (static: the bar adds the choice and the
       // context's bindings resolve at click time).
       action: RecordAny.optional(),
@@ -2996,8 +3053,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             ${columns.map((column, columnIndex) => {
               const cell = this.renderCell(row, column);
               return columnIndex === 0
-                ? html`<th scope="row" class=${alignClass(column)}>${cell}</th>`
-                : html`<td class=${alignClass(column)}>${cell}</td>`;
+                ? html`<th scope="row" class=${alignClass(column)} data-a2ui-column=${column.path || nothing}>${cell}</th>`
+                : html`<td class=${alignClass(column)} data-a2ui-column=${column.path || nothing}>${cell}</td>`;
             })}
             ${this.inlinePrimary()
               ? html`<td class="cell-primary">${this.renderPrimaryAction(row, index)}</td>`
@@ -3032,7 +3089,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
                 (column) => html`
                   <div class="card-field">
                     <dt>${str(column.label)}</dt>
-                    <dd>${this.renderCell(row, column)}</dd>
+                    <dd data-a2ui-column=${column.path || nothing}>${this.renderCell(row, column)}</dd>
                   </div>
                 `,
               )}
@@ -3313,6 +3370,20 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       renderCellValue(row, column) {
         // 3.10: a pairs column bound to its row's items.
         if (column.pairs === true && typeof column.items?.path === "string") return this.renderPairs(row, column);
+        // 3.12: a masked cell draws the value (the masked word) as plain
+        // text: format, link, badge and emptyText are ignored, the element
+        // is marked data-a2ui-masked, and the reason is its title and
+        // accessible description.
+        if (column.masked && typeof column.masked.path === "string") {
+          const maskedReason = str(getByPath(row, column.masked.path));
+          if (maskedReason) {
+            return html`<span
+              data-a2ui-masked
+              title=${maskedReason}
+              aria-description=${maskedReason}>${str(getByPath(row, column.path))}</span
+            >`;
+          }
+        }
         if (column.link && typeof column.link.path === "string") {
           const links = linkEntries(getByPath(row, column.link.path));
           if (links.length > 0) return renderLinks(this, links);
@@ -3603,6 +3674,8 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
             envelope,
             basePath: this.rowBasePath(index),
             label: str(action.label),
+            title: str(action.confirmTitle),
+            body: str(action.confirmBody),
             rowIdentity: this.rowIdentity((this.controller?.props?.rows || [])[index], index),
           };
           this.requestUpdate();
@@ -3665,8 +3738,10 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         }
 
         const dialog = this._confirmEl;
-        dialog.title = `${pending.label} this record?`;
-        dialog.body = "This action cannot be undone.";
+        // 3.13: the server sends the dialog's text, translated, and says
+        // "cannot be undone" only for a destroy.
+        dialog.title = pending.title || pending.label;
+        dialog.body = pending.body;
         dialog.confirmLabel = pending.label || "Confirm";
         dialog.destructive = true;
 
@@ -4679,6 +4754,32 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const props = this.controller?.props;
         if (!props) return nothing;
 
+        // 3.12: a masked field draws its value (the masked word) as plain
+        // text: format, link, badge, edit, emptyText and hideWhenEmpty are
+        // ignored (a value the reader may not see is not edited in place),
+        // the element is marked data-a2ui-masked, and the reason is its
+        // title and accessible description.
+        const maskedReason = str(props.masked || "");
+        if (maskedReason) {
+          this.hidden = false;
+          const review = reviewEntry(props.review);
+          const region = regionAddresses(review) || nothing;
+          return html`
+            <dl class="field" data-review=${review ? review.state : nothing} data-a2ui-region=${region}>
+              <dt class="field-label">${str(props.label)}${props.note ? html` <span class="field-note">${str(props.note)}</span>` : nothing}</dt>
+              <dd
+                class="field-value"
+                data-a2ui-masked
+                title=${maskedReason}
+                aria-description=${maskedReason}
+              >
+                ${str(props.value)}
+              </dd>
+            ${renderReview(review)}${this.renderFieldAction(props)}
+            </dl>
+          `;
+        }
+
         // 3.11: a field the record offers editing on draws its value as a
         // control that opens its input, and never hides.
         if (this.editOffered(props)) {
@@ -4692,6 +4793,7 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         const review = reviewEntry(props.review);
         // 3.8: the regions the value cites, linked with it in a document pane.
         const region = regionAddresses(review) || nothing;
+
         // 1.17: a steps field is empty when it has no steps.
         const steps = props.steps === undefined ? null : stepEntries(props.steps);
         const empty = steps ? steps.length === 0 : props.value == null || props.value === "";
@@ -4777,12 +4879,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
   // --- SaveBar: the unsaved changes, saved or discarded (3.11) ---------------
   //
-  // Shown while /ui/edits holds a change. Save sends save_changes (choice
-  // "save"), or first opens the confirm dialog while fields under review
-  // still wait (`saveDecision`). A swap draws its own bar and dialog and
-  // calls `onSave`, `onDiscard`, `choose(choice)` and `closeConfirm`; it
-  // reads `confirmOpen()`, `busy()` and the helpers (`editCount`,
-  // `waitingReviews`, `countText`, `confirmTexts`).
+  // Shown while /ui/edits holds a change, and with showWhileWaiting (3.14)
+  // while fields under review wait (`saveBarState`). Save sends
+  // save_changes (choice "save"), or first opens the confirm dialog while
+  // fields under review still wait (`saveDecision`); a save with no change
+  // sends nothing (`choiceSends`). A swap draws its own bar and dialog from
+  // `saveBarState` and `confirmTexts` and calls `onSave`, `onDiscard`,
+  // `choose(choice)` and `closeConfirm`; it reads `confirmOpen()` and
+  // `busy()`.
 
   function defineSaveBar() {
     const tag = TAGS.saveBar;
@@ -4884,14 +4988,19 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (decision === "confirm") {
           this._amConfirmOpen = true;
           this.requestUpdate();
-        } else {
+        } else if (decision !== "none") {
           this.choose(decision);
         }
       }
 
-      /** Sends save_changes with `choice` ("save" or "then"), closing the dialog. */
+      /**
+       * Sends save_changes with `choice` ("save" or "then"), closing the
+       * dialog. A "save" with no change sends nothing: there is nothing to
+       * write.
+       */
       choose(choice) {
-        const spec = saveSpec(this.controller?.props, choice);
+        const props = this.controller?.props;
+        const spec = choiceSends(props, choice) ? saveSpec(props, choice) : null;
         this.closeConfirm();
         if (!spec || this._amSaveBusy || !this.context?.componentModel) return;
         this._amSaveBusy = true;
@@ -4944,20 +5053,20 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       render() {
         const props = this.controller?.props;
         if (!props) return nothing;
-        const count = editCount(props.edits);
-        this.hidden = count === 0;
+        const state = saveBarState(props);
+        this.hidden = !state.shown;
         if (this.hidden) return nothing;
 
-        const waiting = waitingReviews(props);
-        const message = waiting > 0 && props.messageWaiting ? props.messageWaiting : props.message;
-        const status = waiting > 0 ? countText(props.status, props.statusOne, waiting) : "";
+        const {message, status} = state;
         const busy = Boolean(this._amSaveBusy);
 
-        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${count} data-waiting=${waiting}>
+        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${state.edits} data-waiting=${state.waiting}>
             ${message ? html`<p class="bar-message" aria-live="polite">${message}</p>` : nothing}
             ${status ? html`<span class="am-badge" data-tone="warning">${status}</span>` : nothing}
             <div class="bar-actions">
-              ${renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})}
+              ${state.discard
+                ? renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})
+                : nothing}
               ${renderActionButton({label: str(props.saveLabel), tone: "primary", busy, onClick: () => this.onSave()})}
             </div>
           </div>

@@ -4,7 +4,8 @@ defmodule AshA2ui.Test.ManifestTask do
   and every row-action shape the manifest describes —
 
     * `:complete`: labelled, `visible_when` on one value;
-    * `:reopen`: `visible_when` on a list of values;
+    * `:reopen`: `visible_when` on a list of values, and a declared
+      confirmation (`confirm :destructive`) on an update;
     * `:annotate`: a prompt over a required accepted attribute, a required
       one-of argument and an optional boolean, with its own title;
     * `:discard`: a destroy (the admin catalog confirms it);
@@ -109,6 +110,7 @@ defmodule AshA2ui.Test.ManifestTask do
 
     action :reopen do
       visible_when status: [:done]
+      confirm :destructive
     end
 
     action :annotate do

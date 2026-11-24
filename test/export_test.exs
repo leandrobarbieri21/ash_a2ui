@@ -311,7 +311,7 @@ defmodule AshA2ui.ExportTest do
                  "\r\nBeta,80,draft,USD,Beta (USD),0,\r\n"
     end
 
-    test "a forbidden table cell renders null, not the inspected placeholder" do
+    test "a forbidden table cell renders the masked text, not the inspected placeholder" do
       assert [message] =
                AshA2ui.Info.build_surface(AshA2ui.Test.ExportContractMarginsUI,
                  actor: %{role: :viewer}
@@ -319,7 +319,11 @@ defmodule AshA2ui.ExportTest do
 
       rows = message["createSurface"]["dataModel"]["records"]
       assert [_ | _] = rows
-      assert Enum.all?(rows, &is_nil(&1["margin"]))
+
+      for row <- rows do
+        assert row["margin"] == "Hidden"
+        assert row["_masked"] == %{"margin" => "You do not have access to this value."}
+      end
     end
 
     test "the column selection may pick an export-only column" do

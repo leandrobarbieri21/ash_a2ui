@@ -1923,7 +1923,8 @@ defmodule AshA2ui do
     transaction). A refused save keeps the changes and says why: each
     field's error at its input, the rest as the outcome. A `confirm` asks
     first while fields still wait. Unsaved changes survive a refresh of the
-    surface's data.
+    surface's data. With `show_while_waiting` it also shows while fields
+    under review wait, before anything changed (admin catalog 3.14).
     """,
     examples: [
       """
@@ -1932,6 +1933,15 @@ defmodule AshA2ui do
         message "You have unsaved changes"
         status "%{count} to check"
         saved_message "Changes saved."
+      end
+      """,
+      """
+      save_bar do
+        context :order
+        message "You have unsaved changes"
+        message_waiting "Reviewing the order"
+        status "%{count} to check"
+        show_while_waiting :correctable
       end
       """
     ],
@@ -1982,6 +1992,21 @@ defmodule AshA2ui do
         Whether saving an edited field reviews it (the host's update action
         records the review), so the count of fields still waiting leaves out
         the ones being edited.
+        """
+      ],
+      show_while_waiting: [
+        type: {:or, [:boolean, :atom]},
+        default: false,
+        doc: """
+        Admin catalog 3.14: whether the bar also shows while fields under
+        review still wait, before anything changed (a review the person
+        works through: the bar reads `message_waiting` with its `status`,
+        and Save opens the `confirm`). `true` shows it on every record; a
+        public attribute, calculation or aggregate of the bar's record shows
+        it where that is `true` (who may save there). Discard shows only
+        while a change waits, and a save with no change sends nothing but
+        the `confirm`'s `then` choice. Off by default: the bar shows only
+        while a change waits.
         """
       ],
       id: [type: :string, doc: "A DOM id for the bar."]
@@ -3039,8 +3064,8 @@ defmodule AshA2ui do
     name: :action,
     describe: """
     Per-action metadata: the button label, refresh targets, argument
-    prompts, per-row visibility conditions, and host-delegated dispatch
-    (`via`).
+    prompts, per-row visibility conditions, a confirmation (`confirm`), and
+    host-delegated dispatch (`via`).
     """,
     examples: [
       """
@@ -3069,6 +3094,13 @@ defmodule AshA2ui do
       """
       action :confirm_merge do
         label "Confirm match"
+      end
+      """,
+      """
+      action :deactivate do
+        # Asked through the admin grid's confirmation dialog, as a destroy is.
+        confirm :destructive
+        visible_when lifecycle_status: :active
       end
       """,
       """
@@ -3147,6 +3179,21 @@ defmodule AshA2ui do
         server-side on every invoke; rendering hides the button per row.
         A bulk action applies the same check to each selected record and
         counts the records that fail it as skipped.
+        """
+      ],
+      confirm: [
+        type: {:in, [:destructive]},
+        doc: """
+        `:destructive` makes the admin catalog's grid ask for confirmation
+        through its ConfirmDialog before invoking this row action, as it
+        does for every destroy: the row button opens the dialog, and its
+        confirm control (labelled with the action's `label`) sends the
+        unchanged `invoke`. For an action whose effect is drastic without
+        being a destroy (deactivating a person). Unlike a destroy's, the
+        dialog does not say the action cannot be undone. Row actions only,
+        and not with `prompt_fields`, whose prompt is the confirmation. The
+        basic catalog has no confirmation dialog and invokes on click, as it
+        does for a destroy.
         """
       ],
       via: [

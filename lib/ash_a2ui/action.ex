@@ -19,6 +19,9 @@ defmodule AshA2ui.Action do
   * `icon` names an icon a renderer may draw the action's button as, the
     label becoming its accessible name and tooltip. Field actions (a
     field's `field_action`) carry it; other buttons draw the label.
+  * `confirm` is `:destructive` when the admin grid asks for confirmation
+    through its ConfirmDialog before invoking the row action, as it does for
+    every destroy; `nil` (the default) leaves that to the action's type.
   * `via` delegates a row action to a host-provided function instead of
     running the mapped Ash action directly: the row button still emits the
     ordinary `invoke` event, but the handler calls
@@ -35,6 +38,7 @@ defmodule AshA2ui.Action do
     :refreshes,
     :prompt_title,
     :via,
+    :confirm,
     prompt_fields: [],
     prompt_options: [],
     visible_when: [],
@@ -50,6 +54,7 @@ defmodule AshA2ui.Action do
           prompt_options: [AshA2ui.PromptOptions.t()],
           prompt_title: String.t() | nil,
           visible_when: [{atom, term}],
-          via: {module, atom, [term]} | nil
+          via: {module, atom, [term]} | nil,
+          confirm: :destructive | nil
         }
 end

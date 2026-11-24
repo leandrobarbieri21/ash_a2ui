@@ -6,8 +6,10 @@ defmodule AshA2ui.SaveBar do
   `"save_changes"` client action, or discards them.
 
   `context` names the record the bar reads: the fields under review it
-  counts and its `confirm` (`AshA2ui.SaveBar.Confirm`). See the
-  editing-a-record-in-place section of the contexts-and-details topic.
+  counts and its `confirm` (`AshA2ui.SaveBar.Confirm`). With
+  `show_while_waiting` (admin catalog 3.14) the bar also shows while those
+  fields wait, before anything changed. See the editing-a-record-in-place
+  section of the contexts-and-details topic.
   """
 
   defstruct [
@@ -22,6 +24,7 @@ defmodule AshA2ui.SaveBar do
     :discard_label,
     :saved_message,
     edit_reviews: false,
+    show_while_waiting: false,
     __spark_metadata__: nil
   ]
 
@@ -36,7 +39,8 @@ defmodule AshA2ui.SaveBar do
           save_label: String.t() | nil,
           discard_label: String.t() | nil,
           saved_message: String.t() | nil,
-          edit_reviews: boolean
+          edit_reviews: boolean,
+          show_while_waiting: boolean | atom
         }
 
   @doc """
@@ -46,4 +50,15 @@ defmodule AshA2ui.SaveBar do
   """
   @spec waiting_states() :: [String.t()]
   def waiting_states, do: ["pending", "missing"]
+
+  @doc """
+  The field of the bar's record gating `show_while_waiting`, or `nil` when
+  the option is off or `true` (no field to read).
+  """
+  @spec show_field(t()) :: atom | nil
+  def show_field(%__MODULE__{show_while_waiting: field})
+      when is_atom(field) and field not in [nil, true, false],
+      do: field
+
+  def show_field(_bar), do: nil
 end

@@ -24,7 +24,7 @@
  * scripts included. With `--corpus DIR` it also runs the pre-build checks:
  * each PDF in DIR (a scanned JBIG2 one, JPX ones, one with an ICC profile, a
  * tagged one; see the ADR 0002 notes) opened under the strict CSP and under
- * keystone's (which allows 'unsafe-eval'), reporting whether it drew, what
+ * a host CSP that allows 'unsafe-eval', reporting whether it drew, what
  * the CSP blocked and whether any WebAssembly was fetched.
  *
  * Fixtures are recorded wire payloads and a generated PDF:
@@ -74,8 +74,8 @@ const CSP = {
     "object-src 'none'",
     "base-uri 'self'",
   ].join("; "),
-  // keystone's (lib/vendorpm_keystone_web/router.ex): 'unsafe-eval' also lets WebAssembly compile.
-  keystone: [
+  // A host CSP that allows 'unsafe-eval', which also lets WebAssembly compile.
+  eval: [
     "default-src 'self'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
@@ -294,14 +294,14 @@ async function main() {
   const root = stage();
   const servers = {
     strict: await serve(root, CSP.strict, port),
-    keystone: await serve(root, CSP.keystone, port + 1),
+    eval: await serve(root, CSP.eval, port + 1),
   };
-  // --serve: stage and serve only (strict CSP on --port, keystone's on the next), to look by hand.
+  // --serve: stage and serve only (strict CSP on --port, the eval CSP on the next), to look by hand.
   if (args.includes("--serve")) {
     console.log(`serving ${root} on http://127.0.0.1:${port}/document_probe.html (Ctrl-C to stop)`);
     return;
   }
-  const base = {strict: `http://127.0.0.1:${port}`, keystone: `http://127.0.0.1:${port + 1}`};
+  const base = {strict: `http://127.0.0.1:${port}`, eval: `http://127.0.0.1:${port + 1}`};
   const browser = await chromium.launch(process.env.CHROME ? {executablePath: process.env.CHROME} : {});
 
   try {
@@ -572,10 +572,10 @@ async function main() {
     });
     await narrow.close();
 
-    /* --- pre-build checks (CLM-200): the corpus under two CSPs ---------------- */
+    /* --- pre-build checks: the corpus under two CSPs ---------------- */
     if (corpus && existsSync(corpus)) {
       const files = readdirSync(corpus).filter((f) => f.endsWith(".pdf")).sort();
-      for (const mode of ["strict", "keystone"]) {
+      for (const mode of ["strict", "eval"]) {
         for (const wasm of [false, true]) {
           for (const file of files) {
             const src = encodeURIComponent(`./corpus/${file}`);
