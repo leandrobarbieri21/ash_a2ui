@@ -1506,6 +1506,8 @@ defmodule AshA2ui.ResolvedView do
             message_waiting: translate(l10n, bar.message_waiting),
             status: counted(l10n, bar.status),
             status_one: counted(l10n, bar.status_one),
+            status_reviewed: counted(l10n, bar.status_reviewed),
+            status_reviewed_one: counted(l10n, bar.status_reviewed_one),
             save_label:
               translate(l10n, bar.save_label) || AshA2ui.Experience.save_changes_label(l10n),
             discard_label:

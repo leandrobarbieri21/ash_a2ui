@@ -8,7 +8,9 @@ defmodule AshA2ui.SaveBar do
   `context` names the record the bar reads: the fields under review it
   counts and its `confirm` (`AshA2ui.SaveBar.Confirm`). With
   `show_while_waiting` (admin catalog 3.14) the bar also shows while those
-  fields wait, before anything changed. See the editing-a-record-in-place
+  fields wait, before anything changed. With `status_reviewed` (admin
+  catalog 3.16) it also counts the fields reviewed so far, beside the ones
+  still waiting. See the editing-a-record-in-place
   section of the contexts-and-details topic.
   """
 
@@ -19,6 +21,8 @@ defmodule AshA2ui.SaveBar do
     :message_waiting,
     :status,
     :status_one,
+    :status_reviewed,
+    :status_reviewed_one,
     :confirm,
     :save_label,
     :discard_label,
@@ -35,6 +39,8 @@ defmodule AshA2ui.SaveBar do
           message_waiting: String.t() | nil,
           status: String.t() | nil,
           status_one: String.t() | nil,
+          status_reviewed: String.t() | nil,
+          status_reviewed_one: String.t() | nil,
           confirm: AshA2ui.SaveBar.Confirm.t() | nil,
           save_label: String.t() | nil,
           discard_label: String.t() | nil,

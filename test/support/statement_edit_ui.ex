@@ -47,6 +47,8 @@ defmodule AshA2ui.Test.StatementEditUI do
       message_waiting "Reviewing the statement"
       status "%{count} to check"
       status_one "1 to check"
+      status_reviewed "%{count} checked"
+      status_reviewed_one "1 checked"
       edit_reviews true
       show_while_waiting :correctable
 

@@ -390,17 +390,36 @@ const WAITING_STATES = ["pending", "missing"];
  * field has an unsaved change (saving it reviews it).
  */
 export function waitingReviews(props) {
+  return reviewCounts(props).waiting;
+}
+
+/**
+ * How a saveBar's fields under review stand (3.16): `waiting` as
+ * `waitingReviews` counts them; `reviewed`, the fields a person reviewed:
+ * their review on the bar's `record` is reviewed, or, with `editReviews`, a
+ * waiting one has an unsaved change (saving it reviews it); and `open`,
+ * whether the review is still open: a field's review on the record is
+ * still pending or missing, whatever the unsaved changes.
+ */
+export function reviewCounts(props) {
   const record = props?.record && typeof props.record === "object" ? props.record : {};
   const edits = props?.edits && typeof props.edits === "object" ? props.edits : {};
   let waiting = 0;
+  let reviewed = 0;
+  let open = false;
   for (const entry of Array.isArray(props?.reviews) ? props.reviews : []) {
     const state = reviewEntry(record[`_review_${entry?.field}`])?.state;
+    if (state === "reviewed") {
+      reviewed += 1;
+      continue;
+    }
     if (!WAITING_STATES.includes(state)) continue;
+    open = true;
     const values = edits[entry.component]?.values;
-    if (props.editReviews === true && values && Object.hasOwn(values, entry.field)) continue;
-    waiting += 1;
+    if (props.editReviews === true && values && Object.hasOwn(values, entry.field)) reviewed += 1;
+    else waiting += 1;
   }
-  return waiting;
+  return {waiting, reviewed, open};
 }
 
 /** A counted text: `one` for one when given, else `other`, `%{count}` replaced. */
@@ -433,20 +452,25 @@ export function showsWhileWaiting(props) {
  * What a saveBar draws, from its props: `shown` (a change waits, or, with
  * `showWhileWaiting`, fields under review wait), the change and waiting
  * counts, its message (`messageWaiting` while fields wait), its status tag
- * ("" when none waits) and whether it offers Discard (only while a change
- * waits). The stock bar and a host's swap both draw from it.
+ * ("" when none waits), its reviewed tag (3.16: `statusReviewed`, "" unless
+ * the review is open and a field is reviewed) and whether it offers Discard
+ * (only while a change waits). The stock bar and a host's swap both draw
+ * from it.
  */
 export function saveBarState(props) {
   const edits = editCount(props?.edits);
-  const waiting = waitingReviews(props);
+  const {waiting, reviewed, open} = reviewCounts(props);
+  const reviewedShown = open && reviewed > 0 && typeof props?.statusReviewed === "string";
   const shown = edits > 0 || (waiting > 0 && showsWhileWaiting(props));
   const message = waiting > 0 && props?.messageWaiting ? props.messageWaiting : props?.message;
   return {
     shown,
     edits,
     waiting,
+    reviewed,
     message: typeof message === "string" ? message : "",
     status: waiting > 0 ? countText(props?.status, props?.statusOne, waiting) : "",
+    statusReviewed: reviewedShown ? countText(props.statusReviewed, props.statusReviewedOne, reviewed) : "",
     discard: edits > 0,
   };
 }
@@ -524,7 +548,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.15.0";
+export const ADMIN_CATALOG_VERSION = "3.16.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -1087,6 +1111,9 @@ export function buildSchemas(basicCatalog = null) {
       messageWaiting: Str.optional(),
       status: Str.optional(),
       statusOne: Str.optional(),
+      // 3.16: a tag counting the fields reviewed, beside status.
+      statusReviewed: Str.optional(),
+      statusReviewedOne: Str.optional(),
       saveLabel: Str,
       discardLabel: Str,
       edits: DynamicValueSchema.nullable().optional(),
@@ -5178,12 +5205,13 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         this.hidden = !state.shown;
         if (this.hidden) return nothing;
 
-        const {message, status} = state;
+        const {message, status, statusReviewed} = state;
         const busy = Boolean(this._amSaveBusy);
 
-        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${state.edits} data-waiting=${state.waiting}>
+        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${state.edits} data-waiting=${state.waiting} data-reviewed=${state.reviewed}>
             ${message ? html`<p class="bar-message" aria-live="polite">${message}</p>` : nothing}
             ${status ? html`<span class="am-badge" data-tone="warning">${status}</span>` : nothing}
+            ${statusReviewed ? html`<span class="am-badge" data-tone="success">${statusReviewed}</span>` : nothing}
             <div class="bar-actions">
               ${state.discard
                 ? renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})

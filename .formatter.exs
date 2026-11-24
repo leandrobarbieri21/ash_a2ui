@@ -213,6 +213,8 @@ spark_locals_without_parens = [
   source: 1,
   status: 1,
   status_one: 1,
+  status_reviewed: 1,
+  status_reviewed_one: 1,
   step: 1,
   step: 2,
   steps: 1,

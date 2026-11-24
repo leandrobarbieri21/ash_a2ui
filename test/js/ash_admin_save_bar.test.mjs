@@ -15,6 +15,7 @@ import {feedback, keepUnsavedEdits} from "../../priv/js/ash_a2ui_protocol.js";
 const {
   editCount,
   waitingReviews,
+  reviewCounts,
   countText,
   saveDecision,
   saveBarState,
@@ -156,8 +157,10 @@ test("3.14: what the bar draws, with and without a change, while fields wait and
     shown: true,
     edits: 0,
     waiting: 2,
+    reviewed: 0,
     message: "Reviewing the statement",
     status: "2 to check",
+    statusReviewed: "",
     discard: false,
   });
 
@@ -177,6 +180,70 @@ test("3.14: what the bar draws, with and without a change, while fields wait and
 
   // a record with no review fields at all: no bar
   assert.equal(saveBarState({...base, showWhileWaiting: true, record: {id: "s1"}}).shown, false);
+});
+
+test("3.16: a field is reviewed once its review is, or, with editReviews, while it has a change", () => {
+  const edits = {facts: {recordId: "s1", values: {title: "x"}}};
+  assert.deepEqual(reviewCounts({reviews, record: record("pending", "missing")}), {waiting: 2, reviewed: 0, open: true});
+  assert.deepEqual(reviewCounts({reviews, record: record("reviewed", "pending")}), {waiting: 1, reviewed: 1, open: true});
+  // a change reviews a waiting field only with editReviews
+  assert.deepEqual(reviewCounts({reviews, edits, record: record("pending", "pending")}), {
+    waiting: 2,
+    reviewed: 0,
+    open: true,
+  });
+  assert.deepEqual(reviewCounts({reviews, edits, editReviews: true, record: record("pending", "reviewed")}), {
+    waiting: 0,
+    reviewed: 2,
+    open: true,
+  });
+  // a change to a field already reviewed counts it once
+  assert.deepEqual(reviewCounts({reviews, edits, editReviews: true, record: record("reviewed", "pending")}), {
+    waiting: 1,
+    reviewed: 1,
+    open: true,
+  });
+  // every review saved reviewed: the review is closed
+  assert.deepEqual(reviewCounts({reviews, record: record("reviewed", "reviewed")}), {
+    waiting: 0,
+    reviewed: 2,
+    open: false,
+  });
+  // a field with no review counts nowhere
+  assert.deepEqual(reviewCounts({reviews, record: {id: "s1"}}), {waiting: 0, reviewed: 0, open: false});
+});
+
+test("3.16: the reviewed tag shows while the review is open and a field is reviewed", () => {
+  const base = {
+    reviews,
+    showWhileWaiting: true,
+    editReviews: true,
+    message: "You have unsaved changes",
+    messageWaiting: "Reviewing the statement",
+    status: "%{count} to check",
+    statusOne: "1 to check",
+    statusReviewed: "%{count} checked",
+    statusReviewedOne: "1 checked!",
+  };
+  const edits = {facts: {recordId: "s1", values: {title: "x"}}};
+
+  // nothing reviewed yet: no tag
+  assert.equal(saveBarState({...base, record: record("pending", "missing")}).statusReviewed, "");
+  // one reviewed: its form for one, beside the waiting one
+  const one = saveBarState({...base, record: record("reviewed", "missing")});
+  assert.equal(one.status, "1 to check");
+  assert.equal(one.statusReviewed, "1 checked!");
+  assert.equal(one.reviewed, 1);
+  // a change reviews the other: two reviewed, none waiting, the review still open
+  const amount = {facts: {recordId: "s1", values: {amount: 3}}};
+  const two = saveBarState({...base, edits: amount, record: record("reviewed", "missing")});
+  assert.equal(two.status, "");
+  assert.equal(two.statusReviewed, "2 checked");
+  // every review saved reviewed: a later change shows no tag
+  assert.equal(saveBarState({...base, edits, record: record("reviewed", "reviewed")}).statusReviewed, "");
+  // without statusReviewed: no tag
+  const {statusReviewed: _omit, ...plain} = base;
+  assert.equal(saveBarState({...plain, record: record("reviewed", "pending")}).statusReviewed, "");
 });
 
 test("the dialog offers its second choice only where the record offers it", () => {
@@ -315,6 +382,7 @@ async function mountPage({
   reviewOpen = true,
   editReviews = true,
   showWhileWaiting = undefined,
+  statusReviewed = undefined,
 } = {}) {
   const hook = mountHook({catalogs: [mergedCatalog, admin]});
   hook.processMessages([
@@ -332,7 +400,12 @@ async function mountPage({
             value: {"@path": "/detail/statement/title"},
             ...facts,
           },
-          {...bar, editReviews, ...(showWhileWaiting === undefined ? {} : {showWhileWaiting})},
+          {
+            ...bar,
+            editReviews,
+            ...(showWhileWaiting === undefined ? {} : {showWhileWaiting}),
+            ...(statusReviewed === undefined ? {} : {statusReviewed}),
+          },
         ],
         dataModel: {
           detail: {
@@ -500,6 +573,23 @@ test("3.14: while values wait, the bar shows before any change, with Save and no
   assert.match(saveBar.renderRoot.textContent, /Reviewing the statement/);
   assert.match(saveBar.renderRoot.textContent, /1 to check/);
   assert.deepEqual(buttons(saveBar), ["Save changes"]);
+});
+
+test("3.16: the reviewed tag follows the review, after the waiting one", async () => {
+  const {field, saveBar} = await mountPage({showWhileWaiting: "correctable", statusReviewed: "%{count} checked"});
+  const tags = () =>
+    [...saveBar.renderRoot.querySelectorAll(".am-badge")].map((tag) => [tag.dataset.tone, tag.textContent.trim()]);
+  assert.deepEqual(tags(), [["warning", "1 to check"]], "nothing reviewed yet: no reviewed tag");
+
+  // a change reviews the field: the reviewed tag, nothing waiting
+  await type(field, "Yearly fee", "Enter");
+  assert.deepEqual(tags(), [["success", "1 checked"]]);
+  assert.equal(saveBar.renderRoot.querySelector(".bar").dataset.reviewed, "1");
+
+  // discarded: back to waiting
+  saveBar.onDiscard();
+  await settle();
+  assert.deepEqual(tags(), [["warning", "1 to check"]]);
 });
 
 test("3.14: a change adds Discard; discarding keeps the bar while values wait", async () => {

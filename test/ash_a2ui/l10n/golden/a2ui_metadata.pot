@@ -12,11 +12,19 @@ msgstr ""
 "Domain: a2ui_metadata\n"
 
 #: test/support/statement_edit_ui.ex:1
+msgid "%{count} checked"
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
 msgid "%{count} to check"
 msgstr ""
 
 #: test/support/statement_edit_ui.ex:1
 msgid "%{count} values still wait."
+msgstr ""
+
+#: test/support/statement_edit_ui.ex:1
+msgid "1 checked"
 msgstr ""
 
 #: test/support/statement_edit_ui.ex:1

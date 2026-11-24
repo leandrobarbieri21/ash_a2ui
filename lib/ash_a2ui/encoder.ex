@@ -2529,6 +2529,8 @@ defmodule AshA2ui.Encoder do
       |> maybe_put("messageWaiting", bar.message_waiting)
       |> maybe_put("status", bar.status)
       |> maybe_put("statusOne", bar.status_one)
+      |> maybe_put("statusReviewed", bar.status_reviewed)
+      |> maybe_put("statusReviewedOne", bar.status_reviewed_one)
       |> maybe_put("domId", bar.id)
       |> maybe_put("confirm", save_bar_confirm(bar.confirm))
       |> maybe_put("showWhileWaiting", show_while_waiting(bar))

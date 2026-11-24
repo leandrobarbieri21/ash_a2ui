@@ -190,6 +190,14 @@ defmodule AshA2ui.SaveBarTest do
       assert detail["correctable"] == false
     end
 
+    test "catalog 3.16: the bar counts the values reviewed with its own words",
+         %{statement: statement} do
+      {components, _detail} = surface(:admin_v1, statement)
+
+      assert components["save_bar"]["statusReviewed"] == "%{count} checked"
+      assert components["save_bar"]["statusReviewedOne"] == "1 checked"
+    end
+
     test "the basic catalog draws the card read-only and no bar", %{statement: statement} do
       {components, _detail} = surface(:basic, statement)
 
@@ -482,6 +490,9 @@ defmodule AshA2ui.SaveBarTest do
       end
 
       assert AshA2ui.Info.save_bar(BarShowAlways).show_while_waiting == true
+      # no reviewed tag unless the bar declares one
+      bar = AshA2ui.Info.save_bar(BarShowAlways)
+      assert bar.status_reviewed == nil and bar.status_reviewed_one == nil
       assert AshA2ui.SaveBar.show_field(AshA2ui.Info.save_bar(BarShowAlways)) == nil
       assert AshA2ui.Info.save_bar(StatementEditUI).show_while_waiting == :correctable
     end

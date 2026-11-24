@@ -10,6 +10,24 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
+### Added: a save bar that counts the fields reviewed (admin catalog 3.16.0)
+
+Additive, under the same catalog id.
+
+- `save_bar`'s `status_reviewed` and `status_reviewed_one` (translated, with
+  `%{count}`): a second tag, after `status`, counting the fields under
+  review a person reviewed. A field counts while its review state is
+  `"reviewed"` and, with `edit_reviews`, while a waiting field holds an
+  unsaved change (saving it reviews it). The tag shows while the review is
+  open (a field on the bar's record is still pending or missing) and at
+  least one field is reviewed.
+- The admin catalog's `saveBar` gains the optional `statusReviewed` and
+  `statusReviewedOne`. The JS module exports `reviewCounts` (waiting,
+  reviewed, and whether the review is open), and `saveBarState` also
+  returns `reviewed` and `statusReviewed`, for a host's swap. The stock bar
+  draws the tag in the success tone. A renderer that ignores it draws the
+  bar as in 3.15.
+
 ### Fixed: a blank body child holds no gap in the record page
 
 Renderer only; the wire is unchanged.
