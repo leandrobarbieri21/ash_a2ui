@@ -10,7 +10,7 @@ This changelog is managed by [git_ops](https://hex.pm/packages/git_ops).
 
 Requires Elixir 1.20 or later.
 
-### Added: a save bar that counts the fields reviewed (admin catalog 3.16.0)
+### Added: a save bar that counts the fields reviewed (admin catalog 3.17.0)
 
 Additive, under the same catalog id.
 
@@ -18,15 +18,35 @@ Additive, under the same catalog id.
   `%{count}`): a second tag, after `status`, counting the fields under
   review a person reviewed. A field counts while its review state is
   `"reviewed"` and, with `edit_reviews`, while a waiting field holds an
-  unsaved change (saving it reviews it). The tag shows while the review is
-  open (a field on the bar's record is still pending or missing) and at
-  least one field is reviewed.
+  unsaved change (saving it reviews it). The table rows the bar counts
+  (3.16) count too, once nothing on them waits and a review is reviewed:
+  the record's `_review_rows` gains `"reviewed"`. The tag shows while the
+  review is open (a field on the bar's record, or a row, still waits) and
+  at least one is reviewed.
 - The admin catalog's `saveBar` gains the optional `statusReviewed` and
   `statusReviewedOne`. The JS module exports `reviewCounts` (waiting,
   reviewed, and whether the review is open), and `saveBarState` also
   returns `reviewed` and `statusReviewed`, for a host's swap. The stock bar
   draws the tag in the success tone. A renderer that ignores it draws the
-  bar as in 3.15.
+  bar as in 3.16.
+
+### Added: a save bar counts the table rows still waiting (admin catalog 3.16.0)
+
+Additive, under the same catalog id.
+
+- A `save_bar` counted only its context's `:detail` review fields, so a
+  table's rows still waiting for review (a `review` column, 3.3; a row's
+  ✓, 3.9; `pairs` items, 3.10) never kept it up: checking every field made
+  the bar go while a `review_summary` still counted lines. The bar now
+  counts them too, the rows a `review_summary` counts (tables filtered by
+  the context alone), each once.
+- The server counts them in the same walk and the same read as the review
+  summary (`AshA2ui.ReviewSummary.data/4`) and puts them on the bar's
+  record at `_review_rows` (`AshA2ui.SaveBar.rows_key/0`),
+  `%{"waiting" => n}`, refreshed with the record, so a row's ✓ counts down.
+- In the browser, `waitingReviews` adds them (`rowsWaiting`): the bar
+  shows while they wait (`show_while_waiting`), its `status` counts them,
+  Save opens the `confirm`, and `then_when_clear` waits for them.
 
 ### Fixed: a blank body child holds no gap in the record page
 

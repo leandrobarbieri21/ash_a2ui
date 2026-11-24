@@ -1946,8 +1946,10 @@ defmodule AshA2ui do
     field's error at its input, the rest as the outcome. A `confirm` asks
     first while fields still wait. Unsaved changes survive a refresh of the
     surface's data. With `show_while_waiting` it also shows while fields
-    under review wait, before anything changed (admin catalog 3.14). With
-    `status_reviewed` it also counts the fields reviewed so far (3.16).
+    under review wait, before anything changed (admin catalog 3.14). The
+    rows of the context's tables count with its fields, as a
+    `review_summary` counts them (3.16).
+    With `status_reviewed` it also counts the fields reviewed so far (3.17).
     """,
     examples: [
       """
@@ -1999,12 +2001,14 @@ defmodule AshA2ui do
       status_reviewed: [
         type: :string,
         doc: """
-        Admin catalog 3.16: a tag counting the fields under review a person
+        Admin catalog 3.17: a tag counting the fields under review a person
         has reviewed, with `%{count}`, drawn after `status`. A field counts
         while its review state is `"reviewed"` (checked, or a saved
         correction) and, with `edit_reviews`, while it holds an unsaved
-        change (saving it reviews it). Shown while the review is open (a
-        field on the record still waits) and at least one is reviewed.
+        change (saving it reviews it); so does each table row the bar
+        counts (3.16) once nothing on it waits and a review is reviewed.
+        Shown while the review is open (a field or row still waits) and at
+        least one is reviewed.
         Translated.
         """
       ],

@@ -8,9 +8,11 @@ defmodule AshA2ui.SaveBar do
   `context` names the record the bar reads: the fields under review it
   counts and its `confirm` (`AshA2ui.SaveBar.Confirm`). With
   `show_while_waiting` (admin catalog 3.14) the bar also shows while those
-  fields wait, before anything changed. With `status_reviewed` (admin
-  catalog 3.16) it also counts the fields reviewed so far, beside the ones
-  still waiting. See the editing-a-record-in-place
+  fields wait, before anything changed. The rows of the context's tables
+  count too (admin catalog 3.16): the ones a `review_summary` would count,
+  carried on the record at `rows_key/0`. With `status_reviewed` (3.17) it
+  also counts the fields and rows reviewed so far, beside the ones still
+  waiting. See the editing-a-record-in-place
   section of the contexts-and-details topic.
   """
 
@@ -56,6 +58,15 @@ defmodule AshA2ui.SaveBar do
   """
   @spec waiting_states() :: [String.t()]
   def waiting_states, do: ["pending", "missing"]
+
+  @doc """
+  The key of the bar's record holding its table rows' count (admin catalog
+  3.16): `%{"waiting" => n}`, the rows (and `pairs` items) of the
+  context's tables still waiting, as `AshA2ui.ReviewSummary` counts them.
+  A table row is not edited through the bar, so the server counts them.
+  """
+  @spec rows_key() :: String.t()
+  def rows_key, do: "_review_rows"
 
   @doc """
   The field of the bar's record gating `show_while_waiting`, or `nil` when

@@ -526,12 +526,19 @@ topics for the full contracts.
   opens the `confirm`; its `save_label` then sends nothing (there is
   nothing to write) and its `then_label` runs the `then_action` alone. The
   bar goes once nothing waits and nothing changed.
-- `status_reviewed` / `status_reviewed_one` (admin catalog 3.16) add a
+- The rows of the context's tables count with its fields (admin catalog
+  3.16), the ones a `review_summary` counts: a table filtered by the
+  context alone, each row waiting once. The server carries them on the
+  bar's record at `_review_rows` (`%{"waiting" => n}`), refreshed with the
+  record, so a row's ✓ counts down and the bar stays until the last line
+  is checked.
+- `status_reviewed` / `status_reviewed_one` (admin catalog 3.17) add a
   second tag after `status`, counting the fields reviewed so far: review
   state `reviewed` (a checked value, a saved correction) and, with
-  `edit_reviews`, a waiting field with an unsaved change. It shows while
-  the review is open (a field on the record is still pending or missing)
-  and at least one field is reviewed: hidden at zero, and hidden once
+  `edit_reviews`, a waiting field with an unsaved change, and the table
+  rows reviewed (`_review_rows`' `"reviewed"`). It shows while the review
+  is open (a field on the record is still pending or missing, or a row
+  waits) and at least one is reviewed: hidden at zero, and hidden once
   every review is saved, so a later correction shows no tag. The stock bar
   draws it in the success tone; a swap reads `saveBarState(props)
   .statusReviewed` (and `.reviewed`, the count).

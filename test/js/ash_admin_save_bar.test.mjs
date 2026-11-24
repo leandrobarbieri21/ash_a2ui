@@ -16,6 +16,7 @@ const {
   editCount,
   waitingReviews,
   reviewCounts,
+  rowsWaiting,
   countText,
   saveDecision,
   saveBarState,
@@ -182,7 +183,7 @@ test("3.14: what the bar draws, with and without a change, while fields wait and
   assert.equal(saveBarState({...base, showWhileWaiting: true, record: {id: "s1"}}).shown, false);
 });
 
-test("3.16: a field is reviewed once its review is, or, with editReviews, while it has a change", () => {
+test("3.17: a field is reviewed once its review is, or, with editReviews, while it has a change", () => {
   const edits = {facts: {recordId: "s1", values: {title: "x"}}};
   assert.deepEqual(reviewCounts({reviews, record: record("pending", "missing")}), {waiting: 2, reviewed: 0, open: true});
   assert.deepEqual(reviewCounts({reviews, record: record("reviewed", "pending")}), {waiting: 1, reviewed: 1, open: true});
@@ -213,7 +214,7 @@ test("3.16: a field is reviewed once its review is, or, with editReviews, while 
   assert.deepEqual(reviewCounts({reviews, record: {id: "s1"}}), {waiting: 0, reviewed: 0, open: false});
 });
 
-test("3.16: the reviewed tag shows while the review is open and a field is reviewed", () => {
+test("3.17: the reviewed tag shows while the review is open and a field is reviewed", () => {
   const base = {
     reviews,
     showWhileWaiting: true,
@@ -244,6 +245,51 @@ test("3.16: the reviewed tag shows while the review is open and a field is revie
   // without statusReviewed: no tag
   const {statusReviewed: _omit, ...plain} = base;
   assert.equal(saveBarState({...plain, record: record("reviewed", "pending")}).statusReviewed, "");
+});
+
+test("3.16: the table rows still waiting on the record count with the fields", () => {
+  const rows = (waiting) => ({_review_rows: {waiting}});
+  assert.equal(rowsWaiting(rows(3)), 3);
+  assert.equal(rowsWaiting({}), 0);
+  assert.equal(rowsWaiting(rows("2")), 0);
+  assert.equal(rowsWaiting(rows(-1)), 0);
+  assert.equal(rowsWaiting(null), 0);
+
+  // two lines wait beside one field
+  assert.equal(waitingReviews({reviews, record: record("pending", "reviewed", rows(2))}), 3);
+  // every field reviewed, lines still waiting: the bar stays, counting them
+  const base = {reviews, showWhileWaiting: true, status: "%{count} to check", statusOne: "1 to check"};
+  const linesOnly = saveBarState({...base, record: record("reviewed", "reviewed", rows(1))});
+  assert.equal(linesOnly.shown, true);
+  assert.equal(linesOnly.status, "1 to check");
+  // and Save asks first while they wait
+  assert.equal(saveDecision({...base, confirm, record: record("reviewed", "reviewed", rows(1))}), "confirm");
+  // none left: the bar goes
+  assert.equal(saveBarState({...base, record: record("reviewed", "reviewed", rows(0))}).shown, false);
+});
+
+test("3.17: the rows reviewed on the record count with the fields, and rows waiting keep the review open", () => {
+  const rows = (waiting, reviewed) => ({_review_rows: {waiting, reviewed}});
+  const base = {
+    reviews,
+    showWhileWaiting: true,
+    status: "%{count} to check",
+    statusReviewed: "%{count} checked",
+  };
+  // two lines checked, one waiting, beside one field checked and one waiting
+  assert.deepEqual(reviewCounts({reviews, record: record("reviewed", "pending", rows(1, 2))}), {
+    waiting: 2,
+    reviewed: 3,
+    open: true,
+  });
+  // every field reviewed, a line still waiting: the review is open, both tags
+  const lineLeft = saveBarState({...base, record: record("reviewed", "reviewed", rows(1, 2))});
+  assert.equal(lineLeft.status, "1 to check");
+  assert.equal(lineLeft.statusReviewed, "4 checked");
+  // all done: closed, no tag
+  assert.equal(saveBarState({...base, record: record("reviewed", "reviewed", rows(0, 3))}).statusReviewed, "");
+  // a bad count counts nowhere
+  assert.equal(reviewCounts({reviews, record: record("pending", "pending", rows(0, "3"))}).reviewed, 0);
 });
 
 test("the dialog offers its second choice only where the record offers it", () => {
@@ -575,7 +621,7 @@ test("3.14: while values wait, the bar shows before any change, with Save and no
   assert.deepEqual(buttons(saveBar), ["Save changes"]);
 });
 
-test("3.16: the reviewed tag follows the review, after the waiting one", async () => {
+test("3.17: the reviewed tag follows the review, after the waiting one", async () => {
   const {field, saveBar} = await mountPage({showWhileWaiting: "correctable", statusReviewed: "%{count} checked"});
   const tags = () =>
     [...saveBar.renderRoot.querySelectorAll(".am-badge")].map((tag) => [tag.dataset.tone, tag.textContent.trim()]);

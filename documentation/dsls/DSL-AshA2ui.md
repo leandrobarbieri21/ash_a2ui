@@ -809,8 +809,10 @@ transaction). A refused save keeps the changes and says why: each
 field's error at its input, the rest as the outcome. A `confirm` asks
 first while fields still wait. Unsaved changes survive a refresh of the
 surface's data. With `show_while_waiting` it also shows while fields
-under review wait, before anything changed (admin catalog 3.14). With
-`status_reviewed` it also counts the fields reviewed so far (3.16).
+under review wait, before anything changed (admin catalog 3.14). The
+rows of the context's tables count with its fields, as a
+`review_summary` counts them (3.16).
+With `status_reviewed` it also counts the fields reviewed so far (3.17).
 
 
 ### Nested DSLs
@@ -852,7 +854,7 @@ end
 | [`message_waiting`](#a2ui-save_bar-message_waiting){: #a2ui-save_bar-message_waiting } | `String.t` |  | The bar's message while fields under review still wait. Translated. |
 | [`status`](#a2ui-save_bar-status){: #a2ui-save_bar-status } | `String.t` |  | A tag counting the fields still waiting, with `%{count}`, shown while any wait. Translated. |
 | [`status_one`](#a2ui-save_bar-status_one){: #a2ui-save_bar-status_one } | `String.t` |  | The tag when one field waits. Translated. |
-| [`status_reviewed`](#a2ui-save_bar-status_reviewed){: #a2ui-save_bar-status_reviewed } | `String.t` |  | Admin catalog 3.16: a tag counting the fields under review a person has reviewed, with `%{count}`, drawn after `status`. A field counts while its review state is `"reviewed"` (checked, or a saved correction) and, with `edit_reviews`, while it holds an unsaved change (saving it reviews it). Shown while the review is open (a field on the record still waits) and at least one is reviewed. Translated. |
+| [`status_reviewed`](#a2ui-save_bar-status_reviewed){: #a2ui-save_bar-status_reviewed } | `String.t` |  | Admin catalog 3.17: a tag counting the fields under review a person has reviewed, with `%{count}`, drawn after `status`. A field counts while its review state is `"reviewed"` (checked, or a saved correction) and, with `edit_reviews`, while it holds an unsaved change (saving it reviews it); so does each table row the bar counts (3.16) once nothing on it waits and a review is reviewed. Shown while the review is open (a field or row still waits) and at least one is reviewed. Translated. |
 | [`status_reviewed_one`](#a2ui-save_bar-status_reviewed_one){: #a2ui-save_bar-status_reviewed_one } | `String.t` |  | The reviewed tag when one field is reviewed. Translated. |
 | [`save_label`](#a2ui-save_bar-save_label){: #a2ui-save_bar-save_label } | `String.t` |  | The Save button. Translated. Defaults to the library's "Save changes". |
 | [`discard_label`](#a2ui-save_bar-discard_label){: #a2ui-save_bar-discard_label } | `String.t` |  | The Discard button. Translated. Defaults to the library's "Discard changes". |

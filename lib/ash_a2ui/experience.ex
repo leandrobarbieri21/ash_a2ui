@@ -201,7 +201,7 @@ defmodule AshA2ui.Experience do
   `preview` (values recalculated from the unsaved changes).
   """
   @spec admin_catalog_version() :: String.t()
-  def admin_catalog_version, do: "3.16.0"
+  def admin_catalog_version, do: "3.17.0"
 
   @doc """
   The basic-catalog component kinds the admin catalog declares and renders
