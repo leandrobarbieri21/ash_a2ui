@@ -177,6 +177,19 @@ defmodule AshA2ui.SaveBarTest do
       assert detail["review_open"] == true
     end
 
+    test "catalog 3.14: the bar shows while values wait where the record's field says so",
+         %{statement: statement} do
+      {components, detail} = surface(:admin_v1, statement)
+
+      assert components["save_bar"]["showWhileWaiting"] == "correctable"
+      # the record carries the field gating it, read with the bar's record
+      assert detail["correctable"] == true
+
+      locked = Ash.update!(statement, %{locked: true}, authorize?: false)
+      {_components, detail} = surface(:admin_v1, locked)
+      assert detail["correctable"] == false
+    end
+
     test "the basic catalog draws the card read-only and no bar", %{statement: statement} do
       {components, _detail} = surface(:basic, statement)
 
@@ -275,6 +288,21 @@ defmodule AshA2ui.SaveBarTest do
     test "nothing to save is refused", %{statement: statement} do
       assert {:error, messages} = save(statement, %{})
       assert Messages.feedback(messages)["message"] == "Nothing to save."
+    end
+
+    test "then with no change runs the then_action alone and writes no correction",
+         %{statement: statement} do
+      assert {:ok, messages} = save(statement, nil, edits: %{}, choice: "then")
+
+      saved = reload(statement)
+      assert saved.reviewed
+      assert saved.title == "Annual fee"
+      assert saved.amount == 1200
+
+      assert write(messages, "/ui/edits") == {:ok, %{}}
+      assert {:ok, detail} = write(messages, "/detail/statement")
+      assert detail["review_open"] == false
+      assert Messages.feedback(messages)["message"] == "Saved and finished."
     end
   end
 
@@ -385,6 +413,77 @@ defmodule AshA2ui.SaveBarTest do
         end)
 
       assert result =~ ~r/then_action :finish is not an update action/
+    end
+
+    test "show_while_waiting names a field of the bar's record" do
+      result =
+        capture_io(:stderr, fn ->
+          defmodule BarShowUnknown do
+            @moduledoc false
+            use AshA2ui.Standalone
+
+            a2ui do
+              for_resource AshA2ui.Test.Statement
+
+              context :statement do
+                resource AshA2ui.Test.Statement
+                picker false
+              end
+
+              component :detail, :facts do
+                context :statement
+                fields [:title]
+
+                editable do
+                  fields [:title]
+                  update_action :correct
+                end
+              end
+
+              save_bar do
+                context :statement
+                show_while_waiting(:nowhere)
+              end
+            end
+          end
+        end)
+
+      assert result =~ ~r/show_while_waiting :nowhere is not an attribute/
+    end
+
+    test "show_while_waiting true shows the bar on every record" do
+      defmodule BarShowAlways do
+        @moduledoc false
+        use AshA2ui.Standalone
+
+        a2ui do
+          for_resource AshA2ui.Test.Statement
+
+          context :statement do
+            resource AshA2ui.Test.Statement
+            picker false
+          end
+
+          component :detail, :facts do
+            context :statement
+            fields [:title]
+
+            editable do
+              fields [:title]
+              update_action :correct
+            end
+          end
+
+          save_bar do
+            context :statement
+            show_while_waiting(true)
+          end
+        end
+      end
+
+      assert AshA2ui.Info.save_bar(BarShowAlways).show_while_waiting == true
+      assert AshA2ui.SaveBar.show_field(AshA2ui.Info.save_bar(BarShowAlways)) == nil
+      assert AshA2ui.Info.save_bar(StatementEditUI).show_while_waiting == :correctable
     end
   end
 end

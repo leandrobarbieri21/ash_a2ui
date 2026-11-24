@@ -4,7 +4,8 @@ defmodule AshA2ui.Test.StatementEditUI do
   statement's title, amount (shown as `amount_text`, edited as `:amount`)
   and kind, edited on its detail card while it is correctable, saved by the
   save bar through `:correct`; the bar counts the values still waiting and
-  offers to save and mark the statement reviewed.
+  offers to save and mark the statement reviewed. It shows while values
+  wait on a statement the person may correct (catalog 3.14).
   """
 
   use AshA2ui.Standalone
@@ -47,6 +48,7 @@ defmodule AshA2ui.Test.StatementEditUI do
       status "%{count} to check"
       status_one "1 to check"
       edit_reviews true
+      show_while_waiting :correctable
 
       confirm do
         title "Save with %{count} values unchecked?"

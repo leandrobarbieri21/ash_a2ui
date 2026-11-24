@@ -376,15 +376,60 @@ export function thenOffered(props) {
 }
 
 /**
+ * Whether a saveBar shows while its fields under review wait, before
+ * anything changed (3.14): its `showWhileWaiting` is true, or names a field
+ * of the bar's record that is true.
+ */
+export function showsWhileWaiting(props) {
+  const show = props?.showWhileWaiting;
+  if (show === true) return true;
+  if (typeof show !== "string" || show === "") return false;
+  return props?.record?.[show] === true;
+}
+
+/**
+ * What a saveBar draws, from its props: `shown` (a change waits, or, with
+ * `showWhileWaiting`, fields under review wait), the change and waiting
+ * counts, its message (`messageWaiting` while fields wait), its status tag
+ * ("" when none waits) and whether it offers Discard (only while a change
+ * waits). The stock bar and a host's swap both draw from it.
+ */
+export function saveBarState(props) {
+  const edits = editCount(props?.edits);
+  const waiting = waitingReviews(props);
+  const shown = edits > 0 || (waiting > 0 && showsWhileWaiting(props));
+  const message = waiting > 0 && props?.messageWaiting ? props.messageWaiting : props?.message;
+  return {
+    shown,
+    edits,
+    waiting,
+    message: typeof message === "string" ? message : "",
+    status: waiting > 0 ? countText(props?.status, props?.statusOne, waiting) : "",
+    discard: edits > 0,
+  };
+}
+
+/**
  * What a saveBar's Save does: "confirm" (open the dialog: fields still
  * wait), "then" (save and run the confirm's then action: nothing waits, it
- * is offered and `thenWhenClear`), else "save".
+ * is offered and `thenWhenClear`), "save", or "none" (no change and no
+ * dialog to open: nothing to send).
  */
 export function saveDecision(props) {
   const confirm = props?.confirm;
-  if (!confirm || typeof confirm !== "object") return "save";
-  if (waitingReviews(props) > 0) return "confirm";
-  return confirm.thenWhenClear === true && thenOffered(props) ? "then" : "save";
+  const hasConfirm = Boolean(confirm) && typeof confirm === "object";
+  if (hasConfirm && waitingReviews(props) > 0) return "confirm";
+  const decision = hasConfirm && confirm.thenWhenClear === true && thenOffered(props) ? "then" : "save";
+  return decision === "save" && !choiceSends(props, "save") ? "none" : decision;
+}
+
+/**
+ * Whether choosing `choice` sends anything: "then" always does (the then
+ * action runs, with the changes if any); "save" only while a change waits.
+ * A save with nothing changed writes nothing, so it sends nothing.
+ */
+export function choiceSends(props, choice) {
+  return choice === "then" || editCount(props?.edits) > 0;
 }
 
 /**
@@ -437,7 +482,7 @@ import {
 const ADMIN_CATALOG_ID = "https://github.com/lukegalea/ash_a2ui/catalogs/admin/v3";
 
 /** The admin catalog contract version (minor versions are additive). */
-export const ADMIN_CATALOG_VERSION = "3.13.0";
+export const ADMIN_CATALOG_VERSION = "3.14.0";
 
 /**
  * The DOM event a reference-link activation raises when the host passed no
@@ -1004,6 +1049,8 @@ export function buildSchemas(basicCatalog = null) {
       record: DynamicValueSchema.nullable().optional(),
       reviews: ArrayOf(RecordAny).optional(),
       editReviews: Bool.optional(),
+      // 3.14: also shown while reviews wait: true, or the record's field gating it.
+      showWhileWaiting: Any.optional(),
       // The save_changes envelope (static: the bar adds the choice and the
       // context's bindings resolve at click time).
       action: RecordAny.optional(),
@@ -4832,12 +4879,14 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
 
   // --- SaveBar: the unsaved changes, saved or discarded (3.11) ---------------
   //
-  // Shown while /ui/edits holds a change. Save sends save_changes (choice
-  // "save"), or first opens the confirm dialog while fields under review
-  // still wait (`saveDecision`). A swap draws its own bar and dialog and
-  // calls `onSave`, `onDiscard`, `choose(choice)` and `closeConfirm`; it
-  // reads `confirmOpen()`, `busy()` and the helpers (`editCount`,
-  // `waitingReviews`, `countText`, `confirmTexts`).
+  // Shown while /ui/edits holds a change, and with showWhileWaiting (3.14)
+  // while fields under review wait (`saveBarState`). Save sends
+  // save_changes (choice "save"), or first opens the confirm dialog while
+  // fields under review still wait (`saveDecision`); a save with no change
+  // sends nothing (`choiceSends`). A swap draws its own bar and dialog from
+  // `saveBarState` and `confirmTexts` and calls `onSave`, `onDiscard`,
+  // `choose(choice)` and `closeConfirm`; it reads `confirmOpen()` and
+  // `busy()`.
 
   function defineSaveBar() {
     const tag = TAGS.saveBar;
@@ -4939,14 +4988,19 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
         if (decision === "confirm") {
           this._amConfirmOpen = true;
           this.requestUpdate();
-        } else {
+        } else if (decision !== "none") {
           this.choose(decision);
         }
       }
 
-      /** Sends save_changes with `choice` ("save" or "then"), closing the dialog. */
+      /**
+       * Sends save_changes with `choice` ("save" or "then"), closing the
+       * dialog. A "save" with no change sends nothing: there is nothing to
+       * write.
+       */
       choose(choice) {
-        const spec = saveSpec(this.controller?.props, choice);
+        const props = this.controller?.props;
+        const spec = choiceSends(props, choice) ? saveSpec(props, choice) : null;
         this.closeConfirm();
         if (!spec || this._amSaveBusy || !this.context?.componentModel) return;
         this._amSaveBusy = true;
@@ -4999,20 +5053,20 @@ function defineAdminElements(deps, {adminApis, inputSchemas = {}}) {
       render() {
         const props = this.controller?.props;
         if (!props) return nothing;
-        const count = editCount(props.edits);
-        this.hidden = count === 0;
+        const state = saveBarState(props);
+        this.hidden = !state.shown;
         if (this.hidden) return nothing;
 
-        const waiting = waitingReviews(props);
-        const message = waiting > 0 && props.messageWaiting ? props.messageWaiting : props.message;
-        const status = waiting > 0 ? countText(props.status, props.statusOne, waiting) : "";
+        const {message, status} = state;
         const busy = Boolean(this._amSaveBusy);
 
-        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${count} data-waiting=${waiting}>
+        return html`<div class="bar" id=${props.domId || nothing} data-edit-count=${state.edits} data-waiting=${state.waiting}>
             ${message ? html`<p class="bar-message" aria-live="polite">${message}</p>` : nothing}
             ${status ? html`<span class="am-badge" data-tone="warning">${status}</span>` : nothing}
             <div class="bar-actions">
-              ${renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})}
+              ${state.discard
+                ? renderActionButton({label: str(props.discardLabel), tone: "quiet", disabled: busy, onClick: () => this.onDiscard()})
+                : nothing}
               ${renderActionButton({label: str(props.saveLabel), tone: "primary", busy, onClick: () => this.onSave()})}
             </div>
           </div>

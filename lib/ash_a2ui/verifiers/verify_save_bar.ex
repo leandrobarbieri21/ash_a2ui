@@ -7,8 +7,8 @@ defmodule AshA2ui.Verifiers.VerifySaveBar do
     * a `:detail` card declaring `editable` has a `save_bar` to save it
       (nothing else would write its changes),
     * when the context's resource is resolvable: its `confirm`'s
-      `then_action` is an update action of it, and `then_visible` a field
-      of it.
+      `then_action` is an update action of it, `then_visible` a field
+      of it, and a `show_while_waiting` field (3.14) a field of it.
 
   Raises `Spark.Error.DslError` on failure.
   """
@@ -69,14 +69,49 @@ defmodule AshA2ui.Verifiers.VerifySaveBar do
          )}
 
       context ->
-        verify_confirm(bar.confirm, context.resource, module)
+        with :ok <- verify_show_field(bar, context.resource, module) do
+          verify_confirm(bar.confirm, context.resource, module)
+        end
     end
+  end
+
+  defp verify_show_field(bar, resource, module) do
+    field = AshA2ui.SaveBar.show_field(bar)
+
+    cond do
+      is_nil(field) ->
+        :ok
+
+      not resolvable?(resource) ->
+        :ok
+
+      field?(resource, field) ->
+        :ok
+
+      true ->
+        {:error,
+         DslError.exception(
+           module: module,
+           path: [:a2ui, :save_bar, :show_while_waiting],
+           message:
+             "save_bar show_while_waiting #{inspect(field)} is not an attribute, " <>
+               "calculation or aggregate of #{inspect(resource)}"
+         )}
+    end
+  end
+
+  defp resolvable?(resource),
+    do: is_atom(resource) and Code.ensure_loaded?(resource) and ResourceInfo.resource?(resource)
+
+  defp field?(resource, field) do
+    ResourceInfo.attribute(resource, field) || ResourceInfo.calculation(resource, field) ||
+      ResourceInfo.aggregate(resource, field)
   end
 
   defp verify_confirm(nil, _resource, _module), do: :ok
 
   defp verify_confirm(confirm, resource, module) do
-    if is_atom(resource) and Code.ensure_loaded?(resource) and ResourceInfo.resource?(resource) do
+    if resolvable?(resource) do
       with :ok <- verify_then_action(confirm, resource, module) do
         verify_then_visible(confirm, resource, module)
       end
@@ -107,8 +142,7 @@ defmodule AshA2ui.Verifiers.VerifySaveBar do
   defp verify_then_visible(%{then_visible: nil}, _resource, _module), do: :ok
 
   defp verify_then_visible(%{then_visible: visible}, resource, module) do
-    if ResourceInfo.attribute(resource, visible) || ResourceInfo.calculation(resource, visible) ||
-         ResourceInfo.aggregate(resource, visible) do
+    if field?(resource, visible) do
       :ok
     else
       {:error,

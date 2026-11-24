@@ -1307,25 +1307,29 @@ defmodule AshA2ui.ResolvedView do
   # field are read with their context's record like a note: loaded and
   # written to /detail/<context>, never drawn as a card's rows.
   # Catalog 3.11: a save bar's confirm reads whether its then_action is
-  # offered with the bar's record, as a page header reads its fields.
-  defp resolve_save_bar_reads(
-         %AshA2ui.SaveBar{context: context, confirm: %{then_visible: visible}},
-         contexts,
-         fields
-       )
-       when not is_nil(visible) do
-    case Enum.find(contexts, &(&1.name == context)) do
-      nil ->
+  # offered with the bar's record, as a page header reads its fields; 3.14:
+  # so does the field gating `show_while_waiting`.
+  defp resolve_save_bar_reads(%AshA2ui.SaveBar{context: context} = bar, contexts, fields) do
+    reads =
+      [bar.confirm && bar.confirm.then_visible, AshA2ui.SaveBar.show_field(bar)]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+
+    case {reads, Enum.find(contexts, &(&1.name == context))} do
+      {[], _context} ->
         []
 
-      %{resource: resource} ->
+      {_reads, nil} ->
+        []
+
+      {reads, %{resource: resource}} ->
         [
           %{
             name: :save_bar,
             component: nil,
             context: context,
-            fields: [visible],
-            loads: field_loads(resource, [visible], fields),
+            fields: reads,
+            loads: field_loads(resource, reads, fields),
             detail_path: "/detail/#{context}"
           }
         ]
